@@ -1,4 +1,4 @@
-# Oficila Site for the Balanced-Work-life app
+# Official Site for the Balanced-Work-life app
 
 Live: (Balanced Work Life)[https://balanced-work-life.herokuapp.com]
 
