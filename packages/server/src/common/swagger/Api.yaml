@@ -1,0 +1,113 @@
+swagger: "2.0"
+info:
+  version: 1.0.0
+  title: myapp
+  description: My cool Mongoose, Typescript, Express app
+basePath: /api/v1
+tags:
+  - name: Examples
+    description: Simple example endpoints
+  - name: Specification
+    description: The swagger API specification
+
+consumes:
+  - application/json
+produces:
+  - application/json
+
+
+definitions:
+  ExampleBody:
+    type: object
+    title: example
+    required:
+      - name
+    properties:
+      name:
+        type: string
+        example: no_stress
+
+paths:
+  /examples:
+    get:
+      tags:
+        - Examples
+      description: Fetch all examples
+      responses:
+        200:
+          description: Returns all examples
+    post:
+      tags:
+        - Examples
+      description: Create a new example
+      parameters:
+        - name: example
+          in: body
+          description: an example
+          required: true
+          schema: 
+            $ref: "#/definitions/ExampleBody"
+      responses:
+        200:
+          description: Returns newly created example
+
+  /examples/{id}:
+    get:
+      tags:
+        - Examples
+      description: Get an example
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the example to retrieve
+          type: string
+      responses:
+        200:
+          description: Return the example with the specified id
+        404:
+          description: Example not found
+    patch:
+      tags:
+        - Examples
+      description: Update an example
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the example to update
+          type: string
+        - name: example
+          in: body
+          description: example attribtues to update
+          required: true
+          schema: 
+            $ref: "#/definitions/ExampleBody"
+      responses:
+        200:
+          description: Return updated examples
+        404:
+          description: Example not found
+    delete:
+      tags:
+        - Examples
+      description: Delete an example
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the example to delete
+          type: string
+      responses:
+        204:
+          description: Delete the example with the specified id
+        404:
+          description: Example not found
+
+  /spec:
+    get:
+      tags:
+        - Specification
+      responses:
+        200:
+          description: Return the API specification
