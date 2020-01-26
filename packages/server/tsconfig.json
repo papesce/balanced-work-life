@@ -6,6 +6,7 @@
     "esModuleInterop": true,
     "sourceMap": true,
     "moduleResolution": "node",
+    "resolveJsonModule": true,
     "outDir": "dist",
     "typeRoots": ["node_modules/@types"]
   },
