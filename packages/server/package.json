@@ -1,7 +1,9 @@
 {
-  "name": "balanced3",
+  "name": "balanced-work-life-server",
   "version": "1.0.0",
   "description": "Balanced Work Life Server",
+  "author": "Pablo Pesce <papesce@gmail.com>",
+  "license": "MIT",
   "main": "index.js",
   "scripts": {
     "start": "node dist/index.js",
@@ -38,6 +40,5 @@
     "ts-node": "^7.0.1",
     "tslint": "^5.11.0",
     "typescript": "^3.1.6"
-  },
-  "author": "Pablo Pesce <papesce@gmail.com>"
+  }
 }

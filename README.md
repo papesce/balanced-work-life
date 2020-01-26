@@ -15,3 +15,7 @@ Live: [Balanced Work Life](https://balanced-work-life.herokuapp.com)
 - npx -p @storybook/cli sb init --type react 
 - yarn add emotion
 - yarn add @emotion/core
+
+
+## node kill
+pkill -f node
