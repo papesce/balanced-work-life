@@ -4,13 +4,19 @@
   "devDependencies": {
     "lerna": "^3.20.2"
   },
+  "engines": {
+    "node": "12.14.1",
+    "npm": "6.13.14"
+  },
   "author": "Pablo Pesce <papesce@gmail.com>",
   "license": "MIT",
   "workspaces": [
     "packages/*"
-],
+  ],
   "scripts": {
     "bootstrap": "lerna bootstrap",
-      "dev:all": "lerna run dev --parallel"
+    "dev:all": "lerna run dev --parallel",
+    "start": "lerna run start:server",
+    "build": "lerna run build --parallel"
   }
 }
