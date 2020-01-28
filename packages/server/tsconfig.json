@@ -1,12 +1,12 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
+    "resolveJsonModule": true,
     "target": "es6",
     "module": "commonjs",
     "esModuleInterop": true,
     "sourceMap": true,
     "moduleResolution": "node",
-    "resolveJsonModule": true,
     "outDir": "dist",
     "typeRoots": ["node_modules/@types"]
   },

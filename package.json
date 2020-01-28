@@ -6,7 +6,8 @@
   },
   "engines": {
     "node": "12.14.1",
-    "npm": "6.13.4"
+    "npm": "6.13.4",
+    "yarn": "1.19.1"
   },
   "author": "Pablo Pesce <papesce@gmail.com>",
   "license": "MIT",
