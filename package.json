@@ -18,6 +18,7 @@
     "bootstrap": "lerna bootstrap",
     "dev:all": "lerna run dev --parallel",
     "start": "lerna run start:server",
-    "build": "lerna run build --parallel"
+    "build": "lerna run build --parallel",
+    "storybook": "lerna run storybook"
   }
 }

@@ -1,8 +1,8 @@
-import React from 'react';
-import Chart from './Chart';
+import React from "react";
+import Chart from "./Chart";
 
 export default {
-    title: 'Button',
-  };
-  
-  export const pieChart = () => <Chart/>;
+  title: "Button"
+};
+
+export const pieChart = () => <Chart />;
