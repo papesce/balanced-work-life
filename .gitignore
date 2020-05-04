@@ -1,3 +1,7 @@
+packages/server/.env
+packages/server/public/*
+packages/server/dist
+packages/model/dist
 dist
 node_modules
 .env

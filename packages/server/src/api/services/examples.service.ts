@@ -57,10 +57,11 @@ export class ExamplesService {
   async remove(id: string): Promise<void> {
     L.info(`delete example with id ${id}`);
 
-    return await Example
+    await Example
       .findOneAndRemove({ _id: id })
       .lean()
       .exec();
+    return;
   }
 }
 
