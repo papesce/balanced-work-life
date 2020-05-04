@@ -10,6 +10,7 @@ Live: [Balanced Work Life](https://balanced-work-life.herokuapp.com)
  - yarn policies set-version berry
  - yarn set version berry
  - yarn plugin import workspace-tools
+ chmod -R a+rwx ./packages
  
  ## Client Build commands:
 - npx create-react-app balanced-work-life --template typescript

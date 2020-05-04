@@ -3,3 +3,7 @@ node_modules
 .env
 .yarn
 static
+packages/server/.env
+packages/server/public/*
+packages/server/dist
+packages/model/dist
