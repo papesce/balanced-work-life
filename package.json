@@ -5,9 +5,9 @@
     "lerna": "^3.20.2"
   },
   "engines": {
-    "node": "12.14.1",
+    "node": "13.12.0",
     "npm": "6.13.4",
-    "yarn": "1.19.1"
+    "yarn": "1.22.4"
   },
   "author": "Pablo Pesce <papesce@gmail.com>",
   "license": "MIT",
@@ -16,8 +16,10 @@
   ],
   "scripts": {
     "bootstrap": "lerna bootstrap",
-    "dev:all": "lerna run dev --parallel",
-    "start": "lerna run start:server",
+    "dev": "lerna run dev --parallel",
+    "dev:client": "cd packages/client && yarn dev && cd ../../",
+    "dev:server": "cd packages/server && yarn dev && cd../../",
+    "start": "lerna run start",
     "build": "lerna run build --parallel",
     "storybook": "lerna run storybook"
   }

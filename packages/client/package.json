@@ -6,8 +6,8 @@
   "license": "MIT",
   "dependencies": {
     "@emotion/core": "^10.0.27",
-    "@material-ui/core": "^4.9.0",
-    "@material-ui/icons": "^4.5.1",
+    "@material-ui/core": "^4.9.11",
+    "@material-ui/icons": "^4.9.1",
     "@testing-library/jest-dom": "^4.2.4",
     "@testing-library/react": "^9.3.2",
     "@testing-library/user-event": "^7.1.2",
@@ -16,21 +16,20 @@
     "@types/react": "^16.9.0",
     "@types/react-dom": "^16.9.0",
     "emotion": "^10.0.27",
-    "react": "^16.12.0",
-    "react-dom": "^16.12.0",
+    "react": "^16.13.1",
+    "react-dom": "^16.13.1",
     "react-minimal-pie-chart": "^6.0.1",
-    "react-scripts": "3.3.0",
+    "react-scripts": "3.4.1",
     "typescript": "~3.7.2"
   },
   "scripts": {
-    "start": "react-scripts start",
     "dev": "react-scripts start",
     "build:client": "react-scripts build",
-    "build": "react-scripts build && mv build ../server",
+    "build": "react-scripts build && ./build.sh",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "storybook": "start-storybook -p 6006",
-    "build-storybook": "build-storybook"
+    "storybook": "start-storybook -p 9009 -s public",
+    "build-storybook": "build-storybook -s public"
   },
   "eslintConfig": {
     "extends": "react-app"
@@ -48,11 +47,10 @@
     ]
   },
   "devDependencies": {
-    "@babel/core": "^7.8.3",
-    "@storybook/addon-actions": "^5.3.8",
-    "@storybook/addon-links": "^5.3.8",
-    "@storybook/addons": "^5.3.8",
-    "@storybook/react": "^5.3.8",
-    "babel-loader": "^8.0.6"
+    "@storybook/addon-actions": "^5.3.18",
+    "@storybook/addon-links": "^5.3.18",
+    "@storybook/addons": "^5.3.18",
+    "@storybook/preset-create-react-app": "^2.1.1",
+    "@storybook/react": "^5.3.18"
   }
 }
