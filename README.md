@@ -17,7 +17,7 @@ Live: [Balanced Work Life](https://balanced-work-life.herokuapp.com)
 - yarn add @material-ui/core
 - yarn add @material-ui/icons
 
-
+chmod u+x ./packages/client/build.sh
 
 ## node kill
 pkill -f node
