@@ -11,7 +11,7 @@ Live: [Balanced Work Life](https://balanced-work-life.herokuapp.com)
 ## Client Build commands:
 - npx create-react-app balanced-work-life --template typescript
 - yarn add react-minimal-pie-chart
-- npx -p @storybook/cli sb init --type react 
+- npx -p @storybook/cli sb init --type react_scripts
 - yarn add emotion
 - yarn add @emotion/core
 - yarn add @material-ui/core
