@@ -1,13 +1,10 @@
 {
   "name": "root",
   "private": true,
-  "devDependencies": {
-    "lerna": "^3.20.2"
-  },
   "engines": {
     "node": "13.12.0",
     "npm": "6.13.4",
-    "yarn": "1.22.4"
+    "yarn": "2.0.0"
   },
   "author": "Pablo Pesce <papesce@gmail.com>",
   "license": "MIT",
@@ -15,12 +12,11 @@
     "packages/*"
   ],
   "scripts": {
-    "bootstrap": "lerna bootstrap",
-    "dev": "lerna run dev --parallel",
+    "dev": "yarn workspaces foreach -pvi run dev",
     "dev:client": "cd packages/client && yarn dev && cd ../../",
     "dev:server": "cd packages/server && yarn dev && cd../../",
-    "start": "lerna run start",
-    "build": "lerna run build --parallel",
-    "storybook": "lerna run storybook"
+    "start": "workspaces start",
+    "build": "yarn workspaces foreach -pvi run build",
+    "storybook": "yarn workspace balanced-work-life run storybook"
   }
 }

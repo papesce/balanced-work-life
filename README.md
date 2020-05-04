@@ -7,8 +7,11 @@ Live: [Balanced Work Life](https://balanced-work-life.herokuapp.com)
 - npm install -g yo generator-express-no-stress-typescript-mongoose
 
 ## monorepo
- - lerna init
-## Client Build commands:
+ - yarn policies set-version berry
+ - yarn set version berry
+ - yarn plugin import workspace-tools
+ 
+ ## Client Build commands:
 - npx create-react-app balanced-work-life --template typescript
 - yarn add react-minimal-pie-chart
 - npx -p @storybook/cli sb init --type react_scripts
