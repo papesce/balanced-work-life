@@ -1,6 +1,8 @@
 # balanced3
 
-Balanced Work Life Server
+Balanced Work Life App 
+
+Live Demo: [dev](https://balanced-work-life-dev.herokuapp.com)
 
 ## Quick Start
 
