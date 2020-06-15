@@ -1,6 +1,6 @@
 import React from "react";
 import InitialHeader from "../header/InitialHeader";
-import Chart from "../Chart";
+import Chart from "../chart/Chart";
 import TaskList from "../TaskList";
 
 function Home() {
