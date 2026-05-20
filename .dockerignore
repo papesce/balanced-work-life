@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+.gitignore
+.env*
+!.env.local.example
+README.md
+CLAUDE.md
+AGENTS.md
+.DS_Store
+*.md
