@@ -23,7 +23,7 @@ A task planner that helps you maintain balance between work and life. Organize t
 1. Clone the repo and install dependencies:
 
 ```bash
-npm install
+pnpm install
 ```
 
 2. Copy the environment file and fill in your credentials:
@@ -41,7 +41,7 @@ NEXT_PUBLIC_POWERSYNC_URL=https://your-instance.powersync.journeyapps.com
 3. Run the development server:
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
