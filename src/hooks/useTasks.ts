@@ -62,9 +62,9 @@ export function useTasks() {
       .eq("id", id);
   };
 
-  const completeTask = async (id: string) => {
-    const now = new Date().toISOString();
-    await updateTask(id, { status: "done", completed_at: now });
+  const completeTask = async (id: string, completedAt?: string) => {
+    const timestamp = completedAt || new Date().toISOString();
+    await updateTask(id, { status: "done", completed_at: timestamp });
   };
 
   const deleteTask = async (id: string) => {
