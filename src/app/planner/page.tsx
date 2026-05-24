@@ -2,8 +2,7 @@
 
 import { useTasks } from "@/hooks/useTasks";
 import { TaskCard } from "@/components/TaskCard";
-import { QuickAddButton } from "@/components/QuickAddButton";
-import { Navigation } from "@/components/Navigation";
+import { AppShell } from "@/components/AppShell";
 import { TimeBucket } from "@/lib/types";
 
 const BUCKETS: { key: TimeBucket; label: string }[] = [
@@ -26,12 +25,8 @@ export default function PlannerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      <header className="bg-white border-b px-4 py-3">
-        <h1 className="text-lg font-bold text-gray-900">Planner</h1>
-      </header>
-
-      <main className="max-w-md mx-auto px-4 py-4 space-y-6">
+    <AppShell title="Planner" onAdd={createTask}>
+      <div className="space-y-6">
         {BUCKETS.map(({ key, label }) => {
           const bucketTasks = activeTasks.filter((t) => t.time_bucket === key);
           return (
@@ -57,10 +52,7 @@ export default function PlannerPage() {
             </section>
           );
         })}
-      </main>
-
-      <QuickAddButton onAdd={createTask} />
-      <Navigation />
-    </div>
+      </div>
+    </AppShell>
   );
 }

@@ -2,11 +2,9 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { useAuth } from "@/hooks/useAuth";
 import { useTasks } from "@/hooks/useTasks";
 import { BalanceRing } from "@/components/BalanceRing";
-import { Navigation } from "@/components/Navigation";
-import { QuickAddButton } from "@/components/QuickAddButton";
+import { AppShell } from "@/components/AppShell";
 import { Task } from "@/lib/types";
 
 type RingMode = "done" | "pending" | "total";
@@ -54,7 +52,6 @@ function formatTime(dateStr: string): string {
 }
 
 export default function SummaryPage() {
-  const { signOut } = useAuth();
   const { tasks, loading, createTask, completeTask } = useTasks();
   const [mode, setMode] = useState<RingMode>("done");
 
@@ -99,18 +96,8 @@ export default function SummaryPage() {
   const doneLife = doneToday.filter((t) => t.balance_category === "life");
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      <header className="bg-white border-b px-4 py-3 flex items-center justify-between">
-        <h1 className="text-lg font-bold text-gray-900">Resumen de hoy</h1>
-        <button
-          onClick={signOut}
-          className="text-sm text-gray-500 hover:text-gray-700"
-        >
-          Sign Out
-        </button>
-      </header>
-
-      <main className="max-w-md mx-auto px-4 py-4 space-y-5">
+    <AppShell title="Resumen de hoy" onAdd={createTask}>
+      <div className="space-y-5">
         {/* Segmented control */}
         <div className="flex gap-0.5 bg-gray-100 rounded-lg p-1">
           {MODES.map(({ key, label }) => (
@@ -257,10 +244,7 @@ export default function SummaryPage() {
             </div>
           </section>
         )}
-      </main>
-
-      <QuickAddButton onAdd={createTask} />
-      <Navigation />
-    </div>
+      </div>
+    </AppShell>
   );
 }

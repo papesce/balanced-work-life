@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useTasks } from "@/hooks/useTasks";
 import { TaskCard } from "@/components/TaskCard";
-import { Navigation } from "@/components/Navigation";
+import { AppShell } from "@/components/AppShell";
 
 export default function ArchivePage() {
   const { completedTasks, loading, updateTask, completeTask, deleteTask } = useTasks();
@@ -33,12 +33,8 @@ export default function ArchivePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      <header className="bg-white border-b px-4 py-3">
-        <h1 className="text-lg font-bold text-gray-900">Archive</h1>
-      </header>
-
-      <main className="max-w-md mx-auto px-4 py-4 space-y-6">
+    <AppShell title="Archive">
+      <div className="space-y-6">
         {completedTasks.length === 0 ? (
           <p className="text-center text-gray-400 py-12 text-sm">
             Completed tasks will appear here.
@@ -63,9 +59,7 @@ export default function ArchivePage() {
             </section>
           ))
         )}
-      </main>
-
-      <Navigation />
-    </div>
+      </div>
+    </AppShell>
   );
 }
