@@ -9,8 +9,8 @@ interface BalanceRingProps {
 }
 
 const CIRC = 2 * Math.PI * 60;
-const WORK_COLOR = "#1D9E75";
-const LIFE_COLOR = "#534AB7";
+const WORK_COLOR = "#4F6BED";
+const LIFE_COLOR = "#1D9E75";
 
 export function BalanceRing({
   workCount,
@@ -75,8 +75,22 @@ export function BalanceRing({
           )}
         </svg>
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
-          <div className="text-2xl font-medium text-gray-900">{workPct}%</div>
-          <div className="text-xs text-gray-500">work</div>
+          {total === 0 ? (
+            <>
+              <div className="text-2xl font-medium text-gray-400">—</div>
+              <div className="text-xs text-gray-400">no tasks</div>
+            </>
+          ) : workPct >= lifePct ? (
+            <>
+              <div className="text-2xl font-medium text-gray-900">{workPct}%</div>
+              <div className="text-xs text-gray-500">work</div>
+            </>
+          ) : (
+            <>
+              <div className="text-2xl font-medium text-gray-900">{lifePct}%</div>
+              <div className="text-xs text-gray-500">life</div>
+            </>
+          )}
         </div>
       </div>
 
@@ -99,7 +113,7 @@ export function BalanceRing({
         </div>
         <div className="bg-gray-50 rounded-lg px-3 py-2.5">
           <div className="text-xs text-gray-500">Balance</div>
-          <div className="text-lg font-medium text-gray-900">{workPct}/{lifePct}</div>
+          <div className="text-lg font-medium text-gray-900">{workPct}% / {lifePct}%</div>
           <div className="text-xs text-gray-400">work / life</div>
         </div>
       </div>
