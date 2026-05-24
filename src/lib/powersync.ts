@@ -21,7 +21,21 @@ export const TasksTable = new Table(
   { indexes: {} }
 );
 
-export const AppSchema = new Schema({ tasks: TasksTable });
+export const IdeasTable = new Table(
+  {
+    user_id: column.text,
+    parent_id: column.text,
+    text: column.text,
+    type: column.text,
+    area: column.text,
+    sort_order: column.text,
+    created_at: column.text,
+    updated_at: column.text,
+  },
+  { indexes: {} }
+);
+
+export const AppSchema = new Schema({ tasks: TasksTable, ideas: IdeasTable });
 
 let powerSyncInstance: Awaited<
   ReturnType<WASQLitePowerSyncDatabaseOpenFactory["getInstance"]>
