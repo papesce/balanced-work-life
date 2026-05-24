@@ -10,26 +10,26 @@ import { Task } from "@/lib/types";
 type RingMode = "done" | "pending" | "total";
 
 const MODES: { key: RingMode; label: string }[] = [
-  { key: "done", label: "Lo que hice" },
-  { key: "pending", label: "Lo que falta" },
-  { key: "total", label: "Total estimado" },
+  { key: "done", label: "What I did" },
+  { key: "pending", label: "What's left" },
+  { key: "total", label: "Estimated total" },
 ];
 
 const MODE_META: Record<RingMode, { desc: string; statLabel: string; statSub: string }> = {
   done: {
-    desc: "Tareas completadas hoy por categoría",
-    statLabel: "Completadas",
-    statSub: "de hoy",
+    desc: "Tasks completed today by category",
+    statLabel: "Completed",
+    statSub: "today",
   },
   pending: {
-    desc: "Tareas que aún faltan completar hoy",
-    statLabel: "Pendientes",
-    statSub: "quedan por hacer",
+    desc: "Tasks still left to complete today",
+    statLabel: "Pending",
+    statSub: "left to do",
   },
   total: {
-    desc: "Estimado total del día (hechas + pendientes)",
-    statLabel: "Total del día",
-    statSub: "planificadas para hoy",
+    desc: "Estimated total for the day (done + pending)",
+    statLabel: "Total",
+    statSub: "planned for today",
   },
 };
 
@@ -96,7 +96,7 @@ export default function SummaryPage() {
   const doneLife = doneToday.filter((t) => t.balance_category === "life");
 
   return (
-    <AppShell title="Resumen de hoy" onAdd={createTask}>
+    <AppShell title="Today's Summary" onAdd={createTask}>
       <div className="space-y-5">
         {/* Segmented control */}
         <div className="flex gap-0.5 bg-gray-100 rounded-lg p-1">
@@ -127,11 +127,11 @@ export default function SummaryPage() {
         {/* Done today */}
         <section>
           <h2 className="text-sm font-semibold text-gray-700 mb-2">
-            Completadas hoy ({doneToday.length})
+            Completed today ({doneToday.length})
           </h2>
           {doneToday.length === 0 ? (
             <p className="text-xs text-gray-400 py-2">
-              Aún no completaste tareas hoy
+              No tasks completed yet today
             </p>
           ) : (
             <div className="space-y-1">
@@ -143,8 +143,8 @@ export default function SummaryPage() {
                   <span
                     className={`w-2 h-2 rounded-full flex-shrink-0 ${
                       task.balance_category === "work"
-                        ? "bg-[#1D9E75]"
-                        : "bg-[#534AB7]"
+                        ? "bg-[#4F6BED]"
+                        : "bg-[#1D9E75]"
                     }`}
                   />
                   <span className="text-sm text-gray-700 truncate flex-1">
@@ -165,7 +165,7 @@ export default function SummaryPage() {
         <section>
           <div className="flex items-center gap-2 mb-2">
             <h2 className="text-sm font-semibold text-gray-700">
-              Pendientes hoy
+              Pending today
             </h2>
             {activeToday.length > 0 && (
               <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">
@@ -175,7 +175,7 @@ export default function SummaryPage() {
           </div>
           {activeToday.length === 0 ? (
             <p className="text-xs text-gray-400 py-2">
-              Todo listo por hoy
+              All done for today
             </p>
           ) : (
             <div className="space-y-1">
@@ -212,14 +212,14 @@ export default function SummaryPage() {
           <section>
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-sm font-semibold text-gray-700">
-                Mañana ({tomorrowTasks.length})
+                Tomorrow ({tomorrowTasks.length})
               </h2>
               {tomorrowTasks.length > 5 && (
                 <Link
                   href="/planner"
                   className="text-xs text-indigo-600 font-medium"
                 >
-                  Ver todo
+                  See all
                 </Link>
               )}
             </div>
@@ -232,8 +232,8 @@ export default function SummaryPage() {
                   <span
                     className={`w-2 h-2 rounded-full flex-shrink-0 ${
                       task.balance_category === "work"
-                        ? "bg-[#1D9E75]"
-                        : "bg-[#534AB7]"
+                        ? "bg-[#4F6BED]"
+                        : "bg-[#1D9E75]"
                     }`}
                   />
                   <span className="text-sm text-gray-600 truncate">
