@@ -11,10 +11,11 @@ interface AppShellProps {
   children: ReactNode;
   title: string;
   headerActions?: ReactNode;
+  fullWidth?: boolean;
   onAdd?: (title: string, bucket: TimeBucket, category: BalanceCategory) => Promise<void>;
 }
 
-export function AppShell({ children, title, headerActions, onAdd }: AppShellProps) {
+export function AppShell({ children, title, headerActions, fullWidth, onAdd }: AppShellProps) {
   const { signOut } = useAuth();
 
   return (
@@ -36,7 +37,7 @@ export function AppShell({ children, title, headerActions, onAdd }: AppShellProp
         </header>
 
         <main className="flex-1 px-4 py-4 pb-20 md:pb-6">
-          <div className="max-w-2xl mx-auto">
+          <div className={fullWidth ? "w-full" : "max-w-2xl mx-auto"}>
             {children}
           </div>
         </main>

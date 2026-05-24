@@ -28,6 +28,9 @@ export const IdeasTable = new Table(
     text: column.text,
     type: column.text,
     area: column.text,
+    effort: column.text,
+    impact: column.text,
+    urgency: column.text,
     sort_order: column.text,
     created_at: column.text,
     updated_at: column.text,
@@ -35,7 +38,18 @@ export const IdeasTable = new Table(
   { indexes: {} }
 );
 
-export const AppSchema = new Schema({ tasks: TasksTable, ideas: IdeasTable });
+export const IdeaLinksTable = new Table(
+  {
+    user_id: column.text,
+    source_id: column.text,
+    target_id: column.text,
+    link_type: column.text,
+    created_at: column.text,
+  },
+  { indexes: {} }
+);
+
+export const AppSchema = new Schema({ tasks: TasksTable, ideas: IdeasTable, idea_links: IdeaLinksTable });
 
 let powerSyncInstance: Awaited<
   ReturnType<WASQLitePowerSyncDatabaseOpenFactory["getInstance"]>
