@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { IdeaNode as IdeaNodeType, Idea, IdeaType, LifeArea } from "@/lib/types";
+import { IdeaNode as IdeaNodeType, Idea, IdeaLink, IdeaType, LifeArea, LinkType } from "@/lib/types";
 import { IdeaNode } from "./IdeaNode";
 
 interface IdeaTreeProps {
   tree: IdeaNodeType[];
+  ideas: Idea[];
+  links: IdeaLink[];
   createIdea: (text: string, parentId?: string | null) => Promise<string>;
   updateIdea: (id: string, updates: Partial<Idea>) => Promise<void>;
   deleteIdea: (id: string) => Promise<void>;
@@ -13,10 +15,14 @@ interface IdeaTreeProps {
   toggleCollapse: (id: string) => void;
   expandAll: () => void;
   collapseAll: () => void;
+  onCreateLink: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
+  onDeleteLink: (id: string) => Promise<void>;
 }
 
 export function IdeaTree({
   tree,
+  ideas,
+  links,
   createIdea,
   updateIdea,
   deleteIdea,
@@ -24,6 +30,8 @@ export function IdeaTree({
   toggleCollapse,
   expandAll,
   collapseAll,
+  onCreateLink,
+  onDeleteLink,
 }: IdeaTreeProps) {
   const [search, setSearch] = useState("");
   const [showType, setShowType] = useState(true);
@@ -117,6 +125,10 @@ export function IdeaTree({
               deleteIdea={deleteIdea}
               moveIdea={moveIdea}
               toggleCollapse={toggleCollapse}
+              allIdeas={ideas}
+              links={links}
+              onCreateLink={onCreateLink}
+              onDeleteLink={onDeleteLink}
             />
           ))}
         </div>

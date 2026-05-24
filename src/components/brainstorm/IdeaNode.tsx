@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
-import { IdeaNode as IdeaNodeType, Idea, IdeaType, LifeArea } from "@/lib/types";
+import { IdeaNode as IdeaNodeType, Idea, IdeaLink, IdeaType, LifeArea, LinkType } from "@/lib/types";
 import { TypePicker } from "./TypePicker";
 import { AreaPicker } from "./AreaPicker";
+import { LinkPanel } from "./LinkPanel";
 
 interface IdeaNodeProps {
   node: IdeaNodeType;
@@ -18,6 +19,10 @@ interface IdeaNodeProps {
   deleteIdea: (id: string) => Promise<void>;
   moveIdea: (id: string, newParentId: string | null, newSortOrder: number) => Promise<void>;
   toggleCollapse: (id: string) => void;
+  allIdeas: Idea[];
+  links: IdeaLink[];
+  onCreateLink: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
+  onDeleteLink: (id: string) => Promise<void>;
 }
 
 const TYPE_COLORS: Record<IdeaType, string> = {
@@ -50,14 +55,23 @@ export function IdeaNode({
   deleteIdea,
   moveIdea,
   toggleCollapse,
+  allIdeas,
+  links,
+  onCreateLink,
+  onDeleteLink,
 }: IdeaNodeProps) {
   const isEditing = editingId === node.id;
   const [editText, setEditText] = useState(node.text);
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const [showLinkPanel, setShowLinkPanel] = useState(false);
   const [dragOver, setDragOver] = useState<"top" | "center" | "bottom" | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
+
+  const linkCount = links.filter(
+    (l) => l.source_id === node.id || l.target_id === node.id
+  ).length;
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -257,8 +271,15 @@ export function IdeaNode({
           </div>
         )}
 
+        {/* Link count badge */}
+        {linkCount > 0 && (
+          <span className="text-xs text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded-full flex-shrink-0">
+            {linkCount}
+          </span>
+        )}
+
         {/* Actions (visible on hover) */}
-        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+        <div className="relative flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
           <button
             onClick={handleAddChild}
             title="Add child"
@@ -274,12 +295,29 @@ export function IdeaNode({
             +
           </button>
           <button
+            onClick={() => setShowLinkPanel(!showLinkPanel)}
+            title="Link"
+            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded text-xs"
+          >
+            🔗
+          </button>
+          <button
             onClick={() => deleteIdea(node.id)}
             title="Delete"
             className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded text-xs"
           >
             ×
           </button>
+          {showLinkPanel && (
+            <LinkPanel
+              ideaId={node.id}
+              ideas={allIdeas}
+              links={links}
+              onCreateLink={onCreateLink}
+              onDeleteLink={onDeleteLink}
+              onClose={() => setShowLinkPanel(false)}
+            />
+          )}
         </div>
       </div>
 
@@ -301,6 +339,10 @@ export function IdeaNode({
               deleteIdea={deleteIdea}
               moveIdea={moveIdea}
               toggleCollapse={toggleCollapse}
+              allIdeas={allIdeas}
+              links={links}
+              onCreateLink={onCreateLink}
+              onDeleteLink={onDeleteLink}
             />
           ))}
         </div>

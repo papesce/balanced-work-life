@@ -1,11 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import { useIdeas } from "@/hooks/useIdeas";
+import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { AppShell } from "@/components/AppShell";
 import { IdeaTree } from "@/components/brainstorm/IdeaTree";
+import { GraphView } from "@/components/brainstorm/GraphView";
 
 export default function BrainstormPage() {
   const ideasHook = useIdeas();
+  const linksHook = useIdeaLinks();
+  const [viewMode, setViewMode] = useState<"tree" | "graph">("tree");
+
+  const hasLinks = linksHook.links.length > 0;
 
   if (ideasHook.loading) {
     return (
@@ -15,9 +22,61 @@ export default function BrainstormPage() {
     );
   }
 
+  const headerActions = (
+    <div className="flex gap-1">
+      <button
+        onClick={() => setViewMode("tree")}
+        className={`text-xs px-2.5 py-1 rounded-full border ${
+          viewMode === "tree"
+            ? "bg-white border-indigo-300 text-indigo-700 font-medium"
+            : "bg-gray-100 border-gray-200 text-gray-500"
+        }`}
+      >
+        Tree
+      </button>
+      <button
+        onClick={() => setViewMode("graph")}
+        disabled={!hasLinks}
+        className={`text-xs px-2.5 py-1 rounded-full border ${
+          !hasLinks
+            ? "bg-gray-50 border-gray-200 text-gray-300 cursor-not-allowed"
+            : viewMode === "graph"
+            ? "bg-white border-indigo-300 text-indigo-700 font-medium"
+            : "bg-gray-100 border-gray-200 text-gray-500"
+        }`}
+        title={!hasLinks ? "Link two ideas to unlock" : ""}
+      >
+        Graph
+      </button>
+    </div>
+  );
+
   return (
-    <AppShell title="Brainstorm">
-      <IdeaTree {...ideasHook} />
+    <AppShell title="Brainstorm" headerActions={headerActions} fullWidth={viewMode === "graph"}>
+      {viewMode === "tree" ? (
+        <IdeaTree
+          tree={ideasHook.tree}
+          ideas={ideasHook.ideas}
+          links={linksHook.links}
+          createIdea={ideasHook.createIdea}
+          updateIdea={ideasHook.updateIdea}
+          deleteIdea={ideasHook.deleteIdea}
+          moveIdea={ideasHook.moveIdea}
+          toggleCollapse={ideasHook.toggleCollapse}
+          expandAll={ideasHook.expandAll}
+          collapseAll={ideasHook.collapseAll}
+          onCreateLink={linksHook.createLink}
+          onDeleteLink={linksHook.deleteLink}
+        />
+      ) : (
+        <GraphView
+          ideas={ideasHook.ideas}
+          links={linksHook.links}
+          onNodeDoubleClick={(ideaId) => {
+            setViewMode("tree");
+          }}
+        />
+      )}
     </AppShell>
   );
 }
