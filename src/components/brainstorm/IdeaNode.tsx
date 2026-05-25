@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
-import { IdeaNode as IdeaNodeType, Idea, IdeaLink, IdeaType, LifeArea, LinkType } from "@/lib/types";
+import { IdeaNode as IdeaNodeType, Idea, IdeaLink, IdeaType, LifeArea, LinkType, Task, TimeBucket } from "@/lib/types";
 import { TypePicker } from "./TypePicker";
 import { AreaPicker } from "./AreaPicker";
 import { LinkPanel } from "./LinkPanel";
+import { PromoteMenu } from "./PromoteMenu";
 
 interface IdeaNodeProps {
   node: IdeaNodeType;
@@ -23,6 +24,8 @@ interface IdeaNodeProps {
   links: IdeaLink[];
   onCreateLink: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
   onDeleteLink: (id: string) => Promise<void>;
+  activeTasksByIdeaId: Map<string, Task>;
+  onPromote: (ideaId: string, bucket: TimeBucket) => void;
 }
 
 const TYPE_COLORS: Record<IdeaType, string> = {
@@ -59,6 +62,8 @@ export function IdeaNode({
   links,
   onCreateLink,
   onDeleteLink,
+  activeTasksByIdeaId,
+  onPromote,
 }: IdeaNodeProps) {
   const isEditing = editingId === node.id;
   const [editText, setEditText] = useState(node.text);
@@ -66,8 +71,18 @@ export function IdeaNode({
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [showLinkPanel, setShowLinkPanel] = useState(false);
   const [dragOver, setDragOver] = useState<"top" | "center" | "bottom" | null>(null);
+  const [showPromoteMenu, setShowPromoteMenu] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
+
+  const activeTask = activeTasksByIdeaId.get(node.id);
+
+  const BUCKET_CHIP_LABELS: Record<TimeBucket, string> = {
+    today: "Hoy",
+    tomorrow: "Mañana",
+    next_week: "Semana",
+    backlog: "Backlog",
+  };
 
   const linkCount = links.filter(
     (l) => l.source_id === node.id || l.target_id === node.id
@@ -278,6 +293,13 @@ export function IdeaNode({
           </span>
         )}
 
+        {/* Active task status chip */}
+        {activeTask && (
+          <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full flex-shrink-0 border border-blue-200">
+            {BUCKET_CHIP_LABELS[activeTask.time_bucket]}
+          </span>
+        )}
+
         {/* Actions (visible on hover) */}
         <div className="relative flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
           <button
@@ -301,6 +323,30 @@ export function IdeaNode({
           >
             🔗
           </button>
+          {node.type === "task" && (
+            <div className="relative">
+              <button
+                onClick={() => setShowPromoteMenu(!showPromoteMenu)}
+                title="Promote to task"
+                className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded text-xs"
+              >
+                ▶
+              </button>
+              {showPromoteMenu && (
+                <PromoteMenu
+                  hasActiveTask={!!activeTask}
+                  onSelect={(bucket) => {
+                    onPromote(node.id, bucket);
+                    setShowPromoteMenu(false);
+                  }}
+                  onViewInPlanner={activeTask ? () => {
+                    window.location.href = `/planner?highlight=${activeTask.id}`;
+                  } : undefined}
+                  onClose={() => setShowPromoteMenu(false)}
+                />
+              )}
+            </div>
+          )}
           <button
             onClick={() => deleteIdea(node.id)}
             title="Delete"
@@ -343,6 +389,8 @@ export function IdeaNode({
               links={links}
               onCreateLink={onCreateLink}
               onDeleteLink={onDeleteLink}
+              activeTasksByIdeaId={activeTasksByIdeaId}
+              onPromote={onPromote}
             />
           ))}
         </div>
