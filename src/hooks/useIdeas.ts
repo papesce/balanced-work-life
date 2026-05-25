@@ -1,10 +1,63 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "./useAuth";
 import { Idea, IdeaNode, IdeaType, LifeArea } from "@/lib/types";
+
+const STORAGE_KEY = "brainstorm-tree-overrides";
+const DEFAULT_EXPAND_DEPTH = 1;
+
+type OverrideState = "expanded" | "collapsed";
+
+function loadOverrides(): Map<string, OverrideState> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return new Map();
+    return new Map(Object.entries(JSON.parse(raw)));
+  } catch {
+    return new Map();
+  }
+}
+
+function saveOverrides(overrides: Map<string, OverrideState>) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(overrides)));
+  } catch {}
+}
+
+function getDepthMap(ideas: Idea[]): Map<string, number> {
+  const depths = new Map<string, number>();
+  const childrenOf = new Map<string | null, string[]>();
+  for (const idea of ideas) {
+    const parentKey = idea.parent_id ?? null;
+    if (!childrenOf.has(parentKey)) childrenOf.set(parentKey, []);
+    childrenOf.get(parentKey)!.push(idea.id);
+  }
+  const walk = (id: string, depth: number) => {
+    depths.set(id, depth);
+    for (const childId of childrenOf.get(id) ?? []) walk(childId, depth + 1);
+  };
+  for (const rootId of childrenOf.get(null) ?? []) walk(rootId, 0);
+  return depths;
+}
+
+function computeCollapsedIds(ideas: Idea[], overrides: Map<string, OverrideState>): Set<string> {
+  const depths = getDepthMap(ideas);
+  const collapsed = new Set<string>();
+  const parents = new Set(ideas.filter((i) => ideas.some((c) => c.parent_id === i.id)).map((i) => i.id));
+
+  for (const id of parents) {
+    const depth = depths.get(id) ?? 0;
+    const override = overrides.get(id);
+    if (override === "expanded") continue;
+    if (override === "collapsed" || depth >= DEFAULT_EXPAND_DEPTH) {
+      collapsed.add(id);
+    }
+  }
+  return collapsed;
+}
 
 function buildTree(ideas: Idea[], collapsedIds: Set<string>): IdeaNode[] {
   const map = new Map<string, IdeaNode>();
@@ -36,7 +89,18 @@ export function useIdeas() {
   const { user } = useAuth();
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+  const overridesRef = useRef<Map<string, OverrideState>>(new Map());
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    overridesRef.current = loadOverrides();
+  }, []);
+
+  useEffect(() => {
+    if (ideas.length > 0) {
+      setCollapsedIds(computeCollapsedIds(ideas, overridesRef.current));
+    }
+  }, [ideas]);
 
   const fetchIdeas = useCallback(async () => {
     if (!user) return;
@@ -139,16 +203,42 @@ export function useIdeas() {
   const toggleCollapse = (id: string) => {
     setCollapsedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      const wasCollapsed = next.has(id);
+      if (wasCollapsed) {
+        next.delete(id);
+        overridesRef.current.set(id, "expanded");
+      } else {
+        next.add(id);
+        overridesRef.current.set(id, "collapsed");
+      }
+      saveOverrides(overridesRef.current);
       return next;
     });
   };
 
-  const expandAll = () => setCollapsedIds(new Set());
+  const expandAll = () => {
+    overridesRef.current.clear();
+    const parents = ideas.filter((i) => ideas.some((c) => c.parent_id === i.id));
+    for (const p of parents) {
+      const depth = getDepthMap(ideas).get(p.id) ?? 0;
+      if (depth >= DEFAULT_EXPAND_DEPTH) {
+        overridesRef.current.set(p.id, "expanded");
+      }
+    }
+    saveOverrides(overridesRef.current);
+    setCollapsedIds(new Set());
+  };
 
   const collapseAll = () => {
+    overridesRef.current.clear();
     const parents = new Set(ideas.filter((i) => ideas.some((c) => c.parent_id === i.id)).map((i) => i.id));
+    for (const id of parents) {
+      const depth = getDepthMap(ideas).get(id) ?? 0;
+      if (depth < DEFAULT_EXPAND_DEPTH) {
+        overridesRef.current.set(id, "collapsed");
+      }
+    }
+    saveOverrides(overridesRef.current);
     setCollapsedIds(parents);
   };
 
