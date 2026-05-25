@@ -12,7 +12,7 @@ interface AppShellProps {
   title: string;
   headerActions?: ReactNode;
   fullWidth?: boolean;
-  onAdd?: (title: string, bucket: TimeBucket, category: BalanceCategory) => Promise<void>;
+  onAdd?: (title: string, bucket: TimeBucket, category: BalanceCategory) => Promise<unknown>;
 }
 
 export function AppShell({ children, title, headerActions, fullWidth, onAdd }: AppShellProps) {

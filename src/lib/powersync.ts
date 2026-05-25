@@ -14,6 +14,7 @@ export const TasksTable = new Table(
     status: column.text,
     time_bucket: column.text,
     balance_category: column.text,
+    idea_id: column.text,
     created_at: column.text,
     completed_at: column.text,
     updated_at: column.text,

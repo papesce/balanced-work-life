@@ -10,6 +10,7 @@ export interface Task {
   status: TaskStatus;
   time_bucket: TimeBucket;
   balance_category: BalanceCategory;
+  idea_id: string | null;
   created_at: string;
   completed_at: string | null;
   updated_at: string;

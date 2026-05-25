@@ -8,7 +8,7 @@ interface QuickAddButtonProps {
     title: string,
     bucket: TimeBucket,
     category: BalanceCategory
-  ) => Promise<void>;
+  ) => Promise<unknown>;
 }
 
 export function QuickAddButton({ onAdd }: QuickAddButtonProps) {
