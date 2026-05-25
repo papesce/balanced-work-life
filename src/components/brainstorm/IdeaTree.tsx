@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { IdeaNode as IdeaNodeType, Idea, IdeaLink, IdeaType, LifeArea, LinkType } from "@/lib/types";
+import { IdeaNode as IdeaNodeType, Idea, IdeaLink, IdeaType, LifeArea, LinkType, Task, TimeBucket } from "@/lib/types";
 import { IdeaNode } from "./IdeaNode";
 
 interface IdeaTreeProps {
   tree: IdeaNodeType[];
   ideas: Idea[];
   links: IdeaLink[];
+  activeTasksByIdeaId: Map<string, Task>;
   createIdea: (text: string, parentId?: string | null) => Promise<string>;
   updateIdea: (id: string, updates: Partial<Idea>) => Promise<void>;
   deleteIdea: (id: string) => Promise<void>;
@@ -17,12 +18,14 @@ interface IdeaTreeProps {
   collapseAll: () => void;
   onCreateLink: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
   onDeleteLink: (id: string) => Promise<void>;
+  onPromote: (ideaId: string, bucket: TimeBucket) => void;
 }
 
 export function IdeaTree({
   tree,
   ideas,
   links,
+  activeTasksByIdeaId,
   createIdea,
   updateIdea,
   deleteIdea,
@@ -32,6 +35,7 @@ export function IdeaTree({
   collapseAll,
   onCreateLink,
   onDeleteLink,
+  onPromote,
 }: IdeaTreeProps) {
   const [search, setSearch] = useState("");
   const [showType, setShowType] = useState(true);
@@ -129,6 +133,8 @@ export function IdeaTree({
               links={links}
               onCreateLink={onCreateLink}
               onDeleteLink={onDeleteLink}
+              activeTasksByIdeaId={activeTasksByIdeaId}
+              onPromote={onPromote}
             />
           ))}
         </div>
