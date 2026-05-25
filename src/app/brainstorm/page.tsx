@@ -3,16 +3,31 @@
 import { useState } from "react";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
+import { useTasks } from "@/hooks/useTasks";
+import { usePromoteIdea } from "@/hooks/usePromoteIdea";
 import { AppShell } from "@/components/AppShell";
 import { IdeaTree } from "@/components/brainstorm/IdeaTree";
 import { GraphView } from "@/components/brainstorm/GraphView";
+import { ConflictDialog } from "@/components/brainstorm/ConflictDialog";
+import { TimeBucket } from "@/lib/types";
 
 export default function BrainstormPage() {
   const ideasHook = useIdeas();
   const linksHook = useIdeaLinks();
+  const tasksHook = useTasks();
+  const { promote, conflictState, resolveConflict, dismissConflict } = usePromoteIdea(
+    tasksHook.activeTasksByIdeaId,
+    tasksHook.createTask,
+    tasksHook.updateTask
+  );
   const [viewMode, setViewMode] = useState<"tree" | "graph">("tree");
 
   const hasLinks = linksHook.links.length > 0;
+
+  const handlePromote = (ideaId: string, bucket: TimeBucket) => {
+    const idea = ideasHook.ideas.find((i) => i.id === ideaId);
+    if (idea) promote(idea, bucket);
+  };
 
   if (ideasHook.loading) {
     return (
@@ -58,6 +73,7 @@ export default function BrainstormPage() {
           tree={ideasHook.tree}
           ideas={ideasHook.ideas}
           links={linksHook.links}
+          activeTasksByIdeaId={tasksHook.activeTasksByIdeaId}
           createIdea={ideasHook.createIdea}
           updateIdea={ideasHook.updateIdea}
           deleteIdea={ideasHook.deleteIdea}
@@ -67,6 +83,7 @@ export default function BrainstormPage() {
           collapseAll={ideasHook.collapseAll}
           onCreateLink={linksHook.createLink}
           onDeleteLink={linksHook.deleteLink}
+          onPromote={handlePromote}
         />
       ) : (
         <GraphView
@@ -75,6 +92,14 @@ export default function BrainstormPage() {
           onNodeDoubleClick={(ideaId) => {
             setViewMode("tree");
           }}
+        />
+      )}
+      {conflictState && (
+        <ConflictDialog
+          existingTask={conflictState.existingTask}
+          targetBucket={conflictState.targetBucket}
+          onMove={() => resolveConflict("move")}
+          onCancel={dismissConflict}
         />
       )}
     </AppShell>
