@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "./useAuth";
@@ -29,7 +29,8 @@ export function useTasks() {
   const createTask = async (
     title: string,
     timeBucket: TimeBucket = "today",
-    balanceCategory: BalanceCategory = "work"
+    balanceCategory: BalanceCategory = "work",
+    ideaId: string | null = null
   ) => {
     if (!user) return;
     const now = new Date().toISOString();
@@ -41,12 +42,14 @@ export function useTasks() {
       status: "active",
       time_bucket: timeBucket,
       balance_category: balanceCategory,
+      idea_id: ideaId,
       created_at: now,
       completed_at: null,
       updated_at: now,
     };
     setTasks((prev) => [task, ...prev]);
     await supabase.from("tasks").insert(task);
+    return task;
   };
 
   const updateTask = async (id: string, updates: Partial<Task>) => {
@@ -75,10 +78,19 @@ export function useTasks() {
   const activeTasks = tasks.filter((t) => t.status === "active");
   const completedTasks = tasks.filter((t) => t.status === "done");
 
+  const activeTasksByIdeaId = useMemo(() => {
+    const map = new Map<string, Task>();
+    for (const t of activeTasks) {
+      if (t.idea_id) map.set(t.idea_id, t);
+    }
+    return map;
+  }, [activeTasks]);
+
   return {
     tasks,
     activeTasks,
     completedTasks,
+    activeTasksByIdeaId,
     loading,
     createTask,
     updateTask,
