@@ -141,6 +141,16 @@ export function TaskCard({ task, onComplete, onUpdate, onDelete }: TaskCardProps
               {task.balance_category}
             </span>
           </div>
+          {task.idea_id && (
+            <a
+              href={`/brainstorm?highlight=${task.idea_id}`}
+              className="inline-flex items-center gap-1 text-xs text-purple-500 hover:text-purple-700 mt-1"
+              title="Ver idea en brainstorm"
+            >
+              <span className="text-[10px]">🧠</span>
+              <span>Idea</span>
+            </a>
+          )}
         </div>
       </div>
       {showDatePicker && (
