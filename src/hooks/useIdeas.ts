@@ -161,6 +161,8 @@ export function useIdeas() {
       effort: null,
       impact: null,
       urgency: null,
+      scheduled_date: null,
+      done_at: null,
       sort_order: sortOrder,
       created_at: now,
       updated_at: now,
@@ -238,6 +240,18 @@ export function useIdeas() {
     }
   };
 
+  const markDone = async (id: string) => {
+    await updateIdea(id, { done_at: new Date().toISOString() });
+  };
+
+  const markUndone = async (id: string) => {
+    await updateIdea(id, { done_at: null });
+  };
+
+  const scheduleIdea = async (id: string, date: string | null) => {
+    await updateIdea(id, { scheduled_date: date });
+  };
+
   const toggleCollapse = (id: string) => {
     setCollapsedIds((prev) => {
       const next = new Set(prev);
@@ -249,6 +263,17 @@ export function useIdeas() {
         next.add(id);
         overridesRef.current.set(id, "collapsed");
       }
+      saveOverrides(overridesRef.current);
+      return next;
+    });
+  };
+
+  const expandIdea = (id: string) => {
+    setCollapsedIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      overridesRef.current.set(id, "expanded");
       saveOverrides(overridesRef.current);
       return next;
     });
@@ -290,7 +315,11 @@ export function useIdeas() {
     updateIdea,
     deleteIdea,
     moveIdea,
+    markDone,
+    markUndone,
+    scheduleIdea,
     toggleCollapse,
+    expandIdea,
     expandAll,
     collapseAll,
     refetch: fetchIdeas,
