@@ -102,14 +102,15 @@ export function IdeaTree({
     const pruneNode = (node: IdeaNodeType): IdeaNodeType | null => {
       if (!visibleIds.has(node.id)) return null;
       const children = node.children.map(pruneNode).filter(Boolean) as IdeaNodeType[];
-      return { ...node, children, collapsed: false };
+      return { ...node, children, collapsed: timeFilter === "today" ? false : node.collapsed };
     };
     filteredTree = filteredTree.map(pruneNode).filter(Boolean) as IdeaNodeType[];
   }
 
   return (
     <div className="space-y-3" onClick={() => setSelectedId(null)}>
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Row 1: Actions */}
+      <div className="flex items-center gap-2">
         <button
           onClick={handleAddRoot}
           className="text-sm px-3 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
@@ -135,6 +136,11 @@ export function IdeaTree({
           onChange={(e) => setSearch(e.target.value)}
           className="flex-1 min-w-[120px] text-sm px-3 py-1.5 border border-gray-300 rounded-md outline-none focus:border-indigo-500 bg-white"
         />
+      </div>
+
+      {/* Row 2: Filters */}
+      <div className="flex items-center gap-3">
+        {/* Display toggles */}
         <div className="flex gap-1">
           <button
             onClick={() => setShowType(!showType)}
@@ -157,6 +163,10 @@ export function IdeaTree({
             Area
           </button>
         </div>
+
+        <span className="text-gray-200">|</span>
+
+        {/* Time filter */}
         <div className="flex gap-1">
           <button
             onClick={() => setTimeFilter("all")}
@@ -179,6 +189,10 @@ export function IdeaTree({
             Today
           </button>
         </div>
+
+        <span className="text-gray-200">|</span>
+
+        {/* Done filter */}
         <button
           onClick={() => setHideDone(!hideDone)}
           className={`text-xs px-2.5 py-1 rounded-full border ${
