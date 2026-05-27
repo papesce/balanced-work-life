@@ -7,6 +7,8 @@ import { AreaPicker } from "./AreaPicker";
 import { LinkPanel } from "./LinkPanel";
 import { PromoteMenu } from "./PromoteMenu";
 import { IdeaComposer } from "./IdeaComposer";
+import { MoveIdeaPanel } from "./MoveIdeaPanel";
+import { SchedulePicker } from "./SchedulePicker";
 
 interface IdeaNodeProps {
   node: IdeaNodeType;
@@ -23,12 +25,27 @@ interface IdeaNodeProps {
   deleteIdea: (id: string) => Promise<void>;
   moveIdea: (id: string, newParentId: string | null, newSortOrder: number) => Promise<void>;
   toggleCollapse: (id: string) => void;
+  expandIdea: (id: string) => void;
   allIdeas: Idea[];
   links: IdeaLink[];
   onCreateLink: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
   onDeleteLink: (id: string) => Promise<void>;
   activeTasksByIdeaId: Map<string, Task>;
   onPromote: (ideaId: string, bucket: TimeBucket) => void;
+  onMarkDone: (id: string) => Promise<void>;
+  onMarkUndone: (id: string) => Promise<void>;
+  onSchedule: (id: string, date: string | null) => Promise<void>;
+  todayString: string;
+  isAncestorOnly?: boolean;
+}
+
+function formatScheduleDate(date: string, today: string): string {
+  if (date === today) return "Hoy";
+  const tomorrow = new Date(today + "T12:00:00");
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (date === tomorrow.toISOString().split("T")[0]) return "Mañana";
+  const d = new Date(date + "T12:00:00");
+  return d.toLocaleDateString("es", { weekday: "short", day: "numeric", month: "short" });
 }
 
 const TYPE_COLORS: Record<IdeaType, string> = {
@@ -63,12 +80,18 @@ export function IdeaNode({
   deleteIdea,
   moveIdea,
   toggleCollapse,
+  expandIdea,
   allIdeas,
   links,
   onCreateLink,
   onDeleteLink,
   activeTasksByIdeaId,
   onPromote,
+  onMarkDone,
+  onMarkUndone,
+  onSchedule,
+  todayString,
+  isAncestorOnly,
 }: IdeaNodeProps) {
   const isEditing = editingId === node.id;
   const isSelected = selectedId === node.id;
@@ -76,8 +99,10 @@ export function IdeaNode({
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [showLinkPanel, setShowLinkPanel] = useState(false);
+  const [showMovePanel, setShowMovePanel] = useState(false);
   const [dragOver, setDragOver] = useState<"top" | "center" | "bottom" | null>(null);
   const [showPromoteMenu, setShowPromoteMenu] = useState(false);
+  const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
 
@@ -102,6 +127,13 @@ export function IdeaNode({
   }, [isEditing]);
 
   const hasChildren = node.children.length > 0;
+
+  const isDescendant = (possibleDescendantId: string, ancestorId: string): boolean => {
+    const possibleDescendant = allIdeas.find((idea) => idea.id === possibleDescendantId);
+    if (!possibleDescendant?.parent_id) return false;
+    if (possibleDescendant.parent_id === ancestorId) return true;
+    return isDescendant(possibleDescendant.parent_id, ancestorId);
+  };
 
   const handleStartEdit = () => {
     setSelectedId(node.id);
@@ -175,12 +207,25 @@ export function IdeaNode({
     setDragOver(null);
 
     if (dragOver === "center") {
+      if (isDescendant(node.id, draggedId)) return;
       moveIdea(draggedId, node.id, 0);
     } else if (dragOver === "top") {
+      if (node.parent_id === draggedId || (node.parent_id && isDescendant(node.parent_id, draggedId))) return;
       moveIdea(draggedId, node.parent_id, node.sort_order);
     } else if (dragOver === "bottom") {
+      if (node.parent_id === draggedId || (node.parent_id && isDescendant(node.parent_id, draggedId))) return;
       moveIdea(draggedId, node.parent_id, node.sort_order + 1);
     }
+  };
+
+  const handleMove = async (newParentId: string | null, newSortOrder: number) => {
+    await moveIdea(node.id, newParentId, newSortOrder);
+    setSelectedId(node.id);
+  };
+
+  const handleMoved = (parentIdToExpand: string | null) => {
+    if (!parentIdToExpand) return;
+    expandIdea(parentIdToExpand);
   };
 
   const matchesSearch = (n: IdeaNodeType): boolean => {
@@ -225,6 +270,21 @@ export function IdeaNode({
           ⠿
         </span>
 
+        {/* Done checkbox */}
+        {node.scheduled_date && !isAncestorOnly && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              node.done_at ? onMarkUndone(node.id) : onMarkDone(node.id);
+            }}
+            className={`w-4 h-4 border-2 rounded-full flex-shrink-0 ${
+              node.done_at
+                ? "bg-green-500 border-green-500"
+                : "border-gray-300 hover:border-indigo-500"
+            }`}
+          />
+        )}
+
         {/* Text */}
         {isEditing ? (
           <input
@@ -243,7 +303,11 @@ export function IdeaNode({
               e.stopPropagation();
               handleStartEdit();
             }}
-            className="flex-1 text-sm text-gray-800 px-2 py-0.5 rounded cursor-text hover:bg-gray-100 min-w-0 truncate"
+            className={`flex-1 text-sm px-2 py-0.5 rounded min-w-0 truncate ${
+              isAncestorOnly ? "text-gray-400 italic cursor-default" :
+              node.done_at ? "line-through text-gray-400 cursor-text hover:bg-gray-100" :
+              "text-gray-800 cursor-text hover:bg-gray-100"
+            }`}
           >
             {node.text || <span className="text-gray-400 italic">empty</span>}
           </span>
@@ -311,22 +375,79 @@ export function IdeaNode({
           </span>
         )}
 
+        {/* Scheduled date chip */}
+        {node.scheduled_date && !activeTask && (
+          <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 border ${
+            node.scheduled_date === todayString
+              ? "text-green-700 bg-green-50 border-green-200"
+              : "text-gray-600 bg-gray-50 border-gray-200"
+          }`}>
+            {formatScheduleDate(node.scheduled_date, todayString)}
+          </span>
+        )}
+
         {/* Actions (visible on hover) */}
         <div
           className="relative flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
           onClick={(e) => e.stopPropagation()}
         >
           <button
-            onClick={() => setShowLinkPanel(!showLinkPanel)}
+            onClick={() => {
+              setShowMovePanel(false);
+              setShowSchedulePicker(false);
+              setShowLinkPanel(!showLinkPanel);
+            }}
             title="Link"
             className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded text-xs"
           >
             🔗
           </button>
+          <button
+            onClick={() => {
+              setShowLinkPanel(false);
+              setShowPromoteMenu(false);
+              setShowSchedulePicker(false);
+              setShowMovePanel(!showMovePanel);
+            }}
+            title="Move"
+            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded text-xs"
+          >
+            ↕
+          </button>
+          <div className="relative">
+            <button
+              onClick={() => {
+                setShowMovePanel(false);
+                setShowLinkPanel(false);
+                setShowPromoteMenu(false);
+                setShowSchedulePicker(!showSchedulePicker);
+              }}
+              title="Schedule"
+              className={`w-6 h-6 flex items-center justify-center rounded text-xs ${
+                node.scheduled_date
+                  ? "text-indigo-600 bg-indigo-50"
+                  : "text-gray-400 hover:text-indigo-600 hover:bg-indigo-50"
+              }`}
+            >
+              📅
+            </button>
+            {showSchedulePicker && (
+              <SchedulePicker
+                currentDate={node.scheduled_date}
+                onSelect={(date) => { onSchedule(node.id, date); setShowSchedulePicker(false); }}
+                onClear={() => { onSchedule(node.id, null); setShowSchedulePicker(false); }}
+                onClose={() => setShowSchedulePicker(false)}
+              />
+            )}
+          </div>
           {node.type === "task" && (
             <div className="relative">
               <button
-                onClick={() => setShowPromoteMenu(!showPromoteMenu)}
+                onClick={() => {
+                  setShowMovePanel(false);
+                  setShowSchedulePicker(false);
+                  setShowPromoteMenu(!showPromoteMenu);
+                }}
                 title="Promote to task"
                 className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded text-xs"
               >
@@ -364,6 +485,15 @@ export function IdeaNode({
               onClose={() => setShowLinkPanel(false)}
             />
           )}
+          {showMovePanel && (
+            <MoveIdeaPanel
+              idea={node}
+              ideas={allIdeas}
+              onMove={handleMove}
+              onMoved={handleMoved}
+              onClose={() => setShowMovePanel(false)}
+            />
+          )}
         </div>
       </div>
 
@@ -396,12 +526,18 @@ export function IdeaNode({
               deleteIdea={deleteIdea}
               moveIdea={moveIdea}
               toggleCollapse={toggleCollapse}
+              expandIdea={expandIdea}
               allIdeas={allIdeas}
               links={links}
               onCreateLink={onCreateLink}
               onDeleteLink={onDeleteLink}
               activeTasksByIdeaId={activeTasksByIdeaId}
               onPromote={onPromote}
+              onMarkDone={onMarkDone}
+              onMarkUndone={onMarkUndone}
+              onSchedule={onSchedule}
+              todayString={todayString}
+              isAncestorOnly={isAncestorOnly}
             />
           ))}
         </div>
