@@ -14,11 +14,26 @@ interface IdeaTreeProps {
   deleteIdea: (id: string) => Promise<void>;
   moveIdea: (id: string, newParentId: string | null, newSortOrder: number) => Promise<void>;
   toggleCollapse: (id: string) => void;
+  expandIdea: (id: string) => void;
   expandAll: () => void;
   collapseAll: () => void;
   onCreateLink: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
   onDeleteLink: (id: string) => Promise<void>;
   onPromote: (ideaId: string, bucket: TimeBucket) => void;
+  onMarkDone: (id: string) => Promise<void>;
+  onMarkUndone: (id: string) => Promise<void>;
+  onSchedule: (id: string, date: string | null) => Promise<void>;
+}
+
+function getAncestorIds(ideaId: string, ideas: Idea[]): Set<string> {
+  const ancestors = new Set<string>();
+  const ideaMap = new Map(ideas.map(i => [i.id, i]));
+  let current = ideaMap.get(ideaId);
+  while (current?.parent_id) {
+    ancestors.add(current.parent_id);
+    current = ideaMap.get(current.parent_id);
+  }
+  return ancestors;
 }
 
 export function IdeaTree({
@@ -31,17 +46,24 @@ export function IdeaTree({
   deleteIdea,
   moveIdea,
   toggleCollapse,
+  expandIdea,
   expandAll,
   collapseAll,
   onCreateLink,
   onDeleteLink,
   onPromote,
+  onMarkDone,
+  onMarkUndone,
+  onSchedule,
 }: IdeaTreeProps) {
   const [search, setSearch] = useState("");
   const [showType, setShowType] = useState(true);
   const [showArea, setShowArea] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [timeFilter, setTimeFilter] = useState<"all" | "today">("all");
+  const [hideDone, setHideDone] = useState(false);
+  const todayString = new Date().toISOString().split("T")[0];
 
   const handleAddRoot = async () => {
     const id = await createIdea("", null, "top");
@@ -58,7 +80,32 @@ export function IdeaTree({
     return node.children.some(matchesSearch);
   };
 
-  const filteredTree = search ? tree.filter(matchesSearch) : tree;
+  const searchFiltered = search ? tree.filter(matchesSearch) : tree;
+
+  let filteredTree = searchFiltered;
+  let passingIds: Set<string> | null = null;
+
+  if (timeFilter === "today" || hideDone) {
+    passingIds = new Set<string>();
+    for (const idea of ideas) {
+      let passes = true;
+      if (timeFilter === "today" && idea.scheduled_date !== todayString) passes = false;
+      if (hideDone && idea.done_at) passes = false;
+      if (passes) passingIds.add(idea.id);
+    }
+    const visibleIds = new Set(passingIds);
+    if (timeFilter === "today") {
+      for (const id of passingIds) {
+        for (const aid of getAncestorIds(id, ideas)) visibleIds.add(aid);
+      }
+    }
+    const pruneNode = (node: IdeaNodeType): IdeaNodeType | null => {
+      if (!visibleIds.has(node.id)) return null;
+      const children = node.children.map(pruneNode).filter(Boolean) as IdeaNodeType[];
+      return { ...node, children, collapsed: false };
+    };
+    filteredTree = filteredTree.map(pruneNode).filter(Boolean) as IdeaNodeType[];
+  }
 
   return (
     <div className="space-y-3" onClick={() => setSelectedId(null)}>
@@ -110,6 +157,38 @@ export function IdeaTree({
             Area
           </button>
         </div>
+        <div className="flex gap-1">
+          <button
+            onClick={() => setTimeFilter("all")}
+            className={`text-xs px-2.5 py-1 rounded-full border ${
+              timeFilter === "all"
+                ? "bg-white border-indigo-300 text-indigo-700 font-medium"
+                : "bg-gray-100 border-gray-200 text-gray-500"
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setTimeFilter("today")}
+            className={`text-xs px-2.5 py-1 rounded-full border ${
+              timeFilter === "today"
+                ? "bg-white border-indigo-300 text-indigo-700 font-medium"
+                : "bg-gray-100 border-gray-200 text-gray-500"
+            }`}
+          >
+            Today
+          </button>
+        </div>
+        <button
+          onClick={() => setHideDone(!hideDone)}
+          className={`text-xs px-2.5 py-1 rounded-full border ${
+            hideDone
+              ? "bg-white border-indigo-300 text-indigo-700 font-medium"
+              : "bg-gray-100 border-gray-200 text-gray-500"
+          }`}
+        >
+          Hide done
+        </button>
       </div>
 
 
@@ -136,12 +215,18 @@ export function IdeaTree({
               deleteIdea={deleteIdea}
               moveIdea={moveIdea}
               toggleCollapse={toggleCollapse}
+              expandIdea={expandIdea}
               allIdeas={ideas}
               links={links}
               onCreateLink={onCreateLink}
               onDeleteLink={onDeleteLink}
               activeTasksByIdeaId={activeTasksByIdeaId}
               onPromote={onPromote}
+              onMarkDone={onMarkDone}
+              onMarkUndone={onMarkUndone}
+              onSchedule={onSchedule}
+              todayString={todayString}
+              isAncestorOnly={passingIds !== null && !passingIds.has(node.id)}
             />
           ))}
         </div>
