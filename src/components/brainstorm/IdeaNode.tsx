@@ -144,23 +144,6 @@ export function IdeaNode({
     }
   };
 
-  const handleAddChild = async () => {
-    const childId = await createIdea("", node.id, "top");
-    if (node.collapsed) toggleCollapse(node.id);
-    if (childId) {
-      setSelectedId(childId);
-      setEditingId(childId);
-    }
-  };
-
-  const handleAddSibling = async () => {
-    const siblingId = await createIdea("", node.parent_id, "top");
-    if (siblingId) {
-      setSelectedId(siblingId);
-      setEditingId(siblingId);
-    }
-  };
-
   const handleCreateChild = async (text: string) => {
     const childId = await createIdea(text, node.id, "top");
     if (node.collapsed) toggleCollapse(node.id);
@@ -224,7 +207,10 @@ export function IdeaNode({
       >
         {/* Collapse toggle */}
         <button
-          onClick={() => hasChildren && toggleCollapse(node.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (hasChildren) toggleCollapse(node.id);
+          }}
           className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 flex-shrink-0 text-xs"
         >
           {hasChildren ? (node.collapsed ? "▶" : "▼") : ""}
@@ -253,7 +239,10 @@ export function IdeaNode({
           />
         ) : (
           <span
-            onClick={handleStartEdit}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleStartEdit();
+            }}
             className="flex-1 text-sm text-gray-800 px-2 py-0.5 rounded cursor-text hover:bg-gray-100 min-w-0 truncate"
           >
             {node.text || <span className="text-gray-400 italic">empty</span>}
@@ -262,7 +251,7 @@ export function IdeaNode({
 
         {/* Type pill */}
         {showType && (
-          <div className="relative flex-shrink-0">
+          <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setShowTypePicker(!showTypePicker)}
               className={`text-xs px-2 py-0.5 rounded-full border ${
@@ -286,7 +275,7 @@ export function IdeaNode({
 
         {/* Area pill */}
         {showArea && (
-          <div className="relative flex-shrink-0">
+          <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setShowAreaPicker(!showAreaPicker)}
               className={`text-xs px-2 py-0.5 rounded-full border ${
@@ -323,21 +312,10 @@ export function IdeaNode({
         )}
 
         {/* Actions (visible on hover) */}
-        <div className="relative flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-          <button
-            onClick={handleAddChild}
-            title="Add child"
-            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded text-xs"
-          >
-            ↳
-          </button>
-          <button
-            onClick={handleAddSibling}
-            title="Add sibling"
-            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded text-xs"
-          >
-            +
-          </button>
+        <div
+          className="relative flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+          onClick={(e) => e.stopPropagation()}
+        >
           <button
             onClick={() => setShowLinkPanel(!showLinkPanel)}
             title="Link"
