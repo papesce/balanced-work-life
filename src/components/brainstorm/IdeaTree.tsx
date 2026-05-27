@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { IdeaNode as IdeaNodeType, Idea, IdeaLink, IdeaType, LifeArea, LinkType, Task, TimeBucket } from "@/lib/types";
+import { IdeaNode as IdeaNodeType, Idea, IdeaLink, LinkType, Task, TimeBucket } from "@/lib/types";
 import { IdeaNode } from "./IdeaNode";
 
 interface IdeaTreeProps {
@@ -9,7 +9,7 @@ interface IdeaTreeProps {
   ideas: Idea[];
   links: IdeaLink[];
   activeTasksByIdeaId: Map<string, Task>;
-  createIdea: (text: string, parentId?: string | null) => Promise<string>;
+  createIdea: (text: string, parentId?: string | null, position?: "top" | "bottom") => Promise<string>;
   updateIdea: (id: string, updates: Partial<Idea>) => Promise<void>;
   deleteIdea: (id: string) => Promise<void>;
   moveIdea: (id: string, newParentId: string | null, newSortOrder: number) => Promise<void>;
@@ -41,10 +41,14 @@ export function IdeaTree({
   const [showType, setShowType] = useState(true);
   const [showArea, setShowArea] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const handleAddRoot = async () => {
-    const id = await createIdea("");
-    if (id) setEditingId(id);
+    const id = await createIdea("", null, "top");
+    if (id) {
+      setSelectedId(id);
+      setEditingId(id);
+    }
   };
 
   const matchesSearch = (node: IdeaNodeType): boolean => {
@@ -57,7 +61,7 @@ export function IdeaTree({
   const filteredTree = search ? tree.filter(matchesSearch) : tree;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" onClick={() => setSelectedId(null)}>
       <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={handleAddRoot}
@@ -108,6 +112,7 @@ export function IdeaTree({
         </div>
       </div>
 
+
       {filteredTree.length === 0 ? (
         <p className="text-sm text-gray-400 italic py-4">
           {search ? "No matching ideas" : "No ideas yet. Click \"+ New idea\" to start."}
@@ -124,6 +129,8 @@ export function IdeaTree({
               search={search}
               editingId={editingId}
               setEditingId={setEditingId}
+              selectedId={selectedId}
+              setSelectedId={setSelectedId}
               createIdea={createIdea}
               updateIdea={updateIdea}
               deleteIdea={deleteIdea}

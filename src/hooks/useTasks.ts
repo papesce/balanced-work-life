@@ -23,8 +23,26 @@ export function useTasks() {
   }, [user]);
 
   useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
+    if (!user) return;
+    let cancelled = false;
+
+    const loadTasks = async () => {
+      const { data } = await supabase
+        .from("tasks")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      if (cancelled) return;
+      if (data) setTasks(data as Task[]);
+      setLoading(false);
+    };
+
+    void loadTasks();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const createTask = async (
     title: string,

@@ -89,7 +89,7 @@ export default function BrainstormPage() {
         <GraphView
           ideas={ideasHook.ideas}
           links={linksHook.links}
-          onNodeDoubleClick={(ideaId) => {
+          onNodeDoubleClick={() => {
             setViewMode("tree");
           }}
         />

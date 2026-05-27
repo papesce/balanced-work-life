@@ -6,6 +6,7 @@ import { TypePicker } from "./TypePicker";
 import { AreaPicker } from "./AreaPicker";
 import { LinkPanel } from "./LinkPanel";
 import { PromoteMenu } from "./PromoteMenu";
+import { IdeaComposer } from "./IdeaComposer";
 
 interface IdeaNodeProps {
   node: IdeaNodeType;
@@ -15,7 +16,9 @@ interface IdeaNodeProps {
   search: string;
   editingId: string | null;
   setEditingId: (id: string | null) => void;
-  createIdea: (text: string, parentId?: string | null) => Promise<string>;
+  selectedId: string | null;
+  setSelectedId: (id: string | null) => void;
+  createIdea: (text: string, parentId?: string | null, position?: "top" | "bottom") => Promise<string>;
   updateIdea: (id: string, updates: Partial<Idea>) => Promise<void>;
   deleteIdea: (id: string) => Promise<void>;
   moveIdea: (id: string, newParentId: string | null, newSortOrder: number) => Promise<void>;
@@ -53,6 +56,8 @@ export function IdeaNode({
   search,
   editingId,
   setEditingId,
+  selectedId,
+  setSelectedId,
   createIdea,
   updateIdea,
   deleteIdea,
@@ -66,6 +71,7 @@ export function IdeaNode({
   onPromote,
 }: IdeaNodeProps) {
   const isEditing = editingId === node.id;
+  const isSelected = selectedId === node.id;
   const [editText, setEditText] = useState(node.text);
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
@@ -95,13 +101,10 @@ export function IdeaNode({
     }
   }, [isEditing]);
 
-  useEffect(() => {
-    setEditText(node.text);
-  }, [node.text]);
-
   const hasChildren = node.children.length > 0;
 
   const handleStartEdit = () => {
+    setSelectedId(node.id);
     setEditText(node.text);
     setEditingId(node.id);
   };
@@ -132,19 +135,36 @@ export function IdeaNode({
     } else if (e.key === "Tab") {
       e.preventDefault();
       handleConfirmEdit();
-      const childId = await createIdea("", node.id);
-      if (childId) setEditingId(childId);
+      const childId = await createIdea("", node.id, "top");
+      if (node.collapsed) toggleCollapse(node.id);
+      if (childId) {
+        setSelectedId(childId);
+        setEditingId(childId);
+      }
     }
   };
 
   const handleAddChild = async () => {
-    const childId = await createIdea("", node.id);
-    if (childId) setEditingId(childId);
+    const childId = await createIdea("", node.id, "top");
+    if (node.collapsed) toggleCollapse(node.id);
+    if (childId) {
+      setSelectedId(childId);
+      setEditingId(childId);
+    }
   };
 
   const handleAddSibling = async () => {
-    const siblingId = await createIdea("", node.parent_id);
-    if (siblingId) setEditingId(siblingId);
+    const siblingId = await createIdea("", node.parent_id, "top");
+    if (siblingId) {
+      setSelectedId(siblingId);
+      setEditingId(siblingId);
+    }
+  };
+
+  const handleCreateChild = async (text: string) => {
+    const childId = await createIdea(text, node.id, "top");
+    if (node.collapsed) toggleCollapse(node.id);
+    if (childId) setSelectedId(childId);
   };
 
   const handleDragStart = (e: React.DragEvent) => {
@@ -194,8 +214,10 @@ export function IdeaNode({
         className={`group flex items-center gap-1 py-1 px-1 rounded-md ${
           dragOver === "top" ? "border-t-2 border-indigo-400" :
           dragOver === "bottom" ? "border-b-2 border-indigo-400" :
-          dragOver === "center" ? "bg-indigo-50" : ""
+          dragOver === "center" ? "bg-indigo-50" :
+          isSelected ? "bg-indigo-50/60" : ""
         }`}
+        onClick={(e) => { e.stopPropagation(); setSelectedId(isSelected ? null : node.id); }}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -367,6 +389,15 @@ export function IdeaNode({
         </div>
       </div>
 
+      {isSelected && !search && !node.collapsed && (
+        <IdeaComposer
+          depth={depth + 1}
+          placeholder="Add child idea..."
+          onCreate={handleCreateChild}
+          onDismiss={() => setSelectedId(null)}
+        />
+      )}
+
       {/* Children */}
       {hasChildren && !node.collapsed && (
         <div>
@@ -380,6 +411,8 @@ export function IdeaNode({
               search={search}
               editingId={editingId}
               setEditingId={setEditingId}
+              selectedId={selectedId}
+              setSelectedId={setSelectedId}
               createIdea={createIdea}
               updateIdea={updateIdea}
               deleteIdea={deleteIdea}
