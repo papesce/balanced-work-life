@@ -4,12 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "./useAuth";
-import { Idea, IdeaNode, IdeaType, LifeArea } from "@/lib/types";
+import { Idea, IdeaNode } from "@/lib/types";
 
 const STORAGE_KEY = "brainstorm-tree-overrides";
 const DEFAULT_EXPAND_DEPTH = 1;
 
 type OverrideState = "expanded" | "collapsed";
+export type CreateIdeaPosition = "top" | "bottom";
 
 function loadOverrides(): Map<string, OverrideState> {
   try {
@@ -114,15 +115,42 @@ export function useIdeas() {
   }, [user]);
 
   useEffect(() => {
-    fetchIdeas();
-  }, [fetchIdeas]);
+    if (!user) return;
+    let cancelled = false;
 
-  const createIdea = async (text: string, parentId: string | null = null): Promise<string> => {
+    const loadIdeas = async () => {
+      const { data } = await supabase
+        .from("ideas")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("sort_order", { ascending: true });
+      if (cancelled) return;
+      if (data) setIdeas(data as Idea[]);
+      setLoading(false);
+    };
+
+    void loadIdeas();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  const createIdea = async (
+    text: string,
+    parentId: string | null = null,
+    position: CreateIdeaPosition = "bottom"
+  ): Promise<string> => {
     if (!user) return "";
     const siblings = ideas.filter((i) => i.parent_id === parentId);
     const maxOrder = siblings.length > 0 ? Math.max(...siblings.map((s) => s.sort_order)) : -1;
     const now = new Date().toISOString();
     const id = uuidv4();
+    const sortOrder = position === "top" ? 0 : maxOrder + 1;
+    const reorderedSiblings =
+      position === "top"
+        ? siblings.map((s) => ({ ...s, sort_order: s.sort_order + 1 }))
+        : [];
     const idea: Idea = {
       id,
       user_id: user.id,
@@ -133,12 +161,22 @@ export function useIdeas() {
       effort: null,
       impact: null,
       urgency: null,
-      sort_order: maxOrder + 1,
+      sort_order: sortOrder,
       created_at: now,
       updated_at: now,
     };
-    setIdeas((prev) => [...prev, idea]);
+    setIdeas((prev) =>
+      prev
+        .map((i) => reorderedSiblings.find((s) => s.id === i.id) ?? i)
+        .concat(idea)
+    );
     await supabase.from("ideas").insert(idea);
+    for (const sibling of reorderedSiblings) {
+      await supabase
+        .from("ideas")
+        .update({ sort_order: sibling.sort_order })
+        .eq("id", sibling.id);
+    }
     return id;
   };
 

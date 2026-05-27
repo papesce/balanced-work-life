@@ -22,8 +22,25 @@ export function useIdeaLinks() {
   }, [user]);
 
   useEffect(() => {
-    fetchLinks();
-  }, [fetchLinks]);
+    if (!user) return;
+    let cancelled = false;
+
+    const loadLinks = async () => {
+      const { data } = await supabase
+        .from("idea_links")
+        .select("*")
+        .eq("user_id", user.id);
+      if (cancelled) return;
+      if (data) setLinks(data as IdeaLink[]);
+      setLoading(false);
+    };
+
+    void loadLinks();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const createLink = async (
     sourceId: string,
