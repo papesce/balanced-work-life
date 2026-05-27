@@ -83,10 +83,9 @@ export function IdeaTree({
   const searchFiltered = search ? tree.filter(matchesSearch) : tree;
 
   let filteredTree = searchFiltered;
-  let passingIds: Set<string> | null = null;
 
   if (timeFilter === "today" || hideDone) {
-    passingIds = new Set<string>();
+    const passingIds = new Set<string>();
     for (const idea of ideas) {
       let passes = true;
       if (timeFilter === "today" && idea.scheduled_date !== todayString) passes = false;
@@ -102,7 +101,7 @@ export function IdeaTree({
     const pruneNode = (node: IdeaNodeType): IdeaNodeType | null => {
       if (!visibleIds.has(node.id)) return null;
       const children = node.children.map(pruneNode).filter(Boolean) as IdeaNodeType[];
-      return { ...node, children, collapsed: timeFilter === "today" ? false : node.collapsed };
+      return { ...node, children };
     };
     filteredTree = filteredTree.map(pruneNode).filter(Boolean) as IdeaNodeType[];
   }
@@ -240,7 +239,7 @@ export function IdeaTree({
               onMarkUndone={onMarkUndone}
               onSchedule={onSchedule}
               todayString={todayString}
-              isAncestorOnly={passingIds !== null && !passingIds.has(node.id)}
+              isAncestorOnly={false}
             />
           ))}
         </div>
