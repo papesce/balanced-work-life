@@ -29,6 +29,8 @@ export interface Idea {
   effort: number | null;
   impact: number | null;
   urgency: number | null;
+  scheduled_date: string | null;
+  done_at: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;

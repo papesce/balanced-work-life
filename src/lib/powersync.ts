@@ -32,6 +32,8 @@ export const IdeasTable = new Table(
     effort: column.text,
     impact: column.text,
     urgency: column.text,
+    scheduled_date: column.text,
+    done_at: column.text,
     sort_order: column.text,
     created_at: column.text,
     updated_at: column.text,
