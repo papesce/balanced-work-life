@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
-import { IdeaNode as IdeaNodeType, Idea, IdeaLink, IdeaType, LifeArea, LinkType, Task, TimeBucket } from "@/lib/types";
+import { IdeaNode as IdeaNodeType, Idea, IdeaLink, IdeaType, LifeArea, LinkType } from "@/lib/types";
 import { TypePicker } from "./TypePicker";
 import { AreaPicker } from "./AreaPicker";
 import { LinkPanel } from "./LinkPanel";
-import { PromoteMenu } from "./PromoteMenu";
 import { IdeaComposer } from "./IdeaComposer";
 import { MoveIdeaPanel } from "./MoveIdeaPanel";
 import { SchedulePicker } from "./SchedulePicker";
@@ -30,8 +29,6 @@ interface IdeaNodeProps {
   links: IdeaLink[];
   onCreateLink: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
   onDeleteLink: (id: string) => Promise<void>;
-  activeTasksByIdeaId: Map<string, Task>;
-  onPromote: (ideaId: string, bucket: TimeBucket) => void;
   onMarkDone: (id: string) => Promise<void>;
   onMarkUndone: (id: string) => Promise<void>;
   onSchedule: (id: string, date: string | null) => Promise<void>;
@@ -85,8 +82,6 @@ export function IdeaNode({
   links,
   onCreateLink,
   onDeleteLink,
-  activeTasksByIdeaId,
-  onPromote,
   onMarkDone,
   onMarkUndone,
   onSchedule,
@@ -101,19 +96,9 @@ export function IdeaNode({
   const [showLinkPanel, setShowLinkPanel] = useState(false);
   const [showMovePanel, setShowMovePanel] = useState(false);
   const [dragOver, setDragOver] = useState<"top" | "center" | "bottom" | null>(null);
-  const [showPromoteMenu, setShowPromoteMenu] = useState(false);
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
-
-  const activeTask = activeTasksByIdeaId.get(node.id);
-
-  const BUCKET_CHIP_LABELS: Record<TimeBucket, string> = {
-    today: "Hoy",
-    tomorrow: "Mañana",
-    next_week: "Semana",
-    backlog: "Backlog",
-  };
 
   const linkCount = links.filter(
     (l) => l.source_id === node.id || l.target_id === node.id
@@ -372,15 +357,8 @@ export function IdeaNode({
           </span>
         )}
 
-        {/* Active task status chip */}
-        {activeTask && (
-          <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full flex-shrink-0 border border-blue-200">
-            {BUCKET_CHIP_LABELS[activeTask.time_bucket]}
-          </span>
-        )}
-
         {/* Scheduled date chip */}
-        {node.scheduled_date && !activeTask && (
+        {node.scheduled_date && (
           <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 border ${
             node.scheduled_date === todayString
               ? "text-green-700 bg-green-50 border-green-200"
@@ -409,7 +387,6 @@ export function IdeaNode({
           <button
             onClick={() => {
               setShowLinkPanel(false);
-              setShowPromoteMenu(false);
               setShowSchedulePicker(false);
               setShowMovePanel(!showMovePanel);
             }}
@@ -423,7 +400,6 @@ export function IdeaNode({
               onClick={() => {
                 setShowMovePanel(false);
                 setShowLinkPanel(false);
-                setShowPromoteMenu(false);
                 setShowSchedulePicker(!showSchedulePicker);
               }}
               title="Schedule"
@@ -444,34 +420,6 @@ export function IdeaNode({
               />
             )}
           </div>
-          {node.type === "task" && (
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setShowMovePanel(false);
-                  setShowSchedulePicker(false);
-                  setShowPromoteMenu(!showPromoteMenu);
-                }}
-                title="Promote to task"
-                className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded text-xs"
-              >
-                ▶
-              </button>
-              {showPromoteMenu && (
-                <PromoteMenu
-                  hasActiveTask={!!activeTask}
-                  onSelect={(bucket) => {
-                    onPromote(node.id, bucket);
-                    setShowPromoteMenu(false);
-                  }}
-                  onViewInPlanner={activeTask ? () => {
-                    window.location.href = `/planner?highlight=${activeTask.id}`;
-                  } : undefined}
-                  onClose={() => setShowPromoteMenu(false)}
-                />
-              )}
-            </div>
-          )}
           <button
             onClick={() => deleteIdea(node.id)}
             title="Delete"
@@ -535,8 +483,6 @@ export function IdeaNode({
               links={links}
               onCreateLink={onCreateLink}
               onDeleteLink={onDeleteLink}
-              activeTasksByIdeaId={activeTasksByIdeaId}
-              onPromote={onPromote}
               onMarkDone={onMarkDone}
               onMarkUndone={onMarkUndone}
               onSchedule={onSchedule}

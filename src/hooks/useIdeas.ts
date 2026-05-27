@@ -78,7 +78,12 @@ function buildTree(ideas: Idea[], collapsedIds: Set<string>): IdeaNode[] {
   }
 
   const sortNodes = (nodes: IdeaNode[]) => {
-    nodes.sort((a, b) => a.sort_order - b.sort_order);
+    nodes.sort((a, b) => {
+      const aDone = a.done_at ? 1 : 0;
+      const bDone = b.done_at ? 1 : 0;
+      if (aDone !== bDone) return aDone - bDone;
+      return a.sort_order - b.sort_order;
+    });
     for (const node of nodes) sortNodes(node.children);
   };
   sortNodes(roots);

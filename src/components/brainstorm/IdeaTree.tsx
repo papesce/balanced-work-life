@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { IdeaNode as IdeaNodeType, Idea, IdeaLink, LinkType, Task, TimeBucket } from "@/lib/types";
+import { IdeaNode as IdeaNodeType, Idea, IdeaLink, LinkType } from "@/lib/types";
 import { IdeaNode } from "./IdeaNode";
 
 interface IdeaTreeProps {
   tree: IdeaNodeType[];
   ideas: Idea[];
   links: IdeaLink[];
-  activeTasksByIdeaId: Map<string, Task>;
   createIdea: (text: string, parentId?: string | null, position?: "top" | "bottom") => Promise<string>;
   updateIdea: (id: string, updates: Partial<Idea>) => Promise<void>;
   deleteIdea: (id: string) => Promise<void>;
@@ -19,7 +18,6 @@ interface IdeaTreeProps {
   collapseAll: () => void;
   onCreateLink: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
   onDeleteLink: (id: string) => Promise<void>;
-  onPromote: (ideaId: string, bucket: TimeBucket) => void;
   onMarkDone: (id: string) => Promise<void>;
   onMarkUndone: (id: string) => Promise<void>;
   onSchedule: (id: string, date: string | null) => Promise<void>;
@@ -40,7 +38,6 @@ export function IdeaTree({
   tree,
   ideas,
   links,
-  activeTasksByIdeaId,
   createIdea,
   updateIdea,
   deleteIdea,
@@ -51,7 +48,6 @@ export function IdeaTree({
   collapseAll,
   onCreateLink,
   onDeleteLink,
-  onPromote,
   onMarkDone,
   onMarkUndone,
   onSchedule,
@@ -139,7 +135,6 @@ export function IdeaTree({
 
       {/* Row 2: Filters */}
       <div className="flex items-center gap-3">
-        {/* Display toggles */}
         <div className="flex gap-1">
           <button
             onClick={() => setShowType(!showType)}
@@ -165,7 +160,6 @@ export function IdeaTree({
 
         <span className="text-gray-200">|</span>
 
-        {/* Time filter */}
         <div className="flex gap-1">
           <button
             onClick={() => setTimeFilter("all")}
@@ -191,7 +185,6 @@ export function IdeaTree({
 
         <span className="text-gray-200">|</span>
 
-        {/* Done filter */}
         <button
           onClick={() => setHideDone(!hideDone)}
           className={`text-xs px-2.5 py-1 rounded-full border ${
@@ -233,8 +226,6 @@ export function IdeaTree({
               links={links}
               onCreateLink={onCreateLink}
               onDeleteLink={onDeleteLink}
-              activeTasksByIdeaId={activeTasksByIdeaId}
-              onPromote={onPromote}
               onMarkDone={onMarkDone}
               onMarkUndone={onMarkUndone}
               onSchedule={onSchedule}
