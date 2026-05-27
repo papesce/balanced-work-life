@@ -79,11 +79,15 @@ export default function BrainstormPage() {
           deleteIdea={ideasHook.deleteIdea}
           moveIdea={ideasHook.moveIdea}
           toggleCollapse={ideasHook.toggleCollapse}
+          expandIdea={ideasHook.expandIdea}
           expandAll={ideasHook.expandAll}
           collapseAll={ideasHook.collapseAll}
           onCreateLink={linksHook.createLink}
           onDeleteLink={linksHook.deleteLink}
           onPromote={handlePromote}
+          onMarkDone={ideasHook.markDone}
+          onMarkUndone={ideasHook.markUndone}
+          onSchedule={ideasHook.scheduleIdea}
         />
       ) : (
         <GraphView

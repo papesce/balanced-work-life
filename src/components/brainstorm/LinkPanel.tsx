@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Idea, IdeaLink, LinkType } from "@/lib/types";
+import { IdeaSearchPicker } from "./IdeaSearchPicker";
 
 const LINK_TYPES: { value: LinkType; label: string }[] = [
   { value: "unblocks", label: "Unblocks" },
@@ -29,7 +30,6 @@ export function LinkPanel({
   onClose,
 }: LinkPanelProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const [search, setSearch] = useState("");
   const [selectedType, setSelectedType] = useState<LinkType>("related_to");
 
   useEffect(() => {
@@ -48,18 +48,10 @@ export function LinkPanel({
     ideaLinks.flatMap((l) => [l.source_id, l.target_id])
   );
 
-  const searchResults = search.trim()
-    ? ideas.filter(
-        (i) =>
-          i.id !== ideaId &&
-          !linkedIds.has(i.id) &&
-          i.text.toLowerCase().includes(search.toLowerCase())
-      ).slice(0, 5)
-    : [];
+  linkedIds.add(ideaId);
 
   const handleSelectIdea = async (targetId: string) => {
     await onCreateLink(ideaId, targetId, selectedType);
-    setSearch("");
   };
 
   const getIdeaText = (id: string) => {
@@ -87,34 +79,21 @@ export function LinkPanel({
         ))}
       </select>
 
-      {/* Search input */}
-      <input
-        type="text"
-        placeholder="Search ideas..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full text-sm px-2 py-1.5 border border-gray-300 rounded-md mb-2 outline-none focus:border-indigo-500"
-        autoFocus
+      <IdeaSearchPicker
+        ideas={ideas}
+        excludeIds={linkedIds}
+        renderActions={(idea, clearSearch) => (
+          <button
+            onClick={async () => {
+              await handleSelectIdea(idea.id);
+              clearSearch();
+            }}
+            className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-600 hover:text-indigo-700 hover:border-indigo-200 hover:bg-indigo-50"
+          >
+            Link
+          </button>
+        )}
       />
-
-      {/* Search results */}
-      {searchResults.length > 0 && (
-        <div className="border border-gray-200 rounded-md mb-2 max-h-[150px] overflow-y-auto">
-          {searchResults.map((idea) => (
-            <button
-              key={idea.id}
-              onClick={() => handleSelectIdea(idea.id)}
-              className="block w-full text-left text-sm px-2 py-1.5 hover:bg-indigo-50 truncate"
-            >
-              {idea.text}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {search.trim() && searchResults.length === 0 && (
-        <p className="text-xs text-gray-400 italic mb-2">No matching ideas</p>
-      )}
 
       {/* Existing links */}
       {ideaLinks.length > 0 && (
