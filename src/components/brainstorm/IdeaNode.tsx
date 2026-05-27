@@ -275,7 +275,11 @@ export function IdeaNode({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              node.done_at ? onMarkUndone(node.id) : onMarkDone(node.id);
+              if (node.done_at) {
+                onMarkUndone(node.id);
+              } else {
+                onMarkDone(node.id);
+              }
             }}
             className={`w-4 h-4 border-2 rounded-full flex-shrink-0 ${
               node.done_at
