@@ -6,22 +6,6 @@ import {
 } from "@powersync/web";
 import { supabase } from "./supabase";
 
-export const TasksTable = new Table(
-  {
-    user_id: column.text,
-    title: column.text,
-    notes: column.text,
-    status: column.text,
-    time_bucket: column.text,
-    balance_category: column.text,
-    idea_id: column.text,
-    created_at: column.text,
-    completed_at: column.text,
-    updated_at: column.text,
-  },
-  { indexes: {} }
-);
-
 export const IdeasTable = new Table(
   {
     user_id: column.text,
@@ -52,7 +36,7 @@ export const IdeaLinksTable = new Table(
   { indexes: {} }
 );
 
-export const AppSchema = new Schema({ tasks: TasksTable, ideas: IdeasTable, idea_links: IdeaLinksTable });
+export const AppSchema = new Schema({ ideas: IdeasTable, idea_links: IdeaLinksTable });
 
 let powerSyncInstance: Awaited<
   ReturnType<WASQLitePowerSyncDatabaseOpenFactory["getInstance"]>

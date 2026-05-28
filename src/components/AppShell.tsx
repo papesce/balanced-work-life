@@ -5,14 +5,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { Navigation } from "@/components/Navigation";
 import { QuickAddButton } from "@/components/QuickAddButton";
 import { DesktopSidebar } from "@/components/DesktopSidebar";
-import { TimeBucket, BalanceCategory } from "@/lib/types";
+import { LifeArea } from "@/lib/types";
 
 interface AppShellProps {
   children: ReactNode;
   title: string;
   headerActions?: ReactNode;
   fullWidth?: boolean;
-  onAdd?: (title: string, bucket: TimeBucket, category: BalanceCategory) => Promise<unknown>;
+  onAdd?: (text: string, area: LifeArea, scheduledDate: string | null) => Promise<unknown>;
 }
 
 export function AppShell({ children, title, headerActions, fullWidth, onAdd }: AppShellProps) {

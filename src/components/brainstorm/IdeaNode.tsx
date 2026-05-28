@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
-import { IdeaNode as IdeaNodeType, Idea, IdeaLink, IdeaType, LifeArea, LinkType, Task, TimeBucket } from "@/lib/types";
+import { IdeaNode as IdeaNodeType, Idea, IdeaLink, IdeaType, LifeArea, LinkType } from "@/lib/types";
 import { TypePicker } from "./TypePicker";
 import { AreaPicker } from "./AreaPicker";
 import { LinkPanel } from "./LinkPanel";
-import { PromoteMenu } from "./PromoteMenu";
 import { IdeaComposer } from "./IdeaComposer";
 import { MoveIdeaPanel } from "./MoveIdeaPanel";
 import { SchedulePicker } from "./SchedulePicker";
@@ -30,8 +29,6 @@ interface IdeaNodeProps {
   links: IdeaLink[];
   onCreateLink: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
   onDeleteLink: (id: string) => Promise<void>;
-  activeTasksByIdeaId: Map<string, Task>;
-  onPromote: (ideaId: string, bucket: TimeBucket) => void;
   onMarkDone: (id: string) => Promise<void>;
   onMarkUndone: (id: string) => Promise<void>;
   onSchedule: (id: string, date: string | null) => Promise<void>;
@@ -85,8 +82,6 @@ export function IdeaNode({
   links,
   onCreateLink,
   onDeleteLink,
-  activeTasksByIdeaId,
-  onPromote,
   onMarkDone,
   onMarkUndone,
   onSchedule,
@@ -101,19 +96,10 @@ export function IdeaNode({
   const [showLinkPanel, setShowLinkPanel] = useState(false);
   const [showMovePanel, setShowMovePanel] = useState(false);
   const [dragOver, setDragOver] = useState<"top" | "center" | "bottom" | null>(null);
-  const [showPromoteMenu, setShowPromoteMenu] = useState(false);
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
+  const [showDeleteWarning, setShowDeleteWarning] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
-
-  const activeTask = activeTasksByIdeaId.get(node.id);
-
-  const BUCKET_CHIP_LABELS: Record<TimeBucket, string> = {
-    today: "Hoy",
-    tomorrow: "Mañana",
-    next_week: "Semana",
-    backlog: "Backlog",
-  };
 
   const linkCount = links.filter(
     (l) => l.source_id === node.id || l.target_id === node.id
@@ -226,6 +212,18 @@ export function IdeaNode({
   const handleMoved = (parentIdToExpand: string | null) => {
     if (!parentIdToExpand) return;
     expandIdea(parentIdToExpand);
+  };
+
+  const handleRequestDelete = () => {
+    setShowMovePanel(false);
+    setShowLinkPanel(false);
+    setShowSchedulePicker(false);
+    setShowDeleteWarning(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    await deleteIdea(node.id);
+    setShowDeleteWarning(false);
   };
 
   const matchesSearch = (n: IdeaNodeType): boolean => {
@@ -372,15 +370,8 @@ export function IdeaNode({
           </span>
         )}
 
-        {/* Active task status chip */}
-        {activeTask && (
-          <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full flex-shrink-0 border border-blue-200">
-            {BUCKET_CHIP_LABELS[activeTask.time_bucket]}
-          </span>
-        )}
-
         {/* Scheduled date chip */}
-        {node.scheduled_date && !activeTask && (
+        {node.scheduled_date && (
           <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 border ${
             node.scheduled_date === todayString
               ? "text-green-700 bg-green-50 border-green-200"
@@ -397,6 +388,7 @@ export function IdeaNode({
         >
           <button
             onClick={() => {
+              setShowDeleteWarning(false);
               setShowMovePanel(false);
               setShowSchedulePicker(false);
               setShowLinkPanel(!showLinkPanel);
@@ -408,8 +400,8 @@ export function IdeaNode({
           </button>
           <button
             onClick={() => {
+              setShowDeleteWarning(false);
               setShowLinkPanel(false);
-              setShowPromoteMenu(false);
               setShowSchedulePicker(false);
               setShowMovePanel(!showMovePanel);
             }}
@@ -421,9 +413,9 @@ export function IdeaNode({
           <div className="relative">
             <button
               onClick={() => {
+                setShowDeleteWarning(false);
                 setShowMovePanel(false);
                 setShowLinkPanel(false);
-                setShowPromoteMenu(false);
                 setShowSchedulePicker(!showSchedulePicker);
               }}
               title="Schedule"
@@ -444,41 +436,42 @@ export function IdeaNode({
               />
             )}
           </div>
-          {node.type === "task" && (
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setShowMovePanel(false);
-                  setShowSchedulePicker(false);
-                  setShowPromoteMenu(!showPromoteMenu);
-                }}
-                title="Promote to task"
-                className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded text-xs"
-              >
-                ▶
-              </button>
-              {showPromoteMenu && (
-                <PromoteMenu
-                  hasActiveTask={!!activeTask}
-                  onSelect={(bucket) => {
-                    onPromote(node.id, bucket);
-                    setShowPromoteMenu(false);
-                  }}
-                  onViewInPlanner={activeTask ? () => {
-                    window.location.href = `/planner?highlight=${activeTask.id}`;
-                  } : undefined}
-                  onClose={() => setShowPromoteMenu(false)}
-                />
-              )}
-            </div>
-          )}
-          <button
-            onClick={() => deleteIdea(node.id)}
-            title="Delete"
-            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded text-xs"
-          >
-            ×
-          </button>
+          <div className="relative">
+            <button
+              onClick={handleRequestDelete}
+              title="Delete"
+              aria-expanded={showDeleteWarning}
+              className={`w-6 h-6 flex items-center justify-center rounded text-sm ${
+                showDeleteWarning
+                  ? "text-red-600 bg-red-50"
+                  : "text-gray-400 hover:text-red-600 hover:bg-red-50"
+              }`}
+            >
+              🗑
+            </button>
+            {showDeleteWarning && (
+              <div className="absolute right-0 top-7 z-20 w-52 rounded-md border border-red-200 bg-white p-2 shadow-lg">
+                <p className="text-xs font-medium text-red-700">Delete this idea?</p>
+                {hasChildren && (
+                  <p className="mt-1 text-xs text-gray-500">Child ideas will be deleted too.</p>
+                )}
+                <div className="mt-2 flex justify-end gap-1.5">
+                  <button
+                    onClick={() => setShowDeleteWarning(false)}
+                    className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirmDelete}
+                    className="px-2 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
           {showLinkPanel && (
             <LinkPanel
               ideaId={node.id}
@@ -535,8 +528,6 @@ export function IdeaNode({
               links={links}
               onCreateLink={onCreateLink}
               onDeleteLink={onDeleteLink}
-              activeTasksByIdeaId={activeTasksByIdeaId}
-              onPromote={onPromote}
               onMarkDone={onMarkDone}
               onMarkUndone={onMarkUndone}
               onSchedule={onSchedule}

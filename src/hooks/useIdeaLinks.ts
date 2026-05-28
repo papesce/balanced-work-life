@@ -68,6 +68,26 @@ export function useIdeaLinks() {
     await supabase.from("idea_links").delete().eq("id", id);
   };
 
+  const removeLinksForIdeaIds = (ideaIds: Set<string>): IdeaLink[] => {
+    const removed = links.filter(
+      (link) => ideaIds.has(link.source_id) || ideaIds.has(link.target_id)
+    );
+    setLinks((prev) =>
+      prev.filter((link) => !ideaIds.has(link.source_id) && !ideaIds.has(link.target_id))
+    );
+    return removed;
+  };
+
+  const restoreLinks = async (restoredLinks: IdeaLink[]): Promise<void> => {
+    if (restoredLinks.length === 0) return;
+    const restoredIds = new Set(restoredLinks.map((link) => link.id));
+    setLinks((prev) => [
+      ...prev.filter((link) => !restoredIds.has(link.id)),
+      ...restoredLinks,
+    ]);
+    await supabase.from("idea_links").upsert(restoredLinks);
+  };
+
   const getLinksForIdea = useCallback(
     (ideaId: string): IdeaLink[] => {
       return links.filter(
@@ -82,6 +102,8 @@ export function useIdeaLinks() {
     loading,
     createLink,
     deleteLink,
+    removeLinksForIdeaIds,
+    restoreLinks,
     getLinksForIdea,
     refetch: fetchLinks,
   };

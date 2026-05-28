@@ -78,12 +78,32 @@ function buildTree(ideas: Idea[], collapsedIds: Set<string>): IdeaNode[] {
   }
 
   const sortNodes = (nodes: IdeaNode[]) => {
-    nodes.sort((a, b) => a.sort_order - b.sort_order);
+    nodes.sort((a, b) => {
+      const aDone = a.done_at ? 1 : 0;
+      const bDone = b.done_at ? 1 : 0;
+      if (aDone !== bDone) return aDone - bDone;
+      return a.sort_order - b.sort_order;
+    });
     for (const node of nodes) sortNodes(node.children);
   };
   sortNodes(roots);
 
   return roots;
+}
+
+function sortIdeasForInsert(ideas: Idea[]): Idea[] {
+  const byId = new Map(ideas.map((idea) => [idea.id, idea]));
+  const depthOf = (idea: Idea): number => {
+    let depth = 0;
+    let current = idea;
+    while (current.parent_id && byId.has(current.parent_id)) {
+      depth += 1;
+      current = byId.get(current.parent_id)!;
+    }
+    return depth;
+  };
+
+  return [...ideas].sort((a, b) => depthOf(a) - depthOf(b));
 }
 
 export function useIdeas() {
@@ -204,6 +224,16 @@ export function useIdeas() {
     await supabase.from("ideas").delete().eq("id", id);
   };
 
+  const restoreIdeas = async (restoredIdeas: Idea[]) => {
+    if (restoredIdeas.length === 0) return;
+    const orderedIdeas = sortIdeasForInsert(restoredIdeas);
+    setIdeas((prev) => {
+      const restoredIds = new Set(orderedIdeas.map((idea) => idea.id));
+      return [...prev.filter((idea) => !restoredIds.has(idea.id)), ...orderedIdeas];
+    });
+    await supabase.from("ideas").upsert(orderedIdeas);
+  };
+
   const moveIdea = async (id: string, newParentId: string | null, newSortOrder: number) => {
     const updatedAt = new Date().toISOString();
     const siblings = ideas.filter(
@@ -318,6 +348,7 @@ export function useIdeas() {
     markDone,
     markUndone,
     scheduleIdea,
+    restoreIdeas,
     toggleCollapse,
     expandIdea,
     expandAll,
