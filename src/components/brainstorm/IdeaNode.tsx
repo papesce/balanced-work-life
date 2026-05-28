@@ -97,6 +97,7 @@ export function IdeaNode({
   const [showMovePanel, setShowMovePanel] = useState(false);
   const [dragOver, setDragOver] = useState<"top" | "center" | "bottom" | null>(null);
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
+  const [showDeleteWarning, setShowDeleteWarning] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
 
@@ -211,6 +212,18 @@ export function IdeaNode({
   const handleMoved = (parentIdToExpand: string | null) => {
     if (!parentIdToExpand) return;
     expandIdea(parentIdToExpand);
+  };
+
+  const handleRequestDelete = () => {
+    setShowMovePanel(false);
+    setShowLinkPanel(false);
+    setShowSchedulePicker(false);
+    setShowDeleteWarning(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    await deleteIdea(node.id);
+    setShowDeleteWarning(false);
   };
 
   const matchesSearch = (n: IdeaNodeType): boolean => {
@@ -375,6 +388,7 @@ export function IdeaNode({
         >
           <button
             onClick={() => {
+              setShowDeleteWarning(false);
               setShowMovePanel(false);
               setShowSchedulePicker(false);
               setShowLinkPanel(!showLinkPanel);
@@ -386,6 +400,7 @@ export function IdeaNode({
           </button>
           <button
             onClick={() => {
+              setShowDeleteWarning(false);
               setShowLinkPanel(false);
               setShowSchedulePicker(false);
               setShowMovePanel(!showMovePanel);
@@ -398,6 +413,7 @@ export function IdeaNode({
           <div className="relative">
             <button
               onClick={() => {
+                setShowDeleteWarning(false);
                 setShowMovePanel(false);
                 setShowLinkPanel(false);
                 setShowSchedulePicker(!showSchedulePicker);
@@ -420,13 +436,42 @@ export function IdeaNode({
               />
             )}
           </div>
-          <button
-            onClick={() => deleteIdea(node.id)}
-            title="Delete"
-            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded text-xs"
-          >
-            ×
-          </button>
+          <div className="relative">
+            <button
+              onClick={handleRequestDelete}
+              title="Delete"
+              aria-expanded={showDeleteWarning}
+              className={`w-6 h-6 flex items-center justify-center rounded text-sm ${
+                showDeleteWarning
+                  ? "text-red-600 bg-red-50"
+                  : "text-gray-400 hover:text-red-600 hover:bg-red-50"
+              }`}
+            >
+              🗑
+            </button>
+            {showDeleteWarning && (
+              <div className="absolute right-0 top-7 z-20 w-52 rounded-md border border-red-200 bg-white p-2 shadow-lg">
+                <p className="text-xs font-medium text-red-700">Delete this idea?</p>
+                {hasChildren && (
+                  <p className="mt-1 text-xs text-gray-500">Child ideas will be deleted too.</p>
+                )}
+                <div className="mt-2 flex justify-end gap-1.5">
+                  <button
+                    onClick={() => setShowDeleteWarning(false)}
+                    className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirmDelete}
+                    className="px-2 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
           {showLinkPanel && (
             <LinkPanel
               ideaId={node.id}
