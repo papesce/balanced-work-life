@@ -41,10 +41,19 @@ NEXT_PUBLIC_POWERSYNC_URL=https://your-instance.powersync.journeyapps.com
 3. Run the development server:
 
 ```bash
-pnpm dev
+pnpm dev          # plain Next.js dev server
+pnpm dev:open     # frees port 3000, starts dev, auto-opens the browser
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+For a production-mode preview (build + start):
+
+```bash
+pnpm start:open
+```
+
+Override the port on either: `PORT=4000 pnpm dev:open`.
+
+Open [http://localhost:3000](http://localhost:3000) in your browser (auto-opened by `:open` variants).
 
 ## Features
 

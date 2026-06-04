@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:open": "./scripts/launch.sh dev",
     "build": "next build",
     "start": "next start",
+    "start:open": "./scripts/launch.sh start",
     "lint": "eslint"
   },
   "dependencies": {
