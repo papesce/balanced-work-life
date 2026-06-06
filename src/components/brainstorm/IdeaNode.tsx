@@ -269,7 +269,7 @@ export function IdeaNode({
         </span>
 
         {/* Done checkbox */}
-        {node.scheduled_date && !isAncestorOnly && (
+        {node.type === "task" && node.scheduled_date && !isAncestorOnly && (
           <button
             onClick={(e) => {
               e.stopPropagation();

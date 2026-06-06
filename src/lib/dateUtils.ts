@@ -34,3 +34,26 @@ export function isToday(isoTimestamp: string | null): boolean {
   if (!isoTimestamp) return false;
   return isoTimestamp.slice(0, 10) === getToday();
 }
+
+export function formatDate(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+export function getDatesRange(daysBack: number, daysForward: number): string[] {
+  const dates: string[] = [];
+  for (let i = -daysBack; i <= daysForward; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    dates.push(d.toISOString().slice(0, 10));
+  }
+  return dates;
+}
+
+export function isPast(dateStr: string): boolean {
+  return dateStr < getToday();
+}

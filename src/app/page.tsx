@@ -89,10 +89,12 @@ export default function TodayPage() {
   const meta = MODE_META[mode];
 
   const handleAdd = async (text: string, area: LifeArea, scheduledDate: string | null) => {
-    const id = await createIdea(text, null, "top");
-    if (id) {
-      await updateIdea(id, { type: "task", area, scheduled_date: scheduledDate });
-    }
+    await createIdea(text, null, "top", {
+      type: "task",
+      area,
+      scheduled_date: scheduledDate,
+      status: scheduledDate ? "scheduled" : "inbox"
+    });
   };
 
   if (loading) {

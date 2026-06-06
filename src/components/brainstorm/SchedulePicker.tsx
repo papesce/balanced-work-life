@@ -27,6 +27,15 @@ function getNextMonday(): string {
   return today.toISOString().split("T")[0];
 }
 
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00");
+  return d.toLocaleDateString("es", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+}
+
 export function SchedulePicker({ currentDate, onSelect, onClear, onClose }: SchedulePickerProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -41,29 +50,34 @@ export function SchedulePicker({ currentDate, onSelect, onClear, onClose }: Sche
   }, [onClose]);
 
   const today = getTodayString();
+  const tomorrow = addDays(today, 1);
+  const nextMonday = getNextMonday();
 
   return (
     <div
       ref={menuRef}
-      className="absolute right-0 top-full mt-1 z-50 w-48 bg-white rounded-lg shadow-lg border border-gray-200 p-2 space-y-1"
+      className="absolute right-0 top-full mt-1 z-50 w-56 bg-white rounded-lg shadow-lg border border-gray-200 p-2 space-y-1"
     >
       <button
         onClick={() => onSelect(today)}
-        className="w-full text-left px-3 py-1.5 text-sm text-gray-700 rounded-md hover:bg-gray-100"
+        className="w-full text-left px-3 py-1.5 text-sm text-gray-700 rounded-md hover:bg-gray-100 flex justify-between items-center"
       >
-        Hoy
+        <span>Hoy</span>
+        <span className="text-[10px] text-gray-400 font-mono uppercase">{formatDate(today)}</span>
       </button>
       <button
-        onClick={() => onSelect(addDays(today, 1))}
-        className="w-full text-left px-3 py-1.5 text-sm text-gray-700 rounded-md hover:bg-gray-100"
+        onClick={() => onSelect(tomorrow)}
+        className="w-full text-left px-3 py-1.5 text-sm text-gray-700 rounded-md hover:bg-gray-100 flex justify-between items-center"
       >
-        Mañana
+        <span>Mañana</span>
+        <span className="text-[10px] text-gray-400 font-mono uppercase">{formatDate(tomorrow)}</span>
       </button>
       <button
-        onClick={() => onSelect(getNextMonday())}
-        className="w-full text-left px-3 py-1.5 text-sm text-gray-700 rounded-md hover:bg-gray-100"
+        onClick={() => onSelect(nextMonday)}
+        className="w-full text-left px-3 py-1.5 text-sm text-gray-700 rounded-md hover:bg-gray-100 flex justify-between items-center"
       >
-        Lunes
+        <span>Lunes</span>
+        <span className="text-[10px] text-gray-400 font-mono uppercase">{formatDate(nextMonday)}</span>
       </button>
       <input
         type="date"

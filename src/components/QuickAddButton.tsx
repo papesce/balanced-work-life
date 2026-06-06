@@ -75,20 +75,28 @@ export function QuickAddButton({ onAdd }: QuickAddButtonProps) {
         <div>
           <label className="text-sm text-gray-600 block mb-1">When</label>
           <div className="flex gap-2 flex-wrap">
-            {(["today", "tomorrow", "custom", "none"] as WhenOption[]).map((opt) => (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => setWhen(opt)}
-                className={`text-sm px-3 py-1.5 rounded-lg border ${
-                  when === opt
-                    ? "bg-indigo-50 border-indigo-300 text-indigo-700 font-medium"
-                    : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                }`}
-              >
-                {opt === "today" ? "Today" : opt === "tomorrow" ? "Tomorrow" : opt === "custom" ? "Pick date" : "No date"}
-              </button>
-            ))}
+            {(["today", "tomorrow", "custom", "none"] as WhenOption[]).map((opt) => {
+              const today = getToday();
+              const tomorrow = getTomorrow();
+              const label = opt === "today" ? `Today (${today.split("-").slice(1).reverse().join("/")})` 
+                          : opt === "tomorrow" ? `Tomorrow (${tomorrow.split("-").slice(1).reverse().join("/")})` 
+                          : opt === "custom" ? "Pick date" 
+                          : "No date";
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => setWhen(opt)}
+                  className={`text-sm px-3 py-1.5 rounded-lg border ${
+                    when === opt
+                      ? "bg-indigo-50 border-indigo-300 text-indigo-700 font-medium"
+                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
           {when === "custom" && (
             <input

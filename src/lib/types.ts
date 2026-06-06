@@ -1,5 +1,6 @@
 export type IdeaType = "idea" | "objective" | "project" | "initiative" | "task";
 export type LifeArea = "work" | "health" | "relationships" | "growth" | "finances" | "life";
+export type IdeaStatus = "inbox" | "scheduled" | "completed" | "archived";
 
 export interface Idea {
   id: string;
@@ -12,6 +13,12 @@ export interface Idea {
   impact: number | null;
   urgency: number | null;
   scheduled_date: string | null;
+  scheduled_time: string | null;
+  duration_minutes: number | null;
+  is_priority: boolean;
+  priority_order: number | null;
+  status: IdeaStatus;
+  notes: string | null;
   done_at: string | null;
   sort_order: number;
   created_at: string;

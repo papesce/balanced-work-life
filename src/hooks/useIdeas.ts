@@ -159,7 +159,8 @@ export function useIdeas() {
   const createIdea = async (
     text: string,
     parentId: string | null = null,
-    position: CreateIdeaPosition = "bottom"
+    position: CreateIdeaPosition = "bottom",
+    initialUpdates: Partial<Idea> = {}
   ): Promise<string> => {
     if (!user) return "";
     const siblings = ideas.filter((i) => i.parent_id === parentId);
@@ -182,10 +183,17 @@ export function useIdeas() {
       impact: null,
       urgency: null,
       scheduled_date: null,
+      scheduled_time: null,
+      duration_minutes: null,
+      is_priority: false,
+      priority_order: null,
+      status: "inbox",
+      notes: null,
       done_at: null,
       sort_order: sortOrder,
       created_at: now,
       updated_at: now,
+      ...initialUpdates,
     };
     setIdeas((prev) =>
       prev
