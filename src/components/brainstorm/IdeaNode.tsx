@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
+import { ChevronRight, ChevronDown, GripVertical, Link2, ArrowUpDown, Calendar, Trash2 } from "lucide-react";
 import { IdeaNode as IdeaNodeType, Idea, IdeaLink, IdeaType, LifeArea, LinkType } from "@/lib/types";
 import { TypePicker } from "./TypePicker";
 import { AreaPicker } from "./AreaPicker";
@@ -254,18 +255,24 @@ export function IdeaNode({
             e.stopPropagation();
             if (hasChildren) toggleCollapse(node.id);
           }}
-          className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 flex-shrink-0 text-xs"
+          className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 flex-shrink-0"
         >
-          {hasChildren ? (node.collapsed ? "▶" : "▼") : ""}
+          {hasChildren ? (
+            node.collapsed ? (
+              <ChevronRight size={14} strokeWidth={2} />
+            ) : (
+              <ChevronDown size={14} strokeWidth={2} />
+            )
+          ) : null}
         </button>
 
         {/* Drag handle */}
         <span
           draggable
           onDragStart={handleDragStart}
-          className="cursor-grab text-gray-300 hover:text-gray-500 flex-shrink-0 text-sm select-none"
+          className="cursor-grab text-gray-300 hover:text-gray-500 flex-shrink-0 select-none flex items-center"
         >
-          ⠿
+          <GripVertical size={14} strokeWidth={1.5} />
         </span>
 
         {/* Done checkbox */}
@@ -394,9 +401,9 @@ export function IdeaNode({
               setShowLinkPanel(!showLinkPanel);
             }}
             title="Link"
-            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded text-xs"
+            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"
           >
-            🔗
+            <Link2 size={14} strokeWidth={1.5} />
           </button>
           <button
             onClick={() => {
@@ -406,9 +413,9 @@ export function IdeaNode({
               setShowMovePanel(!showMovePanel);
             }}
             title="Move"
-            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded text-xs"
+            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"
           >
-            ↕
+            <ArrowUpDown size={14} strokeWidth={1.5} />
           </button>
           <div className="relative">
             <button
@@ -419,13 +426,13 @@ export function IdeaNode({
                 setShowSchedulePicker(!showSchedulePicker);
               }}
               title="Schedule"
-              className={`w-6 h-6 flex items-center justify-center rounded text-xs ${
+              className={`w-6 h-6 flex items-center justify-center rounded ${
                 node.scheduled_date
                   ? "text-indigo-600 bg-indigo-50"
                   : "text-gray-400 hover:text-indigo-600 hover:bg-indigo-50"
               }`}
             >
-              📅
+              <Calendar size={14} strokeWidth={1.5} />
             </button>
             {showSchedulePicker && (
               <SchedulePicker
@@ -441,13 +448,13 @@ export function IdeaNode({
               onClick={handleRequestDelete}
               title="Delete"
               aria-expanded={showDeleteWarning}
-              className={`w-6 h-6 flex items-center justify-center rounded text-sm ${
+              className={`w-6 h-6 flex items-center justify-center rounded ${
                 showDeleteWarning
                   ? "text-red-600 bg-red-50"
                   : "text-gray-400 hover:text-red-600 hover:bg-red-50"
               }`}
             >
-              🗑
+              <Trash2 size={14} strokeWidth={1.5} />
             </button>
             {showDeleteWarning && (
               <div className="absolute right-0 top-7 z-20 w-52 rounded-md border border-red-200 bg-white p-2 shadow-lg">

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { motion } from "framer-motion";
+import { Check } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
 import { BalanceRing } from "@/components/BalanceRing";
 import { AppShell } from "@/components/AppShell";
@@ -23,13 +25,13 @@ const MODE_META: Record<RingMode, { desc: string; statLabel: string; statSub: st
 
 const GROUP_ORDER: ScheduleGroup[] = ["Today", "Tomorrow", "This week", "Later", "Unscheduled"];
 
-const AREA_COLORS: Record<LifeArea, string> = {
-  work: "bg-indigo-50 text-indigo-600",
-  health: "bg-red-50 text-red-600",
-  relationships: "bg-pink-50 text-pink-600",
-  growth: "bg-amber-50 text-amber-600",
-  finances: "bg-emerald-50 text-emerald-600",
-  life: "bg-purple-50 text-purple-600",
+const AREA_COLORS: Record<LifeArea, { bg: string; text: string }> = {
+  work: { bg: "rgba(59, 130, 246, 0.1)", text: "#2563eb" },
+  health: { bg: "rgba(239, 68, 68, 0.1)", text: "#dc2626" },
+  relationships: { bg: "rgba(244, 63, 94, 0.1)", text: "#e11d48" },
+  growth: { bg: "rgba(245, 158, 11, 0.1)", text: "#d97706" },
+  finances: { bg: "rgba(16, 185, 129, 0.1)", text: "#059669" },
+  life: { bg: "rgba(139, 92, 246, 0.1)", text: "#7c3aed" },
 };
 
 function areaCounts(items: Idea[]): Record<LifeArea, number> {
@@ -42,7 +44,7 @@ function areaCounts(items: Idea[]): Record<LifeArea, number> {
 }
 
 export default function TodayPage() {
-  const { ideas, loading, createIdea, updateIdea, markDone, markUndone, scheduleIdea } = useIdeas();
+  const { ideas, loading, createIdea, markDone, markUndone, scheduleIdea } = useIdeas();
   const [mode, setMode] = useState<RingMode>("done");
 
   const today = getToday();
@@ -93,7 +95,7 @@ export default function TodayPage() {
       type: "task",
       area,
       scheduled_date: scheduledDate,
-      status: scheduledDate ? "scheduled" : "inbox"
+      status: scheduledDate ? "scheduled" : "inbox",
     });
   };
 
@@ -107,17 +109,17 @@ export default function TodayPage() {
 
   return (
     <AppShell title="Today" onAdd={handleAdd}>
-      <div className="space-y-6">
+      <div className="space-y-5">
         {/* Mode toggle */}
-        <div className="flex gap-0.5 bg-gray-100 rounded-lg p-1">
+        <div className="flex gap-0.5 bg-white/60 backdrop-blur-sm rounded-xl p-1 border border-white/20 shadow-sm">
           {MODES.map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setMode(key)}
-              className={`flex-1 px-2 py-1.5 text-xs rounded-md transition-colors ${
+              className={`flex-1 px-2 py-1.5 text-xs rounded-lg transition-all ${
                 mode === key
-                  ? "bg-white text-gray-900 font-medium shadow-sm border border-gray-200"
-                  : "text-gray-500"
+                  ? "bg-white text-gray-800 font-medium shadow-sm border border-gray-200/60"
+                  : "text-gray-400 hover:text-gray-600"
               }`}
             >
               {label}
@@ -138,36 +140,47 @@ export default function TodayPage() {
           const items = grouped[group];
           if (items.length === 0) return null;
           return (
-            <section key={group}>
-              <div className="flex items-center gap-2 mb-2">
-                <h2 className="text-sm font-semibold text-gray-700">{group}</h2>
-                <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">
+            <motion.section
+              key={group}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="flex items-center gap-2 mb-2.5">
+                <h2 className="text-xs font-semibold text-gray-600">{group}</h2>
+                <span className="text-[10px] font-semibold text-violet-600 bg-violet-100/60 px-2 py-0.5 rounded-full">
                   {items.length}
                 </span>
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 {items.map((idea) => (
                   <div
                     key={idea.id}
-                    className="flex items-center gap-3 bg-white rounded-lg px-4 py-2.5 shadow-sm"
+                    className="glass-card rounded-[16px] px-4 py-2.5 flex items-center gap-3"
                   >
                     <button
                       onClick={() => markDone(idea.id)}
-                      className="w-5 h-5 border-2 border-gray-300 rounded-full hover:border-indigo-500 flex-shrink-0 transition-colors"
+                      className="w-[18px] h-[18px] rounded-full border-2 border-gray-300 hover:border-violet-500 flex-shrink-0 transition-colors"
                       aria-label="Complete task"
                     />
-                    <span className="text-sm text-gray-800 truncate flex-1">
+                    <span className="text-sm text-gray-800 truncate flex-1" style={{ fontWeight: 450 }}>
                       {idea.text}
                     </span>
                     {idea.area && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${AREA_COLORS[idea.area]}`}>
+                      <span
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                        style={{
+                          background: AREA_COLORS[idea.area].bg,
+                          color: AREA_COLORS[idea.area].text,
+                        }}
+                      >
                         {idea.area}
                       </span>
                     )}
                     {group !== "Today" && (
                       <button
                         onClick={() => scheduleIdea(idea.id, today)}
-                        className="text-xs text-indigo-600 hover:text-indigo-800 flex-shrink-0"
+                        className="text-[11px] text-violet-600 hover:text-violet-800 font-medium flex-shrink-0 transition-colors"
                         title="Move to today"
                       >
                         → Today
@@ -176,36 +189,46 @@ export default function TodayPage() {
                   </div>
                 ))}
               </div>
-            </section>
+            </motion.section>
           );
         })}
 
         {/* Completed today */}
-        <section>
-          <h2 className="text-sm font-semibold text-gray-700 mb-2">
+        <motion.section
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+        >
+          <h2 className="text-xs font-semibold text-gray-500 mb-2.5">
             Completed today ({doneToday.length})
           </h2>
           {doneToday.length === 0 ? (
-            <p className="text-xs text-gray-400 py-2">No tasks completed yet today</p>
+            <p className="text-xs text-gray-400 py-2 italic">No tasks completed yet today</p>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {doneToday.map((idea) => (
                 <div
                   key={idea.id}
-                  className="flex items-center gap-3 bg-white rounded-lg px-4 py-2.5 shadow-sm"
+                  className="glass-card rounded-[16px] px-4 py-2.5 flex items-center gap-3"
                 >
                   <button
                     onClick={() => markUndone(idea.id)}
-                    className="w-5 h-5 bg-green-500 rounded-full flex-shrink-0 flex items-center justify-center"
+                    className="w-[18px] h-[18px] bg-violet-600 rounded-full flex-shrink-0 flex items-center justify-center"
                     aria-label="Undo complete"
                   >
-                    <span className="text-white text-xs">✓</span>
+                    <Check size={10} strokeWidth={3} className="text-white" />
                   </button>
-                  <span className="text-sm text-gray-500 line-through truncate flex-1">
+                  <span className="text-sm text-gray-400 line-through truncate flex-1" style={{ opacity: 0.6 }}>
                     {idea.text}
                   </span>
                   {idea.area && (
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${AREA_COLORS[idea.area]}`}>
+                    <span
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                      style={{
+                        background: AREA_COLORS[idea.area].bg,
+                        color: AREA_COLORS[idea.area].text,
+                      }}
+                    >
                       {idea.area}
                     </span>
                   )}
@@ -213,7 +236,7 @@ export default function TodayPage() {
               ))}
             </div>
           )}
-        </section>
+        </motion.section>
       </div>
     </AppShell>
   );

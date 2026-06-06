@@ -43,7 +43,7 @@ export function BalanceRing({ counts, modeLabel, statLabel, statSub }: BalanceRi
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
+    <div className="glass-card rounded-[20px] p-5">
       <p className="text-xs text-gray-500 text-center mb-4 min-h-[32px]">
         {modeLabel}
       </p>
@@ -55,7 +55,7 @@ export function BalanceRing({ counts, modeLabel, statLabel, statSub }: BalanceRi
             cy="80"
             r="60"
             fill="none"
-            stroke="#f3f4f6"
+            stroke="rgba(0,0,0,0.06)"
             strokeWidth="18"
           />
           {total > 0 && segments.map(({ area, arc, offset: segOffset }) => (
@@ -100,12 +100,12 @@ export function BalanceRing({ counts, modeLabel, statLabel, statSub }: BalanceRi
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <div className="bg-gray-50 rounded-lg px-3 py-2.5">
+        <div className="bg-black/[0.03] rounded-xl px-3 py-2.5">
           <div className="text-xs text-gray-500">{statLabel}</div>
           <div className="text-lg font-medium text-gray-900">{total}</div>
           <div className="text-xs text-gray-400">{statSub}</div>
         </div>
-        <div className="bg-gray-50 rounded-lg px-3 py-2.5">
+        <div className="bg-black/[0.03] rounded-xl px-3 py-2.5">
           <div className="text-xs text-gray-500">Areas</div>
           <div className="text-lg font-medium text-gray-900">{areas.length}</div>
           <div className="text-xs text-gray-400">active</div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { AppShell } from "@/components/AppShell";
@@ -190,23 +191,19 @@ export default function BrainstormPage() {
     <div className="flex gap-1">
       <button
         onClick={() => setViewMode("tree")}
-        className={`text-xs px-2.5 py-1 rounded-full border ${
-          viewMode === "tree"
-            ? "bg-white border-indigo-300 text-indigo-700 font-medium"
-            : "bg-gray-100 border-gray-200 text-gray-500"
-        }`}
+        className={`focus-button ${viewMode === "tree" ? "active" : ""}`}
       >
         Tree
       </button>
       <button
         onClick={() => setViewMode("graph")}
         disabled={!hasLinks}
-        className={`text-xs px-2.5 py-1 rounded-full border ${
+        className={`focus-button ${
           !hasLinks
-            ? "bg-gray-50 border-gray-200 text-gray-300 cursor-not-allowed"
+            ? "opacity-40 cursor-not-allowed"
             : viewMode === "graph"
-            ? "bg-white border-indigo-300 text-indigo-700 font-medium"
-            : "bg-gray-100 border-gray-200 text-gray-500"
+            ? "active"
+            : ""
         }`}
         title={!hasLinks ? "Link two ideas to unlock" : ""}
       >
@@ -218,24 +215,28 @@ export default function BrainstormPage() {
   return (
     <AppShell title="Brainstorm" headerActions={headerActions} fullWidth={viewMode === "graph"}>
       {undoAction && (
-        <div className="mb-3 flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
-          <span className="text-sm text-amber-900">{undoAction.label}</span>
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-3 flex items-center justify-between gap-3 rounded-[16px] glass-card border-amber-200/40 px-4 py-2.5"
+        >
+          <span className="text-sm text-amber-800 font-medium">{undoAction.label}</span>
           <div className="flex items-center gap-1.5">
             <button
               onClick={handleUndo}
-              className="text-sm font-medium text-amber-900 hover:bg-amber-100 rounded px-2 py-1"
+              className="text-xs font-semibold text-amber-700 hover:bg-amber-100/60 rounded-lg px-2.5 py-1 transition-colors"
             >
               Undo
             </button>
             <button
               onClick={clearUndo}
               aria-label="Dismiss undo"
-              className="w-7 h-7 flex items-center justify-center rounded text-amber-700 hover:bg-amber-100"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-amber-600 hover:bg-amber-100/60 transition-colors"
             >
-              ×
+              <span className="text-sm">×</span>
             </button>
           </div>
-        </div>
+        </motion.div>
       )}
       {viewMode === "tree" ? (
         <IdeaTree
