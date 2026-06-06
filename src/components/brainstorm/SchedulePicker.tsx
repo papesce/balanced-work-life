@@ -56,28 +56,28 @@ export function SchedulePicker({ currentDate, onSelect, onClear, onClose }: Sche
   return (
     <div
       ref={menuRef}
-      className="absolute right-0 top-full mt-1 z-50 w-56 bg-white rounded-lg shadow-lg border border-gray-200 p-2 space-y-1"
+      className="absolute right-0 top-full mt-1 z-50 w-56 glass-card-strong rounded-xl p-2 space-y-1"
     >
       <button
         onClick={() => onSelect(today)}
-        className="w-full text-left px-3 py-1.5 text-sm text-gray-700 rounded-md hover:bg-gray-100 flex justify-between items-center"
+        className="w-full text-left px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 rounded-md hover:bg-black/[0.03] dark:hover:bg-white/[0.06] flex justify-between items-center"
       >
         <span>Hoy</span>
-        <span className="text-[10px] text-gray-400 font-mono uppercase">{formatDate(today)}</span>
+        <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono uppercase">{formatDate(today)}</span>
       </button>
       <button
         onClick={() => onSelect(tomorrow)}
-        className="w-full text-left px-3 py-1.5 text-sm text-gray-700 rounded-md hover:bg-gray-100 flex justify-between items-center"
+        className="w-full text-left px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 rounded-md hover:bg-black/[0.03] dark:hover:bg-white/[0.06] flex justify-between items-center"
       >
         <span>Mañana</span>
-        <span className="text-[10px] text-gray-400 font-mono uppercase">{formatDate(tomorrow)}</span>
+        <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono uppercase">{formatDate(tomorrow)}</span>
       </button>
       <button
         onClick={() => onSelect(nextMonday)}
-        className="w-full text-left px-3 py-1.5 text-sm text-gray-700 rounded-md hover:bg-gray-100 flex justify-between items-center"
+        className="w-full text-left px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 rounded-md hover:bg-black/[0.03] dark:hover:bg-white/[0.06] flex justify-between items-center"
       >
         <span>Lunes</span>
-        <span className="text-[10px] text-gray-400 font-mono uppercase">{formatDate(nextMonday)}</span>
+        <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono uppercase">{formatDate(nextMonday)}</span>
       </button>
       <input
         type="date"
@@ -85,12 +85,12 @@ export function SchedulePicker({ currentDate, onSelect, onClear, onClose }: Sche
         onChange={(e) => {
           if (e.target.value) onSelect(e.target.value);
         }}
-        className="w-full px-3 py-1.5 text-sm text-gray-700 rounded-md border border-gray-200 hover:bg-gray-100 focus:outline-none"
+        className="w-full px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 rounded-lg border border-black/10 dark:border-white/10 bg-white/60 dark:bg-gray-800/60 hover:bg-white/80 dark:hover:bg-gray-800/80 focus:outline-none focus:ring-1 focus:ring-violet-500/40"
       />
       {currentDate && (
         <button
           onClick={onClear}
-          className="w-full text-left px-3 py-1.5 text-sm text-red-600 rounded-md hover:bg-gray-100"
+          className="w-full text-left px-3 py-1.5 text-sm text-red-600 dark:text-red-400 rounded-md hover:bg-black/[0.03] dark:hover:bg-white/[0.06]"
         >
           Quitar
         </button>
