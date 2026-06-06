@@ -14,15 +14,6 @@ import {
   isPast,
 } from "@/lib/dateUtils";
 
-const AREA_COLORS: Record<LifeArea, { bg: string; text: string }> = {
-  work: { bg: "rgba(59, 130, 246, 0.1)", text: "#2563eb" },
-  health: { bg: "rgba(239, 68, 68, 0.1)", text: "#dc2626" },
-  relationships: { bg: "rgba(244, 63, 94, 0.1)", text: "#e11d48" },
-  growth: { bg: "rgba(245, 158, 11, 0.1)", text: "#d97706" },
-  finances: { bg: "rgba(16, 185, 129, 0.1)", text: "#059669" },
-  life: { bg: "rgba(139, 92, 246, 0.1)", text: "#7c3aed" },
-};
-
 const cardVariants = {
   hidden: { opacity: 0, y: 12 },
   visible: (i: number) =>
@@ -98,7 +89,7 @@ export default function TimelinePage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-gray-400">Loading timeline...</div>
+        <div className="animate-pulse text-gray-400 dark:text-gray-500">Loading timeline...</div>
       </div>
     );
   }
@@ -123,10 +114,10 @@ export default function TimelinePage() {
           className="glass-card rounded-[20px] p-4"
         >
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.12em]">
+            <h2 className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-[0.12em]">
               Inbox
             </h2>
-            <span className="text-[10px] font-semibold text-gray-400 bg-black/5 px-2 py-0.5 rounded-full">
+            <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded-full">
               {inboxTasks.length}
             </span>
           </div>
@@ -145,7 +136,7 @@ export default function TimelinePage() {
               <input
                 type="text"
                 placeholder="+ Add to inbox..."
-                className="w-full bg-transparent border-none text-sm py-1.5 focus:ring-0 placeholder:text-gray-300 italic"
+                className="w-full bg-transparent border-none text-sm py-1.5 focus:ring-0 placeholder:text-gray-300 dark:placeholder:text-gray-600 italic"
                 onKeyDown={(e) => handleQuickAdd(e, null)}
               />
               <div className="input-underline" />
@@ -184,17 +175,17 @@ export default function TimelinePage() {
                       <div className="flex flex-col">
                         <span
                           className={`text-[10px] font-semibold tracking-[0.12em] uppercase ${
-                            isTodayDate ? "text-violet-600" : "text-gray-400"
+                            isTodayDate ? "text-violet-600 dark:text-violet-400" : "text-gray-400 dark:text-gray-500"
                           }`}
                         >
                           {isTodayDate ? "Today" : formatDate(date).split(",")[0]}
                         </span>
-                        <span className="text-[22px] font-bold text-gray-900 leading-tight tracking-tight">
+                        <span className="text-[22px] font-bold text-gray-900 dark:text-gray-100 leading-tight tracking-tight">
                           {formatDate(date).split(",")[1]?.trim() || formatDate(date)}
                         </span>
                       </div>
                       {unresolvedCount > 0 && (
-                        <span className="bg-red-100/80 text-red-600 text-[10px] px-2.5 py-0.5 rounded-full font-semibold">
+                        <span className="bg-red-100/80 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[10px] px-2.5 py-0.5 rounded-full font-semibold">
                           {unresolvedCount} unresolved
                         </span>
                       )}
@@ -215,7 +206,7 @@ export default function TimelinePage() {
                         {priorities.map((p) => (
                           <div
                             key={p.id}
-                            className="flex-shrink-0 flex items-center gap-1 bg-amber-50/80 border border-amber-200/50 rounded-full px-3 py-1 text-[10px] font-semibold text-amber-700"
+                            className="flex-shrink-0 flex items-center gap-1 bg-amber-50/80 dark:bg-amber-900/20 border border-amber-200/50 dark:border-amber-700/30 rounded-full px-3 py-1 text-[10px] font-semibold text-amber-700 dark:text-amber-400"
                           >
                             <Star size={10} className="fill-amber-400 text-amber-400" />
                             <span className="truncate max-w-[120px]">{p.text}</span>
@@ -225,7 +216,7 @@ export default function TimelinePage() {
                     )}
 
                     {dayTasks.length === 0 ? (
-                      <p className="text-xs text-gray-400 italic py-1.5">No tasks planned</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 italic py-1.5">No tasks planned</p>
                     ) : (
                       <div className="space-y-0.5">
                         {dayTasks.map((task) => (
@@ -250,22 +241,22 @@ export default function TimelinePage() {
                         transition={{ duration: 0.25, ease: "easeInOut" }}
                         className="overflow-hidden"
                       >
-                        <div className="mt-3 pt-4 border-t border-black/5 space-y-5">
+                        <div className="mt-3 pt-4 border-t border-black/5 dark:border-white/5 space-y-5">
                           <div>
-                            <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.12em] mb-3">
+                            <h3 className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-[0.12em] mb-3">
                               Top Priorities
                             </h3>
                             <div className="space-y-1.5">
                               {priorities.length === 0 ? (
-                                <p className="text-[10px] text-gray-400 italic">No priorities set. Tap the star on a task to prioritize.</p>
+                                <p className="text-[10px] text-gray-400 dark:text-gray-500 italic">No priorities set. Tap the star on a task to prioritize.</p>
                               ) : (
                                 priorities.map((p) => (
                                   <div
                                     key={p.id}
-                                    className="flex items-center gap-2.5 bg-amber-50/60 border border-amber-200/40 rounded-xl p-2.5"
+                                    className="flex items-center gap-2.5 bg-amber-50/60 dark:bg-amber-900/15 border border-amber-200/40 dark:border-amber-700/20 rounded-xl p-2.5"
                                   >
                                     <Star size={14} className="fill-amber-400 text-amber-400 flex-shrink-0" />
-                                    <span className="text-xs font-medium text-amber-900">{p.text}</span>
+                                    <span className="text-xs font-medium text-amber-900 dark:text-amber-300">{p.text}</span>
                                   </div>
                                 ))
                               )}
@@ -273,19 +264,19 @@ export default function TimelinePage() {
                           </div>
 
                           <div>
-                            <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.12em] mb-3">
+                            <h3 className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-[0.12em] mb-3">
                               Today&apos;s Schedule
                             </h3>
                             <div className="space-y-1">
                               {["09:00", "12:00", "15:00", "18:00"].map((time) => (
                                 <div
                                   key={time}
-                                  className="flex items-center gap-3 py-2 border-b border-black/5"
+                                  className="flex items-center gap-3 py-2 border-b border-black/5 dark:border-white/5"
                                 >
-                                  <span className="text-[10px] font-semibold text-gray-400 w-10">
+                                  <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 w-10">
                                     {time}
                                   </span>
-                                  <div className="flex-1 h-6 bg-black/[0.03] rounded-lg border border-dashed border-black/10" />
+                                  <div className="flex-1 h-6 bg-black/[0.03] dark:bg-white/[0.04] rounded-lg border border-dashed border-black/10 dark:border-white/10" />
                                 </div>
                               ))}
                             </div>
@@ -299,7 +290,7 @@ export default function TimelinePage() {
                       <input
                         type="text"
                         placeholder={`+ Add task for ${isTodayDate ? "today" : formatDate(date).split(",")[1]?.trim() || date}...`}
-                        className="w-full bg-transparent border-none text-sm py-1.5 focus:ring-0 placeholder:text-gray-300 italic"
+                        className="w-full bg-transparent border-none text-sm py-1.5 focus:ring-0 placeholder:text-gray-300 dark:placeholder:text-gray-600 italic"
                         onKeyDown={(e) => handleQuickAdd(e, date)}
                       />
                       <div className="input-underline" />
@@ -357,7 +348,7 @@ function TaskRow({
       }}
       transition={{ type: "spring", stiffness: 200, damping: 20 }}
       className={`flex items-center gap-3 rounded-xl px-3 py-2 transition-colors ${
-        isHovered ? "bg-black/[0.03]" : ""
+        isHovered ? "bg-black/[0.03] dark:bg-white/[0.04]" : ""
       }`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -366,7 +357,7 @@ function TaskRow({
         onClick={() => (isCompleted ? onUndone(task.id) : onDone(task.id))}
         className="w-[18px] h-[18px] rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all relative"
         style={{
-          borderColor: isCompleted ? "#7c3aed" : "#d1d5db",
+          borderColor: isCompleted ? "#7c3aed" : "var(--text-subtle)",
           background: isCompleted ? "#7c3aed" : "transparent",
         }}
         aria-label={isCompleted ? "Undo complete" : "Complete task"}
@@ -385,7 +376,7 @@ function TaskRow({
       <motion.span
         animate={{
           textDecoration: isCompleted ? "line-through" : "none",
-          color: isCompleted ? "rgba(107, 114, 128, 0.6)" : "#1f2937",
+          color: isCompleted ? "rgba(107, 114, 128, 0.6)" : "var(--text-primary)",
         }}
         className="text-sm flex-1 truncate"
         style={{ fontWeight: 450 }}
@@ -396,7 +387,7 @@ function TaskRow({
       <button
         onClick={onTogglePriority}
         className={`transition-colors flex-shrink-0 ${
-          task.is_priority ? "text-amber-400" : "text-gray-200 hover:text-gray-400"
+          task.is_priority ? "text-amber-400" : "text-gray-200 dark:text-gray-600 hover:text-gray-400 dark:hover:text-gray-400"
         }`}
         aria-label={task.is_priority ? "Unmark priority" : "Mark priority"}
       >
@@ -412,8 +403,8 @@ function TaskRow({
           onClick={() => setShowAreaPicker(!showAreaPicker)}
           className="text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors"
           style={{
-            background: task.area ? AREA_COLORS[task.area].bg : "rgba(0,0,0,0.04)",
-            color: task.area ? AREA_COLORS[task.area].text : "rgba(156, 163, 175, 1)",
+            background: task.area ? `var(--area-${task.area}-bg)` : "var(--badge-bg)",
+            color: task.area ? `var(--area-${task.area}-text)` : "var(--btn-default-text)",
           }}
         >
           {task.area || "Area"}
@@ -433,7 +424,7 @@ function TaskRow({
       <div className="relative" ref={menuRef}>
         <button
           onClick={() => setShowMenu(!showMenu)}
-          className={`text-gray-300 hover:text-gray-500 transition-all flex-shrink-0 ${
+          className={`text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-all flex-shrink-0 ${
             isHovered || showMenu ? "opacity-100" : "opacity-0"
           }`}
           aria-label="Task actions"
@@ -447,14 +438,14 @@ function TaskRow({
                 onUpdate(task.id, { scheduled_date: today, status: "scheduled" });
                 setShowMenu(false);
               }}
-              className="flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs font-medium text-gray-600 hover:bg-black/[0.03] transition-colors"
+              className="flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors"
             >
               Move to Today
             </button>
             <div className="relative">
               <button
                 onClick={() => setShowDatePicker(!showDatePicker)}
-                className="flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs font-medium text-gray-600 hover:bg-black/[0.03] transition-colors"
+                className="flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors"
               >
                 Pick Date
               </button>
@@ -462,7 +453,7 @@ function TaskRow({
                 <div className="absolute left-full top-0 ml-2 z-50 glass-card-strong rounded-xl p-2 shadow-lg">
                   <input
                     type="date"
-                    className="text-xs border border-black/10 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500 bg-white/80"
+                    className="text-xs border border-black/10 dark:border-white/10 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500 bg-white/80 dark:bg-gray-800/80 text-gray-800 dark:text-gray-200"
                     onChange={(e) => {
                       if (e.target.value) {
                         onUpdate(task.id, { scheduled_date: e.target.value, status: "scheduled" });
@@ -479,18 +470,18 @@ function TaskRow({
                 onUpdate(task.id, { scheduled_date: null, status: "inbox" });
                 setShowMenu(false);
               }}
-              className="flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs font-medium text-gray-600 hover:bg-black/[0.03] transition-colors"
+              className="flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors"
             >
               Move to Backlog
             </button>
-            <div className="border-t border-black/5 my-1" />
+            <div className="border-t border-black/5 dark:border-white/5 my-1" />
             <button
               onClick={() => {
                 if (isCompleted) onUndone(task.id);
                 else onDone(task.id);
                 setShowMenu(false);
               }}
-              className="flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs font-medium text-gray-600 hover:bg-black/[0.03] transition-colors"
+              className="flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors"
             >
               {isCompleted ? "Mark Undone" : "Mark Complete"}
             </button>
@@ -499,7 +490,7 @@ function TaskRow({
                 onUpdate(task.id, { status: "archived" });
                 setShowMenu(false);
               }}
-              className="flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-50/50 transition-colors"
+              className="flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs font-medium text-red-500 dark:text-red-400 hover:bg-red-50/50 dark:hover:bg-red-900/20 transition-colors"
             >
               Archive
             </button>

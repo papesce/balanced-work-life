@@ -24,13 +24,15 @@ export function Navigation({ className = "" }: NavigationProps) {
               key={item.href}
               href={item.href}
               className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-colors ${
-                active ? "text-violet-600" : "text-gray-400 hover:text-gray-600"
+                active
+                  ? "text-violet-600 dark:text-violet-400"
+                  : "text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400"
               }`}
             >
               <Icon
                 size={18}
                 strokeWidth={active ? 2 : 1.5}
-                className={active ? "text-violet-600" : ""}
+                className={active ? "text-violet-600 dark:text-violet-400" : ""}
               />
               <span className="text-[10px] font-semibold tracking-tight">
                 {item.label}
