@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { useIdeas } from "@/hooks/useIdeas";
@@ -92,29 +93,39 @@ export default function BackupPage() {
 
   return (
     <AppShell title="Backup">
-      <div className="space-y-8">
+      <div className="space-y-5">
         {/* Export */}
-        <section className="bg-white rounded-xl p-6 shadow-sm">
-          <h2 className="text-base font-semibold text-gray-900 mb-1">Export</h2>
-          <p className="text-sm text-gray-500 mb-4">
+        <motion.section
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="glass-card rounded-[20px] p-5"
+        >
+          <h2 className="text-sm font-bold text-gray-800 mb-1">Export</h2>
+          <p className="text-xs text-gray-500 mb-4">
             Download a JSON snapshot of all your ideas and links.
           </p>
           <button
             onClick={handleExport}
             disabled={exporting}
-            className="px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+            className="px-4 py-2 bg-white/80 text-sm font-medium text-gray-700 rounded-xl border border-black/10 hover:bg-white hover:shadow-sm transition-all disabled:opacity-50"
           >
             {exporting ? "Exporting..." : "Download backup"}
           </button>
-        </section>
+        </motion.section>
 
         {/* Import */}
-        <section className="bg-white rounded-xl p-6 shadow-sm">
-          <h2 className="text-base font-semibold text-gray-900 mb-1">Import</h2>
-          <p className="text-sm text-gray-500 mb-4">
+        <motion.section
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.05 }}
+          className="glass-card rounded-[20px] p-5"
+        >
+          <h2 className="text-sm font-bold text-gray-800 mb-1">Import</h2>
+          <p className="text-xs text-gray-500 mb-4">
             Restore from a previously exported JSON file. Existing data is merged (not overwritten).
           </p>
-          <label className="inline-block px-4 py-2.5 border border-gray-300 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+          <label className="inline-block px-4 py-2 bg-white/80 text-sm font-medium text-gray-700 rounded-xl border border-black/10 hover:bg-white hover:shadow-sm cursor-pointer transition-all">
             {importing ? "Importing..." : "Choose file..."}
             <input
               type="file"
@@ -128,19 +139,21 @@ export default function BackupPage() {
               }}
             />
           </label>
-        </section>
+        </motion.section>
 
         {/* Feedback */}
         {message && (
-          <div
-            className={`rounded-lg px-4 py-3 text-sm ${
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`rounded-[16px] px-4 py-3 text-sm ${
               message.type === "success"
-                ? "bg-green-50 text-green-800"
-                : "bg-red-50 text-red-800"
+                ? "glass-card border-emerald-200/50 text-emerald-700"
+                : "glass-card border-red-200/50 text-red-600"
             }`}
           >
             {message.text}
-          </div>
+          </motion.div>
         )}
       </div>
     </AppShell>

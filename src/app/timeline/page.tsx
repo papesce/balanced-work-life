@@ -1,24 +1,36 @@
 "use client";
 
 import { useMemo, useState, useRef, useEffect } from "react";
+import { motion } from "framer-motion";
+import { Star, MoreHorizontal, Check } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
 import { AppShell } from "@/components/AppShell";
 import { AreaPicker } from "@/components/brainstorm/AreaPicker";
 import { Idea, LifeArea } from "@/lib/types";
-import { 
-  getToday, 
-  getDatesRange, 
-  formatDate, 
-  isPast 
+import {
+  getToday,
+  getDatesRange,
+  formatDate,
+  isPast,
 } from "@/lib/dateUtils";
 
-const AREA_COLORS: Record<LifeArea, string> = {
-  work: "bg-indigo-50 text-indigo-600 border-indigo-200",
-  health: "bg-red-50 text-red-600 border-red-200",
-  relationships: "bg-pink-50 text-pink-600 border-pink-200",
-  growth: "bg-amber-50 text-amber-600 border-amber-200",
-  finances: "bg-emerald-50 text-emerald-600 border-emerald-200",
-  life: "bg-purple-50 text-purple-600 border-purple-200",
+const AREA_COLORS: Record<LifeArea, { bg: string; text: string }> = {
+  work: { bg: "rgba(59, 130, 246, 0.1)", text: "#2563eb" },
+  health: { bg: "rgba(239, 68, 68, 0.1)", text: "#dc2626" },
+  relationships: { bg: "rgba(244, 63, 94, 0.1)", text: "#e11d48" },
+  growth: { bg: "rgba(245, 158, 11, 0.1)", text: "#d97706" },
+  finances: { bg: "rgba(16, 185, 129, 0.1)", text: "#059669" },
+  life: { bg: "rgba(139, 92, 246, 0.1)", text: "#7c3aed" },
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 12 },
+  visible: (i: number) =>
+    ({
+      opacity: 1,
+      y: 0,
+      transition: { delay: i * 0.06, duration: 0.35, ease: "easeOut" },
+    }) as const,
 };
 
 export default function TimelinePage() {
@@ -49,11 +61,11 @@ export default function TimelinePage() {
   }, [tasks]);
 
   const handleAdd = async (text: string, area: LifeArea, scheduledDate: string | null) => {
-    await createIdea(text, null, "top", { 
-      type: "task", 
-      area, 
+    await createIdea(text, null, "top", {
+      type: "task",
+      area,
       scheduled_date: scheduledDate,
-      status: scheduledDate ? "scheduled" : "inbox"
+      status: scheduledDate ? "scheduled" : "inbox",
     });
   };
 
@@ -75,7 +87,6 @@ export default function TimelinePage() {
 
   useEffect(() => {
     if (!loading && !hasAutoScrolled.current) {
-      // Small delay to ensure the DOM is ready for scrolling
       const timer = setTimeout(() => {
         scrollToToday();
         hasAutoScrolled.current = true;
@@ -95,7 +106,7 @@ export default function TimelinePage() {
   const headerActions = (
     <button
       onClick={scrollToToday}
-      className="text-xs px-3 py-1 bg-indigo-600 text-white rounded-full font-bold hover:bg-indigo-700 shadow-sm transition-colors"
+      className="focus-button"
     >
       Jump to Today
     </button>
@@ -103,108 +114,125 @@ export default function TimelinePage() {
 
   return (
     <AppShell title="Timeline" onAdd={handleAdd} headerActions={headerActions}>
-      <div className="space-y-8 pb-20">
+      <div className="space-y-5 pb-20">
         {/* Inbox Section */}
-        <section className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+        <motion.section
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="glass-card rounded-[20px] p-4"
+        >
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wider">Inbox</h2>
-            <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-bold">
+            <h2 className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.12em]">
+              Inbox
+            </h2>
+            <span className="text-[10px] font-semibold text-gray-400 bg-black/5 px-2 py-0.5 rounded-full">
               {inboxTasks.length}
             </span>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {inboxTasks.map((task) => (
-              <TaskRow 
-                key={task.id} 
-                task={task} 
-                onDone={markDone} 
+              <TaskRow
+                key={task.id}
+                task={task}
+                onDone={markDone}
                 onUndone={markUndone}
                 onUpdate={updateIdea}
-                onTogglePriority={() => togglePriority(task)} 
+                onTogglePriority={() => togglePriority(task)}
               />
             ))}
-            <input
-              type="text"
-              placeholder="+ Add to inbox..."
-              className="w-full bg-transparent border-none text-sm py-1 focus:ring-0 placeholder:text-gray-400"
-              onKeyDown={(e) => handleQuickAdd(e, null)}
-            />
+            <div className="task-input-wrapper">
+              <input
+                type="text"
+                placeholder="+ Add to inbox..."
+                className="w-full bg-transparent border-none text-sm py-1.5 focus:ring-0 placeholder:text-gray-300 italic"
+                onKeyDown={(e) => handleQuickAdd(e, null)}
+              />
+              <div className="input-underline" />
+            </div>
           </div>
-        </section>
+        </motion.section>
 
         {/* Scrollable Days */}
-        <div className="space-y-6">
-          {dates.map((date) => {
+        <div className="space-y-4">
+          {dates.map((date, index) => {
             const dayTasks = tasksByDate[date] || [];
             const isTodayDate = date === today;
             const unresolvedCount = dayTasks.filter((t) => !t.done_at && isPast(date)).length;
             const isFocused = focusDay === date;
-            const priorities = dayTasks.filter(t => t.is_priority);
+            const priorities = dayTasks.filter((t) => t.is_priority);
 
             return (
-              <section 
-                key={date} 
+              <motion.section
+                key={date}
                 ref={isTodayDate ? todayRef : null}
-                className={`relative ${isTodayDate ? "scale-[1.02] z-10" : ""}`}
+                custom={index}
+                variants={cardVariants}
+                initial="hidden"
+                animate="visible"
               >
-                <div 
-                  className={`rounded-xl border transition-all ${
-                    isTodayDate 
-                      ? "bg-white border-indigo-200 shadow-md ring-1 ring-indigo-50" 
-                      : "bg-white border-gray-100 shadow-sm"
-                  } ${isFocused ? "ring-2 ring-indigo-500" : ""}`}
+                <div
+                  className={`rounded-[20px] transition-all ${
+                    isTodayDate
+                      ? "glass-card-today"
+                      : "glass-card"
+                  } ${isFocused ? "ring-2 ring-violet-400/30" : ""}`}
                 >
                   {/* Day Header */}
-                  <div className="flex items-center justify-between p-4 border-b border-gray-50">
+                  <div className="flex items-center justify-between px-5 pt-4 pb-3">
                     <div className="flex items-center gap-3">
                       <div className="flex flex-col">
-                        <span className={`text-xs font-bold uppercase tracking-tighter ${isTodayDate ? "text-indigo-600" : "text-gray-400"}`}>
+                        <span
+                          className={`text-[10px] font-semibold tracking-[0.12em] uppercase ${
+                            isTodayDate ? "text-violet-600" : "text-gray-400"
+                          }`}
+                        >
                           {isTodayDate ? "Today" : formatDate(date).split(",")[0]}
                         </span>
-                        <span className="text-lg font-black text-gray-900 leading-tight">
-                          {formatDate(date).split(",")[1]}
+                        <span className="text-[22px] font-bold text-gray-900 leading-tight tracking-tight">
+                          {formatDate(date).split(",")[1]?.trim() || formatDate(date)}
                         </span>
                       </div>
                       {unresolvedCount > 0 && (
-                        <span className="bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded-full font-black animate-pulse">
-                          {unresolvedCount} UNRESOLVED
+                        <span className="bg-red-100/80 text-red-600 text-[10px] px-2.5 py-0.5 rounded-full font-semibold">
+                          {unresolvedCount} unresolved
                         </span>
                       )}
                     </div>
-                    <button 
+                    <button
                       onClick={() => setFocusDay(isFocused ? null : date)}
-                      className={`text-xs px-3 py-1 rounded-full font-bold transition-colors ${
-                        isFocused 
-                          ? "bg-indigo-600 text-white" 
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      }`}
+                      className={`focus-button ${isFocused ? "active" : ""}`}
                     >
                       {isFocused ? "Close Focus" : "Focus"}
                     </button>
                   </div>
 
                   {/* Day Content */}
-                  <div className="p-4 space-y-3">
+                  <div className="px-5 pb-4 space-y-2.5">
                     {/* Top Priorities in Normal Mode (Teaser) */}
                     {!isFocused && priorities.length > 0 && (
                       <div className="flex gap-2 mb-2 overflow-x-auto pb-1 no-scrollbar">
-                        {priorities.map(p => (
-                          <div key={p.id} className="flex-shrink-0 bg-amber-50 border border-amber-200 rounded px-2 py-0.5 text-[10px] font-bold text-amber-700">
-                            ★ {p.text}
+                        {priorities.map((p) => (
+                          <div
+                            key={p.id}
+                            className="flex-shrink-0 flex items-center gap-1 bg-amber-50/80 border border-amber-200/50 rounded-full px-3 py-1 text-[10px] font-semibold text-amber-700"
+                          >
+                            <Star size={10} className="fill-amber-400 text-amber-400" />
+                            <span className="truncate max-w-[120px]">{p.text}</span>
                           </div>
                         ))}
                       </div>
                     )}
 
                     {dayTasks.length === 0 ? (
-                      <p className="text-xs text-gray-400 italic py-2">No tasks planned</p>
+                      <p className="text-xs text-gray-400 italic py-1.5">No tasks planned</p>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="space-y-0.5">
                         {dayTasks.map((task) => (
-                          <TaskRow 
-                            key={task.id} 
-                            task={task} 
-                            onDone={markDone} 
+                          <TaskRow
+                            key={task.id}
+                            task={task}
+                            onDone={markDone}
                             onUndone={markUndone}
                             onUpdate={updateIdea}
                             onTogglePriority={() => togglePriority(task)}
@@ -212,50 +240,73 @@ export default function TimelinePage() {
                         ))}
                       </div>
                     )}
-                    
+
                     {/* Focus Mode Expansion */}
                     {isFocused && (
-                      <div className="mt-4 pt-4 border-t border-gray-100 animate-in fade-in slide-in-from-top-2 space-y-6">
-                        <div>
-                          <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Top Priorities</h3>
-                          <div className="space-y-2">
-                            {priorities.length === 0 ? (
-                              <p className="text-[10px] text-gray-400 italic">No priorities set. Tap ★ on a task to prioritize.</p>
-                            ) : (
-                              priorities.map(p => (
-                                <div key={p.id} className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-lg p-2">
-                                  <span className="text-amber-500">★</span>
-                                  <span className="text-xs font-bold text-amber-900">{p.text}</span>
-                                </div>
-                              ))
-                            )}
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.25, ease: "easeInOut" }}
+                        className="overflow-hidden"
+                      >
+                        <div className="mt-3 pt-4 border-t border-black/5 space-y-5">
+                          <div>
+                            <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.12em] mb-3">
+                              Top Priorities
+                            </h3>
+                            <div className="space-y-1.5">
+                              {priorities.length === 0 ? (
+                                <p className="text-[10px] text-gray-400 italic">No priorities set. Tap the star on a task to prioritize.</p>
+                              ) : (
+                                priorities.map((p) => (
+                                  <div
+                                    key={p.id}
+                                    className="flex items-center gap-2.5 bg-amber-50/60 border border-amber-200/40 rounded-xl p-2.5"
+                                  >
+                                    <Star size={14} className="fill-amber-400 text-amber-400 flex-shrink-0" />
+                                    <span className="text-xs font-medium text-amber-900">{p.text}</span>
+                                  </div>
+                                ))
+                              )}
+                            </div>
                           </div>
-                        </div>
 
-                        <div>
-                          <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Today's Schedule</h3>
-                          <div className="space-y-1">
-                            {["09:00", "12:00", "15:00", "18:00"].map(time => (
-                              <div key={time} className="flex items-center gap-3 py-2 border-b border-gray-50">
-                                <span className="text-[10px] font-bold text-gray-400 w-10">{time}</span>
-                                <div className="flex-1 h-6 bg-gray-50 rounded border border-dashed border-gray-200"></div>
-                              </div>
-                            ))}
+                          <div>
+                            <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.12em] mb-3">
+                              Today&apos;s Schedule
+                            </h3>
+                            <div className="space-y-1">
+                              {["09:00", "12:00", "15:00", "18:00"].map((time) => (
+                                <div
+                                  key={time}
+                                  className="flex items-center gap-3 py-2 border-b border-black/5"
+                                >
+                                  <span className="text-[10px] font-semibold text-gray-400 w-10">
+                                    {time}
+                                  </span>
+                                  <div className="flex-1 h-6 bg-black/[0.03] rounded-lg border border-dashed border-black/10" />
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      </motion.div>
                     )}
 
                     {/* Inline Add */}
-                    <input
-                      type="text"
-                      placeholder={`+ Add task for ${isTodayDate ? "today" : formatDate(date).split(",")[1]}...`}
-                      className="w-full bg-transparent border-none text-sm py-1 focus:ring-0 placeholder:text-gray-300 italic"
-                      onKeyDown={(e) => handleQuickAdd(e, date)}
-                    />
+                    <div className="task-input-wrapper pt-1">
+                      <input
+                        type="text"
+                        placeholder={`+ Add task for ${isTodayDate ? "today" : formatDate(date).split(",")[1]?.trim() || date}...`}
+                        className="w-full bg-transparent border-none text-sm py-1.5 focus:ring-0 placeholder:text-gray-300 italic"
+                        onKeyDown={(e) => handleQuickAdd(e, date)}
+                      />
+                      <div className="input-underline" />
+                    </div>
                   </div>
                 </div>
-              </section>
+              </motion.section>
             );
           })}
         </div>
@@ -264,50 +315,106 @@ export default function TimelinePage() {
   );
 }
 
-function TaskRow({ 
-  task, 
-  onDone, 
+function TaskRow({
+  task,
+  onDone,
   onUndone,
   onUpdate,
-  onTogglePriority
-}: { 
-  task: Idea; 
-  onDone: (id: string) => void; 
+  onTogglePriority,
+}: {
+  task: Idea;
+  onDone: (id: string) => void;
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onTogglePriority: () => void;
 }) {
   const isCompleted = !!task.done_at;
   const [showAreaPicker, setShowAreaPicker] = useState(false);
-  
+  const [showMenu, setShowMenu] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const today = getToday();
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+        setShowDatePicker(false);
+      }
+    };
+    if (showMenu) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showMenu]);
+
   return (
-    <div className={`flex items-center gap-3 transition-opacity ${isCompleted ? "opacity-40" : ""}`}>
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 4 }}
+      animate={{
+        opacity: isCompleted ? 0.4 : 1,
+        y: 0,
+      }}
+      transition={{ type: "spring", stiffness: 200, damping: 20 }}
+      className={`flex items-center gap-3 rounded-xl px-3 py-2 transition-colors ${
+        isHovered ? "bg-black/[0.03]" : ""
+      }`}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <button
-        onClick={() => isCompleted ? onUndone(task.id) : onDone(task.id)}
-        className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-          isCompleted 
-            ? "bg-green-500 border-green-500" 
-            : "border-gray-300 hover:border-indigo-500"
-        }`}
+        onClick={() => (isCompleted ? onUndone(task.id) : onDone(task.id))}
+        className="w-[18px] h-[18px] rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all relative"
+        style={{
+          borderColor: isCompleted ? "#7c3aed" : "#d1d5db",
+          background: isCompleted ? "#7c3aed" : "transparent",
+        }}
+        aria-label={isCompleted ? "Undo complete" : "Complete task"}
       >
-        {isCompleted && <span className="text-white text-[10px]">✓</span>}
+        {isCompleted && (
+          <motion.span
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 300, damping: 15 }}
+          >
+            <Check size={10} strokeWidth={3} className="text-white" />
+          </motion.span>
+        )}
       </button>
-      <span className={`text-sm text-gray-800 flex-1 truncate ${isCompleted ? "line-through text-gray-500" : ""}`}>
-        {task.text}
-      </span>
-      <button 
-        onClick={onTogglePriority}
-        className={`text-xs transition-colors ${task.is_priority ? "text-amber-500" : "text-gray-200 hover:text-gray-400"}`}
+
+      <motion.span
+        animate={{
+          textDecoration: isCompleted ? "line-through" : "none",
+          color: isCompleted ? "rgba(107, 114, 128, 0.6)" : "#1f2937",
+        }}
+        className="text-sm flex-1 truncate"
+        style={{ fontWeight: 450 }}
       >
-        ★
+        {task.text}
+      </motion.span>
+
+      <button
+        onClick={onTogglePriority}
+        className={`transition-colors flex-shrink-0 ${
+          task.is_priority ? "text-amber-400" : "text-gray-200 hover:text-gray-400"
+        }`}
+        aria-label={task.is_priority ? "Unmark priority" : "Mark priority"}
+      >
+        <Star
+          size={14}
+          strokeWidth={1.5}
+          className={task.is_priority ? "fill-amber-400" : ""}
+        />
       </button>
 
       <div className="relative">
         <button
           onClick={() => setShowAreaPicker(!showAreaPicker)}
-          className={`text-[10px] px-1.5 py-0.5 rounded font-black uppercase border transition-colors ${
-            task.area ? AREA_COLORS[task.area] : "border-gray-200 text-gray-400 hover:border-gray-300"
-          }`}
+          className="text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors"
+          style={{
+            background: task.area ? AREA_COLORS[task.area].bg : "rgba(0,0,0,0.04)",
+            color: task.area ? AREA_COLORS[task.area].text : "rgba(156, 163, 175, 1)",
+          }}
         >
           {task.area || "Area"}
         </button>
@@ -322,6 +429,83 @@ function TaskRow({
           />
         )}
       </div>
-    </div>
+
+      <div className="relative" ref={menuRef}>
+        <button
+          onClick={() => setShowMenu(!showMenu)}
+          className={`text-gray-300 hover:text-gray-500 transition-all flex-shrink-0 ${
+            isHovered || showMenu ? "opacity-100" : "opacity-0"
+          }`}
+          aria-label="Task actions"
+        >
+          <MoreHorizontal size={16} strokeWidth={1.5} />
+        </button>
+        {showMenu && (
+          <div className="absolute right-0 top-full mt-1 z-50 glass-card-strong rounded-xl py-1.5 min-w-[170px] shadow-lg">
+            <button
+              onClick={() => {
+                onUpdate(task.id, { scheduled_date: today, status: "scheduled" });
+                setShowMenu(false);
+              }}
+              className="flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs font-medium text-gray-600 hover:bg-black/[0.03] transition-colors"
+            >
+              Move to Today
+            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowDatePicker(!showDatePicker)}
+                className="flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs font-medium text-gray-600 hover:bg-black/[0.03] transition-colors"
+              >
+                Pick Date
+              </button>
+              {showDatePicker && (
+                <div className="absolute left-full top-0 ml-2 z-50 glass-card-strong rounded-xl p-2 shadow-lg">
+                  <input
+                    type="date"
+                    className="text-xs border border-black/10 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500 bg-white/80"
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        onUpdate(task.id, { scheduled_date: e.target.value, status: "scheduled" });
+                        setShowMenu(false);
+                      }
+                    }}
+                    autoFocus
+                  />
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => {
+                onUpdate(task.id, { scheduled_date: null, status: "inbox" });
+                setShowMenu(false);
+              }}
+              className="flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs font-medium text-gray-600 hover:bg-black/[0.03] transition-colors"
+            >
+              Move to Backlog
+            </button>
+            <div className="border-t border-black/5 my-1" />
+            <button
+              onClick={() => {
+                if (isCompleted) onUndone(task.id);
+                else onDone(task.id);
+                setShowMenu(false);
+              }}
+              className="flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs font-medium text-gray-600 hover:bg-black/[0.03] transition-colors"
+            >
+              {isCompleted ? "Mark Undone" : "Mark Complete"}
+            </button>
+            <button
+              onClick={() => {
+                onUpdate(task.id, { status: "archived" });
+                setShowMenu(false);
+              }}
+              className="flex items-center gap-2.5 w-full text-left px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-50/50 transition-colors"
+            >
+              Archive
+            </button>
+          </div>
+        )}
+      </div>
+    </motion.div>
   );
 }

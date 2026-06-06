@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ArrowRight, ArrowLeft, X } from "lucide-react";
 import { Idea, IdeaLink, LinkType } from "@/lib/types";
 import { IdeaSearchPicker } from "./IdeaSearchPicker";
 
@@ -102,20 +103,20 @@ export function LinkPanel({
           <div className="flex flex-wrap gap-1">
             {ideaLinks.map((link) => {
               const otherId = link.source_id === ideaId ? link.target_id : link.source_id;
-              const direction = link.source_id === ideaId ? "→" : "←";
+              const DirectionIcon = link.source_id === ideaId ? ArrowRight : ArrowLeft;
               return (
                 <span
                   key={link.id}
                   className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full"
                 >
-                  <span className="text-gray-400">{direction}</span>
+                  <DirectionIcon size={10} strokeWidth={2} className="text-gray-400" />
                   <span className="truncate max-w-[120px]">{getIdeaText(otherId)}</span>
                   <span className="text-gray-400">({link.link_type.replace("_", " ")})</span>
                   <button
                     onClick={() => onDeleteLink(link.id)}
                     className="text-gray-400 hover:text-red-500 ml-0.5"
                   >
-                    ×
+                    <X size={12} strokeWidth={2} />
                   </button>
                 </span>
               );
