@@ -101,14 +101,14 @@ export default function BackupPage() {
           transition={{ duration: 0.3 }}
           className="glass-card rounded-[20px] p-5"
         >
-          <h2 className="text-sm font-bold text-gray-800 mb-1">Export</h2>
-          <p className="text-xs text-gray-500 mb-4">
+          <h2 className="text-sm font-bold text-gray-800 dark:text-gray-200 mb-1">Export</h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
             Download a JSON snapshot of all your ideas and links.
           </p>
           <button
             onClick={handleExport}
             disabled={exporting}
-            className="px-4 py-2 bg-white/80 text-sm font-medium text-gray-700 rounded-xl border border-black/10 hover:bg-white hover:shadow-sm transition-all disabled:opacity-50"
+            className="px-4 py-2 bg-white/80 dark:bg-gray-700/80 text-sm font-medium text-gray-700 dark:text-gray-300 rounded-xl border border-black/10 dark:border-white/10 hover:bg-white dark:hover:bg-gray-700 hover:shadow-sm transition-all disabled:opacity-50"
           >
             {exporting ? "Exporting..." : "Download backup"}
           </button>
@@ -121,11 +121,11 @@ export default function BackupPage() {
           transition={{ duration: 0.3, delay: 0.05 }}
           className="glass-card rounded-[20px] p-5"
         >
-          <h2 className="text-sm font-bold text-gray-800 mb-1">Import</h2>
-          <p className="text-xs text-gray-500 mb-4">
+          <h2 className="text-sm font-bold text-gray-800 dark:text-gray-200 mb-1">Import</h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
             Restore from a previously exported JSON file. Existing data is merged (not overwritten).
           </p>
-          <label className="inline-block px-4 py-2 bg-white/80 text-sm font-medium text-gray-700 rounded-xl border border-black/10 hover:bg-white hover:shadow-sm cursor-pointer transition-all">
+          <label className="inline-block px-4 py-2 bg-white/80 dark:bg-gray-700/80 text-sm font-medium text-gray-700 dark:text-gray-300 rounded-xl border border-black/10 dark:border-white/10 hover:bg-white dark:hover:bg-gray-700 hover:shadow-sm cursor-pointer transition-all">
             {importing ? "Importing..." : "Choose file..."}
             <input
               type="file"
@@ -148,8 +148,8 @@ export default function BackupPage() {
             animate={{ opacity: 1, y: 0 }}
             className={`rounded-[16px] px-4 py-3 text-sm ${
               message.type === "success"
-                ? "glass-card border-emerald-200/50 text-emerald-700"
-                : "glass-card border-red-200/50 text-red-600"
+                ? "glass-card border-emerald-200/50 dark:border-emerald-700/30 text-emerald-700 dark:text-emerald-400"
+                : "glass-card border-red-200/50 dark:border-red-700/30 text-red-600 dark:text-red-400"
             }`}
           >
             {message.text}

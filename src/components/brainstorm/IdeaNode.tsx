@@ -47,20 +47,20 @@ function formatScheduleDate(date: string, today: string): string {
 }
 
 const TYPE_COLORS: Record<IdeaType, string> = {
-  idea: "bg-orange-50 text-orange-700 border-orange-200",
-  objective: "bg-purple-50 text-purple-700 border-purple-200",
-  project: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  initiative: "bg-amber-50 text-amber-700 border-amber-200",
-  task: "bg-blue-50 text-blue-700 border-blue-200",
+  idea: "bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-700/30",
+  objective: "bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-700/30",
+  project: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700/30",
+  initiative: "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700/30",
+  task: "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700/30",
 };
 
 const AREA_COLORS: Record<LifeArea, string> = {
-  work: "bg-blue-50 text-blue-700 border-blue-200",
-  health: "bg-red-50 text-red-700 border-red-200",
-  relationships: "bg-pink-50 text-pink-700 border-pink-200",
-  growth: "bg-amber-50 text-amber-700 border-amber-200",
-  finances: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  life: "bg-green-50 text-green-700 border-green-200",
+  work: "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700/30",
+  health: "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-700/30",
+  relationships: "bg-pink-50 dark:bg-pink-900/20 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-700/30",
+  growth: "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700/30",
+  finances: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700/30",
+  life: "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700/30",
 };
 
 export function IdeaNode({

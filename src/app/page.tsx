@@ -25,14 +25,12 @@ const MODE_META: Record<RingMode, { desc: string; statLabel: string; statSub: st
 
 const GROUP_ORDER: ScheduleGroup[] = ["Today", "Tomorrow", "This week", "Later", "Unscheduled"];
 
-const AREA_COLORS: Record<LifeArea, { bg: string; text: string }> = {
-  work: { bg: "rgba(59, 130, 246, 0.1)", text: "#2563eb" },
-  health: { bg: "rgba(239, 68, 68, 0.1)", text: "#dc2626" },
-  relationships: { bg: "rgba(244, 63, 94, 0.1)", text: "#e11d48" },
-  growth: { bg: "rgba(245, 158, 11, 0.1)", text: "#d97706" },
-  finances: { bg: "rgba(16, 185, 129, 0.1)", text: "#059669" },
-  life: { bg: "rgba(139, 92, 246, 0.1)", text: "#7c3aed" },
-};
+function areaStyle(area: LifeArea): React.CSSProperties {
+  return {
+    background: `var(--area-${area}-bg)`,
+    color: `var(--area-${area}-text)`,
+  };
+}
 
 function areaCounts(items: Idea[]): Record<LifeArea, number> {
   const counts: Record<LifeArea, number> = { work: 0, health: 0, relationships: 0, growth: 0, finances: 0, life: 0 };
@@ -102,7 +100,7 @@ export default function TodayPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-gray-400">Loading...</div>
+        <div className="animate-pulse text-gray-400 dark:text-gray-500">Loading...</div>
       </div>
     );
   }
@@ -111,15 +109,15 @@ export default function TodayPage() {
     <AppShell title="Today" onAdd={handleAdd}>
       <div className="space-y-5">
         {/* Mode toggle */}
-        <div className="flex gap-0.5 bg-white/60 backdrop-blur-sm rounded-xl p-1 border border-white/20 shadow-sm">
+        <div className="flex gap-0.5 bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl p-1 border border-white/20 dark:border-white/5 shadow-sm">
           {MODES.map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setMode(key)}
               className={`flex-1 px-2 py-1.5 text-xs rounded-lg transition-all ${
                 mode === key
-                  ? "bg-white text-gray-800 font-medium shadow-sm border border-gray-200/60"
-                  : "text-gray-400 hover:text-gray-600"
+                  ? "bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-medium shadow-sm border border-gray-200/60 dark:border-gray-600"
+                  : "text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400"
               }`}
             >
               {label}
@@ -147,8 +145,8 @@ export default function TodayPage() {
               transition={{ duration: 0.3 }}
             >
               <div className="flex items-center gap-2 mb-2.5">
-                <h2 className="text-xs font-semibold text-gray-600">{group}</h2>
-                <span className="text-[10px] font-semibold text-violet-600 bg-violet-100/60 px-2 py-0.5 rounded-full">
+                <h2 className="text-xs font-semibold text-gray-600 dark:text-gray-400">{group}</h2>
+                <span className="text-[10px] font-semibold text-violet-600 dark:text-violet-400 bg-violet-100/60 dark:bg-violet-500/20 px-2 py-0.5 rounded-full">
                   {items.length}
                 </span>
               </div>
@@ -160,19 +158,16 @@ export default function TodayPage() {
                   >
                     <button
                       onClick={() => markDone(idea.id)}
-                      className="w-[18px] h-[18px] rounded-full border-2 border-gray-300 hover:border-violet-500 flex-shrink-0 transition-colors"
+                      className="w-[18px] h-[18px] rounded-full border-2 border-gray-300 dark:border-gray-600 hover:border-violet-500 flex-shrink-0 transition-colors"
                       aria-label="Complete task"
                     />
-                    <span className="text-sm text-gray-800 truncate flex-1" style={{ fontWeight: 450 }}>
+                    <span className="text-sm text-gray-800 dark:text-gray-200 truncate flex-1" style={{ fontWeight: 450 }}>
                       {idea.text}
                     </span>
                     {idea.area && (
                       <span
                         className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                        style={{
-                          background: AREA_COLORS[idea.area].bg,
-                          color: AREA_COLORS[idea.area].text,
-                        }}
+                        style={areaStyle(idea.area)}
                       >
                         {idea.area}
                       </span>
@@ -180,7 +175,7 @@ export default function TodayPage() {
                     {group !== "Today" && (
                       <button
                         onClick={() => scheduleIdea(idea.id, today)}
-                        className="text-[11px] text-violet-600 hover:text-violet-800 font-medium flex-shrink-0 transition-colors"
+                        className="text-[11px] text-violet-600 dark:text-violet-400 hover:text-violet-800 dark:hover:text-violet-300 font-medium flex-shrink-0 transition-colors"
                         title="Move to today"
                       >
                         → Today
@@ -199,11 +194,11 @@ export default function TodayPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.1 }}
         >
-          <h2 className="text-xs font-semibold text-gray-500 mb-2.5">
+          <h2 className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2.5">
             Completed today ({doneToday.length})
           </h2>
           {doneToday.length === 0 ? (
-            <p className="text-xs text-gray-400 py-2 italic">No tasks completed yet today</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 py-2 italic">No tasks completed yet today</p>
           ) : (
             <div className="space-y-1.5">
               {doneToday.map((idea) => (
@@ -218,16 +213,13 @@ export default function TodayPage() {
                   >
                     <Check size={10} strokeWidth={3} className="text-white" />
                   </button>
-                  <span className="text-sm text-gray-400 line-through truncate flex-1" style={{ opacity: 0.6 }}>
+                  <span className="text-sm text-gray-400 dark:text-gray-500 line-through truncate flex-1" style={{ opacity: 0.6 }}>
                     {idea.text}
                   </span>
                   {idea.area && (
                     <span
                       className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                      style={{
-                        background: AREA_COLORS[idea.area].bg,
-                        color: AREA_COLORS[idea.area].text,
-                      }}
+                      style={areaStyle(idea.area)}
                     >
                       {idea.area}
                     </span>

@@ -23,13 +23,13 @@ export function AppShell({ children, title, headerActions, fullWidth, onAdd }: A
       <DesktopSidebar onSignOut={signOut} />
 
       <div className="md:ml-[220px] flex flex-col min-h-screen">
-        <header className="glass-card-strong border-b border-white/30 px-5 py-3 flex items-center justify-between rounded-none">
-          <h1 className="text-[15px] font-bold text-gray-800 tracking-tight">{title}</h1>
+        <header className="glass-card-strong border-b border-white/30 dark:border-white/5 px-5 py-3 flex items-center justify-between rounded-none">
+          <h1 className="text-[15px] font-bold text-gray-800 dark:text-gray-200 tracking-tight">{title}</h1>
           <div className="flex items-center gap-3">
             {headerActions}
             <button
               onClick={signOut}
-              className="text-xs text-gray-400 hover:text-gray-600 md:hidden transition-colors"
+              className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 md:hidden transition-colors"
             >
               Sign Out
             </button>
