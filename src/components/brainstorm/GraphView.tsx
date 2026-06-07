@@ -160,7 +160,7 @@ export function GraphView({ ideas, links, onNodeDoubleClick }: GraphViewProps) {
           nodeStrokeWidth={3}
           pannable
           zoomable
-          className="!bg-white !border-gray-200"
+          className="!bg-white/80 dark:!bg-gray-800/80 !border-gray-200 dark:!border-gray-700"
         />
       </ReactFlow>
     </div>

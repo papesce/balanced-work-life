@@ -129,7 +129,7 @@ export function IdeaTree({
           placeholder="Search..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 min-w-[120px] text-sm px-3 py-1.5 border border-gray-300 rounded-md outline-none focus:border-indigo-500 bg-white"
+          className="flex-1 min-w-[120px] text-sm px-3 py-1.5 border border-black/10 dark:border-white/10 rounded-lg outline-none focus:border-indigo-500 dark:focus:border-indigo-400 bg-white/60 dark:bg-gray-800/60 text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500"
         />
       </div>
 
@@ -140,8 +140,8 @@ export function IdeaTree({
             onClick={() => setShowType(!showType)}
             className={`text-xs px-2.5 py-1 rounded-full border ${
               showType
-                ? "bg-white border-indigo-300 text-indigo-700 font-medium"
-                : "bg-gray-100 border-gray-200 text-gray-500"
+                ? "bg-white dark:bg-gray-700 border-indigo-300 dark:border-indigo-500/50 text-indigo-700 dark:text-indigo-300 font-medium"
+                : "bg-gray-100 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"
             }`}
           >
             Type
@@ -150,8 +150,8 @@ export function IdeaTree({
             onClick={() => setShowArea(!showArea)}
             className={`text-xs px-2.5 py-1 rounded-full border ${
               showArea
-                ? "bg-white border-indigo-300 text-indigo-700 font-medium"
-                : "bg-gray-100 border-gray-200 text-gray-500"
+                ? "bg-white dark:bg-gray-700 border-indigo-300 dark:border-indigo-500/50 text-indigo-700 dark:text-indigo-300 font-medium"
+                : "bg-gray-100 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"
             }`}
           >
             Area
@@ -165,8 +165,8 @@ export function IdeaTree({
             onClick={() => setTimeFilter("all")}
             className={`text-xs px-2.5 py-1 rounded-full border ${
               timeFilter === "all"
-                ? "bg-white border-indigo-300 text-indigo-700 font-medium"
-                : "bg-gray-100 border-gray-200 text-gray-500"
+                ? "bg-white dark:bg-gray-700 border-indigo-300 dark:border-indigo-500/50 text-indigo-700 dark:text-indigo-300 font-medium"
+                : "bg-gray-100 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"
             }`}
           >
             All
@@ -175,8 +175,8 @@ export function IdeaTree({
             onClick={() => setTimeFilter("today")}
             className={`text-xs px-2.5 py-1 rounded-full border ${
               timeFilter === "today"
-                ? "bg-white border-indigo-300 text-indigo-700 font-medium"
-                : "bg-gray-100 border-gray-200 text-gray-500"
+                ? "bg-white dark:bg-gray-700 border-indigo-300 dark:border-indigo-500/50 text-indigo-700 dark:text-indigo-300 font-medium"
+                : "bg-gray-100 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"
             }`}
           >
             Today
@@ -189,8 +189,8 @@ export function IdeaTree({
           onClick={() => setHideDone(!hideDone)}
           className={`text-xs px-2.5 py-1 rounded-full border ${
             hideDone
-              ? "bg-white border-indigo-300 text-indigo-700 font-medium"
-              : "bg-gray-100 border-gray-200 text-gray-500"
+              ? "bg-white dark:bg-gray-700 border-indigo-300 dark:border-indigo-500/50 text-indigo-700 dark:text-indigo-300 font-medium"
+              : "bg-gray-100 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"
           }`}
         >
           Hide done

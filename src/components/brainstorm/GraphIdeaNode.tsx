@@ -22,7 +22,7 @@ export interface GraphIdeaNodeData {
 
 function GraphIdeaNodeComponent({ data }: NodeProps) {
   const nodeData = data as GraphIdeaNodeData;
-  const bgClass = nodeData.area ? AREA_BG[nodeData.area] : "bg-white border-gray-300";
+  const bgClass = nodeData.area ? AREA_BG[nodeData.area] : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600";
 
   return (
     <>

@@ -241,8 +241,8 @@ export function IdeaNode({
         className={`group flex items-center gap-1 py-1 px-1 rounded-md ${
           dragOver === "top" ? "border-t-2 border-indigo-400" :
           dragOver === "bottom" ? "border-b-2 border-indigo-400" :
-          dragOver === "center" ? "bg-indigo-50" :
-          isSelected ? "bg-indigo-50/60" : ""
+          dragOver === "center" ? "bg-indigo-50 dark:bg-indigo-500/10" :
+          isSelected ? "bg-indigo-50/60 dark:bg-indigo-500/10" : ""
         }`}
         onClick={(e) => { e.stopPropagation(); setSelectedId(isSelected ? null : node.id); }}
         onDragOver={handleDragOver}
@@ -314,8 +314,8 @@ export function IdeaNode({
             }}
             className={`flex-1 text-sm px-2 py-0.5 rounded min-w-0 truncate ${
               isAncestorOnly ? "text-gray-400 italic cursor-default" :
-              node.done_at ? "line-through text-gray-400 cursor-text hover:bg-gray-100" :
-              "text-gray-800 cursor-text hover:bg-gray-100"
+              node.done_at ? "line-through text-gray-400 dark:text-gray-500 cursor-text hover:bg-gray-100 dark:hover:bg-white/[0.04]" :
+              "text-gray-800 dark:text-gray-200 cursor-text hover:bg-gray-100 dark:hover:bg-white/[0.04]"
             }`}
           >
             {node.text || <span className="text-gray-400 italic">empty</span>}
@@ -372,7 +372,7 @@ export function IdeaNode({
 
         {/* Link count badge */}
         {linkCount > 0 && (
-          <span className="text-xs text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded-full flex-shrink-0">
+          <span className="text-xs text-indigo-500 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/20 px-1.5 py-0.5 rounded-full flex-shrink-0">
             {linkCount}
           </span>
         )}
@@ -381,8 +381,8 @@ export function IdeaNode({
         {node.scheduled_date && (
           <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 border ${
             node.scheduled_date === todayString
-              ? "text-green-700 bg-green-50 border-green-200"
-              : "text-gray-600 bg-gray-50 border-gray-200"
+              ? "text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-500/20 border-green-200 dark:border-green-500/30"
+              : "text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700"
           }`}>
             {formatScheduleDate(node.scheduled_date, todayString)}
           </span>
@@ -401,7 +401,7 @@ export function IdeaNode({
               setShowLinkPanel(!showLinkPanel);
             }}
             title="Link"
-            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"
+            className="w-6 h-6 flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded"
           >
             <Link2 size={14} strokeWidth={1.5} />
           </button>
@@ -413,7 +413,7 @@ export function IdeaNode({
               setShowMovePanel(!showMovePanel);
             }}
             title="Move"
-            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"
+            className="w-6 h-6 flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded"
           >
             <ArrowUpDown size={14} strokeWidth={1.5} />
           </button>
@@ -428,8 +428,8 @@ export function IdeaNode({
               title="Schedule"
               className={`w-6 h-6 flex items-center justify-center rounded ${
                 node.scheduled_date
-                  ? "text-indigo-600 bg-indigo-50"
-                  : "text-gray-400 hover:text-indigo-600 hover:bg-indigo-50"
+                  ? "text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/20"
+                  : "text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10"
               }`}
             >
               <Calendar size={14} strokeWidth={1.5} />
@@ -450,28 +450,28 @@ export function IdeaNode({
               aria-expanded={showDeleteWarning}
               className={`w-6 h-6 flex items-center justify-center rounded ${
                 showDeleteWarning
-                  ? "text-red-600 bg-red-50"
-                  : "text-gray-400 hover:text-red-600 hover:bg-red-50"
+                  ? "text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-500/20"
+                  : "text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10"
               }`}
             >
               <Trash2 size={14} strokeWidth={1.5} />
             </button>
             {showDeleteWarning && (
-              <div className="absolute right-0 top-7 z-20 w-52 rounded-md border border-red-200 bg-white p-2 shadow-lg">
-                <p className="text-xs font-medium text-red-700">Delete this idea?</p>
+              <div className="absolute right-0 top-7 z-20 w-52 rounded-xl border border-red-200 dark:border-red-500/30 glass-card-strong p-2">
+                <p className="text-xs font-medium text-red-700 dark:text-red-400">Delete this idea?</p>
                 {hasChildren && (
-                  <p className="mt-1 text-xs text-gray-500">Child ideas will be deleted too.</p>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Child ideas will be deleted too.</p>
                 )}
                 <div className="mt-2 flex justify-end gap-1.5">
                   <button
                     onClick={() => setShowDeleteWarning(false)}
-                    className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded"
+                    className="px-2 py-1 text-xs text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] rounded-lg"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleConfirmDelete}
-                    className="px-2 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded"
+                    className="px-2 py-1 text-xs font-medium text-white bg-red-600 dark:bg-red-500 hover:bg-red-700 dark:hover:bg-red-400 rounded-lg"
                   >
                     Delete
                   </button>
