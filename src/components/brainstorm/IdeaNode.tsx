@@ -234,6 +234,8 @@ export function IdeaNode({
     return n.children.some(matchesSearch);
   };
 
+  const isAnyMenuOpen = showTypePicker || showAreaPicker || showLinkPanel || showMovePanel || showSchedulePicker;
+
   return (
     <div style={{ paddingLeft: depth > 0 ? 20 : 0 }}>
       <div
@@ -243,7 +245,7 @@ export function IdeaNode({
           dragOver === "bottom" ? "border-b-2 border-indigo-400" :
           dragOver === "center" ? "bg-indigo-50 dark:bg-indigo-500/10" :
           isSelected ? "bg-indigo-50/60 dark:bg-indigo-500/10" : ""
-        }`}
+        } ${isAnyMenuOpen ? "relative z-30" : ""}`}
         onClick={(e) => { e.stopPropagation(); setSelectedId(isSelected ? null : node.id); }}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}

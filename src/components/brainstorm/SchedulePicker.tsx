@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { getToday, toLocalDateString } from "@/lib/dateUtils";
 
 interface SchedulePickerProps {
   currentDate: string | null;
@@ -10,13 +11,13 @@ interface SchedulePickerProps {
 }
 
 function getTodayString(): string {
-  return new Date().toISOString().split("T")[0];
+  return getToday();
 }
 
 function addDays(dateStr: string, days: number): string {
   const d = new Date(dateStr + "T12:00:00");
   d.setDate(d.getDate() + days);
-  return d.toISOString().split("T")[0];
+  return toLocalDateString(d);
 }
 
 function getNextMonday(): string {
@@ -24,7 +25,7 @@ function getNextMonday(): string {
   const day = today.getDay();
   const daysUntilMonday = day === 0 ? 1 : 8 - day;
   today.setDate(today.getDate() + daysUntilMonday);
-  return today.toISOString().split("T")[0];
+  return toLocalDateString(today);
 }
 
 function formatDate(dateStr: string): string {

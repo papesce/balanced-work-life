@@ -111,7 +111,8 @@ export default function TimelinePage() {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="glass-card rounded-[20px] p-4"
+          className="glass-card rounded-[20px] p-4 relative"
+          style={{ zIndex: 30 }}
         >
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-[0.12em]">
@@ -161,6 +162,8 @@ export default function TimelinePage() {
                 variants={cardVariants}
                 initial="hidden"
                 animate="visible"
+                className="relative"
+                style={{ zIndex: 20 - index }}
               >
                 <div
                   className={`rounded-[20px] transition-all ${
@@ -338,6 +341,8 @@ function TaskRow({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showMenu]);
 
+  const isAnyMenuOpen = showAreaPicker || showMenu || showDatePicker;
+
   return (
     <motion.div
       layout
@@ -349,7 +354,7 @@ function TaskRow({
       transition={{ type: "spring", stiffness: 200, damping: 20 }}
       className={`flex items-center gap-3 rounded-xl px-3 py-2 transition-colors ${
         isHovered ? "bg-black/[0.03] dark:bg-white/[0.04]" : ""
-      }`}
+      } ${isAnyMenuOpen ? "relative z-30" : ""}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >

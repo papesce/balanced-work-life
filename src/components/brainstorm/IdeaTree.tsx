@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { IdeaNode as IdeaNodeType, Idea, IdeaLink, LinkType } from "@/lib/types";
 import { IdeaNode } from "./IdeaNode";
+import { getToday } from "@/lib/dateUtils";
 
 interface IdeaTreeProps {
   tree: IdeaNodeType[];
@@ -59,7 +60,7 @@ export function IdeaTree({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [timeFilter, setTimeFilter] = useState<"all" | "today">("all");
   const [hideDone, setHideDone] = useState(false);
-  const todayString = new Date().toISOString().split("T")[0];
+  const todayString = getToday();
 
   const handleAddRoot = async () => {
     const id = await createIdea("", null, "top");
