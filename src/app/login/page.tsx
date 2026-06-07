@@ -30,68 +30,68 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Balanced</h1>
-          <p className="text-sm text-gray-500 mt-1">Work-Life Balance Planner</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Balanced</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Work-Life Balance Planner</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-center">
+        <form onSubmit={handleSubmit} className="glass-card rounded-xl p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-center text-gray-800 dark:text-gray-200">
             {mode === "login" ? "Sign In" : "Create Account"}
           </h2>
 
           {error && (
-            <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2 text-center">
+            <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 rounded-lg p-2 text-center">
               {error}
             </p>
           )}
 
           <div>
-            <label className="text-sm text-gray-600 block mb-1">Email</label>
+            <label className="text-sm text-gray-600 dark:text-gray-400 block mb-1">Email</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              className="w-full border border-black/10 dark:border-white/10 rounded-lg px-4 py-2 bg-white/60 dark:bg-gray-800/60 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-violet-500/30 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="text-sm text-gray-600 block mb-1">Password</label>
+            <label className="text-sm text-gray-600 dark:text-gray-400 block mb-1">Password</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              className="w-full border border-black/10 dark:border-white/10 rounded-lg px-4 py-2 bg-white/60 dark:bg-gray-800/60 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-violet-500/30 focus:outline-none"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+            className="w-full py-2.5 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg font-medium hover:bg-indigo-700 dark:hover:bg-indigo-400 disabled:opacity-50 transition-colors"
           >
             {loading ? "..." : mode === "login" ? "Sign In" : "Sign Up"}
           </button>
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200" />
+              <div className="w-full border-t border-black/10 dark:border-white/10" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="bg-white px-2 text-gray-400">or</span>
+              <span className="bg-white dark:bg-gray-800 px-2 text-gray-400 dark:text-gray-500">or</span>
             </div>
           </div>
 
           <button
             type="button"
             onClick={signInWithGoogle}
-            className="w-full py-2.5 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2 transition-colors"
+            className="w-full py-2.5 border border-black/10 dark:border-white/10 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-black/[0.02] dark:hover:bg-white/[0.04] flex items-center justify-center gap-2 transition-colors"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -102,12 +102,12 @@ export default function LoginPage() {
             Continue with Google
           </button>
 
-          <p className="text-sm text-center text-gray-500">
+          <p className="text-sm text-center text-gray-500 dark:text-gray-400">
             {mode === "login" ? "No account?" : "Already have an account?"}{" "}
             <button
               type="button"
               onClick={() => setMode(mode === "login" ? "signup" : "login")}
-              className="text-indigo-600 font-medium hover:underline"
+              className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline"
             >
               {mode === "login" ? "Sign Up" : "Sign In"}
             </button>

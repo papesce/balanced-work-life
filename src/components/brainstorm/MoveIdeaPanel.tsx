@@ -58,9 +58,9 @@ export function MoveIdeaPanel({
   return (
     <div
       ref={ref}
-      className="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-[340px] max-w-[420px]"
+      className="absolute right-0 top-full mt-1 z-50 glass-card-strong rounded-xl p-3 min-w-[340px] max-w-[420px]"
     >
-      <div className="text-xs font-medium text-gray-500 mb-2">Move this idea</div>
+      <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Move this idea</div>
       <IdeaSearchPicker
         ideas={ideas}
         excludeIds={excludedIds}
@@ -69,13 +69,13 @@ export function MoveIdeaPanel({
           <>
             <button
               onClick={() => moveBelow(target)}
-              className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-600 hover:text-indigo-700 hover:border-indigo-200 hover:bg-indigo-50"
+              className="text-xs px-2 py-1 rounded-lg border border-black/10 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:text-indigo-700 dark:hover:text-indigo-400 hover:border-indigo-200 dark:hover:border-indigo-500/30 hover:bg-indigo-50/50 dark:hover:bg-indigo-500/10"
             >
               Below
             </button>
             <button
               onClick={() => moveAsChild(target)}
-              className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-600 hover:text-indigo-700 hover:border-indigo-200 hover:bg-indigo-50"
+              className="text-xs px-2 py-1 rounded-lg border border-black/10 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:text-indigo-700 dark:hover:text-indigo-400 hover:border-indigo-200 dark:hover:border-indigo-500/30 hover:bg-indigo-50/50 dark:hover:bg-indigo-500/10"
             >
               As child
             </button>
