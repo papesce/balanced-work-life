@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { navItems } from "@/lib/navItems";
+import { APP_VERSION } from "@/lib/version";
 
 interface NavigationProps {
   className?: string;
@@ -41,6 +42,9 @@ export function Navigation({ className = "" }: NavigationProps) {
           );
         })}
       </div>
+      <p className="text-[9px] text-gray-300 dark:text-gray-600 text-center pb-1 select-none">
+        v{APP_VERSION}
+      </p>
     </nav>
   );
 }

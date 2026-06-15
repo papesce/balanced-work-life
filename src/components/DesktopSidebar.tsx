@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { navItems } from "@/lib/navItems";
+import { APP_VERSION } from "@/lib/version";
 
 interface DesktopSidebarProps {
   onSignOut: () => void;
@@ -64,13 +65,16 @@ export function DesktopSidebar({ onSignOut }: DesktopSidebarProps) {
         })}
       </nav>
 
-      <div className="px-3 py-4">
+      <div className="px-3 py-4 border-t border-black/5 dark:border-white/5">
         <button
           onClick={onSignOut}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
         >
           Sign Out
         </button>
+        <p className="text-[10px] text-gray-300 dark:text-gray-600 text-center mt-3 select-none">
+          v{APP_VERSION}
+        </p>
       </div>
     </aside>
   );

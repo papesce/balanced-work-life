@@ -242,6 +242,40 @@ export function useIdeas() {
     await supabase.from("ideas").upsert(orderedIdeas);
   };
 
+  const reorderTasks = useCallback(async (taskIds: string[]) => {
+    const updatedAt = new Date().toISOString();
+    setIdeas((prev) => {
+      const next = [...prev];
+      for (let i = 0; i < taskIds.length; i++) {
+        const idx = next.findIndex((t) => t.id === taskIds[i]);
+        if (idx !== -1) {
+          next[idx] = { ...next[idx], sort_order: i, updated_at: updatedAt };
+        }
+      }
+      return next.sort((a, b) => a.sort_order - b.sort_order);
+    });
+    for (let i = 0; i < taskIds.length; i++) {
+      await supabase.from("ideas").update({ sort_order: i, updated_at: updatedAt }).eq("id", taskIds[i]);
+    }
+  }, []);
+
+  const smartSortTasks = useCallback(async (tasksInGroup: Idea[]) => {
+    const computeScore = (t: Idea): number => {
+      const urgency = t.urgency ?? 3;
+      const impact = t.impact ?? 3;
+      const effort = t.effort ?? 3;
+      const priorityBoost = t.is_priority ? 2 : 1;
+      return priorityBoost * (urgency * impact) / Math.max(effort, 1);
+    };
+
+    const sorted = [...tasksInGroup].sort((a, b) => {
+      const diff = computeScore(b) - computeScore(a);
+      return diff !== 0 ? diff : a.sort_order - b.sort_order;
+    });
+
+    await reorderTasks(sorted.map((t) => t.id));
+  }, [reorderTasks]);
+
   const moveIdea = async (id: string, newParentId: string | null, newSortOrder: number) => {
     const updatedAt = new Date().toISOString();
     const siblings = ideas.filter(
@@ -353,6 +387,8 @@ export function useIdeas() {
     updateIdea,
     deleteIdea,
     moveIdea,
+    reorderTasks,
+    smartSortTasks,
     markDone,
     markUndone,
     scheduleIdea,

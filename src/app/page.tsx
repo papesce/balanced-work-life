@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import { motion, Reorder, useDragControls } from "framer-motion";
 import {
   Check,
   Star,
   MoreHorizontal,
+  GripVertical,
   Briefcase,
   Heart,
   Users,
@@ -84,7 +86,7 @@ function formatTime(raw: string): string {
 }
 
 export default function DailyPlannerPage() {
-  const { ideas, loading, createIdea, updateIdea, deleteIdea, markDone, markUndone } = useIdeas();
+  const { ideas, loading, createIdea, updateIdea, deleteIdea, markDone, markUndone, reorderTasks, smartSortTasks } = useIdeas();
   const searchParams = useSearchParams();
   const [activeDate, setActiveDate] = useState<string>(() => searchParams.get("date") ?? getToday());
 
@@ -216,6 +218,7 @@ export default function DailyPlannerPage() {
         totalPending={pendingOnDate.length}
         totalDone={doneOnDate.length}
         isViewingToday={isViewingToday}
+        onSmartSort={pendingOnDate.length > 0 ? () => smartSortTasks(pendingOnDate) : undefined}
       />
 
       <div className="flex gap-4 mt-4">
@@ -259,6 +262,7 @@ export default function DailyPlannerPage() {
                 onUpdate={updateIdea}
                 onDelete={deleteIdea}
                 onAddTask={handleAddToArea}
+                onReorderTasks={reorderTasks}
               />
             );
           })}
@@ -375,11 +379,13 @@ function BalanceBar({
   totalPending,
   totalDone,
   isViewingToday,
+  onSmartSort,
 }: {
   balanceState: { area: LifeArea; count: number; actual: number; target: number; status: string }[];
   totalPending: number;
   totalDone: number;
   isViewingToday: boolean;
+  onSmartSort?: () => void;
 }) {
   const lowAreas = balanceState.filter((b) => b.status === "low").map((b) => AREA_LABELS[b.area]);
   const allGood = lowAreas.length === 0 && totalPending > 0;
@@ -420,8 +426,19 @@ function BalanceBar({
         )}
       </div>
 
-      <div className="text-xs text-gray-400 dark:text-gray-500 font-medium tabular-nums flex-shrink-0">
-        {totalDone}/{totalPending + totalDone}
+      <div className="flex items-center gap-2">
+        <div className="text-xs text-gray-400 dark:text-gray-500 font-medium tabular-nums flex-shrink-0">
+          {totalDone}/{totalPending + totalDone}
+        </div>
+        {totalPending > 0 && onSmartSort && (
+          <button
+            onClick={onSmartSort}
+            className="flex items-center gap-1 text-[11px] font-semibold text-violet-500 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/20 px-2 py-1 rounded-lg transition-all"
+            title="Sort tasks by priority score"
+          >
+            <Sparkles size={12} />
+          </button>
+        )}
       </div>
     </div>
   );
@@ -673,6 +690,7 @@ function AreaTaskGroup({
   onUpdate,
   onDelete,
   onAddTask,
+  onReorderTasks,
 }: {
   area: LifeArea;
   pendingTasks: Idea[];
@@ -682,6 +700,7 @@ function AreaTaskGroup({
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onDelete: (id: string) => void;
   onAddTask: (text: string, area: LifeArea) => Promise<void>;
+  onReorderTasks: (taskIds: string[]) => void;
 }) {
   const Icon = AREA_ICONS[area];
   const color = areaColors[area]?.dot;
@@ -705,9 +724,16 @@ function AreaTaskGroup({
       </div>
 
       <div className="divide-y divide-black/[0.03] dark:divide-white/[0.03]">
-        {pendingTasks.map((task) => (
-          <TaskRow key={task.id} task={task} onDone={onDone} onUndone={onUndone} onUpdate={onUpdate} onDelete={onDelete} />
-        ))}
+        {pendingTasks.length > 0 && (
+          <PendingTaskList
+            tasks={pendingTasks}
+            onReorder={onReorderTasks}
+            onDone={onDone}
+            onUndone={onUndone}
+            onUpdate={onUpdate}
+            onDelete={onDelete}
+          />
+        )}
         {doneTasks.map((task) => (
           <TaskRow key={task.id} task={task} onDone={onDone} onUndone={onUndone} onUpdate={onUpdate} onDelete={onDelete} />
         ))}
@@ -733,6 +759,54 @@ function AreaTaskGroup({
   );
 }
 
+// ─── Pending Task List (draggable) ──────────────────────────────────────────────
+
+function PendingTaskList({
+  tasks,
+  onReorder,
+  onDone,
+  onUndone,
+  onUpdate,
+  onDelete,
+}: {
+  tasks: Idea[];
+  onReorder: (taskIds: string[]) => void;
+  onDone: (id: string) => void;
+  onUndone: (id: string) => void;
+  onUpdate: (id: string, updates: Partial<Idea>) => void;
+  onDelete: (id: string) => void;
+}) {
+  const controls = useDragControls();
+  const [items, setItems] = useState(tasks);
+  const itemsRef = useRef(items);
+
+  useEffect(() => { itemsRef.current = items; }, [items]);
+  useEffect(() => { setItems(tasks); }, [tasks]);
+
+  return (
+    <Reorder.Group axis="y" values={items} onReorder={setItems}>
+      {items.map((task) => (
+        <Reorder.Item
+          key={task.id}
+          value={task}
+          dragControls={controls}
+          className="relative"
+          onDragEnd={() => onReorder(itemsRef.current.map((t) => t.id))}
+        >
+          <TaskRow
+            task={task}
+            onDone={onDone}
+            onUndone={onUndone}
+            onUpdate={onUpdate}
+            onDelete={onDelete}
+            dragControls={controls}
+          />
+        </Reorder.Item>
+      ))}
+    </Reorder.Group>
+  );
+}
+
 // ─── Task Row ─────────────────────────────────────────────────────────────────
 
 function TaskRow({
@@ -741,12 +815,14 @@ function TaskRow({
   onUndone,
   onUpdate,
   onDelete,
+  dragControls,
 }: {
   task: Idea;
   onDone: (id: string) => void;
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onDelete: (id: string) => void;
+  dragControls?: ReturnType<typeof useDragControls>;
 }) {
   const isCompleted = !!task.done_at;
   const [showMenu, setShowMenu] = useState(false);
@@ -762,7 +838,16 @@ function TaskRow({
   }, [showMenu]);
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-black/[0.015] dark:hover:bg-white/[0.02] transition-colors group">
+    <div className="flex items-center gap-2 px-4 py-2.5 hover:bg-black/[0.015] dark:hover:bg-white/[0.02] transition-colors group">
+      {dragControls && (
+        <button
+          onPointerDown={(e) => dragControls.start(e)}
+          className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-400 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+          aria-label="Drag to reorder"
+        >
+          <GripVertical size={11} />
+        </button>
+      )}
       <button
         onClick={() => (isCompleted ? onUndone(task.id) : onDone(task.id))}
         className="w-4 h-4 rounded-full border flex-shrink-0 flex items-center justify-center transition-all"

@@ -1,15 +1,15 @@
 "use client";
 
-import { useMemo, useRef, useEffect, useState } from "react";
+import { useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
-import { Check, Star, MoreHorizontal, Plus } from "lucide-react";
+import { motion, AnimatePresence, Reorder, useDragControls } from "framer-motion";
+import { Check, Star, MoreHorizontal, Plus, GripVertical, Sparkles } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
 import { AppShell } from "@/components/AppShell";
 import { MiniBalanceBar } from "@/components/MiniBalanceBar";
 import { AreaPicker } from "@/components/brainstorm/AreaPicker";
-import { Idea, LifeArea } from "@/lib/types";
-import { getToday, getTomorrow, getDatesRange, formatDate, isPast, toLocalDateString } from "@/lib/dateUtils";
+import { Idea } from "@/lib/types";
+import { getToday, getTomorrow, getDatesRange, isPast } from "@/lib/dateUtils";
 import { areaColors } from "@/styles/tokens";
 
 const cardVariants = {
@@ -22,14 +22,29 @@ const cardVariants = {
     }) as const,
 };
 
+function formatTimelineDate(date: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(`${date}T12:00:00`));
+}
+
+function getTimelineKicker(date: string, today: string, tomorrow: string): string {
+  if (date === today) return "Today";
+  if (date === tomorrow) return "Tomorrow";
+  return date < today ? "Past" : "Upcoming";
+}
+
 export default function TimelinePage() {
   const router = useRouter();
-  const { ideas, loading, createIdea, markDone, markUndone, updateIdea } = useIdeas();
+  const { ideas, loading, createIdea, markDone, markUndone, updateIdea, reorderTasks, smartSortTasks } = useIdeas();
   const todayRef = useRef<HTMLElement>(null);
   const hasAutoScrolled = useRef(false);
   const [fabOpen, setFabOpen] = useState(false);
 
   const today = getToday();
+  const tomorrow = getTomorrow();
   const dates = useMemo(() => getDatesRange(3, 14), []);
   const tasks = useMemo(() => ideas.filter((i) => i.type === "task"), [ideas]);
 
@@ -71,6 +86,14 @@ export default function TimelinePage() {
     setFabOpen(false);
   };
 
+  const handleReorderDate = useCallback(
+    (date: string) =>
+      (reordered: Idea[]) => {
+        reorderTasks(reordered.map((t) => t.id));
+      },
+    [reorderTasks],
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -94,6 +117,8 @@ export default function TimelinePage() {
         {dates.map((date, index) => {
           const dayTasks = tasksByDate[date] ?? [];
           const isTodayDate = date === today;
+          const dateLabel = formatTimelineDate(date);
+          const timelineKicker = getTimelineKicker(date, today, tomorrow);
           const unresolvedCount = dayTasks.filter((t) => !t.done_at && isPast(date)).length;
 
           return (
@@ -116,10 +141,10 @@ export default function TimelinePage() {
                           isTodayDate ? "text-violet-600 dark:text-violet-400" : "text-gray-400 dark:text-gray-500"
                         }`}
                       >
-                        {isTodayDate ? "Today" : formatDate(date).split(",")[0]}
+                        {timelineKicker}
                       </span>
-                      <span className="text-[22px] font-bold text-gray-900 dark:text-gray-100 leading-tight tracking-tight">
-                        {formatDate(date).split(",")[1]?.trim() || formatDate(date)}
+                      <span className="text-[22px] font-bold text-gray-900 dark:text-gray-100 leading-tight">
+                        {dateLabel}
                       </span>
                     </div>
                     {unresolvedCount > 0 && (
@@ -128,8 +153,18 @@ export default function TimelinePage() {
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <MiniBalanceBar tasks={dayTasks} />
+                    {dayTasks.length > 0 && (
+                      <button
+                        onClick={() => smartSortTasks(dayTasks)}
+                        className="flex items-center gap-1 text-[11px] font-semibold text-violet-500 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/20 px-2 py-1 rounded-lg transition-all"
+                        title="Sort tasks by priority score (effort × impact × urgency)"
+                      >
+                        <Sparkles size={12} />
+                        <span className="hidden sm:inline">Smart Sort</span>
+                      </button>
+                    )}
                     <button
                       onClick={() => router.push(`/?date=${date}`)}
                       className="focus-button"
@@ -139,27 +174,24 @@ export default function TimelinePage() {
                   </div>
                 </div>
 
-                <div className="px-5 pb-2 space-y-0.5">
+                <div className="px-5 pb-2">
                   {dayTasks.length === 0 ? (
                     <p className="text-xs text-gray-400 dark:text-gray-500 italic py-1">No tasks planned</p>
                   ) : (
-                    dayTasks.map((task) => (
-                      <TaskRow
-                        key={task.id}
-                        task={task}
-                        onDone={markDone}
-                        onUndone={markUndone}
-                        onUpdate={updateIdea}
-                        onTogglePriority={() => updateIdea(task.id, { is_priority: !task.is_priority })}
-                        today={today}
-                      />
-                    ))
+                    <DayTaskList
+                      tasks={dayTasks}
+                      onReorder={handleReorderDate(date)}
+                      onDone={markDone}
+                      onUndone={markUndone}
+                      onUpdate={updateIdea}
+                      today={today}
+                    />
                   )}
                 </div>
 
                 <div className="px-5 pb-4 pt-1">
                   <QuickAddInput
-                    placeholder={`+ Add task for ${isTodayDate ? "today" : formatDate(date).split(",")[1]?.trim() ?? date}...`}
+                    placeholder={`+ Add task for ${isTodayDate ? "today" : dateLabel}...`}
                     onAdd={(text) => handleQuickAdd(text, date)}
                   />
                 </div>
@@ -316,9 +348,10 @@ function QuickAddInput({ placeholder, onAdd }: { placeholder: string; onAdd: (te
         placeholder={placeholder}
         className="w-full bg-transparent border-none text-sm py-1.5 focus:ring-0 placeholder:text-gray-300 dark:placeholder:text-gray-600 italic outline-none"
         onKeyDown={async (e) => {
-          if (e.key === "Enter" && e.currentTarget.value.trim()) {
-            await onAdd(e.currentTarget.value.trim());
-            e.currentTarget.value = "";
+          const input = ref.current;
+          if (e.key === "Enter" && input?.value.trim()) {
+            await onAdd(input.value.trim());
+            input.value = "";
           }
         }}
       />
@@ -327,22 +360,70 @@ function QuickAddInput({ placeholder, onAdd }: { placeholder: string; onAdd: (te
   );
 }
 
+// ─── Day Task List (draggable) ─────────────────────────────────────────────────
+
+function DayTaskList({
+  tasks,
+  onReorder,
+  onDone,
+  onUndone,
+  onUpdate,
+  today,
+}: {
+  tasks: Idea[];
+  onReorder: (reordered: Idea[]) => void;
+  onDone: (id: string) => void;
+  onUndone: (id: string) => void;
+  onUpdate: (id: string, updates: Partial<Idea>) => void;
+  today: string;
+}) {
+  const controls = useDragControls();
+  const [items, setItems] = useState(tasks);
+  const itemsRef = useRef(items);
+
+  useEffect(() => { itemsRef.current = items; }, [items]);
+  useEffect(() => { setItems(tasks); }, [tasks]);
+
+  return (
+    <Reorder.Group axis="y" values={items} onReorder={setItems} className="space-y-0.5">
+      {items.map((task) => (
+        <Reorder.Item
+          key={task.id}
+          value={task}
+          dragControls={controls}
+          className="relative"
+          onDragEnd={() => onReorder(itemsRef.current)}
+        >
+          <TimelineTaskRow
+            task={task}
+            onDone={onDone}
+            onUndone={onUndone}
+            onUpdate={onUpdate}
+            today={today}
+            dragControls={controls}
+          />
+        </Reorder.Item>
+      ))}
+    </Reorder.Group>
+  );
+}
+
 // ─── Task Row ─────────────────────────────────────────────────────────────────
 
-function TaskRow({
+function TimelineTaskRow({
   task,
   onDone,
   onUndone,
   onUpdate,
-  onTogglePriority,
   today,
+  dragControls,
 }: {
   task: Idea;
   onDone: (id: string) => void;
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
-  onTogglePriority: () => void;
   today: string;
+  dragControls: ReturnType<typeof useDragControls>;
 }) {
   const isCompleted = !!task.done_at;
   const [showMenu, setShowMenu] = useState(false);
@@ -362,17 +443,22 @@ function TaskRow({
   const areaColor = task.area ? areaColors[task.area] : null;
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: isCompleted ? 0.5 : 1, y: 0 }}
-      transition={{ type: "spring", stiffness: 200, damping: 20 }}
-      className={`flex items-center gap-3 rounded-xl px-3 py-2 transition-colors ${
+    <div
+      className={`flex items-center gap-1.5 rounded-xl px-3 py-2 transition-colors group ${
         isHovered ? "bg-black/[0.03] dark:bg-white/[0.04]" : ""
       }`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
+      {/* Drag handle */}
+      <button
+        onPointerDown={(e) => dragControls.start(e)}
+        className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-400 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+        aria-label="Drag to reorder"
+      >
+        <GripVertical size={12} />
+      </button>
+
       {/* Checkbox */}
       <button
         onClick={() => (isCompleted ? onUndone(task.id) : onDone(task.id))}
@@ -435,7 +521,7 @@ function TaskRow({
 
       {/* Priority */}
       <button
-        onClick={onTogglePriority}
+        onClick={() => onUpdate(task.id, { is_priority: !task.is_priority })}
         className={`transition-colors flex-shrink-0 ${
           task.is_priority ? "text-amber-400" : "text-gray-200 dark:text-gray-600 hover:text-gray-400"
         }`}
@@ -494,6 +580,6 @@ function TaskRow({
           </div>
         )}
       </div>
-    </motion.div>
+    </div>
   );
 }
