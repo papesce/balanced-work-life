@@ -7,6 +7,7 @@
 
 :root {
   color-scheme: light dark;
+  --ring-bg: rgba(0, 0, 0, 0.04);
 }
 
 @layer base {
@@ -173,6 +174,9 @@ body {
 
 /* Dark mode overrides */
 @media (prefers-color-scheme: dark) {
+  :root {
+    --ring-bg: rgba(255, 255, 255, 0.04);
+  }
   body {
     background: #0b0b14;
   }
