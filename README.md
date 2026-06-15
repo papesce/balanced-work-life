@@ -45,15 +45,49 @@ pnpm dev          # plain Next.js dev server
 pnpm dev:open     # frees port 3000, starts dev, auto-opens the browser
 ```
 
+For a background dev server on a bookmark-friendly port:
+
+```bash
+pnpm balance:open    # starts if needed and opens http://localhost:4327
+pnpm balance:status
+pnpm balance:stop
+pnpm balance:logs
+```
+
+To make the `balance` command available from any terminal:
+
+```bash
+pnpm balance:install
+```
+
+This installs a symlink at `~/bin/balance` and adds `~/bin` to your shell
+`PATH` if needed. Open a new terminal after installing. Then use:
+
+```bash
+balance open
+balance status
+balance stop
+```
+
+To remove the command and the managed PATH entry:
+
+```bash
+balance uninstall
+# or: pnpm balance:uninstall
+```
+
 For a production-mode preview (build + start):
 
 ```bash
 pnpm start:open
+pnpm balance:start prod
 ```
 
-Override the port on either: `PORT=4000 pnpm dev:open`.
+Override the background launcher port with `BALANCE_PORT=4000 pnpm balance:open`.
+Override the foreground launcher port with `PORT=4000 pnpm dev:open`.
 
 Open [http://localhost:3000](http://localhost:3000) in your browser (auto-opened by `:open` variants).
+The background launcher uses [http://localhost:4327](http://localhost:4327) by default.
 
 ## Features
 

@@ -30,6 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# local launcher state
+.balance/
+
 # env files (can opt-in for committing if needed)
 .env*
 
@@ -42,3 +45,8 @@ supabase/.temp/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# playwright mcp
+.playwright-mcp/
+*.png
+*.jpeg

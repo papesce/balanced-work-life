@@ -39,7 +39,7 @@ export function getScheduleGroup(scheduledDate: string | null): ScheduleGroup {
 
 export function isToday(isoTimestamp: string | null): boolean {
   if (!isoTimestamp) return false;
-  return isoTimestamp.slice(0, 10) === getToday();
+  return toLocalDateString(new Date(isoTimestamp)) === getToday();
 }
 
 export function formatDate(dateStr: string): string {
