@@ -1,5 +1,5 @@
-const CACHE_NAME = "balanced-v1";
-const STATIC_ASSETS = ["/", "/planner", "/archive", "/manifest.json"];
+const CACHE_NAME = "balanced-v2";
+const STATIC_ASSETS = ["/", "/timeline", "/brainstorm", "/backup", "/manifest.json"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

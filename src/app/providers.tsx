@@ -10,10 +10,10 @@ function AuthGuard({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user && pathname !== "/login") {
+    if (loading) return;
+    if (!user && pathname !== "/login") {
       router.replace("/login");
-    }
-    if (!loading && user && pathname === "/login") {
+    } else if (user && pathname === "/login") {
       router.replace("/");
     }
   }, [user, loading, pathname, router]);
@@ -26,7 +26,13 @@ function AuthGuard({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!user && pathname !== "/login") return null;
+  if (!user && pathname !== "/login") {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse text-gray-400">Loading...</div>
+      </div>
+    );
+  }
 
   return <>{children}</>;
 }

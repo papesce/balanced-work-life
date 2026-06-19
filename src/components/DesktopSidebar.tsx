@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { navItems } from "@/lib/navItems";
 import { APP_VERSION } from "@/lib/version";
 
@@ -38,13 +38,28 @@ export function DesktopSidebar({ onSignOut }: DesktopSidebarProps) {
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
               }`}
             >
-              {active && (
-                <motion.div
-                  layoutId="nav-active-bg"
-                  className="absolute inset-0 rounded-xl bg-violet-50/80 dark:bg-violet-500/15"
-                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                />
-              )}
+              <AnimatePresence>
+                {active && (
+                  <>
+                    <motion.div
+                      key="bg"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute inset-0 rounded-xl bg-violet-50/80 dark:bg-violet-500/15"
+                    />
+                    <motion.div
+                      key="bar"
+                      initial={{ opacity: 0, scaleY: 0 }}
+                      animate={{ opacity: 1, scaleY: 1 }}
+                      exit={{ opacity: 0, scaleY: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-violet-600 dark:bg-violet-500 rounded-full"
+                    />
+                  </>
+                )}
+              </AnimatePresence>
               <span className="relative z-10 flex items-center gap-3">
                 <Icon
                   size={18}
@@ -53,13 +68,6 @@ export function DesktopSidebar({ onSignOut }: DesktopSidebarProps) {
                 />
                 <span>{item.label}</span>
               </span>
-              {active && (
-                <motion.div
-                  layoutId="nav-active-bar"
-                  className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-violet-600 dark:bg-violet-500 rounded-full"
-                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                />
-              )}
             </Link>
           );
         })}

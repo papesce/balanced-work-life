@@ -8,16 +8,25 @@
 #
 set -euo pipefail
 
+# Source nvm so pnpm is on PATH in non-interactive shells
+export NVM_DIR="${NVM_DIR:-${HOME}/.nvm}"
+[ -s "${NVM_DIR}/nvm.sh" ] && source "${NVM_DIR}/nvm.sh"
+
 APP_NAME="Balanced Work Life"
 DEFAULT_PORT="4327"
 COMMAND="${1:-help}"
-MODE="${2:-${BALANCE_MODE:-dev}}"
 PORT="${BALANCE_PORT:-${PORT:-$DEFAULT_PORT}}"
 
 FG=0
-for arg in "$@"; do
-  [[ "${arg}" == "--fg" ]] && FG=1
+MODE=""
+for arg in "${@:2}"; do
+  if [[ "${arg}" == "--fg" ]]; then
+    FG=1
+  elif [[ -z "${MODE}" && "${arg}" != --* ]]; then
+    MODE="${arg}"
+  fi
 done
+MODE="${MODE:-${BALANCE_MODE:-dev}}"
 URL="http://localhost:${PORT}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -117,14 +126,19 @@ start_server() {
 stop_server() {
   clear_stale_pid
 
-  if ! pid_is_running; then
-    echo "${APP_NAME} is not running."
-    echo "Hint: balance open   to start and open in browser"
-    return
-  fi
-
   local pid
-  pid="$(current_pid)"
+  if pid_is_running; then
+    pid="$(current_pid)"
+  else
+    # No PID file — fall back to port-based lookup
+    pid="$(lsof -ti TCP:"${PORT}" 2>/dev/null | head -1)"
+    if [[ -z "${pid}" ]]; then
+      echo "${APP_NAME} is not running."
+      echo "Hint: balance open   to start and open in browser"
+      return
+    fi
+    echo "Warning: no PID file found; stopping process on port ${PORT} (pid ${pid})."
+  fi
   kill "${pid}" >/dev/null 2>&1 || true
 
   for _ in 1 2 3 4 5; do
@@ -160,6 +174,13 @@ status_server() {
 }
 
 open_app() {
+  # If something is already on the port, just open the browser — don't error
+  if [[ -n "$(port_owner)" ]]; then
+    echo "${APP_NAME} is already running at ${URL}"
+    open "${URL}"
+    return
+  fi
+
   if [[ "${FG}" == "1" ]]; then
     (sleep 3 && open "${URL}") &
     start_server
