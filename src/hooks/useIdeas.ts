@@ -79,8 +79,8 @@ function buildTree(ideas: Idea[], collapsedIds: Set<string>): IdeaNode[] {
 
   const sortNodes = (nodes: IdeaNode[]) => {
     nodes.sort((a, b) => {
-      const aDone = a.done_at ? 1 : 0;
-      const bDone = b.done_at ? 1 : 0;
+      const aDone = a.completed_at ? 1 : 0;
+      const bDone = b.completed_at ? 1 : 0;
       if (aDone !== bDone) return aDone - bDone;
       return a.sort_order - b.sort_order;
     });
@@ -189,7 +189,9 @@ export function useIdeas() {
       priority_order: null,
       status: "inbox",
       notes: null,
-      done_at: null,
+      completed_at: null,
+      cancelled_at: null,
+      paused_at: null,
       sort_order: sortOrder,
       created_at: now,
       updated_at: now,
@@ -313,11 +315,28 @@ export function useIdeas() {
   };
 
   const markDone = async (id: string) => {
-    await updateIdea(id, { done_at: new Date().toISOString() });
+    const now = new Date().toISOString();
+    await updateIdea(id, { status: "completed", completed_at: now });
   };
 
   const markUndone = async (id: string) => {
-    await updateIdea(id, { done_at: null });
+    const idea = ideas.find((i) => i.id === id);
+    const fallbackStatus = idea?.scheduled_date
+      ? (idea?.scheduled_time ? "scheduled" : "planned")
+      : "inbox";
+    await updateIdea(id, { status: fallbackStatus, completed_at: null });
+  };
+
+  const markInProgress = async (id: string) => {
+    await updateIdea(id, { status: "in_progress" });
+  };
+
+  const markPaused = async (id: string) => {
+    await updateIdea(id, { status: "paused", paused_at: new Date().toISOString() });
+  };
+
+  const markCancelled = async (id: string) => {
+    await updateIdea(id, { status: "cancelled", cancelled_at: new Date().toISOString() });
   };
 
   const scheduleIdea = async (id: string, date: string | null) => {
@@ -391,6 +410,9 @@ export function useIdeas() {
     smartSortTasks,
     markDone,
     markUndone,
+    markInProgress,
+    markPaused,
+    markCancelled,
     scheduleIdea,
     restoreIdeas,
     toggleCollapse,

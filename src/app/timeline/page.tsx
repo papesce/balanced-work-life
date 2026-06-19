@@ -58,11 +58,11 @@ export default function TimelinePage() {
   }, [loading]);
 
   const handleQuickAdd = async (text: string, date: string) => {
-    await createIdea(text, null, "bottom", { type: "task", scheduled_date: date, status: "scheduled" });
+    await createIdea(text, null, "bottom", { type: "task", scheduled_date: date, status: "planned" });
   };
 
   const handleFabAdd = async (text: string, date: string | null) => {
-    await createIdea(text, null, "bottom", { type: "task", scheduled_date: date, status: date ? "scheduled" : "inbox" });
+    await createIdea(text, null, "bottom", { type: "task", scheduled_date: date, status: date ? "planned" : "inbox" });
     setFabOpen(false);
   };
 
@@ -96,7 +96,7 @@ export default function TimelinePage() {
           const isTodayDate = date === today;
           const dateLabel = formatTimelineDate(date);
           const timelineKicker = getTimelineKicker(date, today, tomorrow);
-          const unresolvedCount = dayTasks.filter((t) => !t.done_at && isPast(date)).length;
+          const unresolvedCount = dayTasks.filter((t) => t.status !== "completed" && t.status !== "cancelled" && isPast(date)).length;
 
           return (
             <motion.section

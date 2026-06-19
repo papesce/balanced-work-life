@@ -1,12 +1,23 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
 import { Reorder, useDragControls } from "framer-motion";
-import { Check, Star, MoreHorizontal, GripVertical } from "lucide-react";
+import { Check, Star, MoreHorizontal, GripVertical, Play, Pause, X } from "lucide-react";
 import { areaColors } from "@/styles/tokens";
-import { Idea } from "@/lib/types";
+import { Idea, IdeaStatus } from "@/lib/types";
 import { AreaPicker } from "@/components/brainstorm/AreaPicker";
+import { StatusPicker } from "@/components/brainstorm/StatusPicker";
+
+const STATUS_CONFIG: Record<IdeaStatus, { label: string; color: string; icon: React.ElementType | null }> = {
+  inbox:       { label: "Inbox",       color: "text-gray-400",              icon: null },
+  planned:     { label: "Planned",     color: "text-sky-500",               icon: null },
+  scheduled:   { label: "Scheduled",   color: "text-blue-500",              icon: null },
+  in_progress: { label: "In Progress", color: "text-amber-500",             icon: Play },
+  paused:      { label: "Paused",      color: "text-orange-400",            icon: Pause },
+  completed:   { label: "Completed",   color: "text-violet-600",            icon: Check },
+  cancelled:   { label: "Cancelled",   color: "text-red-500",               icon: X },
+  archived:    { label: "Archived",    color: "text-gray-400",              icon: null },
+};
 
 interface DayTaskListProps {
   tasks: Idea[];
@@ -69,7 +80,11 @@ function TimelineTaskRow({
   today: string;
   dragControls: ReturnType<typeof useDragControls>;
 }) {
-  const isCompleted = !!task.done_at;
+  const isCompleted = task.status === "completed";
+  const isCancelled = task.status === "cancelled";
+  const isInProgress = task.status === "in_progress";
+  const isPaused = task.status === "paused";
+  const statusConfig = STATUS_CONFIG[task.status];
   const [showMenu, setShowMenu] = useState(false);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -83,7 +98,33 @@ function TimelineTaskRow({
     return () => document.removeEventListener("mousedown", handler);
   }, [showMenu]);
 
+  const [showStatusPicker, setShowStatusPicker] = useState(false);
   const areaColor = task.area ? areaColors[task.area] : null;
+
+  const handleStatusSelect = (status: IdeaStatus) => {
+    const now = new Date().toISOString();
+    switch (status) {
+      case "completed":
+        onDone(task.id);
+        break;
+      case "cancelled":
+        onUpdate(task.id, { status: "cancelled", cancelled_at: now });
+        break;
+      case "in_progress":
+        onUpdate(task.id, { status: "in_progress" });
+        break;
+      case "paused":
+        onUpdate(task.id, { status: "paused", paused_at: now });
+        break;
+      case "planned":
+        onUpdate(task.id, { status: "planned" });
+        break;
+      case "scheduled":
+        onUndone(task.id);
+        break;
+    }
+    setShowStatusPicker(false);
+  };
 
   return (
     <div
@@ -99,27 +140,15 @@ function TimelineTaskRow({
         <GripVertical size={12} />
       </button>
 
-      <button
-        onClick={() => (isCompleted ? onUndone(task.id) : onDone(task.id))}
-        className="w-[18px] h-[18px] rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all"
-        style={{
-          borderColor: isCompleted ? "#7c3aed" : "var(--text-subtle)",
-          background: isCompleted ? "#7c3aed" : "transparent",
-        }}
-      >
-        {isCompleted && (
-          <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 300, damping: 15 }}>
-            <Check size={10} strokeWidth={3} className="text-white" />
-          </motion.span>
-        )}
-      </button>
-
+      {statusConfig.icon && (
+        <statusConfig.icon size={12} strokeWidth={2} className={`flex-shrink-0 ${statusConfig.color}`} />
+      )}
       <span
-        className="flex-1 text-sm truncate"
+        className={`flex-1 text-sm truncate ${isCancelled ? "line-through text-red-400/60" : ""}`}
         style={{
           fontWeight: 450,
-          textDecoration: isCompleted ? "line-through" : "none",
-          color: isCompleted ? "rgba(107, 114, 128, 0.6)" : "var(--text-primary)",
+          textDecoration: isCancelled ? "line-through" : "none",
+          color: isCompleted ? "rgba(107, 114, 128, 0.6)" : isCancelled ? "rgba(239, 68, 68, 0.5)" : isPaused ? "rgba(249, 115, 22, 0.7)" : "var(--text-primary)",
         }}
       >
         {task.text}
@@ -149,6 +178,28 @@ function TimelineTaskRow({
             onSelect={(area) => { onUpdate(task.id, { area }); setShowAreaPicker(false); }}
             onClose={() => setShowAreaPicker(false)}
           />
+        )}
+      </div>
+
+      <div className="relative flex-shrink-0">
+        <button
+          onClick={() => setShowStatusPicker((v) => !v)}
+          className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full transition-all cursor-pointer hover:opacity-80"
+          style={{
+            background: isCompleted ? "#f5f3ff" : isCancelled ? "#fef2f2" : isPaused ? "#fff7ed" : isInProgress ? "#fefce8" : "rgba(0,0,0,0.05)",
+            color: isCompleted ? "#7c3aed" : isCancelled ? "#ef4444" : isPaused ? "#f97316" : isInProgress ? "#d97706" : "#9ca3af",
+          }}
+        >
+          {statusConfig.label}
+        </button>
+        {showStatusPicker && (
+          <div className="absolute right-0 top-full mt-1 z-50">
+            <StatusPicker
+              current={task.status}
+              onSelect={handleStatusSelect}
+              onClose={() => setShowStatusPicker(false)}
+            />
+          </div>
         )}
       </div>
 
@@ -194,6 +245,7 @@ function TimelineTaskRow({
             >
               Move to Inbox
             </button>
+
             <div className="border-t border-black/5 dark:border-white/5 my-1" />
             <button
               onClick={() => { onUpdate(task.id, { status: "archived" }); setShowMenu(false); }}

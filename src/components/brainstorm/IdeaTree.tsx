@@ -86,7 +86,7 @@ export function IdeaTree({
     for (const idea of ideas) {
       let passes = true;
       if (timeFilter === "today" && idea.scheduled_date !== todayString) passes = false;
-      if (hideDone && idea.done_at) passes = false;
+      if (hideDone && (idea.status === "completed" || idea.status === "cancelled")) passes = false;
       if (passes) passingIds.add(idea.id);
     }
     const visibleIds = new Set(passingIds);
