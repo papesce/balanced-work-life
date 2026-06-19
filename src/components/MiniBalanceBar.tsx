@@ -21,7 +21,7 @@ const AREA_LABELS: Record<LifeArea, string> = {
 
 export function MiniBalanceBar({ tasks }: MiniBalanceBarProps) {
   const segments = useMemo(() => {
-    const activeTasks = tasks.filter((t) => t.status !== "archived");
+    const activeTasks = tasks.filter((t) => t.status !== "archived" && t.status !== "cancelled");
     const total = activeTasks.length;
     if (total === 0) return [];
 

@@ -2,11 +2,23 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Reorder } from "framer-motion";
-import { Check, Star, MoreHorizontal, GripVertical, Clock } from "lucide-react";
+import { Check, Star, MoreHorizontal, GripVertical, Clock, Play, Pause, X } from "lucide-react";
 import { areaColors } from "@/styles/tokens";
-import { Idea, LifeArea } from "@/lib/types";
+import { Idea, IdeaStatus, LifeArea } from "@/lib/types";
 import { AREA_ICONS, AREA_LABELS } from "./constants";
 import { formatTime } from "./plannerUtils";
+import { StatusPicker } from "@/components/brainstorm/StatusPicker";
+
+const STATUS_CONFIG: Record<IdeaStatus, { label: string; color: string; icon: React.ElementType | null }> = {
+  inbox:       { label: "Inbox",       color: "text-gray-400",              icon: null },
+  planned:     { label: "Planned",     color: "text-sky-500",               icon: null },
+  scheduled:   { label: "Scheduled",   color: "text-blue-500",              icon: null },
+  in_progress: { label: "In Progress", color: "text-amber-500",             icon: Play },
+  paused:      { label: "Paused",      color: "text-orange-400",            icon: Pause },
+  completed:   { label: "Completed",   color: "text-violet-600",            icon: Check },
+  cancelled:   { label: "Cancelled",   color: "text-red-500",               icon: X },
+  archived:    { label: "Archived",    color: "text-gray-400",              icon: null },
+};
 
 interface AreaTaskGroupProps {
   area: LifeArea;
@@ -40,7 +52,7 @@ export function AreaTaskGroup({
         e.preventDefault();
         setIsDragOver(false);
         const taskId = e.dataTransfer.getData("text/plain");
-        if (taskId) onUpdate(taskId, { area, status: "scheduled", scheduled_date: activeDate, scheduled_time: null });
+        if (taskId) onUpdate(taskId, { area, status: "planned", scheduled_date: activeDate, scheduled_time: null });
       }}
     >
       <div
@@ -134,8 +146,13 @@ function TaskRow({
   onDelete: (id: string) => void;
   showDragHandle?: boolean;
 }) {
-  const isCompleted = !!task.done_at;
+  const isCompleted = task.status === "completed";
+  const isCancelled = task.status === "cancelled";
+  const isPaused = task.status === "paused";
+  const isInProgress = task.status === "in_progress";
+  const statusConfig = STATUS_CONFIG[task.status];
   const [showMenu, setShowMenu] = useState(false);
+  const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showDurationDropdown, setShowDurationDropdown] = useState(false);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customVal, setCustomVal] = useState(task.duration_minutes?.toString() ?? "");
@@ -150,6 +167,31 @@ function TaskRow({
     if (showMenu || showDurationDropdown) document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [showMenu, showDurationDropdown]);
+
+  const handleStatusSelect = (status: IdeaStatus) => {
+    const now = new Date().toISOString();
+    switch (status) {
+      case "completed":
+        onDone(task.id);
+        break;
+      case "cancelled":
+        onUpdate(task.id, { status: "cancelled", cancelled_at: now });
+        break;
+      case "in_progress":
+        onUpdate(task.id, { status: "in_progress" });
+        break;
+      case "paused":
+        onUpdate(task.id, { status: "paused", paused_at: now });
+        break;
+      case "planned":
+        onUpdate(task.id, { status: "planned" });
+        break;
+      case "scheduled":
+        onUndone(task.id);
+        break;
+    }
+    setShowStatusPicker(false);
+  };
 
   return (
     <div
@@ -166,22 +208,39 @@ function TaskRow({
         </div>
       )}
 
-      <button
-        onClick={() => (isCompleted ? onUndone(task.id) : onDone(task.id))}
-        className="w-4.5 h-4.5 rounded-full border flex-shrink-0 flex items-center justify-center transition-all cursor-pointer"
-        style={{
-          borderColor: isCompleted ? "#7c3aed" : "var(--text-subtle, #9ca3af)",
-          background: isCompleted ? "#7c3aed" : "transparent",
-        }}
-      >
-        {isCompleted && <Check size={10} strokeWidth={4} className="text-white" />}
-      </button>
-
+      {statusConfig.icon && (
+        <statusConfig.icon size={12} strokeWidth={2} className={`flex-shrink-0 ${statusConfig.color}`} />
+      )}
       <span className={`flex-1 text-[13px] min-w-0 truncate ${
-        isCompleted ? "line-through text-gray-400 dark:text-gray-500 font-normal" : "text-gray-700 dark:text-gray-200 font-semibold"
+        isCompleted ? "text-gray-400 dark:text-gray-500 font-normal" :
+        isCancelled ? "line-through text-red-400/60 font-normal" :
+        isPaused ? "text-orange-600/70 dark:text-orange-400/70 font-semibold" :
+        "text-gray-700 dark:text-gray-200 font-semibold"
       }`}>
         {task.text}
       </span>
+
+      <div className="relative flex-shrink-0">
+        <button
+          onClick={() => setShowStatusPicker((v) => !v)}
+          className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full transition-all cursor-pointer hover:opacity-80"
+          style={{
+            background: isCompleted ? "#f5f3ff" : isCancelled ? "#fef2f2" : isPaused ? "#fff7ed" : isInProgress ? "#fefce8" : "rgba(0,0,0,0.05)",
+            color: isCompleted ? "#7c3aed" : isCancelled ? "#ef4444" : isPaused ? "#f97316" : isInProgress ? "#d97706" : "#9ca3af",
+          }}
+        >
+          {statusConfig.label}
+        </button>
+        {showStatusPicker && (
+          <div className="absolute right-0 top-full mt-1 z-50">
+            <StatusPicker
+              current={task.status}
+              onSelect={handleStatusSelect}
+              onClose={() => setShowStatusPicker(false)}
+            />
+          </div>
+        )}
+      </div>
 
       <div className="relative" ref={durationRef}>
         <button

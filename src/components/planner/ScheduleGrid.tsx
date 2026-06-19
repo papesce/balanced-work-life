@@ -86,7 +86,7 @@ export function ScheduleGrid({ allTasks, onUpdateTask, onCreateTask }: ScheduleG
                         <>
                           <div className="flex items-start justify-between gap-2">
                             <span className={`font-semibold text-[11px] leading-snug break-words ${
-                              task.done_at ? "line-through text-gray-400 dark:text-gray-500" : "text-gray-700 dark:text-gray-200"
+                              task.status === "completed" || task.status === "cancelled" ? "line-through text-gray-400 dark:text-gray-500" : "text-gray-700 dark:text-gray-200"
                             }`}>
                               {task.text}
                             </span>
@@ -112,7 +112,7 @@ export function ScheduleGrid({ allTasks, onUpdateTask, onCreateTask }: ScheduleG
                         <>
                           <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: areaColors[task.area ?? "life"]?.dot }} />
                           <span className={`flex-1 truncate font-medium text-[11px] ${
-                            task.done_at ? "line-through text-gray-400 dark:text-gray-500" : "text-gray-700 dark:text-gray-200"
+                            task.status === "completed" || task.status === "cancelled" ? "line-through text-gray-400 dark:text-gray-500" : "text-gray-700 dark:text-gray-200"
                           }`}>
                             {task.text}
                           </span>

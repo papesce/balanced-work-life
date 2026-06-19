@@ -141,7 +141,7 @@ export default function BrainstormPage() {
     registerUndo({
       label: "Idea completed",
       run: async () => {
-        await ideasHook.updateIdea(id, { done_at: previous.done_at });
+        await ideasHook.updateIdea(id, { status: previous.status, completed_at: previous.completed_at });
       },
     });
   };
@@ -154,7 +154,7 @@ export default function BrainstormPage() {
     registerUndo({
       label: "Idea reopened",
       run: async () => {
-        await ideasHook.updateIdea(id, { done_at: previous.done_at });
+        await ideasHook.updateIdea(id, { status: previous.status, completed_at: previous.completed_at });
       },
     });
   };

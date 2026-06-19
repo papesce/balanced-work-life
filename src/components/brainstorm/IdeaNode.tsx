@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
-import { ChevronRight, ChevronDown, GripVertical, Link2, ArrowUpDown, Calendar, Trash2 } from "lucide-react";
-import { IdeaNode as IdeaNodeType, Idea, IdeaLink, IdeaType, LifeArea, LinkType } from "@/lib/types";
+import { ChevronRight, ChevronDown, GripVertical, Link2, ArrowUpDown, Calendar, Trash2, Play, Pause, Check, X } from "lucide-react";
+import { IdeaNode as IdeaNodeType, Idea, IdeaLink, IdeaType, LifeArea, LinkType, IdeaStatus } from "@/lib/types";
 import { TypePicker } from "./TypePicker";
 import { AreaPicker } from "./AreaPicker";
+import { StatusPicker } from "./StatusPicker";
 import { LinkPanel } from "./LinkPanel";
 import { IdeaComposer } from "./IdeaComposer";
 import { MoveIdeaPanel } from "./MoveIdeaPanel";
@@ -63,6 +64,39 @@ const AREA_COLORS: Record<LifeArea, string> = {
   life: "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700/30",
 };
 
+const STATUS_STYLES: Record<IdeaStatus, string> = {
+  inbox: "border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 bg-transparent",
+  planned: "border-sky-200 dark:border-sky-700/30 bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-300",
+  scheduled: "border-blue-200 dark:border-blue-700/30 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300",
+  in_progress: "border-amber-200 dark:border-amber-700/30 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300",
+  paused: "border-orange-200 dark:border-orange-700/30 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300",
+  completed: "border-violet-200 dark:border-violet-700/30 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300",
+  cancelled: "border-red-200 dark:border-red-700/30 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300",
+  archived: "border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 bg-transparent",
+};
+
+const STATUS_LABELS: Record<IdeaStatus, string> = {
+  inbox: "Inbox",
+  planned: "Planned",
+  scheduled: "Scheduled",
+  in_progress: "Active",
+  paused: "Paused",
+  completed: "Done",
+  cancelled: "Cancelled",
+  archived: "Archived",
+};
+
+const STATUS_ICON: Record<IdeaStatus, { icon: React.ElementType | null; color: string }> = {
+  inbox:       { icon: null, color: "text-gray-400" },
+  planned:     { icon: null, color: "text-sky-500" },
+  scheduled:   { icon: null, color: "text-blue-500" },
+  in_progress: { icon: Play, color: "text-amber-500" },
+  paused:      { icon: Pause, color: "text-orange-400" },
+  completed:   { icon: Check, color: "text-violet-600" },
+  cancelled:   { icon: X,     color: "text-red-500" },
+  archived:    { icon: null, color: "text-gray-400" },
+};
+
 export function IdeaNode({
   node,
   depth,
@@ -94,6 +128,7 @@ export function IdeaNode({
   const [editText, setEditText] = useState(node.text);
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showLinkPanel, setShowLinkPanel] = useState(false);
   const [showMovePanel, setShowMovePanel] = useState(false);
   const [dragOver, setDragOver] = useState<"top" | "center" | "bottom" | null>(null);
@@ -215,7 +250,35 @@ export function IdeaNode({
     expandIdea(parentIdToExpand);
   };
 
+  const handleStatusSelect = (status: IdeaStatus) => {
+    const now = new Date().toISOString();
+    switch (status) {
+      case "completed":
+        updateIdea(node.id, { status: "completed", completed_at: now });
+        break;
+      case "cancelled":
+        updateIdea(node.id, { status: "cancelled", cancelled_at: now });
+        break;
+      case "in_progress":
+        updateIdea(node.id, { status: "in_progress" });
+        break;
+      case "paused":
+        updateIdea(node.id, { status: "paused", paused_at: now });
+        break;
+      case "planned":
+      case "scheduled":
+      case "inbox":
+        updateIdea(node.id, { status, completed_at: null, cancelled_at: null, paused_at: null });
+        break;
+      case "archived":
+        updateIdea(node.id, { status: "archived" });
+        break;
+    }
+    setShowStatusPicker(false);
+  };
+
   const handleRequestDelete = () => {
+    setShowStatusPicker(false);
     setShowMovePanel(false);
     setShowLinkPanel(false);
     setShowSchedulePicker(false);
@@ -234,7 +297,7 @@ export function IdeaNode({
     return n.children.some(matchesSearch);
   };
 
-  const isAnyMenuOpen = showTypePicker || showAreaPicker || showLinkPanel || showMovePanel || showSchedulePicker;
+  const isAnyMenuOpen = showTypePicker || showAreaPicker || showStatusPicker || showLinkPanel || showMovePanel || showSchedulePicker;
 
   return (
     <div style={{ paddingLeft: depth > 0 ? 20 : 0 }}>
@@ -277,23 +340,24 @@ export function IdeaNode({
           <GripVertical size={14} strokeWidth={1.5} />
         </span>
 
-        {/* Done checkbox */}
-        {node.type === "task" && node.scheduled_date && !isAncestorOnly && (
+        {/* Status icon */}
+        {!isAncestorOnly && STATUS_ICON[node.status].icon && (
           <button
             onClick={(e) => {
               e.stopPropagation();
-              if (node.done_at) {
+              if (node.status === "completed" || node.status === "cancelled") {
                 onMarkUndone(node.id);
               } else {
                 onMarkDone(node.id);
               }
             }}
-            className={`w-4 h-4 border-2 rounded-full flex-shrink-0 ${
-              node.done_at
-                ? "bg-green-500 border-green-500"
-                : "border-gray-300 hover:border-indigo-500"
-            }`}
-          />
+            className={`flex-shrink-0 flex items-center justify-center w-4 h-4 ${STATUS_ICON[node.status].color}`}
+          >
+            {(() => {
+              const Icon = STATUS_ICON[node.status].icon;
+              return Icon ? <Icon size={14} strokeWidth={2.5} /> : null;
+            })()}
+          </button>
         )}
 
         {/* Text */}
@@ -316,7 +380,10 @@ export function IdeaNode({
             }}
             className={`flex-1 text-sm px-2 py-0.5 rounded min-w-0 truncate ${
               isAncestorOnly ? "text-gray-400 italic cursor-default" :
-              node.done_at ? "line-through text-gray-400 dark:text-gray-500 cursor-text hover:bg-gray-100 dark:hover:bg-white/[0.04]" :
+              node.status === "completed" ? "text-violet-600/70 dark:text-violet-400/60 cursor-text hover:bg-gray-100 dark:hover:bg-white/[0.04]" :
+              node.status === "cancelled" ? "line-through text-red-400/60 dark:text-red-400/50 cursor-text hover:bg-gray-100 dark:hover:bg-white/[0.04]" :
+              node.status === "paused" ? "text-orange-600/70 dark:text-orange-400/60 cursor-text hover:bg-gray-100 dark:hover:bg-white/[0.04]" :
+              node.status === "in_progress" ? "text-amber-700 dark:text-amber-300 cursor-text hover:bg-gray-100 dark:hover:bg-white/[0.04]" :
               "text-gray-800 dark:text-gray-200 cursor-text hover:bg-gray-100 dark:hover:bg-white/[0.04]"
             }`}
           >
@@ -372,6 +439,29 @@ export function IdeaNode({
           </div>
         )}
 
+        {/* Status pill */}
+        {!isAncestorOnly && (
+          <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setShowStatusPicker(!showStatusPicker)}
+              className={`text-xs px-2 py-0.5 rounded-full border cursor-pointer ${
+                STATUS_STYLES[node.status]
+              }`}
+            >
+              {STATUS_LABELS[node.status]}
+            </button>
+            {showStatusPicker && (
+              <div className="absolute right-0 top-full mt-1 z-50">
+                <StatusPicker
+                  current={node.status}
+                  onSelect={handleStatusSelect}
+                  onClose={() => setShowStatusPicker(false)}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Link count badge */}
         {linkCount > 0 && (
           <span className="text-xs text-indigo-500 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/20 px-1.5 py-0.5 rounded-full flex-shrink-0">
@@ -397,6 +487,7 @@ export function IdeaNode({
         >
           <button
             onClick={() => {
+              setShowStatusPicker(false);
               setShowDeleteWarning(false);
               setShowMovePanel(false);
               setShowSchedulePicker(false);
@@ -409,6 +500,7 @@ export function IdeaNode({
           </button>
           <button
             onClick={() => {
+              setShowStatusPicker(false);
               setShowDeleteWarning(false);
               setShowLinkPanel(false);
               setShowSchedulePicker(false);
@@ -422,6 +514,7 @@ export function IdeaNode({
           <div className="relative">
             <button
               onClick={() => {
+                setShowStatusPicker(false);
                 setShowDeleteWarning(false);
                 setShowMovePanel(false);
                 setShowLinkPanel(false);

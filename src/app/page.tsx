@@ -50,10 +50,13 @@ function DailyPlannerInner() {
   }, []);
 
   const taskIdeas = useMemo(() => ideas.filter((i) => i.type === "task"), [ideas]);
-  const activeTaskIdeas = useMemo(() => taskIdeas.filter((i) => !i.done_at), [taskIdeas]);
+  const activeTaskIdeas = useMemo(
+    () => taskIdeas.filter((i) => i.status !== "completed" && i.status !== "cancelled" && i.status !== "archived"),
+    [taskIdeas],
+  );
 
   const doneOnDate = useMemo(
-    () => taskIdeas.filter((i) => i.done_at && i.scheduled_date === activeDate && toLocalDateString(new Date(i.done_at)) === activeDate),
+    () => taskIdeas.filter((i) => i.completed_at && i.scheduled_date === activeDate && toLocalDateString(new Date(i.completed_at)) === activeDate),
     [taskIdeas, activeDate],
   );
 
@@ -87,11 +90,11 @@ function DailyPlannerInner() {
   const visibleAreas = selectedArea ? [selectedArea] : AREA_ORDER;
 
   const handleAddToArea = async (text: string, area: LifeArea) => {
-    await createIdea(text, null, "bottom", { type: "task", area, scheduled_date: activeDate, status: "scheduled" });
+    await createIdea(text, null, "bottom", { type: "task", area, scheduled_date: activeDate, status: "planned" });
   };
 
   const handleAdd = async (text: string, area: LifeArea, scheduledDate: string | null) => {
-    await createIdea(text, null, "top", { type: "task", area, scheduled_date: scheduledDate ?? activeDate, status: "scheduled" });
+    await createIdea(text, null, "top", { type: "task", area, scheduled_date: scheduledDate ?? activeDate, status: "planned" });
   };
 
   const handleCreateScheduledTask = async (text: string, time: string, area: LifeArea) => {
@@ -270,7 +273,7 @@ function DailyPlannerInner() {
                 activeDate={activeDate}
                 today={today}
                 onScheduleToDate={async (id, area) => {
-                  await updateIdea(id, { scheduled_date: activeDate, area, status: "scheduled" });
+                  await updateIdea(id, { scheduled_date: activeDate, area, status: "planned" });
                 }}
                 onCreateInboxTask={async (text) => {
                   await createIdea(text, null, "top", { type: "task", status: "inbox" });
