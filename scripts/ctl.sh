@@ -1,17 +1,32 @@
 #!/usr/bin/env bash
 #
-# balance-server.sh - background launcher for Balanced Work Life.
-# Usage: ./scripts/balance-server.sh start|stop|restart|open|status|logs|install|uninstall [dev|prod]
-# Env:   BALANCE_PORT=4327 ./scripts/balance-server.sh open
-#        BALANCE_INSTALL_DIR=/usr/local/bin ./scripts/balance-server.sh install
+# ctl.sh - background launcher for Balanced Work Life.
+# Usage: ./scripts/ctl.sh start|stop|restart|open|status|logs|install|uninstall [dev|prod] [--fg]
+# Env:   BALANCE_PORT=4327 ./scripts/ctl.sh open
+#        BALANCE_INSTALL_DIR=/usr/local/bin ./scripts/ctl.sh install
+# Flags: --fg  run in foreground (blocks terminal, logs to stdout)
 #
 set -euo pipefail
 
+# Source nvm so pnpm is on PATH in non-interactive shells
+export NVM_DIR="${NVM_DIR:-${HOME}/.nvm}"
+[ -s "${NVM_DIR}/nvm.sh" ] && source "${NVM_DIR}/nvm.sh"
+
 APP_NAME="Balanced Work Life"
 DEFAULT_PORT="4327"
-COMMAND="${1:-open}"
-MODE="${2:-${BALANCE_MODE:-dev}}"
+COMMAND="${1:-help}"
 PORT="${BALANCE_PORT:-${PORT:-$DEFAULT_PORT}}"
+
+FG=0
+MODE=""
+for arg in "${@:2}"; do
+  if [[ "${arg}" == "--fg" ]]; then
+    FG=1
+  elif [[ -z "${MODE}" && "${arg}" != --* ]]; then
+    MODE="${arg}"
+  fi
+done
+MODE="${MODE:-${BALANCE_MODE:-dev}}"
 URL="http://localhost:${PORT}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -64,10 +79,25 @@ ensure_port_available() {
 }
 
 start_server() {
+  if [[ "${FG}" == "1" ]]; then
+    ensure_port_available
+    cd "${ROOT_DIR}"
+    if [[ "${MODE}" == "prod" || "${MODE}" == "production" || "${MODE}" == "start" ]]; then
+      echo "Building ${APP_NAME}..."
+      pnpm next build
+      exec pnpm next start -p "${PORT}"
+    else
+      exec pnpm next dev -p "${PORT}"
+    fi
+    return
+  fi
+
   clear_stale_pid
 
   if pid_is_running; then
     echo "${APP_NAME} is already running on ${URL} (pid $(current_pid))."
+    echo "  balance open     open in browser"
+    echo "  balance restart  restart the server"
     return
   fi
 
@@ -87,20 +117,28 @@ start_server() {
   fi
 
   echo "$!" >"${PID_FILE}"
-  echo "Started ${APP_NAME} on ${URL} (pid $(current_pid))."
-  echo "Logs: ${LOG_FILE}"
+  echo "${APP_NAME} started on ${URL} (pid $(current_pid))."
+  echo "  balance open     open in browser"
+  echo "  balance logs     tail server logs"
+  echo "  balance stop     stop the server"
 }
 
 stop_server() {
   clear_stale_pid
 
-  if ! pid_is_running; then
-    echo "${APP_NAME} is not running."
-    return
-  fi
-
   local pid
-  pid="$(current_pid)"
+  if pid_is_running; then
+    pid="$(current_pid)"
+  else
+    # No PID file — fall back to port-based lookup
+    pid="$(lsof -ti TCP:"${PORT}" 2>/dev/null | head -1)"
+    if [[ -z "${pid}" ]]; then
+      echo "${APP_NAME} is not running."
+      echo "Hint: balance open   to start and open in browser"
+      return
+    fi
+    echo "Warning: no PID file found; stopping process on port ${PORT} (pid ${pid})."
+  fi
   kill "${pid}" >/dev/null 2>&1 || true
 
   for _ in 1 2 3 4 5; do
@@ -116,6 +154,7 @@ stop_server() {
 
   rm -f "${PID_FILE}"
   echo "Stopped ${APP_NAME}."
+  echo "  balance open     start again and open in browser"
 }
 
 status_server() {
@@ -123,15 +162,32 @@ status_server() {
 
   if pid_is_running; then
     echo "${APP_NAME} is running on ${URL} (pid $(current_pid))."
-    echo "Logs: ${LOG_FILE}"
+    echo "  balance logs     tail server logs"
+    echo "  balance stop     stop the server"
+    echo "  open ${URL}"
   else
     echo "${APP_NAME} is not running."
+    echo "  balance open     start and open in browser"
+    echo "  balance start    start in background"
+    echo "  balance start --fg   start in foreground (logs to stdout)"
   fi
 }
 
 open_app() {
-  start_server
-  open "${URL}"
+  # If something is already on the port, just open the browser — don't error
+  if [[ -n "$(port_owner)" ]]; then
+    echo "${APP_NAME} is already running at ${URL}"
+    open "${URL}"
+    return
+  fi
+
+  if [[ "${FG}" == "1" ]]; then
+    (sleep 3 && open "${URL}") &
+    start_server
+  else
+    start_server
+    open "${URL}"
+  fi
 }
 
 preferred_profile_file() {
@@ -223,7 +279,7 @@ install_command() {
     add_path_to_profile
   fi
 
-  echo "Try it with: ${INSTALL_NAME} open"
+  echo "  ${INSTALL_NAME} open     start and open in browser"
 }
 
 uninstall_command() {
@@ -242,7 +298,40 @@ uninstall_command() {
   done < <(profile_files)
 }
 
+show_help() {
+  cat <<EOF
+${APP_NAME} — dev server controller
+
+Usage:
+  ./balance <command> [mode] [--fg]
+
+Commands:
+  open        Start server and open in browser (default)
+  start       Start server in background
+  stop        Stop server
+  restart     Restart server
+  status      Show running status and PID
+  logs        Tail server logs
+  install     Symlink 'balance' into ~/bin and add to PATH
+  uninstall   Remove symlink and PATH entry
+
+Modes:    dev (default) | prod
+Flags:    --fg  run in foreground (blocks terminal, logs to stdout)
+Env:      BALANCE_PORT=4327  BALANCE_MODE=dev  BALANCE_INSTALL_DIR=~/bin
+
+Examples:
+  ./balance                    Show this help
+  ./balance open               Start + open browser
+  ./balance start prod         Start production server in background
+  ./balance start --fg         Start dev server in foreground
+  ./balance install            Install 'balance' command globally
+EOF
+}
+
 case "${COMMAND}" in
+  help|--help|-h)
+    show_help
+    ;;
   install)
     install_command
     ;;
@@ -270,7 +359,8 @@ case "${COMMAND}" in
     tail -f "${LOG_FILE}"
     ;;
   *)
-    echo "Usage: $0 start|stop|restart|open|status|logs|install|uninstall [dev|prod]" >&2
+    echo "Unknown command: ${COMMAND}" >&2
+    echo "Run './balance help' for usage." >&2
     exit 1
     ;;
 esac
