@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, KeyboardEvent } from "react";
 import { Reorder, useDragControls } from "framer-motion";
 import { Check, Star, MoreHorizontal, GripVertical, Play, Pause, X } from "lucide-react";
 import { areaColors } from "@/styles/tokens";
@@ -98,6 +98,17 @@ function TimelineTaskRow({
     return () => document.removeEventListener("mousedown", handler);
   }, [showMenu]);
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(task.text);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const areaColor = task.area ? areaColors[task.area] : null;
 
@@ -126,6 +137,32 @@ function TimelineTaskRow({
     setShowStatusPicker(false);
   };
 
+  const handleStartEdit = () => {
+    setEditText(task.text);
+    setIsEditing(true);
+  };
+
+  const handleConfirmEdit = () => {
+    if (editText.trim() && editText.trim() !== task.text) {
+      onUpdate(task.id, { text: editText.trim() });
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleConfirmEdit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      handleCancelEdit();
+    }
+  };
+
   return (
     <div
       className={`flex items-center gap-1.5 rounded-xl px-3 py-2 transition-colors group ${isHovered ? "bg-black/[0.03] dark:bg-white/[0.04]" : ""}`}
@@ -143,16 +180,28 @@ function TimelineTaskRow({
       {statusConfig.icon && (
         <statusConfig.icon size={12} strokeWidth={2} className={`flex-shrink-0 ${statusConfig.color}`} />
       )}
-      <span
-        className={`flex-1 text-sm truncate ${isCancelled ? "line-through text-red-400/60" : ""}`}
-        style={{
-          fontWeight: 450,
-          textDecoration: isCancelled ? "line-through" : "none",
-          color: isCompleted ? "rgba(107, 114, 128, 0.6)" : isCancelled ? "rgba(239, 68, 68, 0.5)" : isPaused ? "rgba(249, 115, 22, 0.7)" : "var(--text-primary)",
-        }}
-      >
-        {task.text}
-      </span>
+      {isEditing ? (
+        <input
+          ref={inputRef}
+          type="text"
+          value={editText}
+          onChange={(e) => setEditText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={handleConfirmEdit}
+          className="flex-1 text-sm px-1.5 py-0.5 border border-violet-300 dark:border-violet-600 rounded-lg outline-none focus:border-violet-500 min-w-0 bg-white/80 dark:bg-gray-800/80"
+        />
+      ) : (
+        <span
+          onClick={handleStartEdit}
+          className={`flex-1 text-sm truncate cursor-text hover:bg-black/[0.03] dark:hover:bg-white/[0.04] rounded px-1 -mx-1 ${isCancelled ? "text-red-400/60" : ""}`}
+          style={{
+            fontWeight: 450,
+            color: isCompleted ? "rgba(107, 114, 128, 0.6)" : isCancelled ? "rgba(239, 68, 68, 0.5)" : isPaused ? "rgba(249, 115, 22, 0.7)" : "var(--text-primary)",
+          }}
+        >
+          {task.text}
+        </span>
+      )}
 
       {task.scheduled_time && (
         <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold flex-shrink-0 tabular-nums">
