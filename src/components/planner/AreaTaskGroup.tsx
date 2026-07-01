@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, KeyboardEvent } from "react";
 import { Reorder } from "framer-motion";
 import { Check, Star, MoreHorizontal, GripVertical, Clock, Play, Pause, X } from "lucide-react";
 import { areaColors } from "@/styles/tokens";
@@ -156,8 +156,44 @@ function TaskRow({
   const [showDurationDropdown, setShowDurationDropdown] = useState(false);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customVal, setCustomVal] = useState(task.duration_minutes?.toString() ?? "");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(task.text);
+  const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const durationRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleStartEdit = () => {
+    setEditText(task.text);
+    setIsEditing(true);
+  };
+
+  const handleConfirmEdit = () => {
+    if (editText.trim() && editText.trim() !== task.text) {
+      onUpdate(task.id, { text: editText.trim() });
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleConfirmEdit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      handleCancelEdit();
+    }
+  };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -211,14 +247,29 @@ function TaskRow({
       {statusConfig.icon && (
         <statusConfig.icon size={12} strokeWidth={2} className={`flex-shrink-0 ${statusConfig.color}`} />
       )}
-      <span className={`flex-1 text-[13px] min-w-0 truncate ${
-        isCompleted ? "text-gray-400 dark:text-gray-500 font-normal" :
-        isCancelled ? "text-red-400/60 font-normal" :
-        isPaused ? "text-orange-600/70 dark:text-orange-400/70 font-semibold" :
-        "text-gray-700 dark:text-gray-200 font-semibold"
-      }`}>
-        {task.text}
-      </span>
+      {isEditing ? (
+        <input
+          ref={inputRef}
+          type="text"
+          value={editText}
+          onChange={(e) => setEditText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={handleConfirmEdit}
+          className="flex-1 text-[13px] px-1.5 py-0.5 border border-violet-300 dark:border-violet-600 rounded-lg outline-none focus:border-violet-500 min-w-0 bg-white/80 dark:bg-gray-800/80 font-semibold"
+        />
+      ) : (
+        <span
+          onClick={handleStartEdit}
+          className={`flex-1 text-[13px] min-w-0 truncate cursor-text hover:bg-black/[0.03] dark:hover:bg-white/[0.04] rounded px-1 -mx-1 ${
+            isCompleted ? "text-gray-400 dark:text-gray-500 font-normal" :
+            isCancelled ? "text-red-400/60 font-normal" :
+            isPaused ? "text-orange-600/70 dark:text-orange-400/70 font-semibold" :
+            "text-gray-700 dark:text-gray-200 font-semibold"
+          }`}
+        >
+          {task.text}
+        </span>
+      )}
 
       <div className="relative flex-shrink-0">
         <button
