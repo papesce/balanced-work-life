@@ -178,7 +178,6 @@ export function useIdeas() {
       parent_id: parentId,
       text,
       type: null,
-      area: null,
       effort: null,
       impact: null,
       urgency: null,
@@ -214,13 +213,22 @@ export function useIdeas() {
 
   const updateIdea = async (id: string, updates: Partial<Idea>) => {
     const updatedAt = new Date().toISOString();
+    const previous = ideas.find((i) => i.id === id);
     setIdeas((prev) =>
       prev.map((i) => (i.id === id ? { ...i, ...updates, updated_at: updatedAt } : i))
     );
-    await supabase
+    const { error } = await supabase
       .from("ideas")
       .update({ ...updates, updated_at: updatedAt })
       .eq("id", id);
+    if (error) {
+      // Roll back the optimistic update so local state matches the DB.
+      if (previous) {
+        setIdeas((prev) => prev.map((i) => (i.id === id ? previous : i)));
+      }
+      console.error("Failed to update idea", id, updates, error);
+      throw error;
+    }
   };
 
   const deleteIdea = async (id: string) => {

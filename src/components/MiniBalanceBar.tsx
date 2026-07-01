@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
-import { Idea, LifeArea } from "@/lib/types";
+import { Idea, LifeArea, Tag, getAreasForIdea } from "@/lib/types";
 import { areaColors } from "@/styles/tokens";
 
 interface MiniBalanceBarProps {
   tasks: Idea[];
+  getTagsForIdea?: (ideaId: string) => Tag[];
 }
 
 const AREA_ORDER: LifeArea[] = ["work", "health", "relationships", "growth", "finances", "life"];
@@ -19,7 +20,7 @@ const AREA_LABELS: Record<LifeArea, string> = {
   life: "Life",
 };
 
-export function MiniBalanceBar({ tasks }: MiniBalanceBarProps) {
+export function MiniBalanceBar({ tasks, getTagsForIdea }: MiniBalanceBarProps) {
   const segments = useMemo(() => {
     const activeTasks = tasks.filter((t) => t.status !== "archived" && t.status !== "cancelled");
     const total = activeTasks.length;
@@ -35,8 +36,13 @@ export function MiniBalanceBar({ tasks }: MiniBalanceBarProps) {
     };
 
     for (const task of activeTasks) {
-      const area = task.area || "life";
-      counts[area]++;
+      const tags = getTagsForIdea ? getTagsForIdea(task.id) : [];
+      const areas = getAreasForIdea(tags);
+      if (areas.length === 0) {
+        counts["life"]++;
+      } else {
+        for (const area of areas) counts[area]++;
+      }
     }
 
     return AREA_ORDER.map((area) => {

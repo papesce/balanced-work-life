@@ -2,13 +2,31 @@ export type IdeaType = "idea" | "objective" | "project" | "initiative" | "task";
 export type LifeArea = "work" | "health" | "relationships" | "growth" | "finances" | "life";
 export type IdeaStatus = "inbox" | "planned" | "scheduled" | "in_progress" | "paused" | "completed" | "cancelled" | "archived";
 
+export interface Tag {
+  id: string;
+  user_id: string;
+  name: string;
+  area: LifeArea;
+  is_system: boolean;
+  created_at: string;
+}
+
+export interface TaskTag {
+  idea_id: string;
+  tag_id: string;
+}
+
+/** Returns the distinct set of Areas a task contributes to (split/all model). */
+export function getAreasForIdea(tags: Tag[]): LifeArea[] {
+  return [...new Set(tags.map((t) => t.area))];
+}
+
 export interface Idea {
   id: string;
   user_id: string;
   parent_id: string | null;
   text: string;
   type: IdeaType | null;
-  area: LifeArea | null;
   effort: number | null;
   impact: number | null;
   urgency: number | null;

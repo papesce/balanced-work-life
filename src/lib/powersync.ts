@@ -12,7 +12,6 @@ export const IdeasTable = new Table(
     parent_id: column.text,
     text: column.text,
     type: column.text,
-    area: column.text,
     effort: column.text,
     impact: column.text,
     urgency: column.text,
@@ -44,7 +43,31 @@ export const IdeaLinksTable = new Table(
   { indexes: {} }
 );
 
-export const AppSchema = new Schema({ ideas: IdeasTable, idea_links: IdeaLinksTable });
+export const TagsTable = new Table(
+  {
+    user_id: column.text,
+    name: column.text,
+    area: column.text,
+    is_system: column.integer,
+    created_at: column.text,
+  },
+  { indexes: {} }
+);
+
+export const TaskTagsTable = new Table(
+  {
+    idea_id: column.text,
+    tag_id: column.text,
+  },
+  { indexes: {} }
+);
+
+export const AppSchema = new Schema({
+  ideas: IdeasTable,
+  idea_links: IdeaLinksTable,
+  tags: TagsTable,
+  task_tags: TaskTagsTable,
+});
 
 let powerSyncInstance: Awaited<
   ReturnType<WASQLitePowerSyncDatabaseOpenFactory["getInstance"]>

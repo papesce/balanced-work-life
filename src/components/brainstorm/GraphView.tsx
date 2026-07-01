@@ -85,7 +85,6 @@ export function GraphView({ ideas, links, onNodeDoubleClick }: GraphViewProps) {
       data: {
         label: idea.text || "untitled",
         type: idea.type,
-        area: idea.area,
       } as GraphIdeaNodeData,
     }));
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { IdeaNode as IdeaNodeType, Idea, IdeaLink, LinkType } from "@/lib/types";
+import { IdeaNode as IdeaNodeType, Idea, IdeaLink, Tag, LifeArea, LinkType } from "@/lib/types";
 import { IdeaNode } from "./IdeaNode";
 import { getToday } from "@/lib/dateUtils";
 
@@ -22,6 +22,11 @@ interface IdeaTreeProps {
   onMarkDone: (id: string) => Promise<void>;
   onMarkUndone: (id: string) => Promise<void>;
   onSchedule: (id: string, date: string | null) => Promise<void>;
+  allTags: Tag[];
+  getTagsForIdea: (ideaId: string) => Tag[];
+  onAddTag: (ideaId: string, tag: Tag) => Promise<void>;
+  onRemoveTag: (ideaId: string, tagId: string) => Promise<void>;
+  onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
 }
 
 function getAncestorIds(ideaId: string, ideas: Idea[]): Set<string> {
@@ -52,6 +57,11 @@ export function IdeaTree({
   onMarkDone,
   onMarkUndone,
   onSchedule,
+  allTags,
+  getTagsForIdea,
+  onAddTag,
+  onRemoveTag,
+  onCreateTag,
 }: IdeaTreeProps) {
   const [search, setSearch] = useState("");
   const [showType, setShowType] = useState(true);
@@ -232,6 +242,11 @@ export function IdeaTree({
               onSchedule={onSchedule}
               todayString={todayString}
               isAncestorOnly={false}
+              allTags={allTags}
+              getTagsForIdea={getTagsForIdea}
+              onAddTag={onAddTag}
+              onRemoveTag={onRemoveTag}
+              onCreateTag={onCreateTag}
             />
           ))}
         </div>

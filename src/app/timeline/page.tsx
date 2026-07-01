@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
+import { useTags } from "@/hooks/useTags";
+import { useTaskTags } from "@/hooks/useTaskTags";
 import { AppShell } from "@/components/AppShell";
 import { MiniBalanceBar } from "@/components/MiniBalanceBar";
 import { Idea } from "@/lib/types";
@@ -27,6 +29,8 @@ const cardVariants = {
 export default function TimelinePage() {
   const router = useRouter();
   const { ideas, loading, createIdea, markDone, markUndone, updateIdea, reorderTasks, smartSortTasks } = useIdeas();
+  const tagsHook = useTags();
+  const taskTagsHook = useTaskTags();
   const todayRef = useRef<HTMLElement>(null);
   const hasAutoScrolled = useRef(false);
   const [fabOpen, setFabOpen] = useState(false);
@@ -129,7 +133,7 @@ export default function TimelinePage() {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <MiniBalanceBar tasks={dayTasks} />
+                    <MiniBalanceBar tasks={dayTasks} getTagsForIdea={taskTagsHook.getTagsForIdea} />
                     {dayTasks.length > 0 && (
                       <button
                         onClick={() => smartSortTasks(dayTasks)}
@@ -157,6 +161,11 @@ export default function TimelinePage() {
                       onUndone={markUndone}
                       onUpdate={updateIdea}
                       today={today}
+                      allTags={tagsHook.tags}
+                      getTagsForIdea={taskTagsHook.getTagsForIdea}
+                      onAddTag={taskTagsHook.addTagToTask}
+                      onRemoveTag={taskTagsHook.removeTagFromTask}
+                      onCreateTag={tagsHook.createTag}
                     />
                   )}
                 </div>

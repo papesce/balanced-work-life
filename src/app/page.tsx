@@ -4,9 +4,11 @@ import { useState, useMemo, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Sparkles, Calendar, Layers, Clock, Inbox, BarChart3 } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
+import { useTags } from "@/hooks/useTags";
+import { useTaskTags } from "@/hooks/useTaskTags";
 import { AppShell } from "@/components/AppShell";
 import { BalanceRing } from "@/components/BalanceRing";
-import { Idea, LifeArea } from "@/lib/types";
+import { Idea, LifeArea, getAreasForIdea } from "@/lib/types";
 import { getToday, toLocalDateString } from "@/lib/dateUtils";
 import { DateNav } from "@/components/planner/DateNav";
 import { AreaFilters } from "@/components/planner/AreaFilters";
@@ -26,6 +28,8 @@ export default function DailyPlannerPage() {
 
 function DailyPlannerInner() {
   const { ideas, loading, createIdea, updateIdea, deleteIdea, markDone, markUndone, reorderTasks, smartSortTasks } = useIdeas();
+  const tagsHook = useTags();
+  const taskTagsHook = useTaskTags();
   const searchParams = useSearchParams();
   const [activeDate, setActiveDate] = useState<string>(() => searchParams.get("date") ?? getToday());
 
@@ -76,10 +80,18 @@ function DailyPlannerInner() {
       finances: { pending: 0, done: 0 },
       life: { pending: 0, done: 0 },
     };
-    for (const t of pendingOnDate) counts[t.area ?? "life"].pending++;
-    for (const t of doneOnDate) counts[t.area ?? "life"].done++;
+    for (const t of pendingOnDate) {
+      const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(t.id));
+      const effectiveAreas = areas.length > 0 ? areas : (["life"] as LifeArea[]);
+      for (const a of effectiveAreas) counts[a].pending++;
+    }
+    for (const t of doneOnDate) {
+      const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(t.id));
+      const effectiveAreas = areas.length > 0 ? areas : (["life"] as LifeArea[]);
+      for (const a of effectiveAreas) counts[a].done++;
+    }
     return counts;
-  }, [pendingOnDate, doneOnDate]);
+  }, [pendingOnDate, doneOnDate, taskTagsHook]);
 
   const balanceRingCounts = useMemo(() => {
     const counts: Record<LifeArea, number> = { work: 0, health: 0, relationships: 0, growth: 0, finances: 0, life: 0 };
@@ -90,15 +102,20 @@ function DailyPlannerInner() {
   const visibleAreas = selectedArea ? [selectedArea] : AREA_ORDER;
 
   const handleAddToArea = async (text: string, area: LifeArea) => {
-    await createIdea(text, null, "bottom", { type: "task", area, scheduled_date: activeDate, status: "planned" });
+    const id = await createIdea(text, null, "bottom", { type: "task", scheduled_date: activeDate, status: "planned" });
+    // Auto-tag with the system tag for this area if it exists
+    if (id) {
+      const systemTag = tagsHook.tags.find((t) => t.is_system && t.area === area);
+      if (systemTag) await taskTagsHook.addTagToTask(id, systemTag);
+    }
   };
 
-  const handleAdd = async (text: string, area: LifeArea, scheduledDate: string | null) => {
-    await createIdea(text, null, "top", { type: "task", area, scheduled_date: scheduledDate ?? activeDate, status: "planned" });
+  const handleAdd = async (text: string, scheduledDate: string | null) => {
+    await createIdea(text, null, "top", { type: "task", scheduled_date: scheduledDate ?? activeDate, status: "planned" });
   };
 
-  const handleCreateScheduledTask = async (text: string, time: string, area: LifeArea) => {
-    await createIdea(text, null, "bottom", { type: "task", area, scheduled_date: activeDate, scheduled_time: time, status: "scheduled" });
+  const handleCreateScheduledTask = async (text: string, time: string) => {
+    await createIdea(text, null, "bottom", { type: "task", scheduled_date: activeDate, scheduled_time: time, status: "scheduled" });
   };
 
   if (loading) {
@@ -191,8 +208,14 @@ function DailyPlannerInner() {
 
           <div className="space-y-4">
             {visibleAreas.map((area) => {
-              const pending = pendingOnDate.filter((t) => (t.area ?? "life") === area);
-              const done = doneOnDate.filter((t) => (t.area ?? "life") === area);
+              const pending = pendingOnDate.filter((t) => {
+                const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(t.id));
+                return areas.length === 0 ? area === "life" : areas.includes(area);
+              });
+              const done = doneOnDate.filter((t) => {
+                const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(t.id));
+                return areas.length === 0 ? area === "life" : areas.includes(area);
+              });
               if (pending.length === 0 && done.length === 0 && selectedArea !== area) return null;
               return (
                 <AreaTaskGroup
@@ -272,12 +295,13 @@ function DailyPlannerInner() {
                 tasks={inboxTasks}
                 activeDate={activeDate}
                 today={today}
-                onScheduleToDate={async (id, area) => {
-                  await updateIdea(id, { scheduled_date: activeDate, area, status: "planned" });
+                onScheduleToDate={async (id) => {
+                  await updateIdea(id, { scheduled_date: activeDate, status: "planned" });
                 }}
                 onCreateInboxTask={async (text) => {
                   await createIdea(text, null, "top", { type: "task", status: "inbox" });
                 }}
+                getTagsForIdea={taskTagsHook.getTagsForIdea}
               />
             )}
           </div>

@@ -3,9 +3,8 @@
 import { useState, useEffect, useRef, KeyboardEvent } from "react";
 import { Reorder, useDragControls } from "framer-motion";
 import { Check, Star, MoreHorizontal, GripVertical, Play, Pause, X } from "lucide-react";
-import { areaColors } from "@/styles/tokens";
-import { Idea, IdeaStatus } from "@/lib/types";
-import { AreaPicker } from "@/components/brainstorm/AreaPicker";
+import { Idea, IdeaStatus, Tag, LifeArea } from "@/lib/types";
+import { TagPicker, AREA_DOT_COLORS } from "@/components/shared/TagPicker";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 
 const STATUS_CONFIG: Record<IdeaStatus, { label: string; color: string; icon: React.ElementType | null }> = {
@@ -26,9 +25,14 @@ interface DayTaskListProps {
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   today: string;
+  allTags: Tag[];
+  getTagsForIdea: (ideaId: string) => Tag[];
+  onAddTag: (ideaId: string, tag: Tag) => Promise<void>;
+  onRemoveTag: (ideaId: string, tagId: string) => Promise<void>;
+  onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
 }
 
-export function DayTaskList({ tasks, onReorder, onDone, onUndone, onUpdate, today }: DayTaskListProps) {
+export function DayTaskList({ tasks, onReorder, onDone, onUndone, onUpdate, today, allTags, getTagsForIdea, onAddTag, onRemoveTag, onCreateTag }: DayTaskListProps) {
   const [items, setItems] = useState(tasks);
   const itemsRef = useRef(items);
 
@@ -46,6 +50,11 @@ export function DayTaskList({ tasks, onReorder, onDone, onUndone, onUpdate, toda
           onUndone={onUndone}
           onUpdate={onUpdate}
           today={today}
+          allTags={allTags}
+          taskTags={getTagsForIdea(task.id)}
+          onAddTag={onAddTag}
+          onRemoveTag={onRemoveTag}
+          onCreateTag={onCreateTag}
         />
       ))}
     </Reorder.Group>
@@ -53,7 +62,7 @@ export function DayTaskList({ tasks, onReorder, onDone, onUndone, onUpdate, toda
 }
 
 function DayTaskItem({
-  task, onReorder, onDone, onUndone, onUpdate, today,
+  task, onReorder, onDone, onUndone, onUpdate, today, allTags, taskTags, onAddTag, onRemoveTag, onCreateTag,
 }: {
   task: Idea;
   onReorder: () => void;
@@ -61,17 +70,22 @@ function DayTaskItem({
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   today: string;
+  allTags: Tag[];
+  taskTags: Tag[];
+  onAddTag: (ideaId: string, tag: Tag) => Promise<void>;
+  onRemoveTag: (ideaId: string, tagId: string) => Promise<void>;
+  onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
 }) {
   const controls = useDragControls();
   return (
     <Reorder.Item value={task} dragControls={controls} className="relative" onDragEnd={onReorder}>
-      <TimelineTaskRow task={task} onDone={onDone} onUndone={onUndone} onUpdate={onUpdate} today={today} dragControls={controls} />
+      <TimelineTaskRow task={task} onDone={onDone} onUndone={onUndone} onUpdate={onUpdate} today={today} dragControls={controls} allTags={allTags} taskTags={taskTags} onAddTag={onAddTag} onRemoveTag={onRemoveTag} onCreateTag={onCreateTag} />
     </Reorder.Item>
   );
 }
 
 function TimelineTaskRow({
-  task, onDone, onUndone, onUpdate, today, dragControls,
+  task, onDone, onUndone, onUpdate, today, dragControls, allTags, taskTags, onAddTag, onRemoveTag, onCreateTag,
 }: {
   task: Idea;
   onDone: (id: string) => void;
@@ -79,6 +93,11 @@ function TimelineTaskRow({
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   today: string;
   dragControls: ReturnType<typeof useDragControls>;
+  allTags: Tag[];
+  taskTags: Tag[];
+  onAddTag: (ideaId: string, tag: Tag) => Promise<void>;
+  onRemoveTag: (ideaId: string, tagId: string) => Promise<void>;
+  onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
 }) {
   const isCompleted = task.status === "completed";
   const isCancelled = task.status === "cancelled";
@@ -86,7 +105,7 @@ function TimelineTaskRow({
   const isPaused = task.status === "paused";
   const statusConfig = STATUS_CONFIG[task.status];
   const [showMenu, setShowMenu] = useState(false);
-  const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const [showTagPicker, setShowTagPicker] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -110,7 +129,6 @@ function TimelineTaskRow({
   }, [isEditing]);
 
   const [showStatusPicker, setShowStatusPicker] = useState(false);
-  const areaColor = task.area ? areaColors[task.area] : null;
 
   const handleStatusSelect = (status: IdeaStatus) => {
     const now = new Date().toISOString();
@@ -209,23 +227,31 @@ function TimelineTaskRow({
         </span>
       )}
 
-      <div className="relative flex-shrink-0">
+      <div className="relative flex items-center gap-1 flex-shrink-0">
+        {taskTags.map((tag) => (
+          <span
+            key={tag.id}
+            className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1"
+            style={{ opacity: 0.85 }}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full inline-block flex-shrink-0 ${AREA_DOT_COLORS[tag.area]}`} />
+            {tag.name}
+          </span>
+        ))}
         <button
-          onClick={() => setShowAreaPicker((v) => !v)}
-          className="text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize transition-opacity hover:opacity-80"
-          style={
-            areaColor
-              ? { background: areaColor.bg, color: areaColor.text }
-              : { background: "rgba(0,0,0,0.05)", color: "#9ca3af" }
-          }
+          onClick={() => setShowTagPicker((v) => !v)}
+          className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-black/5 dark:bg-white/5 text-gray-400 dark:text-gray-500 hover:bg-black/10 dark:hover:bg-white/10"
         >
-          {task.area ?? "—"}
+          {taskTags.length === 0 ? "tag" : "+"}
         </button>
-        {showAreaPicker && (
-          <AreaPicker
-            current={task.area}
-            onSelect={(area) => { onUpdate(task.id, { area }); setShowAreaPicker(false); }}
-            onClose={() => setShowAreaPicker(false)}
+        {showTagPicker && (
+          <TagPicker
+            allTags={allTags}
+            selectedTags={taskTags}
+            onAdd={(tag) => { void onAddTag(task.id, tag); }}
+            onRemove={(tagId) => { void onRemoveTag(task.id, tagId); }}
+            onCreateTag={onCreateTag}
+            onClose={() => setShowTagPicker(false)}
           />
         )}
       </div>

@@ -2,22 +2,21 @@
 
 import { useState } from "react";
 import { Inbox, Plus, ChevronRight } from "lucide-react";
-import { areaColors } from "@/styles/tokens";
-import { Idea, LifeArea } from "@/lib/types";
-import { AREA_ORDER, AREA_LABELS } from "./constants";
+import { Idea, Tag } from "@/lib/types";
+import { AREA_DOT_COLORS } from "@/components/shared/TagPicker";
 import { formatDayLabel } from "./plannerUtils";
 
 interface BacklogCardProps {
   tasks: Idea[];
   activeDate: string;
   today: string;
-  onScheduleToDate: (id: string, area: LifeArea) => Promise<void>;
+  onScheduleToDate: (id: string) => Promise<void>;
   onCreateInboxTask: (text: string) => Promise<void>;
+  getTagsForIdea: (ideaId: string) => Tag[];
 }
 
-export function BacklogCard({ tasks, activeDate, today, onScheduleToDate, onCreateInboxTask }: BacklogCardProps) {
+export function BacklogCard({ tasks, activeDate, today, onScheduleToDate, onCreateInboxTask, getTagsForIdea }: BacklogCardProps) {
   const [inputText, setInputText] = useState("");
-  const [showAreaSelectorForId, setShowAreaSelectorForId] = useState<string | null>(null);
   const dateLabel = formatDayLabel(activeDate, today);
 
   return (
@@ -71,40 +70,22 @@ export function BacklogCard({ tasks, activeDate, today, onScheduleToDate, onCrea
                 <span className="text-xs text-gray-700 dark:text-gray-200 font-semibold leading-snug flex-1">
                   {task.text}
                 </span>
-                {task.area && (
-                  <span
-                    className="text-[9px] font-bold px-1.5 py-0.5 rounded capitalize flex-shrink-0"
-                    style={{ background: areaColors[task.area]?.bg, color: areaColors[task.area]?.text }}
-                  >
-                    {task.area}
-                  </span>
-                )}
+                <div className="flex gap-1 flex-shrink-0 flex-wrap justify-end">
+                  {getTagsForIdea(task.id).map((tag) => (
+                    <span key={tag.id} className="text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                      <span className={`w-1.5 h-1.5 rounded-full inline-block ${AREA_DOT_COLORS[tag.area]}`} />
+                      {tag.name}
+                    </span>
+                  ))}
+                </div>
               </div>
 
-              {showAreaSelectorForId === task.id ? (
-                <div className="flex flex-wrap gap-1 pt-1.5 border-t border-black/5 dark:border-white/5">
-                  {AREA_ORDER.map((area) => (
-                    <button
-                      key={area}
-                      onClick={async () => { await onScheduleToDate(task.id, area); setShowAreaSelectorForId(null); }}
-                      className="text-[9px] font-bold px-2 py-1 rounded-lg capitalize border border-black/5 dark:border-white/5 hover:opacity-80 transition-colors cursor-pointer"
-                      style={{ background: areaColors[area]?.bg, color: areaColors[area]?.text }}
-                    >
-                      {AREA_LABELS[area]}
-                    </button>
-                  ))}
-                  <button onClick={() => setShowAreaSelectorForId(null)} className="text-[9px] text-gray-400 hover:text-gray-600 px-2 py-1 cursor-pointer font-semibold">
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowAreaSelectorForId(task.id)}
-                  className="self-end text-[10px] text-violet-600 dark:text-violet-400 font-semibold flex items-center gap-0.5 hover:text-violet-700 cursor-pointer"
-                >
-                  Schedule to {dateLabel} <ChevronRight size={10} />
-                </button>
-              )}
+              <button
+                onClick={() => onScheduleToDate(task.id)}
+                className="self-end text-[10px] text-violet-600 dark:text-violet-400 font-semibold flex items-center gap-0.5 hover:text-violet-700 cursor-pointer"
+              >
+                Schedule to {dateLabel} <ChevronRight size={10} />
+              </button>
             </div>
           ))
         )}

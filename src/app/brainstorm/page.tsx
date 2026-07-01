@@ -4,6 +4,8 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
+import { useTags } from "@/hooks/useTags";
+import { useTaskTags } from "@/hooks/useTaskTags";
 import { AppShell } from "@/components/AppShell";
 import { IdeaTree } from "@/components/brainstorm/IdeaTree";
 import { GraphView } from "@/components/brainstorm/GraphView";
@@ -27,6 +29,8 @@ function getDescendantIdeaIds(rootId: string, ideas: Idea[]): Set<string> {
 export default function BrainstormPage() {
   const ideasHook = useIdeas();
   const linksHook = useIdeaLinks();
+  const tagsHook = useTags();
+  const taskTagsHook = useTaskTags();
   const [viewMode, setViewMode] = useState<"tree" | "graph">("tree");
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
 
@@ -256,6 +260,11 @@ export default function BrainstormPage() {
           onMarkDone={markDone}
           onMarkUndone={markUndone}
           onSchedule={scheduleIdea}
+          allTags={tagsHook.tags}
+          getTagsForIdea={taskTagsHook.getTagsForIdea}
+          onAddTag={taskTagsHook.addTagToTask}
+          onRemoveTag={taskTagsHook.removeTagFromTask}
+          onCreateTag={tagsHook.createTag}
         />
       ) : (
         <GraphView

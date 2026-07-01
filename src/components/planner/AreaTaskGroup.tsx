@@ -52,7 +52,7 @@ export function AreaTaskGroup({
         e.preventDefault();
         setIsDragOver(false);
         const taskId = e.dataTransfer.getData("text/plain");
-        if (taskId) onUpdate(taskId, { area, status: "planned", scheduled_date: activeDate, scheduled_time: null });
+        if (taskId) onUpdate(taskId, { status: "planned", scheduled_date: activeDate, scheduled_time: null });
       }}
     >
       <div
@@ -213,7 +213,7 @@ function TaskRow({
       )}
       <span className={`flex-1 text-[13px] min-w-0 truncate ${
         isCompleted ? "text-gray-400 dark:text-gray-500 font-normal" :
-        isCancelled ? "line-through text-red-400/60 font-normal" :
+        isCancelled ? "text-red-400/60 font-normal" :
         isPaused ? "text-orange-600/70 dark:text-orange-400/70 font-semibold" :
         "text-gray-700 dark:text-gray-200 font-semibold"
       }`}>

@@ -2,9 +2,9 @@
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { ChevronRight, ChevronDown, GripVertical, Link2, ArrowUpDown, Calendar, Trash2, Play, Pause, Check, X } from "lucide-react";
-import { IdeaNode as IdeaNodeType, Idea, IdeaLink, IdeaType, LifeArea, LinkType, IdeaStatus } from "@/lib/types";
+import { IdeaNode as IdeaNodeType, Idea, IdeaLink, IdeaType, Tag, LinkType, IdeaStatus, LifeArea } from "@/lib/types";
 import { TypePicker } from "./TypePicker";
-import { AreaPicker } from "./AreaPicker";
+import { TagPicker, AREA_DOT_COLORS } from "@/components/shared/TagPicker";
 import { StatusPicker } from "./StatusPicker";
 import { LinkPanel } from "./LinkPanel";
 import { IdeaComposer } from "./IdeaComposer";
@@ -36,6 +36,12 @@ interface IdeaNodeProps {
   onSchedule: (id: string, date: string | null) => Promise<void>;
   todayString: string;
   isAncestorOnly?: boolean;
+  // Tag-related props
+  allTags: Tag[];
+  getTagsForIdea: (ideaId: string) => Tag[];
+  onAddTag: (ideaId: string, tag: Tag) => Promise<void>;
+  onRemoveTag: (ideaId: string, tagId: string) => Promise<void>;
+  onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
 }
 
 function formatScheduleDate(date: string, today: string): string {
@@ -55,14 +61,6 @@ const TYPE_COLORS: Record<IdeaType, string> = {
   task: "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700/30",
 };
 
-const AREA_COLORS: Record<LifeArea, string> = {
-  work: "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700/30",
-  health: "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-700/30",
-  relationships: "bg-pink-50 dark:bg-pink-900/20 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-700/30",
-  growth: "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700/30",
-  finances: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700/30",
-  life: "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700/30",
-};
 
 const STATUS_STYLES: Record<IdeaStatus, string> = {
   inbox: "border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 bg-transparent",
@@ -122,12 +120,18 @@ export function IdeaNode({
   onSchedule,
   todayString,
   isAncestorOnly,
+  allTags,
+  getTagsForIdea,
+  onAddTag,
+  onRemoveTag,
+  onCreateTag,
 }: IdeaNodeProps) {
+  const nodeTags = getTagsForIdea(node.id);
   const isEditing = editingId === node.id;
   const isSelected = selectedId === node.id;
   const [editText, setEditText] = useState(node.text);
   const [showTypePicker, setShowTypePicker] = useState(false);
-  const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const [showTagPicker, setShowTagPicker] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showLinkPanel, setShowLinkPanel] = useState(false);
   const [showMovePanel, setShowMovePanel] = useState(false);
@@ -250,31 +254,36 @@ export function IdeaNode({
     expandIdea(parentIdToExpand);
   };
 
-  const handleStatusSelect = (status: IdeaStatus) => {
+  const handleStatusSelect = async (status: IdeaStatus) => {
     const now = new Date().toISOString();
-    switch (status) {
-      case "completed":
-        updateIdea(node.id, { status: "completed", completed_at: now });
-        break;
-      case "cancelled":
-        updateIdea(node.id, { status: "cancelled", cancelled_at: now });
-        break;
-      case "in_progress":
-        updateIdea(node.id, { status: "in_progress" });
-        break;
-      case "paused":
-        updateIdea(node.id, { status: "paused", paused_at: now });
-        break;
-      case "planned":
-      case "scheduled":
-      case "inbox":
-        updateIdea(node.id, { status, completed_at: null, cancelled_at: null, paused_at: null });
-        break;
-      case "archived":
-        updateIdea(node.id, { status: "archived" });
-        break;
-    }
     setShowStatusPicker(false);
+    try {
+      switch (status) {
+        case "completed":
+          await updateIdea(node.id, { status: "completed", completed_at: now });
+          break;
+        case "cancelled":
+          await updateIdea(node.id, { status: "cancelled", cancelled_at: now });
+          break;
+        case "in_progress":
+          await updateIdea(node.id, { status: "in_progress" });
+          break;
+        case "paused":
+          await updateIdea(node.id, { status: "paused", paused_at: now });
+          break;
+        case "planned":
+        case "scheduled":
+        case "inbox":
+          await updateIdea(node.id, { status, completed_at: null, cancelled_at: null, paused_at: null });
+          break;
+        case "archived":
+          await updateIdea(node.id, { status: "archived" });
+          break;
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      window.alert(`Couldn't change status to "${status}": ${message}`);
+    }
   };
 
   const handleRequestDelete = () => {
@@ -297,7 +306,7 @@ export function IdeaNode({
     return n.children.some(matchesSearch);
   };
 
-  const isAnyMenuOpen = showTypePicker || showAreaPicker || showStatusPicker || showLinkPanel || showMovePanel || showSchedulePicker;
+  const isAnyMenuOpen = showTypePicker || showTagPicker || showStatusPicker || showLinkPanel || showMovePanel || showSchedulePicker;
 
   return (
     <div style={{ paddingLeft: depth > 0 ? 20 : 0 }}>
@@ -381,7 +390,7 @@ export function IdeaNode({
             className={`flex-1 text-sm px-2 py-0.5 rounded min-w-0 truncate ${
               isAncestorOnly ? "text-gray-400 italic cursor-default" :
               node.status === "completed" ? "text-violet-600/70 dark:text-violet-400/60 cursor-text hover:bg-gray-100 dark:hover:bg-white/[0.04]" :
-              node.status === "cancelled" ? "line-through text-red-400/60 dark:text-red-400/50 cursor-text hover:bg-gray-100 dark:hover:bg-white/[0.04]" :
+              node.status === "cancelled" ? "text-red-400/60 dark:text-red-400/50 cursor-text hover:bg-gray-100 dark:hover:bg-white/[0.04]" :
               node.status === "paused" ? "text-orange-600/70 dark:text-orange-400/60 cursor-text hover:bg-gray-100 dark:hover:bg-white/[0.04]" :
               node.status === "in_progress" ? "text-amber-700 dark:text-amber-300 cursor-text hover:bg-gray-100 dark:hover:bg-white/[0.04]" :
               "text-gray-800 dark:text-gray-200 cursor-text hover:bg-gray-100 dark:hover:bg-white/[0.04]"
@@ -415,25 +424,38 @@ export function IdeaNode({
           </div>
         )}
 
-        {/* Area pill */}
+        {/* Tag chips */}
         {showArea && (
-          <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          <div className="relative flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+            {nodeTags.map((tag) => (
+              <span
+                key={tag.id}
+                className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium flex items-center gap-1 ${
+                  AREA_DOT_COLORS[tag.area]
+                    ? "border-current/20"
+                    : "border-gray-200 text-gray-400"
+                }`}
+                style={{ opacity: 0.85 }}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full inline-block flex-shrink-0 ${AREA_DOT_COLORS[tag.area]}`} />
+                {tag.name}
+              </span>
+            ))}
             <button
-              onClick={() => setShowAreaPicker(!showAreaPicker)}
-              className={`text-xs px-2 py-0.5 rounded-full border ${
-                node.area ? AREA_COLORS[node.area] : "border-gray-200 text-gray-400"
-              }`}
+              onClick={() => setShowTagPicker(!showTagPicker)}
+              className="text-[10px] px-1.5 py-0.5 rounded-full border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:border-gray-400 dark:hover:border-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+              title="Add tag"
             >
-              {node.area ? node.area.charAt(0).toUpperCase() + node.area.slice(1) : "—"}
+              {nodeTags.length === 0 ? "tag" : "+"}
             </button>
-            {showAreaPicker && (
-              <AreaPicker
-                current={node.area}
-                onSelect={(area) => {
-                  updateIdea(node.id, { area });
-                  setShowAreaPicker(false);
-                }}
-                onClose={() => setShowAreaPicker(false)}
+            {showTagPicker && (
+              <TagPicker
+                allTags={allTags}
+                selectedTags={nodeTags}
+                onAdd={(tag) => { void onAddTag(node.id, tag); }}
+                onRemove={(tagId) => { void onRemoveTag(node.id, tagId); }}
+                onCreateTag={onCreateTag}
+                onClose={() => setShowTagPicker(false)}
               />
             )}
           </div>
@@ -635,6 +657,11 @@ export function IdeaNode({
               onSchedule={onSchedule}
               todayString={todayString}
               isAncestorOnly={isAncestorOnly}
+              allTags={allTags}
+              getTagsForIdea={getTagsForIdea}
+              onAddTag={onAddTag}
+              onRemoveTag={onRemoveTag}
+              onCreateTag={onCreateTag}
             />
           ))}
         </div>

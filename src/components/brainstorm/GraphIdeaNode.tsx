@@ -2,27 +2,17 @@
 
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { IdeaType, LifeArea } from "@/lib/types";
-
-const AREA_BG: Record<LifeArea, string> = {
-  work: "bg-blue-50 border-blue-300",
-  health: "bg-red-50 border-red-300",
-  relationships: "bg-pink-50 border-pink-300",
-  growth: "bg-amber-50 border-amber-300",
-  finances: "bg-emerald-50 border-emerald-300",
-  life: "bg-green-50 border-green-300",
-};
+import { IdeaType } from "@/lib/types";
 
 export interface GraphIdeaNodeData {
   label: string;
   type: IdeaType | null;
-  area: LifeArea | null;
   [key: string]: unknown;
 }
 
 function GraphIdeaNodeComponent({ data }: NodeProps) {
   const nodeData = data as GraphIdeaNodeData;
-  const bgClass = nodeData.area ? AREA_BG[nodeData.area] : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600";
+  const bgClass = "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600";
 
   return (
     <>

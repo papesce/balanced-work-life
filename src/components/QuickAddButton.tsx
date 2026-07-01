@@ -1,28 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { LifeArea } from "@/lib/types";
 import { getToday, getTomorrow } from "@/lib/dateUtils";
-
-const AREAS: { value: LifeArea; label: string }[] = [
-  { value: "work", label: "Work" },
-  { value: "health", label: "Health" },
-  { value: "relationships", label: "Relationships" },
-  { value: "growth", label: "Growth" },
-  { value: "finances", label: "Finances" },
-  { value: "life", label: "Life" },
-];
 
 type WhenOption = "today" | "tomorrow" | "custom" | "none";
 
 interface QuickAddButtonProps {
-  onAdd: (text: string, area: LifeArea, scheduledDate: string | null) => Promise<unknown>;
+  onAdd: (text: string, scheduledDate: string | null) => Promise<unknown>;
 }
 
 export function QuickAddButton({ onAdd }: QuickAddButtonProps) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
-  const [area, setArea] = useState<LifeArea>("work");
   const [when, setWhen] = useState<WhenOption>("today");
   const [customDate, setCustomDate] = useState("");
 
@@ -36,10 +25,9 @@ export function QuickAddButton({ onAdd }: QuickAddButtonProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!text.trim()) return;
-    await onAdd(text.trim(), area, getScheduledDate());
+    await onAdd(text.trim(), getScheduledDate());
     setText("");
     setWhen("today");
-    setArea("work");
     setCustomDate("");
     setOpen(false);
   };
@@ -106,26 +94,6 @@ export function QuickAddButton({ onAdd }: QuickAddButtonProps) {
               className="mt-2 w-full bg-white/60 dark:bg-gray-800/60 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2 text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-violet-500/30 focus:outline-none"
             />
           )}
-        </div>
-
-        <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1.5 font-medium">Area</label>
-          <div className="flex gap-2 flex-wrap">
-            {AREAS.map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setArea(value)}
-                className={`text-xs px-3 py-1.5 rounded-xl border transition-all ${
-                  area === value
-                    ? "bg-violet-100/80 dark:bg-violet-500/20 border-violet-200 dark:border-violet-500/30 text-violet-700 dark:text-violet-400 font-medium"
-                    : "border-black/10 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-800/60"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
         </div>
 
         <div className="flex gap-3 pt-1">
