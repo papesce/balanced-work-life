@@ -1,12 +1,15 @@
 "use client";
 
 import { useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Idea, LifeArea, Tag, getAreasForIdea } from "@/lib/types";
 import { areaColors } from "@/styles/tokens";
+import { getToday } from "@/lib/dateUtils";
 
 interface MiniBalanceBarProps {
   tasks: Idea[];
   getTagsForIdea?: (ideaId: string) => Tag[];
+  date?: string;
 }
 
 const AREA_ORDER: LifeArea[] = ["work", "health", "relationships", "growth", "finances", "life"];
@@ -20,7 +23,12 @@ const AREA_LABELS: Record<LifeArea, string> = {
   life: "Life",
 };
 
-export function MiniBalanceBar({ tasks, getTagsForIdea }: MiniBalanceBarProps) {
+export function MiniBalanceBar({ tasks, getTagsForIdea, date }: MiniBalanceBarProps) {
+  const router = useRouter();
+  const handleClick = () => {
+    const d = date ?? getToday();
+    router.push(`/balance?window=day&date=${d}`);
+  };
   const segments = useMemo(() => {
     const activeTasks = tasks.filter((t) => t.status !== "archived" && t.status !== "cancelled");
     const total = activeTasks.length;
@@ -59,17 +67,23 @@ export function MiniBalanceBar({ tasks, getTagsForIdea }: MiniBalanceBarProps) {
 
   if (segments.length === 0) {
     return (
-      <div 
-        className="w-20 h-1.5 rounded-full bg-gray-200/50 dark:bg-gray-800/50 border border-dashed border-gray-300/30 dark:border-gray-700/30" 
-        title="No tasks planned"
+      <button
+        onClick={handleClick}
+        className="w-20 h-1.5 rounded-full bg-gray-200/50 dark:bg-gray-800/50 border border-dashed border-gray-300/30 dark:border-gray-700/30 cursor-pointer hover:opacity-70 transition-opacity"
+        title="No tasks planned — view balance"
+        aria-label="View balance"
       />
     );
   }
 
   return (
-    <div className="flex flex-col items-end gap-1 group relative">
+    <button
+      onClick={handleClick}
+      className="flex flex-col items-end gap-1 group relative cursor-pointer"
+      aria-label="View balance for this day"
+    >
       {/* Segmented bar */}
-      <div className="w-24 h-1.5 rounded-full overflow-hidden flex bg-gray-100 dark:bg-gray-800/40">
+      <div className="w-24 h-1.5 rounded-full overflow-hidden flex bg-gray-100 dark:bg-gray-800/40 hover:opacity-80 transition-opacity">
         {segments.map((seg) => (
           <div
             key={seg.area}
@@ -82,7 +96,7 @@ export function MiniBalanceBar({ tasks, getTagsForIdea }: MiniBalanceBarProps) {
           />
         ))}
       </div>
-      
+
       {/* Tooltip on hover */}
       <div className="absolute right-0 bottom-full mb-1.5 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50">
         <div className="glass-card-strong px-2 py-1.5 rounded-lg shadow-lg text-[9px] font-semibold flex flex-col gap-1 min-w-[100px] border border-black/5 dark:border-white/5">
@@ -97,6 +111,6 @@ export function MiniBalanceBar({ tasks, getTagsForIdea }: MiniBalanceBarProps) {
           ))}
         </div>
       </div>
-    </div>
+    </button>
   );
 }

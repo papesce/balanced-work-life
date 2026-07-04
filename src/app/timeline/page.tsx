@@ -133,7 +133,7 @@ export default function TimelinePage() {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <MiniBalanceBar tasks={dayTasks} getTagsForIdea={taskTagsHook.getTagsForIdea} />
+                    <MiniBalanceBar tasks={dayTasks} getTagsForIdea={taskTagsHook.getTagsForIdea} date={date} />
                     {dayTasks.length > 0 && (
                       <button
                         onClick={() => smartSortTasks(dayTasks)}

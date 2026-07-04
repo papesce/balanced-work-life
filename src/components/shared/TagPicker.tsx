@@ -66,9 +66,10 @@ export function TagPicker({
         onRemove(tag.id);
       } else {
         onAdd(tag);
+        onClose();
       }
     },
-    [selectedIds, onAdd, onRemove]
+    [selectedIds, onAdd, onRemove, onClose]
   );
 
   const handleCreate = async () => {
