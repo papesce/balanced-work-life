@@ -1,0 +1,50 @@
+{
+  "name": "balanced-work-life",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:open": "./scripts/ctl.sh open dev --fg",
+    "balance:start": "./scripts/ctl.sh start",
+    "balance:stop": "./scripts/ctl.sh stop",
+    "balance:restart": "./scripts/ctl.sh restart",
+    "balance:open": "./scripts/ctl.sh open",
+    "balance:status": "./scripts/ctl.sh status",
+    "balance:logs": "./scripts/ctl.sh logs",
+    "balance:install": "./scripts/ctl.sh install",
+    "balance:uninstall": "./scripts/ctl.sh uninstall",
+    "build": "next build",
+    "start": "next start",
+    "start:open": "./scripts/ctl.sh open prod --fg",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@powersync/react": "^1.10.0",
+    "@powersync/web": "^1.38.1",
+    "@supabase/auth-helpers-nextjs": "^0.15.0",
+    "@supabase/supabase-js": "^2.106.1",
+    "@xyflow/react": "^12.10.2",
+    "dagre": "^0.8.5",
+    "framer-motion": "^12.40.0",
+    "lucide-react": "^1.17.0",
+    "next": "16.2.6",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "recharts": "^3.8.1",
+    "uuid": "^14.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/dagre": "^0.7.54",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/uuid": "^10.0.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.6",
+    "next-pwa": "^5.6.0",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "packageManager": "pnpm@10.25.0+sha512.5e82639027af37cf832061bcc6d639c219634488e0f2baebe785028a793de7b525ffcd3f7ff574f5e9860654e098fe852ba8ac5dd5cefe1767d23a020a92f501"
+}
