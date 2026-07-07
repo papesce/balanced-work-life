@@ -12,7 +12,7 @@ import { Idea, LifeArea, getAreasForIdea } from "@/lib/types";
 import { getToday, toLocalDateString } from "@/lib/dateUtils";
 import { DateNav } from "@/components/planner/DateNav";
 import { AreaFilters } from "@/components/planner/AreaFilters";
-import { ScheduleGrid } from "@/components/planner/ScheduleGrid";
+import { DayslotTimeline } from "@/components/planner/DayslotTimeline";
 import { AreaTaskGroup } from "@/components/planner/AreaTaskGroup";
 import { BacklogCard } from "@/components/planner/BacklogCard";
 import { AREA_ORDER, AREA_LABELS, DEFAULT_TARGETS, LOCAL_STORAGE_TARGETS_KEY } from "@/components/planner/constants";
@@ -65,7 +65,12 @@ function DailyPlannerInner() {
   );
 
   const pendingOnDate = useMemo(
-    () => activeTaskIdeas.filter((i) => i.scheduled_date === activeDate),
+    () => activeTaskIdeas.filter((i) => i.scheduled_date === activeDate && !i.scheduled_time),
+    [activeTaskIdeas, activeDate],
+  );
+
+  const scheduledOnDate = useMemo(
+    () => activeTaskIdeas.filter((i) => i.scheduled_date === activeDate && !!i.scheduled_time),
     [activeTaskIdeas, activeDate],
   );
 
@@ -189,7 +194,7 @@ function DailyPlannerInner() {
                 {selectedArea ? `${AREA_LABELS[selectedArea]} Focus` : "Today's Agenda"}
               </h2>
               <p className="text-[10px] text-gray-400 dark:text-gray-500 font-medium mt-0.5">
-                {pendingOnDate.length} pending tasks · {doneOnDate.length} completed
+                {pendingOnDate.length + scheduledOnDate.length} pending tasks · {doneOnDate.length} completed
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -208,7 +213,7 @@ function DailyPlannerInner() {
 
           <div className="space-y-4">
             {visibleAreas.map((area) => {
-              const pending = pendingOnDate.filter((t) => {
+              const pending = [...pendingOnDate, ...scheduledOnDate].filter((t) => {
                 const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(t.id));
                 return areas.length === 0 ? area === "life" : areas.includes(area);
               });
@@ -234,7 +239,7 @@ function DailyPlannerInner() {
               );
             })}
 
-            {pendingOnDate.length === 0 && doneOnDate.length === 0 && (
+            {pendingOnDate.length === 0 && scheduledOnDate.length === 0 && doneOnDate.length === 0 && (
               <div className="glass-card rounded-2xl text-center py-20 text-gray-400 dark:text-gray-500 border border-dashed border-black/5 dark:border-white/5">
                 <Calendar size={32} className="mx-auto text-gray-300 dark:text-gray-600 mb-3 opacity-60" />
                 <p className="text-sm font-semibold mb-1">
@@ -284,11 +289,12 @@ function DailyPlannerInner() {
 
           <div className="flex-1 min-h-[400px]">
             {((activeMobileTab === "schedule") || (activeMobileTab !== "backlog" && rightPanelTab === "schedule")) ? (
-              <ScheduleGrid
+              <DayslotTimeline
                 activeDate={activeDate}
-                allTasks={[...pendingOnDate, ...doneOnDate]}
+                allTasks={[...pendingOnDate, ...scheduledOnDate, ...doneOnDate]}
                 onUpdateTask={updateIdea}
                 onCreateTask={handleCreateScheduledTask}
+                getTagsForIdea={taskTagsHook.getTagsForIdea}
               />
             ) : (
               <BacklogCard

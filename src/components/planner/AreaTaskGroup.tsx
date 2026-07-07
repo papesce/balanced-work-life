@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, KeyboardEvent } from "react";
-import { Reorder } from "framer-motion";
+import { Reorder, useDragControls } from "framer-motion";
 import { Check, Star, MoreHorizontal, GripVertical, Clock, Play, Pause, X } from "lucide-react";
 import { areaColors } from "@/styles/tokens";
 import { Idea, IdeaStatus, LifeArea } from "@/lib/types";
@@ -123,21 +123,57 @@ function PendingTaskList({
   return (
     <Reorder.Group axis="y" values={items} onReorder={setItems}>
       {items.map((task) => (
-        <Reorder.Item
+        <ReorderItemWrapper
           key={task.id}
-          value={task}
-          className="relative"
-          onDragEnd={() => onReorder(itemsRef.current.map((t) => t.id))}
-        >
-          <TaskRow task={task} onDone={onDone} onUndone={onUndone} onUpdate={onUpdate} onDelete={onDelete} showDragHandle />
-        </Reorder.Item>
+          task={task}
+          onReorder={onReorder}
+          itemsRef={itemsRef}
+          onDone={onDone}
+          onUndone={onUndone}
+          onUpdate={onUpdate}
+          onDelete={onDelete}
+        />
       ))}
     </Reorder.Group>
   );
 }
 
+function ReorderItemWrapper({
+  task, onReorder, itemsRef, onDone, onUndone, onUpdate, onDelete,
+}: {
+  task: Idea;
+  onReorder: (taskIds: string[]) => void;
+  itemsRef: React.MutableRefObject<Idea[]>;
+  onDone: (id: string) => void;
+  onUndone: (id: string) => void;
+  onUpdate: (id: string, updates: Partial<Idea>) => void;
+  onDelete: (id: string) => void;
+}) {
+  const dragControls = useDragControls();
+
+  return (
+    <Reorder.Item
+      value={task}
+      dragListener={false}
+      dragControls={dragControls}
+      className="relative"
+      onDragEnd={() => onReorder(itemsRef.current.map((t) => t.id))}
+    >
+      <TaskRow
+        task={task}
+        onDone={onDone}
+        onUndone={onUndone}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+        showDragHandle
+        dragControls={dragControls}
+      />
+    </Reorder.Item>
+  );
+}
+
 function TaskRow({
-  task, onDone, onUndone, onUpdate, onDelete, showDragHandle,
+  task, onDone, onUndone, onUpdate, onDelete, showDragHandle, dragControls,
 }: {
   task: Idea;
   onDone: (id: string) => void;
@@ -145,6 +181,7 @@ function TaskRow({
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onDelete: (id: string) => void;
   showDragHandle?: boolean;
+  dragControls?: ReturnType<typeof useDragControls>;
 }) {
   const isCompleted = task.status === "completed";
   const isCancelled = task.status === "cancelled";
@@ -239,7 +276,17 @@ function TaskRow({
       className="flex items-center gap-2 px-4 py-2.5 hover:bg-black/[0.015] dark:hover:bg-white/[0.015] transition-colors group cursor-grab active:cursor-grabbing"
     >
       {showDragHandle && (
-        <div className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-400 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100">
+        <div
+          onPointerDown={(e) => {
+            dragControls?.start(e);
+          }}
+          onDragStart={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          draggable={false}
+          className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-400 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+        >
           <GripVertical size={11} />
         </div>
       )}

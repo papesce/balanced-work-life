@@ -127,6 +127,73 @@ body {
   scrollbar-width: none;
 }
 
+/* Dayslot overrides for glassmorphism theme */
+.ds-timeline {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif !important;
+}
+
+.ds-timeline__header {
+  padding: 12px 16px !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+  font-size: 12px !important;
+  color: #374151 !important;
+  background: rgba(0, 0, 0, 0.01) !important;
+}
+
+.ds-timeline__hour-label {
+  width: 48px !important;
+  min-width: 48px !important;
+  padding: 6px 4px 0 12px !important;
+  font-size: 10px !important;
+  color: #9ca3af !important;
+  font-weight: 700 !important;
+}
+
+.ds-timeline__row {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.03) !important;
+}
+
+.ds-timeline__event {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 10px !important;
+  overflow: hidden !important;
+}
+
+.ds-timeline__resize-handle {
+  opacity: 0.4 !important;
+}
+
+.ds-timeline__now-line,
+.ds-timeline__now-dot {
+  z-index: 5 !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  .ds-timeline__header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    color: #e5e7eb !important;
+    background: rgba(255, 255, 255, 0.01) !important;
+  }
+
+  .ds-timeline__hour-label {
+    color: #6b7280 !important;
+  }
+
+  .ds-timeline__row {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03) !important;
+  }
+
+  .ds-timeline__event {
+    border: none !important;
+    box-shadow: none !important;
+  }
+}
+
 /* Focus button */
 .focus-button {
   background: rgba(255, 255, 255, 0.7);

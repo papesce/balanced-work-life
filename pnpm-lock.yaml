@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@papesce/dayslot':
+        specifier: ^0.3.1
+        version: 0.3.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@powersync/react':
         specifier: ^1.10.0
         version: 1.10.0(@powersync/common@1.53.1)(react@19.2.4)
@@ -896,6 +899,12 @@ packages:
   '@nolyfill/is-core-module@1.0.39':
     resolution: {integrity: sha512-nn5ozdjYQpUCZlWGuxcJY/KpxkWQs4DcbMCmKojjyrYDEAGy4Ce19NN4v5MduafTwJlbKc99UA8YhSVqq9yPZA==}
     engines: {node: '>=12.4.0'}
+
+  '@papesce/dayslot@0.3.1':
+    resolution: {integrity: sha512-FH+4mwZkhQA6+LNBLL+KTTigZhi0aOsFgDPLowvx/d09xtZ/ESUdYMt+Kd4Zo3FQvInmK/CwMyevH4w5AjKEyg==}
+    peerDependencies:
+      react: '>=18'
+      react-dom: '>=18'
 
   '@powersync/common@1.53.1':
     resolution: {integrity: sha512-WAW/XQKpYPCBC66WIf9VjgLzA0YLpQg1TEMwzpCqKm6BuuLoHh6rLMb3PKJ84foFzUHcyF6thw7fB5VvwyguQw==}
@@ -4404,6 +4413,11 @@ snapshots:
       fastq: 1.20.1
 
   '@nolyfill/is-core-module@1.0.39': {}
+
+  '@papesce/dayslot@0.3.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+    dependencies:
+      react: 19.2.4
+      react-dom: 19.2.4(react@19.2.4)
 
   '@powersync/common@1.53.1':
     dependencies:
