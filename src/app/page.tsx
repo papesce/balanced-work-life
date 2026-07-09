@@ -115,6 +115,13 @@ function DailyPlannerInner() {
     }
   };
 
+  const handleMoveTaskBetweenAreas = async (taskId: string, fromArea: LifeArea, toArea: LifeArea) => {
+    const sourceTag = tagsHook.tags.find((t) => t.is_system && t.area === fromArea);
+    if (sourceTag) await taskTagsHook.removeTagFromTask(taskId, sourceTag.id).catch(() => {});
+    const targetTag = tagsHook.tags.find((t) => t.is_system && t.area === toArea);
+    if (targetTag) await taskTagsHook.addTagToTask(taskId, targetTag).catch(() => {});
+  };
+
   const handleAdd = async (text: string, scheduledDate: string | null) => {
     await createIdea(text, null, "top", { type: "task", scheduled_date: scheduledDate ?? activeDate, status: "planned" });
   };
@@ -148,7 +155,7 @@ function DailyPlannerInner() {
       }
     >
       {/* Mobile Tab Control */}
-      <div className="flex md:hidden bg-black/[0.03] dark:bg-white/[0.04] p-1 rounded-xl mb-4 gap-1">
+      <div className="sticky top-[53px] z-10 md:hidden bg-black/[0.03] dark:bg-white/[0.04] p-1 rounded-xl mb-4 gap-1">
         {[
           { id: "tasks", label: "Tasks", icon: Layers },
           { id: "schedule", label: "Schedule", icon: Clock },
@@ -176,7 +183,7 @@ function DailyPlannerInner() {
 
       <div className="flex flex-col md:flex-row gap-5">
         {/* LEFT COLUMN */}
-        <div className={`w-full md:w-[260px] flex-shrink-0 space-y-4 ${activeMobileTab === "balance" ? "block" : "hidden md:block"}`}>
+        <div className={`w-full md:w-[260px] flex-shrink-0 space-y-4 ${activeMobileTab === "balance" ? "block" : "hidden md:block"} md:sticky md:top-[53px] md:self-start`}>
           <BalanceRing counts={balanceRingCounts} modeLabel="Work-Life Balance Ring" statLabel="Active Tasks" statSub="scheduled today" />
           <AreaFilters
             areaTaskCounts={areaTaskCounts}
@@ -235,6 +242,7 @@ function DailyPlannerInner() {
                   onDelete={deleteIdea}
                   onAddTask={handleAddToArea}
                   onReorderTasks={reorderTasks}
+                  onMoveTaskBetweenAreas={handleMoveTaskBetweenAreas}
                 />
               );
             })}

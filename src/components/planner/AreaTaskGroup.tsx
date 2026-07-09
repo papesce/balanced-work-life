@@ -5,7 +5,7 @@ import { Reorder, useDragControls } from "framer-motion";
 import { Check, Star, MoreHorizontal, GripVertical, Clock, Play, Pause, X } from "lucide-react";
 import { areaColors } from "@/styles/tokens";
 import { Idea, IdeaStatus, LifeArea } from "@/lib/types";
-import { AREA_ICONS, AREA_LABELS } from "./constants";
+import { AREA_ICONS, AREA_LABELS, AREA_ORDER } from "./constants";
 import { formatTime } from "./plannerUtils";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 
@@ -31,11 +31,12 @@ interface AreaTaskGroupProps {
   onDelete: (id: string) => void;
   onAddTask: (text: string, area: LifeArea) => Promise<void>;
   onReorderTasks: (taskIds: string[]) => void;
+  onMoveTaskBetweenAreas?: (taskId: string, fromArea: LifeArea, toArea: LifeArea) => void;
 }
 
 export function AreaTaskGroup({
   area, activeDate, pendingTasks, doneTasks,
-  onDone, onUndone, onUpdate, onDelete, onAddTask, onReorderTasks,
+  onDone, onUndone, onUpdate, onDelete, onAddTask, onReorderTasks, onMoveTaskBetweenAreas,
 }: AreaTaskGroupProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const Icon = AREA_ICONS[area];
@@ -52,7 +53,12 @@ export function AreaTaskGroup({
         e.preventDefault();
         setIsDragOver(false);
         const taskId = e.dataTransfer.getData("text/plain");
-        if (taskId) onUpdate(taskId, { status: "planned", scheduled_date: activeDate, scheduled_time: null });
+        const sourceArea = e.dataTransfer.getData("text/lifearea") as LifeArea | "";
+        if (taskId && sourceArea && sourceArea !== area) {
+          onMoveTaskBetweenAreas?.(taskId, sourceArea, area);
+        } else if (taskId) {
+          onUpdate(taskId, { status: "planned", scheduled_date: activeDate, scheduled_time: null });
+        }
       }}
     >
       <div
@@ -72,15 +78,17 @@ export function AreaTaskGroup({
         {pendingTasks.length > 0 && (
           <PendingTaskList
             tasks={pendingTasks}
+            area={area}
             onReorder={onReorderTasks}
             onDone={onDone}
             onUndone={onUndone}
             onUpdate={onUpdate}
             onDelete={onDelete}
+            onMoveTaskBetweenAreas={onMoveTaskBetweenAreas}
           />
         )}
         {doneTasks.map((task) => (
-          <TaskRow key={task.id} task={task} onDone={onDone} onUndone={onUndone} onUpdate={onUpdate} onDelete={onDelete} />
+          <TaskRow key={task.id} task={task} area={area} onDone={onDone} onUndone={onUndone} onUpdate={onUpdate} onDelete={onDelete} onMoveTaskBetweenAreas={onMoveTaskBetweenAreas} />
         ))}
         {pendingTasks.length === 0 && doneTasks.length === 0 && (
           <div className="px-5 py-4 text-xs text-gray-400 dark:text-gray-500 italic">No tasks planned for this day</div>
@@ -105,14 +113,16 @@ export function AreaTaskGroup({
 }
 
 function PendingTaskList({
-  tasks, onReorder, onDone, onUndone, onUpdate, onDelete,
+  tasks, area, onReorder, onDone, onUndone, onUpdate, onDelete, onMoveTaskBetweenAreas,
 }: {
   tasks: Idea[];
+  area: LifeArea;
   onReorder: (taskIds: string[]) => void;
   onDone: (id: string) => void;
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onDelete: (id: string) => void;
+  onMoveTaskBetweenAreas?: (taskId: string, fromArea: LifeArea, toArea: LifeArea) => void;
 }) {
   const [items, setItems] = useState(tasks);
   const itemsRef = useRef(items);
@@ -126,12 +136,14 @@ function PendingTaskList({
         <ReorderItemWrapper
           key={task.id}
           task={task}
+          area={area}
           onReorder={onReorder}
           itemsRef={itemsRef}
           onDone={onDone}
           onUndone={onUndone}
           onUpdate={onUpdate}
           onDelete={onDelete}
+          onMoveTaskBetweenAreas={onMoveTaskBetweenAreas}
         />
       ))}
     </Reorder.Group>
@@ -139,15 +151,17 @@ function PendingTaskList({
 }
 
 function ReorderItemWrapper({
-  task, onReorder, itemsRef, onDone, onUndone, onUpdate, onDelete,
+  task, area, onReorder, itemsRef, onDone, onUndone, onUpdate, onDelete, onMoveTaskBetweenAreas,
 }: {
   task: Idea;
+  area: LifeArea;
   onReorder: (taskIds: string[]) => void;
   itemsRef: React.MutableRefObject<Idea[]>;
   onDone: (id: string) => void;
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onDelete: (id: string) => void;
+  onMoveTaskBetweenAreas?: (taskId: string, fromArea: LifeArea, toArea: LifeArea) => void;
 }) {
   const dragControls = useDragControls();
 
@@ -161,10 +175,12 @@ function ReorderItemWrapper({
     >
       <TaskRow
         task={task}
+        area={area}
         onDone={onDone}
         onUndone={onUndone}
         onUpdate={onUpdate}
         onDelete={onDelete}
+        onMoveTaskBetweenAreas={onMoveTaskBetweenAreas}
         showDragHandle
         dragControls={dragControls}
       />
@@ -173,13 +189,15 @@ function ReorderItemWrapper({
 }
 
 function TaskRow({
-  task, onDone, onUndone, onUpdate, onDelete, showDragHandle, dragControls,
+  task, area, onDone, onUndone, onUpdate, onDelete, onMoveTaskBetweenAreas, showDragHandle, dragControls,
 }: {
   task: Idea;
+  area: LifeArea;
   onDone: (id: string) => void;
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onDelete: (id: string) => void;
+  onMoveTaskBetweenAreas?: (taskId: string, fromArea: LifeArea, toArea: LifeArea) => void;
   showDragHandle?: boolean;
   dragControls?: ReturnType<typeof useDragControls>;
 }) {
@@ -189,6 +207,7 @@ function TaskRow({
   const isInProgress = task.status === "in_progress";
   const statusConfig = STATUS_CONFIG[task.status];
   const [showMenu, setShowMenu] = useState(false);
+  const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showDurationDropdown, setShowDurationDropdown] = useState(false);
   const [showCustomInput, setShowCustomInput] = useState(false);
@@ -271,6 +290,7 @@ function TaskRow({
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", task.id);
+        e.dataTransfer.setData("text/lifearea", area);
         e.dataTransfer.effectAllowed = "move";
       }}
       className="flex items-center gap-2 px-4 py-2.5 hover:bg-black/[0.015] dark:hover:bg-white/[0.015] transition-colors group cursor-grab active:cursor-grabbing"
@@ -421,23 +441,62 @@ function TaskRow({
         </button>
 
         <div className="relative" ref={menuRef}>
-          <button onClick={() => setShowMenu(!showMenu)} className="text-gray-300 dark:text-gray-600 hover:text-gray-500 cursor-pointer">
+          <button onClick={() => { setShowMenu(!showMenu); setShowAreaPicker(false); }} className="text-gray-300 dark:text-gray-600 hover:text-gray-500 cursor-pointer">
             <MoreHorizontal size={13} />
           </button>
           {showMenu && (
-            <div className="absolute right-0 top-full mt-1.5 z-50 glass-card-strong rounded-lg py-1 min-w-[150px] shadow-lg border border-black/5 dark:border-white/5">
-              <button
-                onClick={() => { onUpdate(task.id, { scheduled_date: null, status: "inbox" }); setShowMenu(false); }}
-                className="flex w-full text-left px-3 py-1.5 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] font-semibold cursor-pointer"
-              >
-                Move to Backlog
-              </button>
-              <button
-                onClick={() => { onDelete(task.id); setShowMenu(false); }}
-                className="flex w-full text-left px-3 py-1.5 text-[11px] text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 font-bold cursor-pointer"
-              >
-                Delete
-              </button>
+            <div className="absolute right-0 top-full mt-1.5 z-50 glass-card-strong rounded-lg py-1 min-w-[160px] shadow-lg border border-black/5 dark:border-white/5">
+              {!showAreaPicker ? (
+                <>
+                  {onMoveTaskBetweenAreas && (
+                    <button
+                      onClick={() => setShowAreaPicker(true)}
+                      className="flex w-full text-left px-3 py-1.5 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] font-semibold cursor-pointer"
+                    >
+                      Move to Area...
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { onUpdate(task.id, { scheduled_date: null, status: "inbox" }); setShowMenu(false); }}
+                    className="flex w-full text-left px-3 py-1.5 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] font-semibold cursor-pointer"
+                  >
+                    Move to Backlog
+                  </button>
+                  <button
+                    onClick={() => { onDelete(task.id); setShowMenu(false); }}
+                    className="flex w-full text-left px-3 py-1.5 text-[11px] text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 font-bold cursor-pointer"
+                  >
+                    Delete
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setShowAreaPicker(false)}
+                    className="flex w-full text-left px-3 py-1.5 text-[11px] text-violet-600 dark:text-violet-400 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] font-bold cursor-pointer"
+                  >
+                    ← Back
+                  </button>
+                  <div className="border-t border-black/[0.03] dark:border-white/[0.03] my-1" />
+                  {AREA_ORDER.filter((a) => a !== area).map((targetArea) => {
+                    const TargetIcon = AREA_ICONS[targetArea];
+                    return (
+                      <button
+                        key={targetArea}
+                        onClick={() => {
+                          onMoveTaskBetweenAreas?.(task.id, area, targetArea);
+                          setShowMenu(false);
+                          setShowAreaPicker(false);
+                        }}
+                        className="flex w-full items-center gap-2 text-left px-3 py-1.5 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] font-semibold cursor-pointer"
+                      >
+                        <TargetIcon size={12} />
+                        {AREA_LABELS[targetArea]}
+                      </button>
+                    );
+                  })}
+                </>
+              )}
             </div>
           )}
         </div>

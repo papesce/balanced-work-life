@@ -21,7 +21,7 @@ export function AppShell({ children, title, headerActions, fullWidth, onAdd }: A
       <DesktopSidebar onSignOut={signOut} />
 
       <div className="md:ml-[220px] flex flex-col min-h-screen">
-        <header className="glass-card-strong border-b border-white/30 dark:border-white/5 px-5 py-3 flex items-center justify-between rounded-none">
+        <header className="sticky top-0 z-20 glass-card-strong border-b border-white/30 dark:border-white/5 px-5 py-3 flex items-center justify-between rounded-none">
           <h1 className="text-[15px] font-bold text-gray-800 dark:text-gray-200 tracking-tight">{title}</h1>
           <div className="flex items-center gap-3">
             {headerActions}
