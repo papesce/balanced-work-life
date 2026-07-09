@@ -228,9 +228,9 @@ export function DayslotTimeline({
         events={events}
         startHour={7}
         endHour={22}
-        hourHeight={64}
+        hourHeight={128}
         snapMinutes={15}
-        height="650px"
+        height="1100px"
         title="Daily Timeline"
         onEventChange={handleEventChange}
         onExternalDrop={handleExternalDrop}
