@@ -75,7 +75,7 @@ export function useBalanceData(windowType: WindowType, referenceDate: string): B
     const taskIds = tasks.map((t) => t.id);
 
     // Fetch tags for those tasks
-    let tagsByIdea = new Map<string, Tag[]>();
+    const tagsByIdea = new Map<string, Tag[]>();
     if (taskIds.length > 0) {
       const { data: taskTagData } = await supabase
         .from("task_tags")
