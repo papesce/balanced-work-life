@@ -67,7 +67,7 @@ function SlotForm({
   };
 
   return (
-    <div className="flex flex-col gap-1.5 bg-black/[0.02] dark:bg-white/[0.02] p-2 rounded-xl border border-black/5 dark:border-white/5">
+    <div className="w-full flex flex-col gap-1.5 bg-black/[0.02] dark:bg-white/[0.02] p-2 rounded-xl border border-black/5 dark:border-white/5">
       <input
         type="text"
         placeholder={`Add task at ${timeStr}...`}
@@ -239,6 +239,7 @@ export function DayslotTimeline({
         renderEventContent={renderEventContent}
         renderSlotAction={renderSlotAction}
         showCurrentTime={isToday}
+        slotActionTrigger="button"
       />
     </div>
   );
