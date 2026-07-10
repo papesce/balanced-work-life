@@ -191,6 +191,7 @@ export function useIdeas() {
       completed_at: null,
       cancelled_at: null,
       paused_at: null,
+      horizon: null,
       sort_order: sortOrder,
       created_at: now,
       updated_at: now,

@@ -25,6 +25,7 @@ export const IdeasTable = new Table(
     completed_at: column.text,
     cancelled_at: column.text,
     paused_at: column.text,
+    horizon: column.text,
     sort_order: column.text,
     created_at: column.text,
     updated_at: column.text,
