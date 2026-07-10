@@ -201,15 +201,15 @@ export default function HorizonPage() {
         ))}
       </div>
 
-      {/* Desktop: three columns */}
-      <div className="hidden md:flex gap-5">
+      {/* Desktop: three columns stacked vertically */}
+      <div className="hidden md:flex md:flex-col gap-5">
         {HORIZONS.map((h, i) => (
           <motion.div
             key={h.key}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.08, duration: 0.35, ease: "easeOut" }}
-            className="flex-1 min-w-0"
+            className="min-w-0"
           >
             <HorizonColumn
               label={h.label}

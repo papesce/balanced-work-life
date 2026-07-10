@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { WindowType, getWindowLabel, offsetWindow } from "@/lib/dateUtils";
+import { MonthYearPicker } from "./MonthYearPicker";
 
 const TABS: { key: WindowType; label: string }[] = [
   { key: "day", label: "Day" },
@@ -19,6 +20,17 @@ interface BalanceWindowToggleProps {
 
 export function BalanceWindowToggle({ window, referenceDate, onChange }: BalanceWindowToggleProps) {
   const label = getWindowLabel(window, referenceDate);
+  const isDayMode = window === "day";
+
+  const handlePrev = () => {
+    const unit = isDayMode ? "month" : window;
+    onChange(window, offsetWindow(unit, referenceDate, -1));
+  };
+
+  const handleNext = () => {
+    const unit = isDayMode ? "month" : window;
+    onChange(window, offsetWindow(unit, referenceDate, 1));
+  };
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -52,28 +64,36 @@ export function BalanceWindowToggle({ window, referenceDate, onChange }: Balance
       {/* Date navigation */}
       <div className="flex items-center gap-3">
         <button
-          onClick={() => onChange(window, offsetWindow(window, referenceDate, -1))}
+          onClick={handlePrev}
           className="p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
           aria-label="Previous"
         >
           <ChevronLeft size={16} />
         </button>
 
-        <AnimatePresence mode="wait">
-          <motion.span
-            key={`${window}-${referenceDate}`}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.15 }}
-            className="text-sm font-semibold text-gray-700 dark:text-gray-300 min-w-[160px] text-center"
-          >
-            {label}
-          </motion.span>
-        </AnimatePresence>
+        {isDayMode ? (
+          <MonthYearPicker
+            referenceDate={referenceDate}
+            onSelect={(date) => onChange(window, date)}
+            label={label}
+          />
+        ) : (
+          <AnimatePresence mode="wait">
+            <motion.span
+              key={`${window}-${referenceDate}`}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.15 }}
+              className="text-sm font-semibold text-gray-700 dark:text-gray-300 min-w-[160px] text-center"
+            >
+              {label}
+            </motion.span>
+          </AnimatePresence>
+        )}
 
         <button
-          onClick={() => onChange(window, offsetWindow(window, referenceDate, 1))}
+          onClick={handleNext}
           className="p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
           aria-label="Next"
         >

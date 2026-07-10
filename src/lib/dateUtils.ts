@@ -163,7 +163,7 @@ export function getWindowBuckets(window: WindowType, referenceDate: string): Dat
 export function getWindowLabel(window: WindowType, referenceDate: string): string {
   const ref = new Date(referenceDate + "T00:00:00");
   if (window === "day") {
-    return ref.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    return ref.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   }
   if (window === "week") {
     const { start } = getWindowRange("week", referenceDate);
