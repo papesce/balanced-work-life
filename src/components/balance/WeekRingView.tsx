@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { Idea, LifeArea, Tag, getAreasForIdea } from "@/lib/types";
-import { toLocalDateString, getWindowRange, getToday } from "@/lib/dateUtils";
+import { getToday, getWeeksInMonth, getWindowRange } from "@/lib/dateUtils";
 import { MiniRing } from "./MiniRing";
 import { AREA_ORDER } from "@/components/planner/constants";
 
@@ -43,30 +43,6 @@ function emptyAreaCounts(): Record<LifeArea, number> {
   return { work: 0, health: 0, relationships: 0, growth: 0, finances: 0, life: 0 };
 }
 
-function getMondayOf(dateStr: string): Date {
-  const d = new Date(dateStr + "T00:00:00");
-  const dow = d.getDay();
-  const offset = dow === 0 ? -6 : 1 - dow;
-  d.setDate(d.getDate() + offset);
-  return d;
-}
-
-function buildWeeks(referenceDate: string, count = 8): { label: string; start: string; end: string }[] {
-  const monday = getMondayOf(referenceDate);
-  // Show 4 weeks before + current + 3 after
-  monday.setDate(monday.getDate() - 4 * 7);
-  return Array.from({ length: count }, (_, i) => {
-    const start = new Date(monday);
-    start.setDate(monday.getDate() + i * 7);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    const s = toLocalDateString(start);
-    const e = toLocalDateString(end);
-    const label = `${start.toLocaleDateString(undefined, { month: "short", day: "numeric" })} – ${end.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
-    return { label, start: s, end: e };
-  });
-}
-
 interface WeekRingViewProps {
   referenceDate: string;
 }
@@ -75,8 +51,7 @@ export function WeekRingView({ referenceDate }: WeekRingViewProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [weeks, setWeeks] = useState<WeekBucket[]>([]);
-  const currentMonday = getMondayOf(getToday());
-  const currentMondayStr = toLocalDateString(currentMonday);
+  const currentMondayStr = getWindowRange("week", getToday()).start;
 
   useEffect(() => {
     if (!user) return;
@@ -85,7 +60,7 @@ export function WeekRingView({ referenceDate }: WeekRingViewProps) {
     const fetchData = async () => {
       setLoading(true);
 
-      const weekDefs = buildWeeks(referenceDate, 8);
+      const weekDefs = getWeeksInMonth(referenceDate);
       const rangeStart = weekDefs[0].start;
       const rangeEnd = weekDefs[weekDefs.length - 1].end;
 

@@ -76,6 +76,39 @@ export interface DateBucket extends DateRange {
   label: string;
 }
 
+export function getWeeksInMonth(referenceDate: string): DateBucket[] {
+  const ref = new Date(referenceDate + "T00:00:00");
+  const year = ref.getFullYear();
+  const month = ref.getMonth();
+  const firstOfMonth = new Date(year, month, 1);
+  const lastOfMonth = new Date(year, month + 1, 0);
+
+  // Find the Monday on or before the 1st of the month
+  const firstDow = firstOfMonth.getDay(); // 0=Sun
+  const gridStart = new Date(firstOfMonth);
+  gridStart.setDate(firstOfMonth.getDate() - (firstDow === 0 ? 6 : firstDow - 1));
+
+  const buckets: DateBucket[] = [];
+  const cur = new Date(gridStart);
+
+  while (cur <= lastOfMonth || (cur.getDay() !== 1)) {
+    const weekStart = new Date(cur);
+    const weekEnd = new Date(cur);
+    weekEnd.setDate(cur.getDate() + 6);
+
+    const s = toLocalDateString(weekStart);
+    const e = toLocalDateString(weekEnd);
+    const label = `${weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} – ${weekEnd.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+    buckets.push({ label, start: s, end: e });
+
+    cur.setDate(cur.getDate() + 7);
+    // Stop once we've fully passed the month
+    if (cur > lastOfMonth && cur.getDay() === 1) break;
+  }
+
+  return buckets;
+}
+
 export function getWindowRange(window: WindowType, referenceDate: string): DateRange {
   const ref = new Date(referenceDate + "T00:00:00");
   if (window === "day") {
@@ -166,9 +199,7 @@ export function getWindowLabel(window: WindowType, referenceDate: string): strin
     return ref.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   }
   if (window === "week") {
-    const { start } = getWindowRange("week", referenceDate);
-    const monday = new Date(start + "T00:00:00");
-    return `Week of ${monday.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+    return ref.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   }
   if (window === "month") {
     return ref.toLocaleDateString(undefined, { month: "long", year: "numeric" });
@@ -205,7 +236,7 @@ export function offsetWindow(window: WindowType, referenceDate: string, delta: n
   if (window === "day") {
     ref.setDate(ref.getDate() + delta);
   } else if (window === "week") {
-    ref.setDate(ref.getDate() + delta * 7);
+    ref.setMonth(ref.getMonth() + delta);
   } else if (window === "month") {
     ref.setMonth(ref.getMonth() + delta);
   } else {

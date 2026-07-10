@@ -21,14 +21,15 @@ interface BalanceWindowToggleProps {
 export function BalanceWindowToggle({ window, referenceDate, onChange }: BalanceWindowToggleProps) {
   const label = getWindowLabel(window, referenceDate);
   const isDayMode = window === "day";
+  const showPicker = isDayMode || window === "week";
 
   const handlePrev = () => {
-    const unit = isDayMode ? "month" : window;
+    const unit = showPicker ? "month" : window;
     onChange(window, offsetWindow(unit, referenceDate, -1));
   };
 
   const handleNext = () => {
-    const unit = isDayMode ? "month" : window;
+    const unit = showPicker ? "month" : window;
     onChange(window, offsetWindow(unit, referenceDate, 1));
   };
 
@@ -71,7 +72,7 @@ export function BalanceWindowToggle({ window, referenceDate, onChange }: Balance
           <ChevronLeft size={16} />
         </button>
 
-        {isDayMode ? (
+        {showPicker ? (
           <MonthYearPicker
             referenceDate={referenceDate}
             onSelect={(date) => onChange(window, date)}
