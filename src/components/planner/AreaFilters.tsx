@@ -5,7 +5,7 @@ import { LifeArea } from "@/lib/types";
 import { AREA_ORDER, AREA_LABELS, AREA_ICONS } from "./constants";
 
 interface AreaFiltersProps {
-  areaTaskCounts: Record<LifeArea, { pending: number; done: number }>;
+  areaTaskCounts: Record<LifeArea, { pending: number; scheduled: number; done: number }>;
   selectedArea: LifeArea | null;
   onSelectArea: (area: LifeArea) => void;
   targets: Record<LifeArea, number>;
@@ -30,13 +30,14 @@ export function AreaFilters({ areaTaskCounts, selectedArea, onSelectArea, target
 
       <div className="space-y-1.5">
         {AREA_ORDER.map((area) => {
-          const { pending, done } = areaTaskCounts[area];
+          const { pending, scheduled, done } = areaTaskCounts[area];
+          const total = pending + scheduled + done;
           const Icon = AREA_ICONS[area];
           const isSelected = selectedArea === area;
           const color = areaColors[area]?.dot;
           const targetPct = targets[area] ?? 0;
-          const totalPending = Object.values(areaTaskCounts).reduce((sum, item) => sum + item.pending, 0);
-          const actualPct = totalPending > 0 ? Math.round((pending / totalPending) * 100) : 0;
+          const totalAll = Object.values(areaTaskCounts).reduce((sum, item) => sum + item.pending + item.scheduled + item.done, 0);
+          const actualPct = totalAll > 0 ? Math.round((total / totalAll) * 100) : 0;
 
           return (
             <button
@@ -63,14 +64,14 @@ export function AreaFilters({ areaTaskCounts, selectedArea, onSelectArea, target
                   </p>
                 </div>
                 <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 tabular-nums">
-                  {pending > 0 ? `${pending} pending` : done > 0 ? "✓ done" : "0"}
+                  {total > 0 ? `${total}m` : "0"}
                 </div>
               </div>
 
               <div className="w-full space-y-1">
                 <div className="flex justify-between text-[9px] text-gray-400 dark:text-gray-500">
                   <span>Target: {targetPct}%</span>
-                  {pending > 0 && <span>Actual: {actualPct}%</span>}
+                  {total > 0 && <span>Actual: {actualPct}%</span>}
                 </div>
                 <div className="w-full h-1 bg-black/[0.04] dark:bg-white/[0.04] rounded-full overflow-hidden flex">
                   <div

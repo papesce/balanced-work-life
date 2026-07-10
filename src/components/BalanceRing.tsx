@@ -79,12 +79,12 @@ export function BalanceRing({ counts, modeLabel, statLabel, statSub }: BalanceRi
           {total === 0 ? (
             <>
               <div className="text-2xl font-medium text-gray-400 dark:text-gray-500">—</div>
-              <div className="text-xs text-gray-400 dark:text-gray-500">no items</div>
+              <div className="text-xs text-gray-400 dark:text-gray-500">no tasks</div>
             </>
           ) : (
             <>
               <div className="text-2xl font-medium text-gray-900 dark:text-gray-100">{total}</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">items</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">minutes</div>
             </>
           )}
         </div>

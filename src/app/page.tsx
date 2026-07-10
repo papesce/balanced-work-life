@@ -77,30 +77,36 @@ function DailyPlannerInner() {
   const inboxTasks = useMemo(() => activeTaskIdeas.filter((t) => !t.scheduled_date), [activeTaskIdeas]);
 
   const areaTaskCounts = useMemo(() => {
-    const counts: Record<LifeArea, { pending: number; done: number }> = {
-      work: { pending: 0, done: 0 },
-      health: { pending: 0, done: 0 },
-      relationships: { pending: 0, done: 0 },
-      growth: { pending: 0, done: 0 },
-      finances: { pending: 0, done: 0 },
-      life: { pending: 0, done: 0 },
+    const counts: Record<LifeArea, { pending: number; scheduled: number; done: number }> = {
+      work: { pending: 0, scheduled: 0, done: 0 },
+      health: { pending: 0, scheduled: 0, done: 0 },
+      relationships: { pending: 0, scheduled: 0, done: 0 },
+      growth: { pending: 0, scheduled: 0, done: 0 },
+      finances: { pending: 0, scheduled: 0, done: 0 },
+      life: { pending: 0, scheduled: 0, done: 0 },
     };
+    const duration = (t: Idea) => t.duration_minutes ?? 30;
     for (const t of pendingOnDate) {
       const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(t.id));
       const effectiveAreas = areas.length > 0 ? areas : (["life"] as LifeArea[]);
-      for (const a of effectiveAreas) counts[a].pending++;
+      for (const a of effectiveAreas) counts[a].pending += duration(t);
+    }
+    for (const t of scheduledOnDate) {
+      const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(t.id));
+      const effectiveAreas = areas.length > 0 ? areas : (["life"] as LifeArea[]);
+      for (const a of effectiveAreas) counts[a].scheduled += duration(t);
     }
     for (const t of doneOnDate) {
       const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(t.id));
       const effectiveAreas = areas.length > 0 ? areas : (["life"] as LifeArea[]);
-      for (const a of effectiveAreas) counts[a].done++;
+      for (const a of effectiveAreas) counts[a].done += duration(t);
     }
     return counts;
-  }, [pendingOnDate, doneOnDate, taskTagsHook]);
+  }, [pendingOnDate, scheduledOnDate, doneOnDate, taskTagsHook]);
 
   const balanceRingCounts = useMemo(() => {
     const counts: Record<LifeArea, number> = { work: 0, health: 0, relationships: 0, growth: 0, finances: 0, life: 0 };
-    for (const area of AREA_ORDER) counts[area] = areaTaskCounts[area].pending;
+    for (const area of AREA_ORDER) counts[area] = areaTaskCounts[area].pending + areaTaskCounts[area].scheduled + areaTaskCounts[area].done;
     return counts;
   }, [areaTaskCounts]);
 
@@ -184,7 +190,7 @@ function DailyPlannerInner() {
       <div className="flex flex-col md:flex-row gap-5">
         {/* LEFT COLUMN */}
         <div className={`w-full md:w-[260px] flex-shrink-0 space-y-4 ${activeMobileTab === "balance" ? "block" : "hidden md:block"} md:sticky md:top-[53px] md:self-start`}>
-          <BalanceRing counts={balanceRingCounts} modeLabel="Work-Life Balance Ring" statLabel="Active Tasks" statSub="scheduled today" />
+          <BalanceRing counts={balanceRingCounts} modeLabel="Work-Life Balance Ring" statLabel="Total Minutes" statSub="scheduled today" />
           <AreaFilters
             areaTaskCounts={areaTaskCounts}
             selectedArea={selectedArea}
