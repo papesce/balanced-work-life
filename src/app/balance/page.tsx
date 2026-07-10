@@ -35,6 +35,10 @@ function BalancePageInner() {
     router.replace(`/balance?${params.toString()}`);
   };
 
+  const handleToday = () => {
+    handleChange(windowParam, getToday());
+  };
+
   return (
     <div className="space-y-6 pb-24">
       <div className="glass-card px-5 py-4 rounded-[20px]">
@@ -42,6 +46,7 @@ function BalancePageInner() {
           window={windowParam}
           referenceDate={dateParam}
           onChange={handleChange}
+          onToday={handleToday}
         />
       </div>
 

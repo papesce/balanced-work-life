@@ -1,9 +1,10 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { WindowType, getWindowLabel, offsetWindow } from "@/lib/dateUtils";
+import { motion } from "framer-motion";
+import { ChevronLeft, ChevronRight, Crosshair } from "lucide-react";
+import { WindowType, getWindowLabel, offsetWindow, toLocalDateString } from "@/lib/dateUtils";
 import { MonthYearPicker } from "./MonthYearPicker";
+import { YearPicker } from "./YearPicker";
 
 const TABS: { key: WindowType; label: string }[] = [
   { key: "day", label: "Day" },
@@ -16,22 +17,26 @@ interface BalanceWindowToggleProps {
   window: WindowType;
   referenceDate: string;
   onChange: (window: WindowType, referenceDate: string) => void;
+  onToday: () => void;
 }
 
-export function BalanceWindowToggle({ window, referenceDate, onChange }: BalanceWindowToggleProps) {
+export function BalanceWindowToggle({ window, referenceDate, onChange, onToday }: BalanceWindowToggleProps) {
   const label = getWindowLabel(window, referenceDate);
   const isDayMode = window === "day";
-  const showPicker = isDayMode || window === "week";
+  const showMonthYearPicker = isDayMode || window === "week";
+  const showYearPicker = window === "month" || window === "year";
 
   const handlePrev = () => {
-    const unit = showPicker ? "month" : window;
+    const unit = showMonthYearPicker ? "month" : window === "month" ? "year" : window;
     onChange(window, offsetWindow(unit, referenceDate, -1));
   };
 
   const handleNext = () => {
-    const unit = showPicker ? "month" : window;
+    const unit = showMonthYearPicker ? "month" : window === "month" ? "year" : window;
     onChange(window, offsetWindow(unit, referenceDate, 1));
   };
+
+  const currentYear = new Date(referenceDate + "T00:00:00").getFullYear();
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -72,25 +77,25 @@ export function BalanceWindowToggle({ window, referenceDate, onChange }: Balance
           <ChevronLeft size={16} />
         </button>
 
-        {showPicker ? (
+        {showMonthYearPicker ? (
           <MonthYearPicker
             referenceDate={referenceDate}
             onSelect={(date) => onChange(window, date)}
             label={label}
           />
+        ) : showYearPicker ? (
+          <YearPicker
+            year={currentYear}
+            onSelect={(y) => {
+              const d = new Date(referenceDate + "T00:00:00");
+              d.setFullYear(y);
+              onChange(window, toLocalDateString(d));
+            }}
+          />
         ) : (
-          <AnimatePresence mode="wait">
-            <motion.span
-              key={`${window}-${referenceDate}`}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.15 }}
-              className="text-sm font-semibold text-gray-700 dark:text-gray-300 min-w-[160px] text-center"
-            >
-              {label}
-            </motion.span>
-          </AnimatePresence>
+          <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 min-w-[160px] text-center">
+            {label}
+          </span>
         )}
 
         <button
@@ -99,6 +104,15 @@ export function BalanceWindowToggle({ window, referenceDate, onChange }: Balance
           aria-label="Next"
         >
           <ChevronRight size={16} />
+        </button>
+
+        <button
+          onClick={onToday}
+          className="p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors"
+          aria-label="Go to today"
+          title="Today"
+        >
+          <Crosshair size={16} />
         </button>
       </div>
     </div>
