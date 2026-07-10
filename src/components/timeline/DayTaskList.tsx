@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, KeyboardEvent } from "react";
+import { createPortal } from "react-dom";
 import { Reorder, useDragControls } from "framer-motion";
 import { Check, Star, MoreHorizontal, GripVertical, Play, Pause, X } from "lucide-react";
 import { Idea, IdeaStatus, Tag, LifeArea } from "@/lib/types";
@@ -40,7 +41,7 @@ export function DayTaskList({ tasks, onReorder, onDone, onUndone, onUpdate, toda
   useEffect(() => { setItems(tasks); }, [tasks]);
 
   return (
-    <Reorder.Group axis="y" values={items} onReorder={setItems} className="space-y-0.5">
+    <Reorder.Group axis="y" values={items} onReorder={setItems} className="space-y-0.5" style={{ overflow: "visible" }}>
       {items.map((task) => (
         <DayTaskItem
           key={task.id}
@@ -108,13 +109,29 @@ function TimelineTaskRow({
   const [showTagPicker, setShowTagPicker] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false);
+      if (menuRef.current && !menuRef.current.contains(e.target as Node) &&
+          menuTriggerRef.current && !menuTriggerRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
     };
     if (showMenu) document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
+  }, [showMenu]);
+
+  useEffect(() => {
+    if (!showMenu) return;
+    const close = () => setShowMenu(false);
+    window.addEventListener("scroll", close, { capture: true, passive: true });
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, { capture: true });
+      window.removeEventListener("resize", close);
+    };
   }, [showMenu]);
 
   const [isEditing, setIsEditing] = useState(false);
@@ -285,15 +302,25 @@ function TimelineTaskRow({
         <Star size={14} strokeWidth={1.5} className={task.is_priority ? "fill-amber-400" : ""} />
       </button>
 
-      <div className="relative" ref={menuRef}>
+      <div className="relative">
         <button
-          onClick={() => setShowMenu(!showMenu)}
+          ref={menuTriggerRef}
+          onClick={() => {
+            if (showMenu) { setShowMenu(false); return; }
+            const rect = menuTriggerRef.current?.getBoundingClientRect();
+            if (rect) setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+            setShowMenu(true);
+          }}
           className={`text-gray-300 dark:text-gray-600 hover:text-gray-500 transition-all flex-shrink-0 ${isHovered || showMenu ? "opacity-100" : "opacity-0"}`}
         >
           <MoreHorizontal size={16} strokeWidth={1.5} />
         </button>
-        {showMenu && (
-          <div className="absolute right-0 top-full mt-1 z-50 glass-card-strong rounded-xl py-1.5 min-w-[160px] shadow-lg">
+        {showMenu && menuPos && createPortal(
+          <div
+            ref={menuRef}
+            style={{ position: "fixed", top: menuPos.top, right: menuPos.right, zIndex: 9999 }}
+            className="glass-card-strong rounded-xl py-1.5 min-w-[160px] shadow-lg"
+          >
             {task.scheduled_date !== today && (
               <button
                 onClick={() => { onUpdate(task.id, { scheduled_date: today, status: "scheduled" }); setShowMenu(false); }}
@@ -328,7 +355,8 @@ function TimelineTaskRow({
             >
               Archive
             </button>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     </div>

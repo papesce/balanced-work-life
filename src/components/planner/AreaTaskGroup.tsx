@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, KeyboardEvent } from "react";
+import { createPortal } from "react-dom";
 import { Reorder, useDragControls } from "framer-motion";
 import { Check, Star, MoreHorizontal, GripVertical, Clock, Play, Pause, X } from "lucide-react";
 import { areaColors } from "@/styles/tokens";
@@ -131,7 +132,7 @@ function PendingTaskList({
   useEffect(() => { setItems(tasks); }, [tasks]);
 
   return (
-    <Reorder.Group axis="y" values={items} onReorder={setItems}>
+    <Reorder.Group axis="y" values={items} onReorder={setItems} style={{ overflow: "visible" }}>
       {items.map((task) => (
         <ReorderItemWrapper
           key={task.id}
@@ -209,6 +210,9 @@ function TaskRow({
   const [showMenu, setShowMenu] = useState(false);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
+  const [statusPickerPos, setStatusPickerPos] = useState<{ top: number; left: number } | null>(null);
+  const statusTriggerRef = useRef<HTMLButtonElement>(null);
+  const statusPickerRef = useRef<HTMLDivElement>(null);
   const [showDurationDropdown, setShowDurationDropdown] = useState(false);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customVal, setCustomVal] = useState(task.duration_minutes?.toString() ?? "");
@@ -216,6 +220,8 @@ function TaskRow({
   const [editText, setEditText] = useState(task.text);
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const durationRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -253,12 +259,41 @@ function TaskRow({
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false);
+      if (menuRef.current && !menuRef.current.contains(e.target as Node) &&
+          menuTriggerRef.current && !menuTriggerRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+      if (statusPickerRef.current && !statusPickerRef.current.contains(e.target as Node) &&
+          statusTriggerRef.current && !statusTriggerRef.current.contains(e.target as Node)) {
+        setShowStatusPicker(false);
+      }
       if (durationRef.current && !durationRef.current.contains(e.target as Node)) setShowDurationDropdown(false);
     };
-    if (showMenu || showDurationDropdown) document.addEventListener("mousedown", handler);
+    if (showMenu || showStatusPicker || showDurationDropdown) document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [showMenu, showDurationDropdown]);
+  }, [showMenu, showStatusPicker, showDurationDropdown]);
+
+  useEffect(() => {
+    if (!showMenu) return;
+    const close = () => setShowMenu(false);
+    window.addEventListener("scroll", close, { capture: true, passive: true });
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, { capture: true });
+      window.removeEventListener("resize", close);
+    };
+  }, [showMenu]);
+
+  useEffect(() => {
+    if (!showStatusPicker) return;
+    const close = () => setShowStatusPicker(false);
+    window.addEventListener("scroll", close, { capture: true, passive: true });
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, { capture: true });
+      window.removeEventListener("resize", close);
+    };
+  }, [showStatusPicker]);
 
   const handleStatusSelect = (status: IdeaStatus) => {
     const now = new Date().toISOString();
@@ -338,9 +373,15 @@ function TaskRow({
         </span>
       )}
 
-      <div className="relative flex-shrink-0">
+      <div className="flex-shrink-0">
         <button
-          onClick={() => setShowStatusPicker((v) => !v)}
+          ref={statusTriggerRef}
+          onClick={() => {
+            if (showStatusPicker) { setShowStatusPicker(false); return; }
+            const rect = statusTriggerRef.current?.getBoundingClientRect();
+            if (rect) setStatusPickerPos({ top: rect.bottom + 6, left: rect.left });
+            setShowStatusPicker(true);
+          }}
           className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full transition-all cursor-pointer hover:opacity-80"
           style={{
             background: isCompleted ? "#f5f3ff" : isCancelled ? "#fef2f2" : isPaused ? "#fff7ed" : isInProgress ? "#fefce8" : "rgba(0,0,0,0.05)",
@@ -349,14 +390,18 @@ function TaskRow({
         >
           {statusConfig.label}
         </button>
-        {showStatusPicker && (
-          <div className="absolute right-0 top-full mt-1 z-50">
+        {showStatusPicker && statusPickerPos && createPortal(
+          <div
+            ref={statusPickerRef}
+            style={{ position: "fixed", top: statusPickerPos.top, left: statusPickerPos.left, zIndex: 9999 }}
+          >
             <StatusPicker
               current={task.status}
               onSelect={handleStatusSelect}
               onClose={() => setShowStatusPicker(false)}
             />
-          </div>
+          </div>,
+          document.body
         )}
       </div>
 
@@ -440,12 +485,26 @@ function TaskRow({
           <Star size={12} className={task.is_priority ? "fill-amber-400 text-amber-400" : ""} />
         </button>
 
-        <div className="relative" ref={menuRef}>
-          <button onClick={() => { setShowMenu(!showMenu); setShowAreaPicker(false); }} className="text-gray-300 dark:text-gray-600 hover:text-gray-500 cursor-pointer">
+        <div className="relative">
+          <button
+            ref={menuTriggerRef}
+            onClick={() => {
+              if (showMenu) { setShowMenu(false); return; }
+              const rect = menuTriggerRef.current?.getBoundingClientRect();
+              if (rect) setMenuPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
+              setShowMenu(true);
+              setShowAreaPicker(false);
+            }}
+            className="text-gray-300 dark:text-gray-600 hover:text-gray-500 cursor-pointer"
+          >
             <MoreHorizontal size={13} />
           </button>
-          {showMenu && (
-            <div className="absolute right-0 top-full mt-1.5 z-50 glass-card-strong rounded-lg py-1 min-w-[160px] shadow-lg border border-black/5 dark:border-white/5">
+          {showMenu && menuPos && createPortal(
+            <div
+              ref={menuRef}
+              style={{ position: "fixed", top: menuPos.top, right: menuPos.right, zIndex: 9999 }}
+              className="glass-card-strong rounded-lg py-1 min-w-[160px] shadow-lg border border-black/5 dark:border-white/5"
+            >
               {!showAreaPicker ? (
                 <>
                   {onMoveTaskBetweenAreas && (
@@ -497,7 +556,8 @@ function TaskRow({
                   })}
                 </>
               )}
-            </div>
+            </div>,
+            document.body
           )}
         </div>
       </div>

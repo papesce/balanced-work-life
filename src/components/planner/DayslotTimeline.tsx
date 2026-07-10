@@ -240,6 +240,7 @@ export function DayslotTimeline({
         renderSlotAction={renderSlotAction}
         showCurrentTime={isToday}
         slotActionTrigger="button"
+        slotIntervalMinutes={30}
       />
     </div>
   );
