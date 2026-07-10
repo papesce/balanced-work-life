@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Crosshair } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { WindowType, getWindowLabel, offsetWindow, toLocalDateString } from "@/lib/dateUtils";
 import { MonthYearPicker } from "./MonthYearPicker";
 import { YearPicker } from "./YearPicker";
@@ -17,10 +17,9 @@ interface BalanceWindowToggleProps {
   window: WindowType;
   referenceDate: string;
   onChange: (window: WindowType, referenceDate: string) => void;
-  onToday: () => void;
 }
 
-export function BalanceWindowToggle({ window, referenceDate, onChange, onToday }: BalanceWindowToggleProps) {
+export function BalanceWindowToggle({ window, referenceDate, onChange }: BalanceWindowToggleProps) {
   const label = getWindowLabel(window, referenceDate);
   const isDayMode = window === "day";
   const showMonthYearPicker = isDayMode || window === "week";
@@ -104,15 +103,6 @@ export function BalanceWindowToggle({ window, referenceDate, onChange, onToday }
           aria-label="Next"
         >
           <ChevronRight size={16} />
-        </button>
-
-        <button
-          onClick={onToday}
-          className="p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors"
-          aria-label="Go to today"
-          title="Today"
-        >
-          <Crosshair size={16} />
         </button>
       </div>
     </div>

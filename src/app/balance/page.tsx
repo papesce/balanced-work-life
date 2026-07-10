@@ -13,11 +13,9 @@ import { WindowType, getToday } from "@/lib/dateUtils";
 
 export default function BalancePage() {
   return (
-    <AppShell title="Life Compass">
-      <Suspense>
-        <BalancePageInner />
-      </Suspense>
-    </AppShell>
+    <Suspense>
+      <BalancePageInner />
+    </Suspense>
   );
 }
 
@@ -39,16 +37,22 @@ function BalancePageInner() {
     handleChange(windowParam, getToday());
   };
 
+  const headerActions = (
+    <button onClick={handleToday} className="focus-button">
+      Jump to Today
+    </button>
+  );
+
   return (
-    <div className="space-y-6 pb-24">
-      <div className="glass-card px-5 py-4 rounded-[20px]">
-        <BalanceWindowToggle
-          window={windowParam}
-          referenceDate={dateParam}
-          onChange={handleChange}
-          onToday={handleToday}
-        />
-      </div>
+    <AppShell title="Life Compass" headerActions={headerActions}>
+      <div className="space-y-6 pb-24">
+        <div className="glass-card px-5 py-4 rounded-[20px]">
+          <BalanceWindowToggle
+            window={windowParam}
+            referenceDate={dateParam}
+            onChange={handleChange}
+          />
+        </div>
 
       <AnimatePresence mode="wait">
         <motion.div
@@ -64,6 +68,7 @@ function BalancePageInner() {
           {windowParam === "year" && <YearWheelView referenceDate={dateParam} />}
         </motion.div>
       </AnimatePresence>
-    </div>
+      </div>
+    </AppShell>
   );
 }
