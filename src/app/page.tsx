@@ -60,7 +60,7 @@ function DailyPlannerInner() {
   );
 
   const doneOnDate = useMemo(
-    () => taskIdeas.filter((i) => i.completed_at && i.scheduled_date === activeDate && toLocalDateString(new Date(i.completed_at)) === activeDate),
+    () => taskIdeas.filter((i) => i.completed_at && i.scheduled_date === activeDate),
     [taskIdeas, activeDate],
   );
 
