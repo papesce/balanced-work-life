@@ -9,6 +9,7 @@ const STATUS_OPTIONS: { value: IdeaStatus; label: string; icon: React.ElementTyp
   { value: "scheduled",  label: "Scheduled",  icon: null,  color: "text-blue-600 dark:text-blue-400",   bg: "bg-blue-50 dark:bg-blue-950/20" },
   { value: "in_progress", label: "In Progress", icon: Play, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-950/20" },
   { value: "paused",      label: "Paused",    icon: Pause, color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-50 dark:bg-orange-950/20" },
+  { value: "deferred",    label: "Deferred",  icon: null,  color: "text-amber-700 dark:text-amber-300", bg: "bg-amber-50 dark:bg-amber-950/20" },
   { value: "completed",   label: "Completed", icon: Check, color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-50 dark:bg-violet-950/20" },
   { value: "cancelled",   label: "Cancelled", icon: X,     color: "text-red-600 dark:text-red-400",     bg: "bg-red-50 dark:bg-red-950/20" },
 ];

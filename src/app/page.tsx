@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useMemo, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Sparkles, Calendar, Layers, Clock, Inbox, BarChart3 } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
+import { useDeferredTasks } from "@/hooks/useDeferredTasks";
 import { AppShell } from "@/components/AppShell";
 import { BalanceRing } from "@/components/BalanceRing";
 import { Idea, LifeArea, getAreasForIdea } from "@/lib/types";
@@ -14,9 +15,10 @@ import { DateNav } from "@/components/planner/DateNav";
 import { AreaFilters } from "@/components/planner/AreaFilters";
 import { DayslotTimeline } from "@/components/planner/DayslotTimeline";
 import { AreaTaskGroup } from "@/components/planner/AreaTaskGroup";
-import { BacklogCard } from "@/components/planner/BacklogCard";
+import { InboxDeferredPanel } from "@/components/shared/InboxDeferredPanel";
 import { AREA_ORDER, AREA_LABELS, DEFAULT_TARGETS, LOCAL_STORAGE_TARGETS_KEY } from "@/components/planner/constants";
 import { offsetDate } from "@/components/planner/plannerUtils";
+import { computeReschedulePatch, computeCompletePatch, RescheduleAction } from "@/lib/tasks/rescheduleTask";
 
 export default function DailyPlannerPage() {
   return (
@@ -30,13 +32,34 @@ function DailyPlannerInner() {
   const { ideas, loading, createIdea, updateIdea, deleteIdea, markDone, markUndone, reorderTasks, smartSortTasks } = useIdeas();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
+  const { overdueBuckets, deferredTasks } = useDeferredTasks();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [activeDate, setActiveDate] = useState<string>(() => searchParams.get("date") ?? getToday());
+  const highlightId = searchParams.get("highlight");
 
   useEffect(() => {
     const d = searchParams.get("date");
     if (d) setActiveDate(d);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!highlightId || loading) return;
+    const timer = setTimeout(() => {
+      const el = document.getElementById(`task-${highlightId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("highlight-pulse");
+        const cleanup = () => el.classList.remove("highlight-pulse");
+        el.addEventListener("animationend", cleanup, { once: true });
+        setTimeout(cleanup, 2500);
+      }
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("highlight");
+      router.replace(`/?${params.toString()}`, { scroll: false });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [highlightId, loading, router, searchParams]);
 
   const [selectedArea, setSelectedArea] = useState<LifeArea | null>(null);
   const [activeMobileTab, setActiveMobileTab] = useState<"tasks" | "schedule" | "backlog" | "balance">("tasks");
@@ -135,6 +158,18 @@ function DailyPlannerInner() {
   const handleCreateScheduledTask = async (text: string, time: string) => {
     await createIdea(text, null, "bottom", { type: "task", scheduled_date: activeDate, scheduled_time: time, status: "scheduled" });
   };
+
+  const handleReschedule = useCallback(async (id: string, action: RescheduleAction) => {
+    const idea = ideas.find((i) => i.id === id);
+    if (!idea) return;
+    const patch = computeReschedulePatch(idea, action);
+    await updateIdea(id, patch);
+  }, [ideas, updateIdea]);
+
+  const handleComplete = useCallback(async (id: string) => {
+    const patch = computeCompletePatch();
+    await updateIdea(id, patch);
+  }, [updateIdea]);
 
   if (loading) {
     return (
@@ -245,6 +280,7 @@ function DailyPlannerInner() {
                   onDone={markDone}
                   onUndone={markUndone}
                   onUpdate={updateIdea}
+                  onReschedule={handleReschedule}
                   onDelete={deleteIdea}
                   onAddTask={handleAddToArea}
                   onReorderTasks={reorderTasks}
@@ -311,16 +347,24 @@ function DailyPlannerInner() {
                 getTagsForIdea={taskTagsHook.getTagsForIdea}
               />
             ) : (
-              <BacklogCard
-                tasks={inboxTasks}
+              <InboxDeferredPanel
+                compact
                 activeDate={activeDate}
                 today={today}
-                onScheduleToDate={async (id) => {
-                  await updateIdea(id, { scheduled_date: activeDate, status: "planned" });
-                }}
+                inboxTasks={inboxTasks}
                 onCreateInboxTask={async (text) => {
                   await createIdea(text, null, "top", { type: "task", status: "inbox" });
                 }}
+                onScheduleToDate={async (id) => {
+                  const idea = ideas.find((i) => i.id === id);
+                  if (!idea) return;
+                  const patch = computeReschedulePatch(idea, { type: "reschedule", newDate: activeDate });
+                  await updateIdea(id, patch);
+                }}
+                overdueBuckets={overdueBuckets}
+                deferredTasks={deferredTasks}
+                onReschedule={handleReschedule}
+                onComplete={handleComplete}
                 getTagsForIdea={taskTagsHook.getTagsForIdea}
               />
             )}

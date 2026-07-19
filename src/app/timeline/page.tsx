@@ -7,13 +7,16 @@ import { Sparkles } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
+import { useDeferredTasks } from "@/hooks/useDeferredTasks";
 import { AppShell } from "@/components/AppShell";
 import { MiniBalanceBar } from "@/components/MiniBalanceBar";
 import { Idea } from "@/lib/types";
 import { getToday, getTomorrow, getDatesRange, isPast } from "@/lib/dateUtils";
+import { computeReschedulePatch, computeCompletePatch, RescheduleAction } from "@/lib/tasks/rescheduleTask";
 import { DayTaskList } from "@/components/timeline/DayTaskList";
 import { FloatingAddButton } from "@/components/timeline/FloatingAddButton";
 import { QuickAddInput } from "@/components/timeline/QuickAddInput";
+import { InboxDeferredPanel } from "@/components/shared/InboxDeferredPanel";
 import { formatTimelineDate, getTimelineKicker } from "@/components/timeline/timelineUtils";
 
 const cardVariants = {
@@ -31,6 +34,7 @@ export default function TimelinePage() {
   const { ideas, loading, createIdea, markDone, markUndone, updateIdea, reorderTasks, smartSortTasks } = useIdeas();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
+  const { overdueBuckets, deferredTasks } = useDeferredTasks();
   const todayRef = useRef<HTMLElement>(null);
   const hasAutoScrolled = useRef(false);
   const [fabOpen, setFabOpen] = useState(false);
@@ -39,6 +43,7 @@ export default function TimelinePage() {
   const tomorrow = getTomorrow();
   const dates = useMemo(() => getDatesRange(3, 14), []);
   const tasks = useMemo(() => ideas.filter((i) => i.type === "task"), [ideas]);
+  const inboxTasks = useMemo(() => tasks.filter((t) => !t.scheduled_date && t.status !== "completed" && t.status !== "cancelled" && t.status !== "archived"), [tasks]);
 
   const tasksByDate = useMemo(() => {
     const map: Record<string, Idea[]> = {};
@@ -64,6 +69,18 @@ export default function TimelinePage() {
   const handleQuickAdd = async (text: string, date: string) => {
     await createIdea(text, null, "bottom", { type: "task", scheduled_date: date, status: "planned" });
   };
+
+  const handleReschedule = useCallback(async (id: string, action: RescheduleAction) => {
+    const idea = ideas.find((i) => i.id === id);
+    if (!idea) return;
+    const patch = computeReschedulePatch(idea, action);
+    await updateIdea(id, patch);
+  }, [ideas, updateIdea]);
+
+  const handleComplete = useCallback(async (id: string) => {
+    const patch = computeCompletePatch();
+    await updateIdea(id, patch);
+  }, [updateIdea]);
 
   const handleFabAdd = async (text: string, date: string | null) => {
     await createIdea(text, null, "bottom", { type: "task", scheduled_date: date, status: date ? "planned" : "inbox" });
@@ -95,6 +112,28 @@ export default function TimelinePage() {
   return (
     <AppShell title="Timeline" headerActions={headerActions}>
       <div className="space-y-4 pb-24">
+        {(inboxTasks.length > 0 || overdueBuckets.some((b) => b.tasks.length > 0) || deferredTasks.length > 0) && (
+          <InboxDeferredPanel
+            activeDate={today}
+            today={today}
+            inboxTasks={inboxTasks}
+            onCreateInboxTask={async (text) => {
+              await createIdea(text, null, "bottom", { type: "task", status: "inbox" });
+            }}
+            onScheduleToDate={async (id) => {
+              const idea = ideas.find((i) => i.id === id);
+              if (!idea) return;
+              const patch = computeReschedulePatch(idea, { type: "reschedule", newDate: today });
+              await updateIdea(id, patch);
+            }}
+            overdueBuckets={overdueBuckets}
+            deferredTasks={deferredTasks}
+            onReschedule={handleReschedule}
+            onComplete={handleComplete}
+            getTagsForIdea={taskTagsHook.getTagsForIdea}
+          />
+        )}
+
         {dates.map((date, index) => {
           const dayTasks = tasksByDate[date] ?? [];
           const isTodayDate = date === today;
@@ -160,6 +199,7 @@ export default function TimelinePage() {
                       onDone={markDone}
                       onUndone={markUndone}
                       onUpdate={updateIdea}
+                      onReschedule={handleReschedule}
                       today={today}
                       allTags={tagsHook.tags}
                       getTagsForIdea={taskTagsHook.getTagsForIdea}

@@ -71,6 +71,7 @@ const STATUS_STYLES: Record<IdeaStatus, string> = {
   completed: "border-violet-200 dark:border-violet-700/30 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300",
   cancelled: "border-red-200 dark:border-red-700/30 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300",
   archived: "border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 bg-transparent",
+  deferred: "border-amber-200 dark:border-amber-700/30 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300",
 };
 
 const STATUS_LABELS: Record<IdeaStatus, string> = {
@@ -82,6 +83,7 @@ const STATUS_LABELS: Record<IdeaStatus, string> = {
   completed: "Done",
   cancelled: "Cancelled",
   archived: "Archived",
+  deferred: "Deferred",
 };
 
 const STATUS_ICON: Record<IdeaStatus, { icon: React.ElementType | null; color: string }> = {
@@ -93,6 +95,7 @@ const STATUS_ICON: Record<IdeaStatus, { icon: React.ElementType | null; color: s
   completed:   { icon: Check, color: "text-violet-600" },
   cancelled:   { icon: X,     color: "text-red-500" },
   archived:    { icon: null, color: "text-gray-400" },
+  deferred:    { icon: null, color: "text-amber-600" },
 };
 
 export function IdeaNode({

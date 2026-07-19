@@ -239,6 +239,23 @@ body {
   transform: scaleX(1);
 }
 
+/* Task highlight pulse for deep-link focus */
+@keyframes highlight-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.4);
+    background-color: rgba(139, 92, 246, 0.06);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.2);
+    background-color: rgba(139, 92, 246, 0.1);
+  }
+}
+
+.highlight-pulse {
+  animation: highlight-pulse 0.8s ease-in-out 2;
+  border-radius: 10px;
+}
+
 /* Dark mode overrides */
 @media (prefers-color-scheme: dark) {
   :root {

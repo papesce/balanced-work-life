@@ -9,6 +9,7 @@ import { Idea, IdeaStatus, LifeArea } from "@/lib/types";
 import { AREA_ICONS, AREA_LABELS, AREA_ORDER } from "./constants";
 import { formatTime } from "./plannerUtils";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
+import { RescheduleAction } from "@/lib/tasks/rescheduleTask";
 
 const STATUS_CONFIG: Record<IdeaStatus, { label: string; color: string; icon: React.ElementType | null }> = {
   inbox:       { label: "Inbox",       color: "text-gray-400",              icon: null },
@@ -19,6 +20,7 @@ const STATUS_CONFIG: Record<IdeaStatus, { label: string; color: string; icon: Re
   completed:   { label: "Completed",   color: "text-violet-600",            icon: Check },
   cancelled:   { label: "Cancelled",   color: "text-red-500",               icon: X },
   archived:    { label: "Archived",    color: "text-gray-400",              icon: null },
+  deferred:    { label: "Deferred",    color: "text-amber-600",             icon: null },
 };
 
 interface AreaTaskGroupProps {
@@ -29,6 +31,7 @@ interface AreaTaskGroupProps {
   onDone: (id: string) => void;
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
+  onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
   onDelete: (id: string) => void;
   onAddTask: (text: string, area: LifeArea) => Promise<void>;
   onReorderTasks: (taskIds: string[]) => void;
@@ -37,7 +40,7 @@ interface AreaTaskGroupProps {
 
 export function AreaTaskGroup({
   area, activeDate, pendingTasks, doneTasks,
-  onDone, onUndone, onUpdate, onDelete, onAddTask, onReorderTasks, onMoveTaskBetweenAreas,
+  onDone, onUndone, onUpdate, onReschedule, onDelete, onAddTask, onReorderTasks, onMoveTaskBetweenAreas,
 }: AreaTaskGroupProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const Icon = AREA_ICONS[area];
@@ -58,7 +61,7 @@ export function AreaTaskGroup({
         if (taskId && sourceArea && sourceArea !== area) {
           onMoveTaskBetweenAreas?.(taskId, sourceArea, area);
         } else if (taskId) {
-          onUpdate(taskId, { status: "planned", scheduled_date: activeDate, scheduled_time: null });
+          void onReschedule(taskId, { type: "reschedule", newDate: activeDate });
         }
       }}
     >
@@ -322,6 +325,7 @@ function TaskRow({
 
   return (
     <div
+      id={`task-${task.id}`}
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", task.id);

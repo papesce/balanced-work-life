@@ -7,6 +7,7 @@ import { Check, Star, MoreHorizontal, GripVertical, Play, Pause, X } from "lucid
 import { Idea, IdeaStatus, Tag, LifeArea } from "@/lib/types";
 import { TagPicker, AREA_DOT_COLORS } from "@/components/shared/TagPicker";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
+import { RescheduleAction } from "@/lib/tasks/rescheduleTask";
 
 const STATUS_CONFIG: Record<IdeaStatus, { label: string; color: string; icon: React.ElementType | null }> = {
   inbox:       { label: "Inbox",       color: "text-gray-400",              icon: null },
@@ -17,6 +18,7 @@ const STATUS_CONFIG: Record<IdeaStatus, { label: string; color: string; icon: Re
   completed:   { label: "Completed",   color: "text-violet-600",            icon: Check },
   cancelled:   { label: "Cancelled",   color: "text-red-500",               icon: X },
   archived:    { label: "Archived",    color: "text-gray-400",              icon: null },
+  deferred:    { label: "Deferred",    color: "text-amber-600",             icon: null },
 };
 
 interface DayTaskListProps {
@@ -25,6 +27,7 @@ interface DayTaskListProps {
   onDone: (id: string) => void;
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
+  onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
   today: string;
   allTags: Tag[];
   getTagsForIdea: (ideaId: string) => Tag[];
@@ -33,7 +36,7 @@ interface DayTaskListProps {
   onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
 }
 
-export function DayTaskList({ tasks, onReorder, onDone, onUndone, onUpdate, today, allTags, getTagsForIdea, onAddTag, onRemoveTag, onCreateTag }: DayTaskListProps) {
+export function DayTaskList({ tasks, onReorder, onDone, onUndone, onUpdate, onReschedule, today, allTags, getTagsForIdea, onAddTag, onRemoveTag, onCreateTag }: DayTaskListProps) {
   const [items, setItems] = useState(tasks);
   const itemsRef = useRef(items);
 
@@ -50,6 +53,7 @@ export function DayTaskList({ tasks, onReorder, onDone, onUndone, onUpdate, toda
           onDone={onDone}
           onUndone={onUndone}
           onUpdate={onUpdate}
+          onReschedule={onReschedule}
           today={today}
           allTags={allTags}
           taskTags={getTagsForIdea(task.id)}
@@ -63,13 +67,14 @@ export function DayTaskList({ tasks, onReorder, onDone, onUndone, onUpdate, toda
 }
 
 function DayTaskItem({
-  task, onReorder, onDone, onUndone, onUpdate, today, allTags, taskTags, onAddTag, onRemoveTag, onCreateTag,
+  task, onReorder, onDone, onUndone, onUpdate, onReschedule, today, allTags, taskTags, onAddTag, onRemoveTag, onCreateTag,
 }: {
   task: Idea;
   onReorder: () => void;
   onDone: (id: string) => void;
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
+  onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
   today: string;
   allTags: Tag[];
   taskTags: Tag[];
@@ -80,18 +85,19 @@ function DayTaskItem({
   const controls = useDragControls();
   return (
     <Reorder.Item value={task} dragControls={controls} className="relative" onDragEnd={onReorder}>
-      <TimelineTaskRow task={task} onDone={onDone} onUndone={onUndone} onUpdate={onUpdate} today={today} dragControls={controls} allTags={allTags} taskTags={taskTags} onAddTag={onAddTag} onRemoveTag={onRemoveTag} onCreateTag={onCreateTag} />
+      <TimelineTaskRow task={task} onDone={onDone} onUndone={onUndone} onUpdate={onUpdate} onReschedule={onReschedule} today={today} dragControls={controls} allTags={allTags} taskTags={taskTags} onAddTag={onAddTag} onRemoveTag={onRemoveTag} onCreateTag={onCreateTag} />
     </Reorder.Item>
   );
 }
 
 function TimelineTaskRow({
-  task, onDone, onUndone, onUpdate, today, dragControls, allTags, taskTags, onAddTag, onRemoveTag, onCreateTag,
+  task, onDone, onUndone, onUpdate, onReschedule, today, dragControls, allTags, taskTags, onAddTag, onRemoveTag, onCreateTag,
 }: {
   task: Idea;
   onDone: (id: string) => void;
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
+  onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
   today: string;
   dragControls: ReturnType<typeof useDragControls>;
   allTags: Tag[];
@@ -323,7 +329,7 @@ function TimelineTaskRow({
           >
             {task.scheduled_date !== today && (
               <button
-                onClick={() => { onUpdate(task.id, { scheduled_date: today, status: "scheduled" }); setShowMenu(false); }}
+                onClick={() => { void onReschedule(task.id, { type: "retry_today" }); setShowMenu(false); }}
                 className="flex w-full text-left px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
               >
                 Move to Today
@@ -337,7 +343,7 @@ function TimelineTaskRow({
                 type="date"
                 className="absolute left-full top-0 ml-1 opacity-0 w-0 h-0 pointer-events-none group-hover/date:opacity-100 group-hover/date:w-auto group-hover/date:h-auto group-hover/date:pointer-events-auto text-xs border border-black/10 dark:border-white/10 rounded-lg px-2 py-1.5 bg-white/80 dark:bg-gray-800/80 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-violet-500"
                 onChange={(e) => {
-                  if (e.target.value) { onUpdate(task.id, { scheduled_date: e.target.value, status: "scheduled" }); setShowMenu(false); }
+                  if (e.target.value) { void onReschedule(task.id, { type: "reschedule", newDate: e.target.value }); setShowMenu(false); }
                 }}
               />
             </div>
