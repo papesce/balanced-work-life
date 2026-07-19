@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCalendarData } from "@/hooks/useCalendarData";
 import { MiniRing } from "./MiniRing";
 import { getToday } from "@/lib/dateUtils";
@@ -49,7 +50,11 @@ export function DayCalendarView({ referenceDate }: DayCalendarViewProps) {
           const dimmed = !isCurrentMonth || isFuture;
 
           return (
-            <div key={date} className="flex flex-col items-center gap-0.5">
+            <Link
+              key={date}
+              href={`/?date=${date}`}
+              className="flex flex-col items-center gap-0.5 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] rounded-lg transition-colors cursor-pointer p-1 -m-1"
+            >
               <span
                 className={[
                   "text-[10px] font-medium w-5 h-5 flex items-center justify-center rounded-full",
@@ -63,7 +68,7 @@ export function DayCalendarView({ referenceDate }: DayCalendarViewProps) {
                 {dayNum}
               </span>
               <MiniRing counts={counts} size={34} dimmed={dimmed} />
-            </div>
+            </Link>
           );
         })}
       </div>
