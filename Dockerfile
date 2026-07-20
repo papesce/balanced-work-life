@@ -1,12 +1,15 @@
-FROM node:20-alpine AS deps
-WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+FROM node:20-alpine AS base
+RUN corepack enable && corepack prepare pnpm@10.25.0 --activate
 
-FROM node:20-alpine AS builder
+FROM base AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --prod
+
+FROM base AS builder
+WORKDIR /app
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 COPY . .
 
 ARG NEXT_PUBLIC_SUPABASE_URL
@@ -18,9 +21,9 @@ ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_POWERSYNC_URL=$NEXT_PUBLIC_POWERSYNC_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN npm run build
+RUN pnpm build
 
-FROM node:20-alpine AS runner
+FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1

@@ -1,0 +1,79 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: us-central1
+  SERVICE: balanced-worklife
+  REPOSITORY: balanced-worklife
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Auto-tag version
+        id: tag
+        run: |
+          LATEST_TAG=$(git tag --list 'v*' --sort=-version:refname | head -n1)
+          if [ -z "$LATEST_TAG" ]; then
+            NEW_TAG="v0.1.0"
+          else
+            MAJOR=$(echo "$LATEST_TAG" | cut -d. -f1 | tr -d 'v')
+            MINOR=$(echo "$LATEST_TAG" | cut -d. -f2)
+            PATCH=$(echo "$LATEST_TAG" | cut -d. -f3)
+            PATCH=$((PATCH + 1))
+            NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+          fi
+          git tag "$NEW_TAG"
+          git push origin "$NEW_TAG"
+          echo "version=$NEW_TAG" >> "$GITHUB_OUTPUT"
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and push
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
+            --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
+            --build-arg NEXT_PUBLIC_POWERSYNC_URL="${{ secrets.NEXT_PUBLIC_POWERSYNC_URL }}" \
+            --build-arg NEXT_PUBLIC_APP_VERSION="${{ steps.tag.outputs.version }}" \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:${{ github.sha }} \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:latest \
+            .
+
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:${{ github.sha }}
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:latest
+
+      - uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE }}
+          region: ${{ env.REGION }}
+          image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:${{ github.sha }}
+          flags: |
+            --memory=512Mi
+            --cpu=1
+            --min-instances=0
+            --max-instances=5
+            --concurrency=80
+            --timeout=30s
+            --no-cpu-throttling
+            --allow-unauthenticated
