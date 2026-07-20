@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Plus, Check } from "lucide-react";
 import { Tag, LifeArea } from "@/lib/types";
 import { AREA_ORDER, AREA_LABELS } from "@/components/planner/constants";
+import { areaColors } from "@/styles/tokens";
 
 const AREA_COLORS: Record<LifeArea, string> = {
   work: "text-blue-700 dark:text-blue-300",
@@ -22,6 +23,11 @@ export const AREA_DOT_COLORS: Record<LifeArea, string> = {
   finances: "bg-emerald-500",
   life: "bg-green-500",
 };
+
+function areaBg(area: LifeArea, opacity: number): string {
+  const base = areaColors[area]?.bg ?? "rgba(0,0,0,0)";
+  return base.replace(/[\d.]+\)$/, `${opacity})`);
+}
 
 interface TagPickerProps {
   allTags: Tag[];
@@ -83,9 +89,13 @@ export function TagPicker({
     }
   };
 
-  // Group tags by area
+  // Group tags by area, system tags first
   const tagsByArea = AREA_ORDER.reduce<Record<LifeArea, Tag[]>>((acc, area) => {
-    acc[area] = allTags.filter((t) => t.area === area);
+    const tags = allTags.filter((t) => t.area === area);
+    acc[area] = [
+      ...tags.filter((t) => t.is_system),
+      ...tags.filter((t) => !t.is_system),
+    ];
     return acc;
   }, {} as Record<LifeArea, Tag[]>);
 
@@ -100,16 +110,17 @@ export function TagPicker({
         <p className="text-xs text-gray-400 dark:text-gray-500 px-3 py-1">No tags yet</p>
       )}
 
-      {areasWithTags.map((area) => (
-        <div key={area}>
-          <p className={`text-[10px] font-semibold uppercase tracking-wider px-3 pt-2 pb-0.5 ${AREA_COLORS[area]}`}>
-            {AREA_LABELS[area]}
-          </p>
+      {areasWithTags.map((area, areaIdx) => (
+        <div key={area} className={areaIdx > 0 ? "mt-1.5" : ""}>
           {tagsByArea[area].map((tag) => (
             <button
               key={tag.id}
               onClick={() => handleToggle(tag)}
-              className="flex items-center gap-2 w-full text-left text-sm px-3 py-1.5 hover:bg-black/[0.03] dark:hover:bg-white/[0.06]"
+              className="flex items-center gap-2 w-full text-left text-sm px-3 py-1.5 rounded-md mx-1 transition-colors"
+              style={{
+                width: "calc(100% - 8px)",
+                background: areaBg(area, 0.12),
+              }}
             >
               <span className={`flex-none w-3.5 h-3.5 rounded border flex items-center justify-center ${
                 selectedIds.has(tag.id)
