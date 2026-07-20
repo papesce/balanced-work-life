@@ -5,8 +5,9 @@ import { createPortal } from "react-dom";
 import { Reorder, useDragControls } from "framer-motion";
 import { Check, Star, MoreHorizontal, GripVertical, Clock, Play, Pause, X } from "lucide-react";
 import { areaColors } from "@/styles/tokens";
-import { Idea, IdeaStatus, LifeArea } from "@/lib/types";
-import { AREA_ICONS, AREA_LABELS, AREA_ORDER } from "./constants";
+import { Idea, IdeaStatus, LifeArea, Tag } from "@/lib/types";
+import { AREA_ICONS, AREA_LABELS } from "./constants";
+import { TagPicker } from "@/components/shared/TagPicker";
 import { formatTime } from "./plannerUtils";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { RescheduleAction } from "@/lib/tasks/rescheduleTask";
@@ -36,11 +37,14 @@ interface AreaTaskGroupProps {
   onAddTask: (text: string, area: LifeArea) => Promise<void>;
   onReorderTasks: (taskIds: string[]) => void;
   onMoveTaskBetweenAreas?: (taskId: string, fromArea: LifeArea, toArea: LifeArea) => void;
+  getTagsForIdea?: (ideaId: string) => Tag[];
+  allTags?: Tag[];
+  onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
 }
 
 export function AreaTaskGroup({
   area, activeDate, pendingTasks, doneTasks,
-  onDone, onUndone, onUpdate, onReschedule, onDelete, onAddTask, onReorderTasks, onMoveTaskBetweenAreas,
+  onDone, onUndone, onUpdate, onReschedule, onDelete, onAddTask, onReorderTasks, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag,
 }: AreaTaskGroupProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const Icon = AREA_ICONS[area];
@@ -89,10 +93,13 @@ export function AreaTaskGroup({
             onUpdate={onUpdate}
             onDelete={onDelete}
             onMoveTaskBetweenAreas={onMoveTaskBetweenAreas}
+            getTagsForIdea={getTagsForIdea}
+            allTags={allTags}
+            onCreateTag={onCreateTag}
           />
         )}
         {doneTasks.map((task) => (
-          <TaskRow key={task.id} task={task} area={area} onDone={onDone} onUndone={onUndone} onUpdate={onUpdate} onDelete={onDelete} onMoveTaskBetweenAreas={onMoveTaskBetweenAreas} />
+          <TaskRow key={task.id} task={task} area={area} onDone={onDone} onUndone={onUndone} onUpdate={onUpdate} onDelete={onDelete} onMoveTaskBetweenAreas={onMoveTaskBetweenAreas} getTagsForIdea={getTagsForIdea} allTags={allTags} onCreateTag={onCreateTag} />
         ))}
         {pendingTasks.length === 0 && doneTasks.length === 0 && (
           <div className="px-5 py-4 text-xs text-gray-400 dark:text-gray-500 italic">No tasks planned for this day</div>
@@ -117,7 +124,7 @@ export function AreaTaskGroup({
 }
 
 function PendingTaskList({
-  tasks, area, onReorder, onDone, onUndone, onUpdate, onDelete, onMoveTaskBetweenAreas,
+  tasks, area, onReorder, onDone, onUndone, onUpdate, onDelete, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag,
 }: {
   tasks: Idea[];
   area: LifeArea;
@@ -127,6 +134,9 @@ function PendingTaskList({
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onDelete: (id: string) => void;
   onMoveTaskBetweenAreas?: (taskId: string, fromArea: LifeArea, toArea: LifeArea) => void;
+  getTagsForIdea?: (ideaId: string) => Tag[];
+  allTags?: Tag[];
+  onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
 }) {
   const [items, setItems] = useState(tasks);
   const itemsRef = useRef(items);
@@ -148,6 +158,9 @@ function PendingTaskList({
           onUpdate={onUpdate}
           onDelete={onDelete}
           onMoveTaskBetweenAreas={onMoveTaskBetweenAreas}
+          getTagsForIdea={getTagsForIdea}
+          allTags={allTags}
+          onCreateTag={onCreateTag}
         />
       ))}
     </Reorder.Group>
@@ -155,7 +168,7 @@ function PendingTaskList({
 }
 
 function ReorderItemWrapper({
-  task, area, onReorder, itemsRef, onDone, onUndone, onUpdate, onDelete, onMoveTaskBetweenAreas,
+  task, area, onReorder, itemsRef, onDone, onUndone, onUpdate, onDelete, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag,
 }: {
   task: Idea;
   area: LifeArea;
@@ -166,6 +179,9 @@ function ReorderItemWrapper({
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onDelete: (id: string) => void;
   onMoveTaskBetweenAreas?: (taskId: string, fromArea: LifeArea, toArea: LifeArea) => void;
+  getTagsForIdea?: (ideaId: string) => Tag[];
+  allTags?: Tag[];
+  onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
 }) {
   const dragControls = useDragControls();
 
@@ -185,6 +201,9 @@ function ReorderItemWrapper({
         onUpdate={onUpdate}
         onDelete={onDelete}
         onMoveTaskBetweenAreas={onMoveTaskBetweenAreas}
+        getTagsForIdea={getTagsForIdea}
+        allTags={allTags}
+        onCreateTag={onCreateTag}
         showDragHandle
         dragControls={dragControls}
       />
@@ -193,7 +212,7 @@ function ReorderItemWrapper({
 }
 
 function TaskRow({
-  task, area, onDone, onUndone, onUpdate, onDelete, onMoveTaskBetweenAreas, showDragHandle, dragControls,
+  task, area, onDone, onUndone, onUpdate, onDelete, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag, showDragHandle, dragControls,
 }: {
   task: Idea;
   area: LifeArea;
@@ -202,6 +221,9 @@ function TaskRow({
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onDelete: (id: string) => void;
   onMoveTaskBetweenAreas?: (taskId: string, fromArea: LifeArea, toArea: LifeArea) => void;
+  getTagsForIdea?: (ideaId: string) => Tag[];
+  allTags?: Tag[];
+  onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
   showDragHandle?: boolean;
   dragControls?: ReturnType<typeof useDragControls>;
 }) {
@@ -226,6 +248,9 @@ function TaskRow({
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const durationRef = useRef<HTMLDivElement>(null);
+  const areaDotRef = useRef<HTMLButtonElement>(null);
+  const areaPickerRef = useRef<HTMLDivElement>(null);
+  const [areaPickerPos, setAreaPickerPos] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -271,10 +296,14 @@ function TaskRow({
         setShowStatusPicker(false);
       }
       if (durationRef.current && !durationRef.current.contains(e.target as Node)) setShowDurationDropdown(false);
+      if (areaPickerRef.current && !areaPickerRef.current.contains(e.target as Node) &&
+          areaDotRef.current && !areaDotRef.current.contains(e.target as Node)) {
+        setShowAreaPicker(false);
+      }
     };
-    if (showMenu || showStatusPicker || showDurationDropdown) document.addEventListener("mousedown", handler);
+    if (showMenu || showStatusPicker || showDurationDropdown || showAreaPicker) document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [showMenu, showStatusPicker, showDurationDropdown]);
+  }, [showMenu, showStatusPicker, showDurationDropdown, showAreaPicker]);
 
   useEffect(() => {
     if (!showMenu) return;
@@ -297,6 +326,17 @@ function TaskRow({
       window.removeEventListener("resize", close);
     };
   }, [showStatusPicker]);
+
+  useEffect(() => {
+    if (!showAreaPicker) return;
+    const close = () => setShowAreaPicker(false);
+    window.addEventListener("scroll", close, { capture: true, passive: true });
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, { capture: true });
+      window.removeEventListener("resize", close);
+    };
+  }, [showAreaPicker]);
 
   const handleStatusSelect = (status: IdeaStatus) => {
     const now = new Date().toISOString();
@@ -322,6 +362,15 @@ function TaskRow({
     }
     setShowStatusPicker(false);
   };
+
+  const handleTagSelected = async (tag: Tag) => {
+    if (tag.area === area || !onMoveTaskBetweenAreas) return;
+    onMoveTaskBetweenAreas(task.id, area, tag.area);
+    setShowAreaPicker(false);
+  };
+
+  const taskTags = getTagsForIdea?.(task.id) ?? [];
+  const currentSystemTag = taskTags.find((t) => t.is_system);
 
   return (
     <div
@@ -482,6 +531,37 @@ function TaskRow({
       )}
 
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+        {onMoveTaskBetweenAreas && (() => {
+          const taskTags = getTagsForIdea?.(task.id) ?? [];
+          const nonSystemTags = taskTags.filter((t) => !t.is_system);
+          return (
+            <div className="flex items-center gap-1">
+              <button
+                ref={areaDotRef}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (showAreaPicker) { setShowAreaPicker(false); return; }
+                  const rect = areaDotRef.current?.getBoundingClientRect();
+                  if (rect) setAreaPickerPos({ top: rect.bottom + 4, left: rect.left });
+                  setShowAreaPicker(true);
+                }}
+                className="w-2 h-2 rounded-full cursor-pointer hover:scale-150 transition-transform flex-shrink-0"
+                style={{ background: areaColors[area]?.dot }}
+                title="Change area"
+              />
+              {nonSystemTags.map((tag) => (
+                <span
+                  key={tag.id}
+                  className="text-[9px] font-bold px-1 py-0.5 rounded-full flex-shrink-0"
+                  style={{ background: `${areaColors[tag.area]?.dot}15`, color: areaColors[tag.area]?.dot }}
+                >
+                  {tag.name}
+                </span>
+              ))}
+            </div>
+          );
+        })()}
+
         <button
           onClick={() => onUpdate(task.id, { is_priority: !task.is_priority })}
           className={`cursor-pointer ${task.is_priority ? "text-amber-400" : "text-gray-300 dark:text-gray-600 hover:text-gray-400"}`}
@@ -497,7 +577,6 @@ function TaskRow({
               const rect = menuTriggerRef.current?.getBoundingClientRect();
               if (rect) setMenuPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
               setShowMenu(true);
-              setShowAreaPicker(false);
             }}
             className="text-gray-300 dark:text-gray-600 hover:text-gray-500 cursor-pointer"
           >
@@ -509,62 +588,40 @@ function TaskRow({
               style={{ position: "fixed", top: menuPos.top, right: menuPos.right, zIndex: 9999 }}
               className="glass-card-strong rounded-lg py-1 min-w-[160px] shadow-lg border border-black/5 dark:border-white/5"
             >
-              {!showAreaPicker ? (
-                <>
-                  {onMoveTaskBetweenAreas && (
-                    <button
-                      onClick={() => setShowAreaPicker(true)}
-                      className="flex w-full text-left px-3 py-1.5 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] font-semibold cursor-pointer"
-                    >
-                      Move to Area...
-                    </button>
-                  )}
-                  <button
-                    onClick={() => { onUpdate(task.id, { scheduled_date: null, status: "inbox" }); setShowMenu(false); }}
-                    className="flex w-full text-left px-3 py-1.5 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] font-semibold cursor-pointer"
-                  >
-                    Move to Backlog
-                  </button>
-                  <button
-                    onClick={() => { onDelete(task.id); setShowMenu(false); }}
-                    className="flex w-full text-left px-3 py-1.5 text-[11px] text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 font-bold cursor-pointer"
-                  >
-                    Delete
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={() => setShowAreaPicker(false)}
-                    className="flex w-full text-left px-3 py-1.5 text-[11px] text-violet-600 dark:text-violet-400 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] font-bold cursor-pointer"
-                  >
-                    ← Back
-                  </button>
-                  <div className="border-t border-black/[0.03] dark:border-white/[0.03] my-1" />
-                  {AREA_ORDER.filter((a) => a !== area).map((targetArea) => {
-                    const TargetIcon = AREA_ICONS[targetArea];
-                    return (
-                      <button
-                        key={targetArea}
-                        onClick={() => {
-                          onMoveTaskBetweenAreas?.(task.id, area, targetArea);
-                          setShowMenu(false);
-                          setShowAreaPicker(false);
-                        }}
-                        className="flex w-full items-center gap-2 text-left px-3 py-1.5 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] font-semibold cursor-pointer"
-                      >
-                        <TargetIcon size={12} />
-                        {AREA_LABELS[targetArea]}
-                      </button>
-                    );
-                  })}
-                </>
-              )}
+              <button
+                onClick={() => { onUpdate(task.id, { scheduled_date: null, status: "inbox" }); setShowMenu(false); }}
+                className="flex w-full text-left px-3 py-1.5 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] font-semibold cursor-pointer"
+              >
+                Move to Backlog
+              </button>
+              <button
+                onClick={() => { onDelete(task.id); setShowMenu(false); }}
+                className="flex w-full text-left px-3 py-1.5 text-[11px] text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 font-bold cursor-pointer"
+              >
+                Delete
+              </button>
             </div>,
             document.body
           )}
         </div>
       </div>
+
+      {showAreaPicker && areaPickerPos && createPortal(
+        <div
+          ref={areaPickerRef}
+          style={{ position: "fixed", top: areaPickerPos.top, left: areaPickerPos.left, zIndex: 10000 }}
+        >
+          <TagPicker
+            allTags={allTags ?? []}
+            selectedTags={currentSystemTag ? [currentSystemTag] : []}
+            onAdd={handleTagSelected}
+            onRemove={() => {}}
+            onCreateTag={onCreateTag ?? (async () => null)}
+            onClose={() => setShowAreaPicker(false)}
+          />
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

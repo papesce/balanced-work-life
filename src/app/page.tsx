@@ -155,8 +155,12 @@ function DailyPlannerInner() {
     await createIdea(text, null, "top", { type: "task", scheduled_date: scheduledDate ?? activeDate, status: "planned" });
   };
 
-  const handleCreateScheduledTask = async (text: string, time: string) => {
-    await createIdea(text, null, "bottom", { type: "task", scheduled_date: activeDate, scheduled_time: time, status: "scheduled" });
+  const handleCreateScheduledTask = async (text: string, time: string, area?: LifeArea) => {
+    const id = await createIdea(text, null, "bottom", { type: "task", scheduled_date: activeDate, scheduled_time: time, status: "scheduled" });
+    if (id && area) {
+      const tag = tagsHook.tags.find((t) => t.is_system && t.area === area);
+      if (tag) await taskTagsHook.addTagToTask(id, tag);
+    }
   };
 
   const handleReschedule = useCallback(async (id: string, action: RescheduleAction) => {
@@ -285,6 +289,9 @@ function DailyPlannerInner() {
                   onAddTask={handleAddToArea}
                   onReorderTasks={reorderTasks}
                   onMoveTaskBetweenAreas={handleMoveTaskBetweenAreas}
+                  getTagsForIdea={taskTagsHook.getTagsForIdea}
+                  allTags={tagsHook.tags}
+                  onCreateTag={tagsHook.createTag}
                 />
               );
             })}
@@ -345,6 +352,15 @@ function DailyPlannerInner() {
                 onUpdateTask={updateIdea}
                 onCreateTask={handleCreateScheduledTask}
                 getTagsForIdea={taskTagsHook.getTagsForIdea}
+                tags={tagsHook.tags}
+                selectedArea={selectedArea}
+                onChangeTaskArea={handleMoveTaskBetweenAreas}
+                onAddTag={async (ideaId, tag) => { await taskTagsHook.addTagToTask(ideaId, tag); }}
+                onRemoveTag={async (ideaId, tagId) => { await taskTagsHook.removeTagFromTask(ideaId, tagId); }}
+                onCreateTag={async (name, area) => {
+                  const tag = await tagsHook.createTag(name, area);
+                  return tag ?? null;
+                }}
               />
             ) : (
               <InboxDeferredPanel
