@@ -19,7 +19,7 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@papesce/dayslot": "^0.4.0",
+    "@papesce/dayslot": "^0.4.1",
     "@powersync/react": "^1.10.0",
     "@powersync/web": "^1.38.1",
     "@supabase/auth-helpers-nextjs": "^0.15.0",
