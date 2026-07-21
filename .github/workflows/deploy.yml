@@ -19,7 +19,7 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -33,7 +33,8 @@ jobs:
             MAJOR=$(echo "$LATEST_TAG" | cut -d. -f1 | tr -d 'v')
             MINOR=$(echo "$LATEST_TAG" | cut -d. -f2)
             PATCH=$(echo "$LATEST_TAG" | cut -d. -f3)
-            PATCH=$((PATCH + 1))
+            MINOR=$((MINOR + 1))
+            PATCH=0
             NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
           fi
           git tag "$NEW_TAG"
@@ -41,7 +42,7 @@ jobs:
           echo "version=$NEW_TAG" >> "$GITHUB_OUTPUT"
 
       - id: auth
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
@@ -67,7 +68,7 @@ jobs:
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:${{ github.sha }}
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:latest
 
-      - uses: google-github-actions/deploy-cloudrun@v2
+      - uses: google-github-actions/deploy-cloudrun@v3
         with:
           service: ${{ env.SERVICE }}
           region: ${{ env.REGION }}
