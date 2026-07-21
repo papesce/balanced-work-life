@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { DailyTimeline } from "@papesce/dayslot";
 import type { TimelineEvent } from "@papesce/dayslot";
 import "@papesce/dayslot/style.css";
@@ -10,13 +11,20 @@ import {
   minutesToTimeString,
   parseTimeToMinutes,
 } from "./dayslotAdapter";
+import { TagPicker } from "@/components/shared/TagPicker";
 
 interface DayslotTimelineProps {
   activeDate: string;
   allTasks: Idea[];
   onUpdateTask: (id: string, updates: Partial<Idea>) => void;
-  onCreateTask: (text: string, time: string) => Promise<void>;
+  onCreateTask: (text: string, time: string, area?: LifeArea) => Promise<void>;
   getTagsForIdea: (ideaId: string) => Tag[];
+  tags: Tag[];
+  selectedArea: LifeArea | null;
+  onChangeTaskArea?: (taskId: string, fromArea: LifeArea, toArea: LifeArea) => void;
+  onAddTag?: (ideaId: string, tag: Tag) => Promise<void>;
+  onRemoveTag?: (ideaId: string, tagId: string) => Promise<void>;
+  onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
 }
 
 const AREA_ACCENT_COLORS: Record<LifeArea, string> = {
@@ -51,18 +59,36 @@ function SlotForm({
   startMinute,
   close,
   onCreateTask,
+  defaultArea,
+  tags,
+  onAddTag,
+  onCreateTag,
 }: {
   startMinute: number;
   close: () => void;
-  onCreateTask: (text: string, time: string) => Promise<void>;
+  onCreateTask: (text: string, time: string, area?: LifeArea) => Promise<void>;
+  defaultArea: LifeArea | null;
+  tags: Tag[];
+  onAddTag?: (ideaId: string, tag: Tag) => Promise<void>;
+  onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
 }) {
   const [text, setText] = useState("");
+  const [selectedArea, setSelectedArea] = useState<LifeArea | null>(defaultArea);
+  const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const areaBtnRef = useRef<HTMLButtonElement>(null);
+  const [areaPickerPos, setAreaPickerPos] = useState<{ top: number; left: number } | null>(null);
 
   const timeStr = minutesToTimeString(startMinute);
 
+  const systemTags = useMemo(() => tags.filter((t) => t.is_system), [tags]);
+  const areaSystemTag = useMemo(
+    () => systemTags.find((t) => t.area === (selectedArea || "life")),
+    [systemTags, selectedArea],
+  );
+
   const handleAdd = async () => {
     if (!text.trim()) return;
-    await onCreateTask(text.trim(), timeStr);
+    const id = await onCreateTask(text.trim(), timeStr, selectedArea ?? undefined);
     close();
   };
 
@@ -80,20 +106,50 @@ function SlotForm({
         className="w-full bg-white/80 dark:bg-gray-800/80 border border-black/10 dark:border-white/10 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-violet-500 text-gray-800 dark:text-gray-200"
         autoFocus
       />
-      <div className="flex justify-end items-center gap-2">
+      <div className="flex items-center justify-between gap-2">
         <button
-          onClick={close}
-          className="text-[10px] text-gray-400 hover:text-gray-600 px-2 py-1 cursor-pointer"
+          ref={areaBtnRef}
+          onClick={() => {
+            if (showAreaPicker) { setShowAreaPicker(false); return; }
+            const rect = areaBtnRef.current?.getBoundingClientRect();
+            if (rect) setAreaPickerPos({ top: rect.bottom + 4, left: rect.left });
+            setShowAreaPicker(true);
+          }}
+          className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-black/10 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
         >
-          Cancel
+          Area: {selectedArea ? AREA_LABELS[selectedArea] : "Life"}
         </button>
-        <button
-          onClick={() => void handleAdd()}
-          className="text-[10px] bg-violet-600 text-white px-2.5 py-1 rounded-lg hover:bg-violet-700 font-bold cursor-pointer"
-        >
-          Add
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={close}
+            className="text-[10px] text-gray-400 hover:text-gray-600 px-2 py-1 cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => void handleAdd()}
+            className="text-[10px] bg-violet-600 text-white px-2.5 py-1 rounded-lg hover:bg-violet-700 font-bold cursor-pointer"
+          >
+            Add
+          </button>
+        </div>
       </div>
+      {showAreaPicker && areaPickerPos && createPortal(
+        <div style={{ position: "fixed", top: areaPickerPos.top, left: areaPickerPos.left, zIndex: 10000 }}>
+          <TagPicker
+            allTags={tags}
+            selectedTags={areaSystemTag ? [areaSystemTag] : []}
+            onAdd={(tag) => {
+              setSelectedArea(tag.area);
+              setShowAreaPicker(false);
+            }}
+            onRemove={() => {}}
+            onCreateTag={onCreateTag ?? (async () => null)}
+            onClose={() => setShowAreaPicker(false)}
+          />
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
@@ -120,6 +176,12 @@ export function DayslotTimeline({
   onUpdateTask,
   onCreateTask,
   getTagsForIdea,
+  tags,
+  selectedArea,
+  onChangeTaskArea,
+  onAddTag,
+  onRemoveTag,
+  onCreateTag,
 }: DayslotTimelineProps) {
   const isToday = activeDate === new Date().toISOString().slice(0, 10);
   const scheduledTasks = useMemo(
@@ -166,10 +228,14 @@ export function DayslotTimeline({
           startMinute={startMinute}
           close={close}
           onCreateTask={onCreateTask}
+          defaultArea={selectedArea}
+          tags={tags}
+          onAddTag={onAddTag}
+          onCreateTag={onCreateTag}
         />
       );
     },
-    [onCreateTask],
+    [onCreateTask, selectedArea, tags, onAddTag, onCreateTag],
   );
 
   const renderEventContent = useCallback(
@@ -179,47 +245,31 @@ export function DayslotTimeline({
       const isCompleted = idea.status === "completed";
       const isCancelled = idea.status === "cancelled";
 
-      const tags = getTagsForIdea(idea.id);
-      const areas = getAreasForIdea(tags);
+      const tagsForIdea = getTagsForIdea(idea.id);
+      const areas = getAreasForIdea(tagsForIdea);
       const area = areas[0] || "life";
       const bgClass = AREA_BG_CLASSES[area] || AREA_BG_CLASSES.life;
       const accentColor = AREA_ACCENT_COLORS[area] || AREA_ACCENT_COLORS.life;
 
       return (
-        <div className={`flex h-full w-full rounded-[9px] border backdrop-blur-md transition-all duration-200 ${bgClass}`}>
-          <div
-            className="w-1 flex-shrink-0 rounded-l-full my-1.5 ml-1.5"
-            style={{ background: accentColor }}
-          />
-          <div className="flex-1 flex flex-col justify-between min-w-0 px-2 py-1.5">
-            <span
-              className={`text-[10px] font-bold leading-tight break-words ${
-                isCompleted
-                  ? "line-through opacity-50"
-                  : isCancelled
-                    ? "opacity-50"
-                    : ""
-              }`}
-            >
-              {event.title}
-            </span>
-            <div className="flex items-center justify-between mt-auto pt-1">
-              {event.category && (
-                <span className="text-[8px] font-bold opacity-60">
-                  {event.category}
-                </span>
-              )}
-              {event.durationMinutes > 0 && (
-                <span className="text-[8px] bg-black/5 dark:bg-white/10 px-1 py-0.5 rounded font-bold tabular-nums">
-                  {event.durationMinutes}m
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
+        <EventCard
+          idea={idea}
+          event={event}
+          area={area}
+          areaTags={tagsForIdea}
+          allTags={tags}
+          bgClass={bgClass}
+          accentColor={accentColor}
+          isCompleted={isCompleted}
+          isCancelled={isCancelled}
+          onChangeTaskArea={onChangeTaskArea}
+          onAddTag={onAddTag}
+          onRemoveTag={onRemoveTag}
+          onCreateTag={onCreateTag}
+        />
       );
     },
-    [scheduledTasks, getTagsForIdea],
+    [scheduledTasks, getTagsForIdea, tags, onChangeTaskArea, onAddTag, onRemoveTag, onCreateTag],
   );
 
   return (
@@ -242,6 +292,164 @@ export function DayslotTimeline({
         slotActionTrigger="button"
         slotIntervalMinutes={30}
       />
+    </div>
+  );
+}
+
+function EventCard({
+  idea,
+  event,
+  area,
+  areaTags,
+  allTags,
+  bgClass,
+  accentColor,
+  isCompleted,
+  isCancelled,
+  onChangeTaskArea,
+  onAddTag,
+  onRemoveTag,
+  onCreateTag,
+}: {
+  idea: Idea;
+  event: TimelineEvent;
+  area: LifeArea;
+  areaTags: Tag[];
+  allTags: Tag[];
+  bgClass: string;
+  accentColor: string;
+  isCompleted: boolean;
+  isCancelled: boolean;
+  onChangeTaskArea?: (taskId: string, fromArea: LifeArea, toArea: LifeArea) => void;
+  onAddTag?: (ideaId: string, tag: Tag) => Promise<void>;
+  onRemoveTag?: (ideaId: string, tagId: string) => Promise<void>;
+  onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
+}) {
+  const [showMenu, setShowMenu] = useState(false);
+  const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const areaBtnRef = useRef<HTMLButtonElement>(null);
+  const [areaPickerPos, setAreaPickerPos] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+        setShowAreaPicker(false);
+      }
+    };
+    if (showMenu || showAreaPicker) {
+      document.addEventListener("mousedown", handler);
+    }
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showMenu, showAreaPicker]);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMenuPos({ top: e.clientY, left: e.clientX });
+    setShowMenu(true);
+  }, []);
+
+  const handleOpenAreaPicker = useCallback(() => {
+    if (showAreaPicker) { setShowAreaPicker(false); return; }
+    const rect = areaBtnRef.current?.getBoundingClientRect();
+    if (rect) setAreaPickerPos({ top: rect.bottom + 4, left: rect.left });
+    setShowAreaPicker(true);
+  }, [showAreaPicker]);
+
+  const handleTagSelected = useCallback(async (tag: Tag) => {
+    if (tag.area === area) return;
+    const currentAreaTag = areaTags.find((t) => t.is_system);
+    if (currentAreaTag && onRemoveTag) {
+      await onRemoveTag(idea.id, currentAreaTag.id);
+    }
+    if (onAddTag) {
+      await onAddTag(idea.id, tag);
+    }
+    setShowMenu(false);
+    setShowAreaPicker(false);
+  }, [area, areaTags, idea.id, onAddTag, onRemoveTag]);
+
+  const currentSystemTag = areaTags.find((t) => t.is_system);
+
+  return (
+    <div
+      className={`flex h-full w-full rounded-[9px] border backdrop-blur-md transition-all duration-200 ${bgClass}`}
+      onContextMenu={handleContextMenu}
+    >
+      <div
+        className="w-1 flex-shrink-0 rounded-l-full my-1.5 ml-1.5"
+        style={{ background: accentColor }}
+      />
+      <div className="flex-1 flex flex-col justify-between min-w-0 px-2 py-1.5">
+        <span
+          className={`text-[10px] font-bold leading-tight break-words ${
+            isCompleted
+              ? "line-through opacity-50"
+              : isCancelled
+                ? "opacity-50"
+                : ""
+          }`}
+        >
+          {event.title}
+        </span>
+        <div className="flex items-center justify-between mt-auto pt-1">
+          <button
+            ref={areaBtnRef}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenAreaPicker();
+            }}
+            className="text-[8px] font-bold opacity-60 hover:opacity-100 flex items-center gap-1 cursor-pointer"
+          >
+            <span
+              className="w-1.5 h-1.5 rounded-full inline-block"
+              style={{ background: accentColor }}
+            />
+            {event.category}
+          </button>
+          {event.durationMinutes > 0 && (
+            <span className="text-[8px] bg-black/5 dark:bg-white/10 px-1 py-0.5 rounded font-bold tabular-nums">
+              {event.durationMinutes}m
+            </span>
+          )}
+        </div>
+      </div>
+
+      {showMenu && menuPos && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: "fixed", top: menuPos.top, left: menuPos.left, zIndex: 9999 }}
+          className="glass-card-strong rounded-lg py-1 min-w-[160px] shadow-lg border border-black/5 dark:border-white/5"
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenAreaPicker();
+            }}
+            className="flex w-full text-left px-3 py-1.5 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] font-semibold cursor-pointer"
+          >
+            Change Area...
+          </button>
+        </div>,
+        document.body
+      )}
+
+      {showAreaPicker && areaPickerPos && createPortal(
+        <div style={{ position: "fixed", top: areaPickerPos.top, left: areaPickerPos.left, zIndex: 10000 }}>
+          <TagPicker
+            allTags={allTags}
+            selectedTags={currentSystemTag ? [currentSystemTag] : []}
+            onAdd={handleTagSelected}
+            onRemove={() => {}}
+            onCreateTag={onCreateTag ?? (async () => null)}
+            onClose={() => { setShowAreaPicker(false); setShowMenu(false); }}
+          />
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
