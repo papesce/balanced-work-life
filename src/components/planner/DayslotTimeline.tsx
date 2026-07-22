@@ -428,6 +428,7 @@ function EventCard({
   return (
     <div
       className={`flex h-full w-full rounded-[9px] border backdrop-blur-md transition-all duration-200 ${bgClass}`}
+      style={{ containerType: "inline-size" }}
       onContextMenu={handleContextMenu}
     >
       <div
@@ -470,7 +471,7 @@ function EventCard({
                   e.stopPropagation();
                   handleOpenStatusPicker();
                 }}
-                className="text-[8px] font-bold px-1.5 py-0.5 rounded-full cursor-pointer hover:brightness-95 transition-all"
+                className="event-status-badge text-[8px] font-bold px-1.5 py-0.5 rounded-full cursor-pointer hover:brightness-95 transition-all"
                 style={{ color: statusCfg.color, background: statusCfg.bg }}
               >
                 {statusCfg.label}

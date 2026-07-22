@@ -251,6 +251,8 @@ function TaskRow({
   const areaDotRef = useRef<HTMLButtonElement>(null);
   const areaPickerRef = useRef<HTMLDivElement>(null);
   const [areaPickerPos, setAreaPickerPos] = useState<{ top: number; left: number } | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const deleteConfirmRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -595,11 +597,36 @@ function TaskRow({
                 Move to Backlog
               </button>
               <button
-                onClick={() => { onDelete(task.id); setShowMenu(false); }}
+                onClick={() => { setShowDeleteConfirm(true); setShowMenu(false); }}
                 className="flex w-full text-left px-3 py-1.5 text-[11px] text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 font-bold cursor-pointer"
               >
                 Delete
               </button>
+            </div>,
+            document.body
+          )}
+
+          {showDeleteConfirm && createPortal(
+            <div
+              ref={deleteConfirmRef}
+              style={{ position: "fixed", top: menuPos ? menuPos.top : 0, right: menuPos ? menuPos.right : 0, zIndex: 10001 }}
+              className="glass-card-strong rounded-xl p-2 min-w-[180px] shadow-lg border border-red-200 dark:border-red-500/30"
+            >
+              <p className="text-[11px] font-medium text-red-700 dark:text-red-400 px-1">Delete this task?</p>
+              <div className="mt-2 flex justify-end gap-1.5">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-2 py-1 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] rounded-lg cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { onDelete(task.id); setShowDeleteConfirm(false); }}
+                  className="px-2 py-1 text-[11px] font-medium text-white bg-red-600 dark:bg-red-500 hover:bg-red-700 dark:hover:bg-red-400 rounded-lg cursor-pointer"
+                >
+                  Delete
+                </button>
+              </div>
             </div>,
             document.body
           )}

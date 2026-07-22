@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef, Suspense } from "react";
+import { motion } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Sparkles, Calendar, Layers, Clock, Inbox, BarChart3 } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
@@ -20,6 +21,11 @@ import { AREA_ORDER, AREA_LABELS, DEFAULT_TARGETS, LOCAL_STORAGE_TARGETS_KEY } f
 import { offsetDate } from "@/components/planner/plannerUtils";
 import { computeReschedulePatch, computeCompletePatch, RescheduleAction } from "@/lib/tasks/rescheduleTask";
 
+type UndoAction = {
+  label: string;
+  run: () => Promise<void>;
+};
+
 export default function DailyPlannerPage() {
   return (
     <Suspense>
@@ -29,7 +35,7 @@ export default function DailyPlannerPage() {
 }
 
 function DailyPlannerInner() {
-  const { ideas, loading, createIdea, updateIdea, deleteIdea, markDone, markUndone, reorderTasks, smartSortTasks } = useIdeas();
+  const { ideas, loading, createIdea, updateIdea, deleteIdea, markDone, markUndone, reorderTasks, smartSortTasks, restoreIdeas } = useIdeas();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
   const { overdueBuckets, deferredTasks } = useDeferredTasks();
@@ -66,6 +72,52 @@ function DailyPlannerInner() {
   const [rightPanelTab, setRightPanelTab] = useState<"schedule" | "backlog">("schedule");
   const [targets, setTargets] = useState<Record<LifeArea, number>>(DEFAULT_TARGETS);
   const [showDateInput, setShowDateInput] = useState(false);
+  const [rightColWidth, setRightColWidth] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("planner-right-col-width");
+      if (saved) {
+        const n = parseInt(saved, 10);
+        if (!isNaN(n) && n >= 320 && n <= 600) return n;
+      }
+    }
+    return 360;
+  });
+  const rightColWidthRef = useRef(rightColWidth);
+  useEffect(() => { rightColWidthRef.current = rightColWidth; });
+
+  const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
+  const registerUndo = (undo: UndoAction) => setUndoAction(undo);
+  const clearUndo = () => setUndoAction(null);
+  const handleUndo = async () => {
+    if (!undoAction) return;
+    const action = undoAction;
+    setUndoAction(null);
+    await action.run();
+  };
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = rightColWidthRef.current;
+
+    const onMouseMove = (e: MouseEvent) => {
+      const delta = startX - e.clientX;
+      const newWidth = Math.min(Math.max(startWidth + delta, 320), 600);
+      setRightColWidth(newWidth);
+    };
+    const onMouseUp = () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      localStorage.setItem("planner-right-col-width", String(rightColWidthRef.current));
+    };
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
 
   const today = getToday();
 
@@ -175,6 +227,18 @@ function DailyPlannerInner() {
     await updateIdea(id, patch);
   }, [updateIdea]);
 
+  const handleDeleteTask = useCallback(async (id: string) => {
+    const idea = ideas.find((i) => i.id === id);
+    await deleteIdea(id);
+    if (!idea) return;
+    registerUndo({
+      label: "Task deleted",
+      run: async () => {
+        await restoreIdeas([idea]);
+      },
+    });
+  }, [ideas, deleteIdea, restoreIdeas]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -225,6 +289,31 @@ function DailyPlannerInner() {
           );
         })}
       </div>
+
+      {undoAction && (
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-3 flex items-center justify-between gap-3 rounded-[16px] glass-card border-amber-200/40 dark:border-amber-700/30 px-4 py-2.5"
+        >
+          <span className="text-sm text-amber-800 dark:text-amber-300 font-medium">{undoAction.label}</span>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleUndo}
+              className="text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-100/60 dark:hover:bg-amber-900/20 rounded-lg px-2.5 py-1 transition-colors cursor-pointer"
+            >
+              Undo
+            </button>
+            <button
+              onClick={clearUndo}
+              aria-label="Dismiss undo"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-amber-600 dark:text-amber-400 hover:bg-amber-100/60 dark:hover:bg-amber-900/20 transition-colors cursor-pointer"
+            >
+              <span className="text-sm">&times;</span>
+            </button>
+          </div>
+        </motion.div>
+      )}
 
       <div className="flex flex-col md:flex-row gap-5">
         {/* LEFT COLUMN */}
@@ -285,7 +374,7 @@ function DailyPlannerInner() {
                   onUndone={markUndone}
                   onUpdate={updateIdea}
                   onReschedule={handleReschedule}
-                  onDelete={deleteIdea}
+                  onDelete={handleDeleteTask}
                   onAddTask={handleAddToArea}
                   onReorderTasks={reorderTasks}
                   onMoveTaskBetweenAreas={handleMoveTaskBetweenAreas}
@@ -308,8 +397,16 @@ function DailyPlannerInner() {
           </div>
         </div>
 
+        {/* RESIZE HANDLE */}
+        <div
+          onMouseDown={handleResizeStart}
+          className="w-1 flex-shrink-0 cursor-col-resize group hidden md:flex items-stretch"
+        >
+          <div className="w-px mx-auto bg-gray-200 dark:bg-gray-700 group-hover:bg-violet-400 transition-colors" />
+        </div>
+
         {/* RIGHT COLUMN */}
-        <div className={`w-full lg:w-[360px] flex-shrink-0 flex flex-col gap-4 ${
+        <div style={{ "--right-col-width": `${rightColWidth}px` } as React.CSSProperties} className={`resizable-right-col flex-shrink-0 flex flex-col gap-4 w-full ${
           activeMobileTab === "schedule" || activeMobileTab === "backlog" ? "block" : "hidden lg:flex"
         }`}>
           <div className="glass-card rounded-2xl p-1 flex gap-1 border border-black/5 dark:border-white/5">

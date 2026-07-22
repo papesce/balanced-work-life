@@ -194,6 +194,20 @@ body {
   }
 }
 
+/* EventCard container query: hide status badge when too narrow */
+@container (max-width: 219px) {
+  .event-status-badge {
+    display: none !important;
+  }
+}
+
+/* Resizable right column */
+@media (min-width: 1024px) {
+  .resizable-right-col {
+    width: var(--right-col-width, 360px) !important;
+  }
+}
+
 /* Focus button */
 .focus-button {
   background: rgba(255, 255, 255, 0.7);
