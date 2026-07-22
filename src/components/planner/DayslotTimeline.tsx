@@ -5,13 +5,14 @@ import { createPortal } from "react-dom";
 import { DailyTimeline } from "@papesce/dayslot";
 import type { TimelineEvent } from "@papesce/dayslot";
 import "@papesce/dayslot/style.css";
-import { Idea, LifeArea, getAreasForIdea, Tag } from "@/lib/types";
+import { Idea, IdeaStatus, LifeArea, getAreasForIdea, Tag } from "@/lib/types";
 import { AREA_LABELS } from "./constants";
 import {
   minutesToTimeString,
   parseTimeToMinutes,
 } from "./dayslotAdapter";
 import { TagPicker } from "@/components/shared/TagPicker";
+import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 
 interface DayslotTimelineProps {
   activeDate: string;
@@ -43,6 +44,18 @@ const AREA_BG_CLASSES: Record<LifeArea, string> = {
   growth: "bg-amber-50/65 border-amber-200/40 dark:bg-amber-950/15 dark:border-amber-900/25 text-amber-700 dark:text-amber-300",
   finances: "bg-emerald-50/65 border-emerald-200/40 dark:bg-emerald-950/15 dark:border-emerald-900/25 text-emerald-700 dark:text-emerald-300",
   life: "bg-violet-50/65 border-violet-200/40 dark:bg-violet-950/15 dark:border-violet-900/25 text-violet-700 dark:text-violet-300",
+};
+
+const STATUS_CONFIG: Record<IdeaStatus, { label: string; color: string; bg: string }> = {
+  inbox:       { label: "Inbox",       color: "#9ca3af", bg: "rgba(0,0,0,0.05)" },
+  planned:     { label: "Planned",     color: "#0ea5e9", bg: "rgba(14,165,233,0.1)" },
+  scheduled:   { label: "Scheduled",   color: "#3b82f6", bg: "rgba(59,130,246,0.1)" },
+  in_progress: { label: "In Progress", color: "#d97706", bg: "rgba(217,119,6,0.1)" },
+  paused:      { label: "Paused",      color: "#f97316", bg: "rgba(249,115,22,0.1)" },
+  completed:   { label: "Completed",   color: "#7c3aed", bg: "rgba(124,58,237,0.1)" },
+  cancelled:   { label: "Cancelled",   color: "#ef4444", bg: "rgba(239,68,68,0.1)" },
+  archived:    { label: "Archived",    color: "#9ca3af", bg: "rgba(0,0,0,0.05)" },
+  deferred:    { label: "Deferred",    color: "#d97706", bg: "rgba(217,119,6,0.1)" },
 };
 
 function getCategoryColor(areas: LifeArea[]): string | undefined {
@@ -262,6 +275,7 @@ export function DayslotTimeline({
           accentColor={accentColor}
           isCompleted={isCompleted}
           isCancelled={isCancelled}
+          onUpdateTask={onUpdateTask}
           onChangeTaskArea={onChangeTaskArea}
           onAddTag={onAddTag}
           onRemoveTag={onRemoveTag}
@@ -269,7 +283,7 @@ export function DayslotTimeline({
         />
       );
     },
-    [scheduledTasks, getTagsForIdea, tags, onChangeTaskArea, onAddTag, onRemoveTag, onCreateTag],
+    [scheduledTasks, getTagsForIdea, tags, onUpdateTask, onChangeTaskArea, onAddTag, onRemoveTag, onCreateTag],
   );
 
   return (
@@ -306,6 +320,7 @@ function EventCard({
   accentColor,
   isCompleted,
   isCancelled,
+  onUpdateTask,
   onChangeTaskArea,
   onAddTag,
   onRemoveTag,
@@ -320,6 +335,7 @@ function EventCard({
   accentColor: string;
   isCompleted: boolean;
   isCancelled: boolean;
+  onUpdateTask: (id: string, updates: Partial<Idea>) => void;
   onChangeTaskArea?: (taskId: string, fromArea: LifeArea, toArea: LifeArea) => void;
   onAddTag?: (ideaId: string, tag: Tag) => Promise<void>;
   onRemoveTag?: (ideaId: string, tagId: string) => Promise<void>;
@@ -327,10 +343,13 @@ function EventCard({
 }) {
   const [showMenu, setShowMenu] = useState(false);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const [showStatusPicker, setShowStatusPicker] = useState(false);
+  const [statusPickerPos, setStatusPickerPos] = useState<{ top: number; left: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const areaBtnRef = useRef<HTMLButtonElement>(null);
   const [areaPickerPos, setAreaPickerPos] = useState<{ top: number; left: number } | null>(null);
+  const statusBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -344,6 +363,38 @@ function EventCard({
     }
     return () => document.removeEventListener("mousedown", handler);
   }, [showMenu, showAreaPicker]);
+
+  const handleStatusSelect = useCallback((status: IdeaStatus) => {
+    const now = new Date().toISOString();
+    switch (status) {
+      case "completed":
+        onUpdateTask(idea.id, { status: "completed", completed_at: now });
+        break;
+      case "cancelled":
+        onUpdateTask(idea.id, { status: "cancelled", cancelled_at: now });
+        break;
+      case "in_progress":
+        onUpdateTask(idea.id, { status: "in_progress" });
+        break;
+      case "paused":
+        onUpdateTask(idea.id, { status: "paused", paused_at: now });
+        break;
+      case "planned":
+      case "scheduled":
+      case "inbox":
+      case "deferred":
+        onUpdateTask(idea.id, { status, completed_at: null, cancelled_at: null, paused_at: null });
+        break;
+    }
+    setShowStatusPicker(false);
+  }, [idea.id, onUpdateTask]);
+
+  const handleOpenStatusPicker = useCallback(() => {
+    if (showStatusPicker) { setShowStatusPicker(false); return; }
+    const rect = statusBtnRef.current?.getBoundingClientRect();
+    if (rect) setStatusPickerPos({ top: rect.bottom + 4, left: rect.left });
+    setShowStatusPicker(true);
+  }, [showStatusPicker]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -410,6 +461,22 @@ function EventCard({
             />
             {event.category}
           </button>
+          {(() => {
+            const statusCfg = STATUS_CONFIG[idea.status] || STATUS_CONFIG.planned;
+            return (
+              <button
+                ref={statusBtnRef}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenStatusPicker();
+                }}
+                className="text-[8px] font-bold px-1.5 py-0.5 rounded-full cursor-pointer hover:brightness-95 transition-all"
+                style={{ color: statusCfg.color, background: statusCfg.bg }}
+              >
+                {statusCfg.label}
+              </button>
+            );
+          })()}
           {event.durationMinutes > 0 && (
             <span className="text-[8px] bg-black/5 dark:bg-white/10 px-1 py-0.5 rounded font-bold tabular-nums">
               {event.durationMinutes}m
@@ -424,6 +491,15 @@ function EventCard({
           style={{ position: "fixed", top: menuPos.top, left: menuPos.left, zIndex: 9999 }}
           className="glass-card-strong rounded-lg py-1 min-w-[160px] shadow-lg border border-black/5 dark:border-white/5"
         >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenStatusPicker();
+            }}
+            className="flex w-full text-left px-3 py-1.5 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] font-semibold cursor-pointer"
+          >
+            Change Status...
+          </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -446,6 +522,17 @@ function EventCard({
             onRemove={() => {}}
             onCreateTag={onCreateTag ?? (async () => null)}
             onClose={() => { setShowAreaPicker(false); setShowMenu(false); }}
+          />
+        </div>,
+        document.body
+      )}
+
+      {showStatusPicker && statusPickerPos && createPortal(
+        <div style={{ position: "fixed", top: statusPickerPos.top, left: statusPickerPos.left, zIndex: 10000 }}>
+          <StatusPicker
+            current={idea.status}
+            onSelect={handleStatusSelect}
+            onClose={() => { setShowStatusPicker(false); setShowMenu(false); }}
           />
         </div>,
         document.body
