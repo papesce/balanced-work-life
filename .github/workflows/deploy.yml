@@ -23,23 +23,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Auto-tag version
-        id: tag
+      - name: Read version from package.json
+        id: version
         run: |
-          LATEST_TAG=$(git tag --list 'v*' --sort=-version:refname | head -n1)
-          if [ -z "$LATEST_TAG" ]; then
-            NEW_TAG="v0.1.0"
-          else
-            MAJOR=$(echo "$LATEST_TAG" | cut -d. -f1 | tr -d 'v')
-            MINOR=$(echo "$LATEST_TAG" | cut -d. -f2)
-            PATCH=$(echo "$LATEST_TAG" | cut -d. -f3)
-            MINOR=$((MINOR + 1))
-            PATCH=0
-            NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
-          fi
-          git tag "$NEW_TAG"
-          git push origin "$NEW_TAG"
-          echo "version=$NEW_TAG" >> "$GITHUB_OUTPUT"
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=v${VERSION}" >> "$GITHUB_OUTPUT"
+          git tag "v${VERSION}" 2>/dev/null || echo "Tag v${VERSION} already exists"
+          git push origin "v${VERSION}" 2>/dev/null || echo "Tag push skipped"
 
       - id: auth
         uses: google-github-actions/auth@v3
@@ -60,7 +50,7 @@ jobs:
             --build-arg NEXT_PUBLIC_SUPABASE_URL="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
             --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
             --build-arg NEXT_PUBLIC_POWERSYNC_URL="${{ secrets.NEXT_PUBLIC_POWERSYNC_URL }}" \
-            --build-arg NEXT_PUBLIC_APP_VERSION="${{ steps.tag.outputs.version }}" \
+            --build-arg NEXT_PUBLIC_APP_VERSION="${{ steps.version.outputs.version }}" \
             -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:${{ github.sha }} \
             -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:latest \
             .

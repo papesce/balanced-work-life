@@ -4,6 +4,7 @@ node_modules
 .gitignore
 .env*
 !.env.local.example
+.changeset/
 README.md
 CLAUDE.md
 AGENTS.md

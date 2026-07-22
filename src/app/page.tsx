@@ -400,9 +400,13 @@ function DailyPlannerInner() {
         {/* RESIZE HANDLE */}
         <div
           onMouseDown={handleResizeStart}
-          className="w-1 flex-shrink-0 cursor-col-resize group hidden md:flex items-stretch"
+          className="w-3 flex-shrink-0 cursor-col-resize group hidden md:flex items-center justify-center"
         >
-          <div className="w-px mx-auto bg-gray-200 dark:bg-gray-700 group-hover:bg-violet-400 transition-colors" />
+          <div className="flex flex-col gap-[3px] group-hover:opacity-100 opacity-40 transition-opacity">
+            <div className="w-[3px] h-[3px] rounded-full bg-gray-400 dark:bg-gray-500 group-hover:bg-violet-400" />
+            <div className="w-[3px] h-[3px] rounded-full bg-gray-400 dark:bg-gray-500 group-hover:bg-violet-400" />
+            <div className="w-[3px] h-[3px] rounded-full bg-gray-400 dark:bg-gray-500 group-hover:bg-violet-400" />
+          </div>
         </div>
 
         {/* RIGHT COLUMN */}
