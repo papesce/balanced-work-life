@@ -38,7 +38,7 @@ function DailyPlannerInner() {
   const { ideas, loading, createIdea, updateIdea, deleteIdea, markDone, markUndone, reorderTasks, smartSortTasks, restoreIdeas } = useIdeas();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
-  const { overdueBuckets, deferredTasks } = useDeferredTasks();
+  const { overdueBuckets, deferredTasks, refetch: refetchDeferred } = useDeferredTasks();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [activeDate, setActiveDate] = useState<string>(() => searchParams.get("date") ?? getToday());
@@ -264,7 +264,7 @@ function DailyPlannerInner() {
       }
     >
       {/* Mobile Tab Control */}
-      <div className="sticky top-[53px] z-10 md:hidden bg-black/[0.03] dark:bg-white/[0.04] p-1 rounded-xl mb-4 gap-1">
+      <div className="sticky top-[53px] z-10 md:hidden flex bg-white/60 dark:bg-gray-900/60 backdrop-blur-lg border border-black/5 dark:border-white/5 p-1.5 rounded-2xl mb-4 gap-1 shadow-sm">
         {[
           { id: "tasks", label: "Tasks", icon: Layers },
           { id: "schedule", label: "Schedule", icon: Clock },
@@ -277,13 +277,13 @@ function DailyPlannerInner() {
             <button
               key={tab.id}
               onClick={() => setActiveMobileTab(tab.id as typeof activeMobileTab)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold transition-all duration-200 cursor-pointer ${
                 isActive
-                  ? "bg-white dark:bg-gray-800 shadow-sm text-gray-800 dark:text-gray-100 font-bold"
-                  : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  ? "bg-violet-600 dark:bg-violet-500 shadow-md text-white dark:text-white"
+                  : "text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
               }`}
             >
-              <Icon size={13} />
+              <Icon size={14} strokeWidth={isActive ? 2.5 : 2} />
               <span>{tab.label}</span>
             </button>
           );
@@ -483,6 +483,7 @@ function DailyPlannerInner() {
                 onReschedule={handleReschedule}
                 onComplete={handleComplete}
                 getTagsForIdea={taskTagsHook.getTagsForIdea}
+                onRefresh={refetchDeferred}
               />
             )}
           </div>

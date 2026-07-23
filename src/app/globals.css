@@ -173,6 +173,24 @@ body {
   z-index: 5 !important;
 }
 
+@media (max-width: 767px) {
+  .ds-timeline__hour-label {
+    width: 36px !important;
+    min-width: 36px !important;
+    padding: 6px 2px 0 6px !important;
+    font-size: 9px !important;
+  }
+
+  .ds-timeline__header {
+    padding: 8px 12px !important;
+    font-size: 11px !important;
+  }
+
+  .ds-timeline__event {
+    border-radius: 8px !important;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   .ds-timeline__header {
     border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
@@ -198,6 +216,14 @@ body {
 @container (max-width: 219px) {
   .event-status-badge {
     display: none !important;
+  }
+}
+
+/* EventCard mobile improvements */
+@media (max-width: 767px) {
+  .event-status-badge {
+    font-size: 9px !important;
+    padding: 2px 6px !important;
   }
 }
 

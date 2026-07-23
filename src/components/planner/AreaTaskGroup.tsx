@@ -288,7 +288,7 @@ function TaskRow({
   };
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
+    const handler = (e: PointerEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node) &&
           menuTriggerRef.current && !menuTriggerRef.current.contains(e.target as Node)) {
         setShowMenu(false);
@@ -303,8 +303,8 @@ function TaskRow({
         setShowAreaPicker(false);
       }
     };
-    if (showMenu || showStatusPicker || showDurationDropdown || showAreaPicker) document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    if (showMenu || showStatusPicker || showDurationDropdown || showAreaPicker) document.addEventListener("pointerdown", handler);
+    return () => document.removeEventListener("pointerdown", handler);
   }, [showMenu, showStatusPicker, showDurationDropdown, showAreaPicker]);
 
   useEffect(() => {
@@ -395,7 +395,7 @@ function TaskRow({
             e.stopPropagation();
           }}
           draggable={false}
-          className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-400 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+          className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-400 transition-colors flex-shrink-0 md:opacity-0 md:group-hover:opacity-100"
         >
           <GripVertical size={11} />
         </div>
@@ -466,7 +466,7 @@ function TaskRow({
           className={`text-[10px] tabular-nums font-bold flex-shrink-0 transition-colors rounded px-1.5 py-0.5 flex items-center gap-1 cursor-pointer ${
             task.duration_minutes
               ? "text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/20 hover:bg-violet-100 dark:hover:bg-violet-900/30"
-              : "text-gray-400 dark:text-gray-500 hover:bg-black/5 dark:hover:bg-white/5 opacity-0 group-hover:opacity-100"
+              : "text-gray-400 dark:text-gray-500 hover:bg-black/5 dark:hover:bg-white/5 md:opacity-0 md:group-hover:opacity-100"
           }`}
           title="Set task duration"
         >
@@ -532,7 +532,7 @@ function TaskRow({
         </span>
       )}
 
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+      <div className="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
         {onMoveTaskBetweenAreas && (() => {
           const taskTags = getTagsForIdea?.(task.id) ?? [];
           const nonSystemTags = taskTags.filter((t) => !t.is_system);
@@ -580,7 +580,7 @@ function TaskRow({
               if (rect) setMenuPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
               setShowMenu(true);
             }}
-            className="text-gray-300 dark:text-gray-600 hover:text-gray-500 cursor-pointer"
+            className="text-gray-300 dark:text-gray-600 hover:text-gray-500 cursor-pointer md:opacity-50 md:hover:opacity-100"
           >
             <MoreHorizontal size={13} />
           </button>

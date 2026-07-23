@@ -14,6 +14,18 @@ import {
 import { TagPicker } from "@/components/shared/TagPicker";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return isMobile;
+}
+
 interface DayslotTimelineProps {
   activeDate: string;
   allTasks: Idea[];
@@ -197,6 +209,7 @@ export function DayslotTimeline({
   onCreateTag,
 }: DayslotTimelineProps) {
   const isToday = activeDate === new Date().toISOString().slice(0, 10);
+  const isMobile = useIsMobile();
   const scheduledTasks = useMemo(
     () => allTasks.filter((t) => t.scheduled_time && t.status !== "archived"),
     [allTasks],
@@ -292,9 +305,9 @@ export function DayslotTimeline({
         events={events}
         startHour={7}
         endHour={22}
-        hourHeight={128}
+        hourHeight={isMobile ? 80 : 128}
         snapMinutes={15}
-        height="1100px"
+        height={isMobile ? "auto" : "1100px"}
         title="Daily Timeline"
         onEventChange={handleEventChange}
         onExternalDrop={handleExternalDrop}
@@ -352,16 +365,16 @@ function EventCard({
   const statusBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
+    const handler = (e: PointerEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setShowMenu(false);
         setShowAreaPicker(false);
       }
     };
     if (showMenu || showAreaPicker) {
-      document.addEventListener("mousedown", handler);
+      document.addEventListener("pointerdown", handler);
     }
-    return () => document.removeEventListener("mousedown", handler);
+    return () => document.removeEventListener("pointerdown", handler);
   }, [showMenu, showAreaPicker]);
 
   const handleStatusSelect = useCallback((status: IdeaStatus) => {
@@ -454,7 +467,7 @@ function EventCard({
               e.stopPropagation();
               handleOpenAreaPicker();
             }}
-            className="text-[8px] font-bold opacity-60 hover:opacity-100 flex items-center gap-1 cursor-pointer"
+            className="text-[9px] font-bold opacity-60 hover:opacity-100 flex items-center gap-1 cursor-pointer"
           >
             <span
               className="w-1.5 h-1.5 rounded-full inline-block"
@@ -471,7 +484,7 @@ function EventCard({
                   e.stopPropagation();
                   handleOpenStatusPicker();
                 }}
-                className="event-status-badge text-[8px] font-bold px-1.5 py-0.5 rounded-full cursor-pointer hover:brightness-95 transition-all"
+                className="event-status-badge text-[9px] font-bold px-1.5 py-0.5 rounded-full cursor-pointer hover:brightness-95 transition-all"
                 style={{ color: statusCfg.color, background: statusCfg.bg }}
               >
                 {statusCfg.label}
@@ -479,7 +492,7 @@ function EventCard({
             );
           })()}
           {event.durationMinutes > 0 && (
-            <span className="text-[8px] bg-black/5 dark:bg-white/10 px-1 py-0.5 rounded font-bold tabular-nums">
+            <span className="text-[9px] bg-black/5 dark:bg-white/10 px-1.5 py-0.5 rounded font-bold tabular-nums">
               {event.durationMinutes}m
             </span>
           )}

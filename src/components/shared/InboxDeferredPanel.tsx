@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { Inbox, Clock, ChevronRight, Plus, Check, ExternalLink } from "lucide-react";
+import { Inbox, Clock, ChevronRight, Plus, Check, ExternalLink, RefreshCw } from "lucide-react";
 import { Idea, Tag } from "@/lib/types";
 import { RescheduleAction, getContextDate } from "@/lib/tasks/rescheduleTask";
 import { AgeBucket } from "@/hooks/useDeferredTasks";
@@ -20,6 +20,7 @@ interface InboxDeferredPanelProps {
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
   onComplete: (id: string) => Promise<void>;
   getTagsForIdea: (ideaId: string) => Tag[];
+  onRefresh?: () => void;
 }
 
 export function InboxDeferredPanel({
@@ -34,9 +35,11 @@ export function InboxDeferredPanel({
   onReschedule,
   onComplete,
   getTagsForIdea,
+  onRefresh,
 }: InboxDeferredPanelProps) {
   const [activeTab, setActiveTab] = useState<"inbox" | "deferred">("inbox");
   const [inputText, setInputText] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
   const totalDeferred = useMemo(
     () => overdueBuckets.reduce((sum, b) => sum + b.tasks.length, 0) + deferredTasks.length,
@@ -44,7 +47,7 @@ export function InboxDeferredPanel({
   );
 
   return (
-    <div className="glass-card rounded-2xl flex flex-col h-[650px] overflow-hidden border border-black/5 dark:border-white/5">
+    <div className="glass-card rounded-2xl flex flex-col h-[min(650px,calc(100vh-280px))] overflow-hidden border border-black/5 dark:border-white/5">
       {/* Tab bar */}
       <div className="flex gap-1 p-1 border-b border-black/5 dark:border-white/5 bg-black/[0.01] dark:bg-white/[0.01] flex-shrink-0">
         {[
@@ -69,6 +72,20 @@ export function InboxDeferredPanel({
                 <span className="text-[10px] font-bold bg-violet-100 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400 px-1.5 py-0.5 rounded-full">
                   {tab.count}
                 </span>
+              )}
+              {tab.id === "deferred" && isActive && onRefresh && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setRefreshing(true);
+                    onRefresh();
+                    setTimeout(() => setRefreshing(false), 600);
+                  }}
+                  className="ml-0.5 p-0.5 rounded hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-colors cursor-pointer"
+                  title="Refresh deferred tasks"
+                >
+                  <RefreshCw size={11} className={refreshing ? "animate-spin" : ""} />
+                </button>
               )}
             </button>
           );
@@ -313,6 +330,7 @@ function CompactDeferredRow({
   getTagsForIdea: (ideaId: string) => Tag[];
 }) {
   const tags = getTagsForIdea(task.id);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   return (
     <div className="bg-white/60 dark:bg-white/[0.02] border border-black/5 dark:border-white/5 rounded-xl p-2.5 flex flex-col gap-1.5">
@@ -351,38 +369,46 @@ function CompactDeferredRow({
           className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 px-1.5 py-0.5 rounded hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-colors cursor-pointer flex items-center gap-0.5"
         >
           <Check size={10} />
-          Completar
+          Complete
         </button>
         <Link
           href={`/?date=${getContextDate(task)}&highlight=${task.id}`}
           className="text-[9px] font-bold text-gray-400 dark:text-gray-500 hover:text-gray-600 px-1.5 py-0.5 rounded hover:bg-gray-50 dark:hover:bg-gray-900/20 transition-colors flex items-center gap-0.5"
         >
           <ExternalLink size={9} />
-          Contexto
+          Context
         </Link>
         <button
           onClick={() => void onReschedule(task.id, { type: "retry_today" })}
           className="text-[9px] font-bold text-violet-600 dark:text-violet-400 hover:text-violet-700 px-1.5 py-0.5 rounded hover:bg-violet-50 dark:hover:bg-violet-950/20 transition-colors cursor-pointer"
         >
-          Hoy
+          Today
         </button>
-        <div className="relative group/date">
-          <button className="text-[9px] font-bold text-sky-600 dark:text-sky-400 hover:text-sky-700 px-1.5 py-0.5 rounded hover:bg-sky-50 dark:hover:bg-sky-950/20 transition-colors cursor-pointer">
-            Reprogramar
+        <div className="relative">
+          <button
+            onClick={() => setShowDatePicker(!showDatePicker)}
+            className="text-[9px] font-bold text-sky-600 dark:text-sky-400 hover:text-sky-700 px-1.5 py-0.5 rounded hover:bg-sky-50 dark:hover:bg-sky-950/20 transition-colors cursor-pointer"
+          >
+            Reschedule
           </button>
-          <input
-            type="date"
-            className="absolute right-0 top-full mt-1 opacity-0 w-0 h-0 pointer-events-none group-hover/date:opacity-100 group-hover/date:w-auto group-hover/date:h-auto group-hover/date:pointer-events-auto text-xs border border-black/10 dark:border-white/10 rounded-lg px-2 py-1.5 bg-white/80 dark:bg-gray-800/80 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-violet-500 z-50"
-            onChange={(e) => {
-              if (e.target.value) void onReschedule(task.id, { type: "reschedule", newDate: e.target.value });
-            }}
-          />
+          {showDatePicker && (
+            <input
+              type="date"
+              autoFocus
+              className="absolute right-0 top-full mt-1 text-xs border border-black/10 dark:border-white/10 rounded-lg px-2 py-1.5 bg-white/80 dark:bg-gray-800/80 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-violet-500 z-50"
+              onChange={(e) => {
+                if (e.target.value) void onReschedule(task.id, { type: "reschedule", newDate: e.target.value });
+                setShowDatePicker(false);
+              }}
+              onBlur={() => setShowDatePicker(false)}
+            />
+          )}
         </div>
         <button
           onClick={() => void onReschedule(task.id, { type: "defer" })}
           className="text-[9px] font-bold text-gray-400 dark:text-gray-500 hover:text-gray-600 px-1.5 py-0.5 rounded hover:bg-gray-50 dark:hover:bg-gray-900/20 transition-colors cursor-pointer"
         >
-          Sin fecha
+          No date
         </button>
       </div>
     </div>

@@ -17,7 +17,7 @@ function daysBetween(dateA: string, dateB: string): number {
 }
 
 export function useDeferredTasks() {
-  const { ideas, loading } = useIdeas();
+  const { ideas, loading, refetch } = useIdeas();
   const today = getToday();
 
   const taskIdeas = useMemo(() => ideas.filter((i) => i.type === "task"), [ideas]);
@@ -72,5 +72,5 @@ export function useDeferredTasks() {
     [taskIdeas],
   );
 
-  return { overdueBuckets, deferredTasks, loading };
+  return { overdueBuckets, deferredTasks, loading, refetch };
 }
