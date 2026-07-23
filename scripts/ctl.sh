@@ -78,6 +78,25 @@ ensure_port_available() {
   fi
 }
 
+kill_process_tree() {
+  local pid="$1"
+  local children
+
+  children="$(pgrep -P "${pid}" 2>/dev/null)" || true
+  for child in ${children}; do
+    kill_process_tree "${child}"
+  done
+  kill "${pid}" >/dev/null 2>&1 || true
+}
+
+kill_port_processes() {
+  local pids
+  pids="$(lsof -ti TCP:"${PORT}" 2>/dev/null)" || true
+  for pid in ${pids}; do
+    kill -9 "${pid}" >/dev/null 2>&1 || true
+  done
+}
+
 start_server() {
   if [[ "${FG}" == "1" ]]; then
     ensure_port_available
@@ -139,7 +158,11 @@ stop_server() {
     fi
     echo "Warning: no PID file found; stopping process on port ${PORT} (pid ${pid})."
   fi
-  kill "${pid}" >/dev/null 2>&1 || true
+
+  # Tell the browser to clear SW cache before killing the server
+  curl -s -X POST "http://localhost:${PORT}/api/shutdown" >/dev/null 2>&1 || true
+
+  kill_process_tree "${pid}"
 
   for _ in 1 2 3 4 5; do
     if ! kill -0 "${pid}" >/dev/null 2>&1; then
@@ -151,6 +174,9 @@ stop_server() {
   if kill -0 "${pid}" >/dev/null 2>&1; then
     kill -9 "${pid}" >/dev/null 2>&1 || true
   fi
+
+  # Safety net: kill any remaining processes still on the port
+  kill_port_processes
 
   rm -f "${PID_FILE}"
   echo "Stopped ${APP_NAME}."
