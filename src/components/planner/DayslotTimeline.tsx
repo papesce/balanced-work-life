@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { DailyTimeline } from "@papesce/dayslot";
-import type { TimelineEvent } from "@papesce/dayslot";
+import type { TimelineEvent, DailyTimelineHandle } from "@papesce/dayslot";
 import "@papesce/dayslot/style.css";
 import { Idea, IdeaStatus, LifeArea, getAreasForIdea, Tag } from "@/lib/types";
 import { AREA_LABELS } from "./constants";
@@ -210,6 +210,11 @@ export function DayslotTimeline({
 }: DayslotTimelineProps) {
   const isToday = activeDate === new Date().toISOString().slice(0, 10);
   const isMobile = useIsMobile();
+  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
+
+  const handleTimelineRef = useCallback((handle: DailyTimelineHandle | null) => {
+    setScrollEl(handle?.scrollElement ?? null);
+  }, []);
   const scheduledTasks = useMemo(
     () => allTasks.filter((t) => t.scheduled_time && t.status !== "archived"),
     [allTasks],
@@ -288,6 +293,7 @@ export function DayslotTimeline({
           accentColor={accentColor}
           isCompleted={isCompleted}
           isCancelled={isCancelled}
+          scrollElement={scrollEl}
           onUpdateTask={onUpdateTask}
           onChangeTaskArea={onChangeTaskArea}
           onAddTag={onAddTag}
@@ -296,7 +302,7 @@ export function DayslotTimeline({
         />
       );
     },
-    [scheduledTasks, getTagsForIdea, tags, onUpdateTask, onChangeTaskArea, onAddTag, onRemoveTag, onCreateTag],
+    [scheduledTasks, getTagsForIdea, tags, scrollEl, onUpdateTask, onChangeTaskArea, onAddTag, onRemoveTag, onCreateTag],
   );
 
   return (
@@ -309,6 +315,7 @@ export function DayslotTimeline({
         snapMinutes={15}
         height={isMobile ? "auto" : "1100px"}
         title="Daily Timeline"
+        timelineRef={handleTimelineRef}
         onEventChange={handleEventChange}
         onExternalDrop={handleExternalDrop}
         onEventRemove={handleEventRemove}
@@ -317,7 +324,8 @@ export function DayslotTimeline({
         renderSlotAction={renderSlotAction}
         showCurrentTime={isToday}
         slotActionTrigger="button"
-        slotIntervalMinutes={30}
+        slotMinutes={15}
+        customProperties={{ "--ds-event-padding": "0" }}
       />
     </div>
   );
@@ -333,6 +341,7 @@ function EventCard({
   accentColor,
   isCompleted,
   isCancelled,
+  scrollElement,
   onUpdateTask,
   onChangeTaskArea,
   onAddTag,
@@ -348,6 +357,7 @@ function EventCard({
   accentColor: string;
   isCompleted: boolean;
   isCancelled: boolean;
+  scrollElement: HTMLDivElement | null;
   onUpdateTask: (id: string, updates: Partial<Idea>) => void;
   onChangeTaskArea?: (taskId: string, fromArea: LifeArea, toArea: LifeArea) => void;
   onAddTag?: (ideaId: string, tag: Tag) => Promise<void>;
@@ -357,6 +367,13 @@ function EventCard({
   const [showMenu, setShowMenu] = useState(false);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
+  const showMenuRef = useRef(false);
+  const showAreaPickerRef = useRef(false);
+  const showStatusPickerRef = useRef(false);
+
+  useEffect(() => { showMenuRef.current = showMenu; }, [showMenu]);
+  useEffect(() => { showAreaPickerRef.current = showAreaPicker; }, [showAreaPicker]);
+  useEffect(() => { showStatusPickerRef.current = showStatusPicker; }, [showStatusPicker]);
   const [statusPickerPos, setStatusPickerPos] = useState<{ top: number; left: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
@@ -376,6 +393,25 @@ function EventCard({
     }
     return () => document.removeEventListener("pointerdown", handler);
   }, [showMenu, showAreaPicker]);
+
+  useEffect(() => {
+    if (!scrollElement) return;
+    const handler = () => {
+      if (showStatusPickerRef.current) {
+        const rect = statusBtnRef.current?.getBoundingClientRect();
+        if (rect) setStatusPickerPos({ top: rect.bottom + 4, left: rect.left });
+      }
+      if (showAreaPickerRef.current) {
+        const rect = areaBtnRef.current?.getBoundingClientRect();
+        if (rect) setAreaPickerPos({ top: rect.bottom + 4, left: rect.left });
+      }
+      if (showMenuRef.current) {
+        setShowMenu(false);
+      }
+    };
+    scrollElement.addEventListener("scroll", handler, { passive: true });
+    return () => scrollElement.removeEventListener("scroll", handler);
+  }, [scrollElement]);
 
   const handleStatusSelect = useCallback((status: IdeaStatus) => {
     const now = new Date().toISOString();

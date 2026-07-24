@@ -129,6 +129,7 @@ body {
 
 /* Dayslot overrides for glassmorphism theme */
 .ds-timeline {
+  --ds-hour-col: 48px;
   background: transparent !important;
   box-shadow: none !important;
   border-radius: 0 !important;
@@ -144,16 +145,7 @@ body {
 }
 
 .ds-timeline__hour-label {
-  width: 48px !important;
-  min-width: 48px !important;
-  padding: 6px 4px 0 12px !important;
-  font-size: 10px !important;
   color: #9ca3af !important;
-  font-weight: 700 !important;
-}
-
-.ds-timeline__row {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.03) !important;
 }
 
 .ds-timeline__event {
@@ -174,11 +166,12 @@ body {
 }
 
 @media (max-width: 767px) {
+  .ds-timeline {
+    --ds-hour-col: 36px;
+  }
+
   .ds-timeline__hour-label {
-    width: 36px !important;
-    min-width: 36px !important;
-    padding: 6px 2px 0 6px !important;
-    font-size: 9px !important;
+    padding: 0 2px 0 6px !important;
   }
 
   .ds-timeline__header {
@@ -200,10 +193,6 @@ body {
 
   .ds-timeline__hour-label {
     color: #6b7280 !important;
-  }
-
-  .ds-timeline__row {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.03) !important;
   }
 
   .ds-timeline__event {

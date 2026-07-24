@@ -250,7 +250,6 @@ function DailyPlannerInner() {
   return (
     <AppShell
       title="Daily Planner"
-      onAdd={handleAdd}
       fullWidth
       headerActions={
         <DateNav

@@ -222,13 +222,13 @@ export default function TimelinePage() {
         })}
       </div>
 
-      <FloatingAddButton
+      {/* <FloatingAddButton
         open={fabOpen}
         onOpen={() => setFabOpen(true)}
         onClose={() => setFabOpen(false)}
         onAdd={handleFabAdd}
         today={today}
-      />
+      /> */}
     </AppShell>
   );
 }
