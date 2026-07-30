@@ -1,10 +1,10 @@
 {
   "name": "balanced-work-life",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "dev:open": "./scripts/ctl.sh open dev --fg",
+    "dev:open": "./scripts/ctl.sh open dev --watch",
     "balance:start": "./scripts/ctl.sh start",
     "balance:stop": "./scripts/ctl.sh stop",
     "balance:restart": "./scripts/ctl.sh restart",
@@ -15,7 +15,7 @@
     "balance:uninstall": "./scripts/ctl.sh uninstall",
     "build": "next build",
     "start": "next start",
-    "start:open": "./scripts/ctl.sh open prod --fg",
+    "start:open": "./scripts/ctl.sh open prod --watch",
     "lint": "eslint",
     "changeset": "changeset",
     "version-packages": "changeset version",
