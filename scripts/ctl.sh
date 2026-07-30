@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
 # ctl.sh - background launcher for Balanced Work Life.
-# Usage: ./scripts/ctl.sh start|stop|restart|open|status|logs|install|uninstall [dev|prod] [--fg]
+# Usage: ./scripts/ctl.sh start|stop|restart|open|status|logs|install|uninstall [dev|prod] [--watch]
 # Env:   BALANCE_PORT=4327 ./scripts/ctl.sh open
 #        BALANCE_INSTALL_DIR=/usr/local/bin ./scripts/ctl.sh install
-# Flags: --fg  run in foreground (blocks terminal, logs to stdout)
+# Flags: --watch  keep terminal open and stream logs (alias: --fg)
 #
 set -euo pipefail
 
@@ -12,16 +12,44 @@ set -euo pipefail
 export NVM_DIR="${NVM_DIR:-${HOME}/.nvm}"
 [ -s "${NVM_DIR}/nvm.sh" ] && source "${NVM_DIR}/nvm.sh"
 
+# Check pnpm is available — give actionable help if not
+require_pnpm() {
+  if ! command -v pnpm >/dev/null 2>&1; then
+    echo "Error: pnpm is not installed or not on PATH." >&2
+    echo "" >&2
+    echo "Install it with one of:" >&2
+    echo "  npm install -g pnpm          (if you have Node/npm)" >&2
+    echo "  brew install pnpm            (macOS with Homebrew)" >&2
+    echo "  curl -fsSL https://get.pnpm.io/install.sh | sh   (standalone installer)" >&2
+    echo "" >&2
+    echo "Then open a new terminal and try again." >&2
+    echo "See https://pnpm.io/installation for full instructions." >&2
+    exit 1
+  fi
+}
+
+require_deps() {
+  # next is installed into node_modules/.bin — if it's missing, deps haven't been installed
+  if [[ ! -x "${ROOT_DIR}/node_modules/.bin/next" ]]; then
+    echo "Dependencies not installed. Running pnpm install..."
+    pnpm --dir "${ROOT_DIR}" install
+    echo ""
+  fi
+}
+
 APP_NAME="Balanced Work Life"
 DEFAULT_PORT="4327"
 COMMAND="${1:-help}"
 PORT="${BALANCE_PORT:-${PORT:-$DEFAULT_PORT}}"
 
-FG=0
+# Derive the invocation name so help text is accurate whether installed or not (#10)
+INVOCATION="$(basename "$0")"
+
+WATCH=0
 MODE=""
 for arg in "${@:2}"; do
-  if [[ "${arg}" == "--fg" ]]; then
-    FG=1
+  if [[ "${arg}" == "--watch" || "${arg}" == "--fg" ]]; then
+    WATCH=1
   elif [[ -z "${MODE}" && "${arg}" != --* ]]; then
     MODE="${arg}"
   fi
@@ -43,6 +71,33 @@ PATH_BLOCK_END="# <<< balanced-work-life path <<<"
 
 mkdir -p "${STATE_DIR}"
 
+# ---------------------------------------------------------------------------
+# Output helpers (#8)
+# ---------------------------------------------------------------------------
+
+# Print an error message to stderr with a visible "Error:" prefix.
+err() {
+  echo "Error: $*" >&2
+}
+
+# Print a warning to stderr.
+warn() {
+  echo "Warning: $*" >&2
+}
+
+# Return the command hint prefix — "balance" if installed globally, else "./scripts/balance" (#9)
+cmd() {
+  if command -v balance >/dev/null 2>&1; then
+    echo "balance"
+  else
+    echo "./scripts/balance"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Process / port helpers
+# ---------------------------------------------------------------------------
+
 pid_is_running() {
   [[ -f "${PID_FILE}" ]] || return 1
 
@@ -55,6 +110,15 @@ pid_is_running() {
 
 current_pid() {
   cat "${PID_FILE}"
+}
+
+# Returns 0 (true) if the PID file exists but the process is already dead — i.e. a crash (#7)
+pid_is_stale() {
+  [[ -f "${PID_FILE}" ]] || return 1
+  local pid
+  pid="$(cat "${PID_FILE}")"
+  [[ -n "${pid}" ]] || return 1
+  ! kill -0 "${pid}" >/dev/null 2>&1
 }
 
 clear_stale_pid() {
@@ -72,8 +136,8 @@ ensure_port_available() {
   owner="$(port_owner)"
 
   if [[ -n "${owner}" ]]; then
-    echo "Port ${PORT} is already in use by pid ${owner}." >&2
-    echo "Stop that process or choose another port with BALANCE_PORT=..." >&2
+    err "Port ${PORT} is already in use by pid ${owner}."
+    err "Stop that process or choose another port with BALANCE_PORT=..."
     exit 1
   fi
 }
@@ -97,8 +161,40 @@ kill_port_processes() {
   done
 }
 
+# ---------------------------------------------------------------------------
+# Readiness polling (#1 #3 #5)
+# Poll localhost:PORT until it responds or the timeout is reached.
+# Prints progress dots and returns 0 when ready, 1 on timeout.
+# ---------------------------------------------------------------------------
+wait_for_server() {
+  local timeout="${1:-60}"
+  local elapsed=0
+  printf "Waiting for server to be ready"
+  while (( elapsed < timeout )); do
+    # Use --max-time 1 (total) with no -f so any HTTP response — including 302
+    # or a Next.js dev splash — counts as "server is up". We only care that the
+    # TCP connection was accepted and the server sent back something, not that
+    # the response is 2xx.
+    if curl -s -o /dev/null --max-time 1 "${URL}" 2>/dev/null; then
+      echo ""
+      return 0
+    fi
+    printf "."
+    sleep 1
+    (( elapsed++ )) || true
+  done
+  echo ""
+  return 1
+}
+
+# ---------------------------------------------------------------------------
+# Start
+# ---------------------------------------------------------------------------
+
 start_server() {
-  if [[ "${FG}" == "1" ]]; then
+  require_pnpm
+  require_deps
+  if [[ "${WATCH}" == "1" ]]; then
     ensure_port_available
     cd "${ROOT_DIR}"
     if [[ "${MODE}" == "prod" || "${MODE}" == "production" || "${MODE}" == "start" ]]; then
@@ -111,12 +207,19 @@ start_server() {
     return
   fi
 
+  # Check for crash before clearing stale PID (#7)
+  if pid_is_stale; then
+    warn "Previous server process crashed or was killed."
+    echo "  Check the logs: $(cmd) logs"
+    rm -f "${PID_FILE}"
+  fi
+
   clear_stale_pid
 
   if pid_is_running; then
     echo "${APP_NAME} is already running on ${URL} (pid $(current_pid))."
-    echo "  balance open     open in browser"
-    echo "  balance restart  restart the server"
+    echo "  $(cmd) open     open in browser"
+    echo "  $(cmd) restart  restart the server"
     return
   fi
 
@@ -131,16 +234,40 @@ start_server() {
   elif [[ "${MODE}" == "dev" ]]; then
     nohup pnpm next dev -p "${PORT}" >"${LOG_FILE}" 2>&1 &
   else
-    echo "Unknown mode: ${MODE} (expected dev|prod)" >&2
+    err "Unknown mode: ${MODE} (expected dev|prod)"
     exit 1
   fi
 
-  echo "$!" >"${PID_FILE}"
-  echo "${APP_NAME} started on ${URL} (pid $(current_pid))."
-  echo "  balance open     open in browser"
-  echo "  balance logs     tail server logs"
-  echo "  balance stop     stop the server"
+  local server_pid="$!"
+  echo "${server_pid}" >"${PID_FILE}"
+
+  # Brief crash check: give the process a moment then verify it is still alive (#2)
+  sleep 1
+  if ! kill -0 "${server_pid}" >/dev/null 2>&1; then
+    err "Server failed to start. Last log output:"
+    tail -n 20 "${LOG_FILE}" >&2
+    rm -f "${PID_FILE}"
+    exit 1
+  fi
+
+  # Wait for the server to accept connections before declaring it ready (#3)
+  if wait_for_server 60; then
+    echo "${APP_NAME} is ready at ${URL} (pid ${server_pid})."
+  else
+    err "Server process is running (pid ${server_pid}) but did not respond within 60 s."
+    echo "  $(cmd) logs     check server logs"
+    echo "  $(cmd) stop     stop the server"
+    exit 1
+  fi
+
+  echo "  $(cmd) open     open in browser"
+  echo "  $(cmd) logs     stream server logs"
+  echo "  $(cmd) stop     stop the server"
 }
+
+# ---------------------------------------------------------------------------
+# Stop
+# ---------------------------------------------------------------------------
 
 stop_server() {
   clear_stale_pid
@@ -153,10 +280,10 @@ stop_server() {
     pid="$(lsof -ti TCP:"${PORT}" 2>/dev/null | head -1)"
     if [[ -z "${pid}" ]]; then
       echo "${APP_NAME} is not running."
-      echo "Hint: balance open   to start and open in browser"
+      echo "  $(cmd) open   start and open in browser"
       return
     fi
-    echo "Warning: no PID file found; stopping process on port ${PORT} (pid ${pid})."
+    warn "No PID file found; stopping process on port ${PORT} (pid ${pid})."
   fi
 
   # Tell the browser to clear SW cache before killing the server
@@ -180,24 +307,41 @@ stop_server() {
 
   rm -f "${PID_FILE}"
   echo "Stopped ${APP_NAME}."
-  echo "  balance open     start again and open in browser"
+  echo "  $(cmd) open   start again and open in browser"
 }
 
+# ---------------------------------------------------------------------------
+# Status
+# ---------------------------------------------------------------------------
+
 status_server() {
+  # Detect crash before clearing stale PID (#7)
+  if pid_is_stale; then
+    echo "${APP_NAME} crashed or was killed (stale PID found)."
+    echo "  $(cmd) logs     check what went wrong"
+    echo "  $(cmd) start    start again in background"
+    rm -f "${PID_FILE}"
+    return
+  fi
+
   clear_stale_pid
 
   if pid_is_running; then
     echo "${APP_NAME} is running on ${URL} (pid $(current_pid))."
-    echo "  balance logs     tail server logs"
-    echo "  balance stop     stop the server"
+    echo "  $(cmd) logs     stream server logs"
+    echo "  $(cmd) stop     stop the server"
     echo "  open ${URL}"
   else
     echo "${APP_NAME} is not running."
-    echo "  balance open     start and open in browser"
-    echo "  balance start    start in background"
-    echo "  balance start --fg   start in foreground (logs to stdout)"
+    echo "  $(cmd) open          start and open in browser"
+    echo "  $(cmd) start         start in background"
+    echo "  $(cmd) start --watch keep terminal open and stream logs"
   fi
 }
+
+# ---------------------------------------------------------------------------
+# Open (#1 #5)
+# ---------------------------------------------------------------------------
 
 open_app() {
   # If something is already on the port, just open the browser — don't error
@@ -207,14 +351,40 @@ open_app() {
     return
   fi
 
-  if [[ "${FG}" == "1" ]]; then
-    (sleep 3 && open "${URL}") &
+  if [[ "${WATCH}" == "1" ]]; then
+    # Poll for readiness in a subshell, then open browser — no hardcoded sleep (#5)
+    (wait_for_server 60 >/dev/null 2>&1 && open "${URL}") &
     start_server
   else
     start_server
     open "${URL}"
   fi
 }
+
+# ---------------------------------------------------------------------------
+# Logs (#6)
+# ---------------------------------------------------------------------------
+
+show_logs() {
+  # Warn the user if the server is not currently running (#6)
+  if ! pid_is_running; then
+    if [[ -f "${LOG_FILE}" ]]; then
+      warn "Server is not running. Showing last log output ($(cmd) start to restart):"
+      echo ""
+    else
+      warn "Server is not running and no log file exists yet."
+      echo "  $(cmd) start   start the server"
+      return
+    fi
+  fi
+
+  touch "${LOG_FILE}"
+  tail -f "${LOG_FILE}"
+}
+
+# ---------------------------------------------------------------------------
+# Install / uninstall
+# ---------------------------------------------------------------------------
 
 preferred_profile_file() {
   case "$(basename "${SHELL:-}")" in
@@ -313,7 +483,7 @@ uninstall_command() {
     rm -f "${INSTALL_PATH}"
     echo "Removed ${INSTALL_PATH}."
   elif [[ -e "${INSTALL_PATH}" ]]; then
-    echo "Skipped ${INSTALL_PATH}; it was not installed by this project." >&2
+    err "Skipped ${INSTALL_PATH}; it was not installed by this project."
   else
     echo "${INSTALL_PATH} is not installed."
   fi
@@ -324,12 +494,16 @@ uninstall_command() {
   done < <(profile_files)
 }
 
+# ---------------------------------------------------------------------------
+# Help (#10)
+# ---------------------------------------------------------------------------
+
 show_help() {
   cat <<EOF
 ${APP_NAME} — dev server controller
 
 Usage:
-  ./balance <command> [mode] [--fg]
+  ${INVOCATION} <command> [mode] [--watch]
 
 Commands:
   open        Start server and open in browser (default)
@@ -337,22 +511,26 @@ Commands:
   stop        Stop server
   restart     Restart server
   status      Show running status and PID
-  logs        Tail server logs
+  logs        Stream server logs
   install     Symlink 'balance' into ~/bin and add to PATH
   uninstall   Remove symlink and PATH entry
 
 Modes:    dev (default) | prod
-Flags:    --fg  run in foreground (blocks terminal, logs to stdout)
+Flags:    --watch  keep terminal open and stream logs live
 Env:      BALANCE_PORT=4327  BALANCE_MODE=dev  BALANCE_INSTALL_DIR=~/bin
 
 Examples:
-  ./balance                    Show this help
-  ./balance open               Start + open browser
-  ./balance start prod         Start production server in background
-  ./balance start --fg         Start dev server in foreground
-  ./balance install            Install 'balance' command globally
+  ${INVOCATION}                       Show this help
+  ${INVOCATION} open                  Start + open browser
+  ${INVOCATION} start prod            Start production server in background
+  ${INVOCATION} start --watch         Start dev server and stream logs
+  ${INVOCATION} install               Install 'balance' command globally
 EOF
 }
+
+# ---------------------------------------------------------------------------
+# Dispatch
+# ---------------------------------------------------------------------------
 
 case "${COMMAND}" in
   help|--help|-h)
@@ -381,12 +559,11 @@ case "${COMMAND}" in
     status_server
     ;;
   logs)
-    touch "${LOG_FILE}"
-    tail -f "${LOG_FILE}"
+    show_logs
     ;;
   *)
-    echo "Unknown command: ${COMMAND}" >&2
-    echo "Run './balance help' for usage." >&2
+    err "Unknown command: ${COMMAND}"
+    err "Run '${INVOCATION} help' for usage."
     exit 1
     ;;
 esac

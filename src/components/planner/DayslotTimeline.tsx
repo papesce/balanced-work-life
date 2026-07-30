@@ -496,7 +496,7 @@ function EventCard({
         >
           {event.title}
         </span>
-        <div className="flex items-center justify-between mt-auto pt-1">
+        <div className="flex items-center justify-between mt-auto pt-1 pb-2">
           <button
             ref={areaBtnRef}
             onClick={(e) => {
