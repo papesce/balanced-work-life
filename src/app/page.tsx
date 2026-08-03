@@ -6,7 +6,6 @@ import { Sparkles, Calendar, Layers, Clock, Inbox, BarChart3 } from "lucide-reac
 import { useIdeas } from "@/hooks/useIdeas";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
-import { useDeferredTasks } from "@/hooks/useDeferredTasks";
 import { AppShell } from "@/components/AppShell";
 import { BalanceRing } from "@/components/BalanceRing";
 import { Idea, LifeArea, Tag, getAreasForIdea } from "@/lib/types";
@@ -15,7 +14,7 @@ import { DateNav } from "@/components/planner/DateNav";
 import { AreaFilters } from "@/components/planner/AreaFilters";
 import { DayslotTimeline } from "@/components/planner/DayslotTimeline";
 import { AreaTaskGroup } from "@/components/planner/AreaTaskGroup";
-import { InboxDeferredPanel } from "@/components/shared/InboxDeferredPanel";
+import { InboxPanel } from "@/components/shared/InboxPanel";
 import { UndoBar } from "@/components/shared/UndoBar";
 import { AREA_ORDER, AREA_LABELS, DEFAULT_TARGETS, LOCAL_STORAGE_TARGETS_KEY } from "@/components/planner/constants";
 import { offsetDate } from "@/components/planner/plannerUtils";
@@ -37,7 +36,6 @@ function DailyPlannerInner() {
   const { ideas, loading, createIdea, updateIdea, deleteIdea, markDone, markUndone, reorderTasks, smartSortTasks, restoreIdeas } = useIdeas();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
-  const { overdueBuckets, deferredTasks, refetch: refetchDeferred } = useDeferredTasks();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [activeDate, setActiveDate] = useState<string>(() => searchParams.get("date") ?? getToday());
@@ -461,10 +459,7 @@ function DailyPlannerInner() {
                 }}
               />
             ) : (
-              <InboxDeferredPanel
-                compact
-                activeDate={activeDate}
-                today={today}
+              <InboxPanel
                 inboxTasks={inboxTasks}
                 onCreateInboxTask={async (text) => {
                   await createIdea(text, null, "top", { type: "task", status: "inbox" });
@@ -475,13 +470,7 @@ function DailyPlannerInner() {
                   const patch = computeReschedulePatch(idea, { type: "reschedule", newDate: activeDate });
                   await updateIdea(id, patch);
                 }}
-                overdueBuckets={overdueBuckets}
-                deferredTasks={deferredTasks}
-                onReschedule={handleReschedule}
-                onComplete={handleComplete}
-                onCancel={handleCancel}
                 getTagsForIdea={taskTagsHook.getTagsForIdea}
-                onRefresh={refetchDeferred}
               />
             )}
           </div>

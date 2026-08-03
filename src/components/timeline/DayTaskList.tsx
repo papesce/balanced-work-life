@@ -7,9 +7,7 @@ import { Check, Star, MoreHorizontal, GripVertical, Play, Pause, X } from "lucid
 import { Idea, IdeaStatus, Tag, LifeArea } from "@/lib/types";
 import { TagPicker, AREA_DOT_COLORS } from "@/components/shared/TagPicker";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
-import { RescheduleAction, DayOccurrence, getTriageMeta, computeClearDatePatch } from "@/lib/tasks/rescheduleTask";
-import { TriageActions } from "@/components/triage/TriageActions";
-import { formatTimelineDate } from "@/components/timeline/timelineUtils";
+import { RescheduleAction, DayOccurrence, computeClearDatePatch } from "@/lib/tasks/rescheduleTask";
 
 const STATUS_CONFIG: Record<IdeaStatus, { label: string; color: string; icon: React.ElementType | null }> = {
   inbox:       { label: "Inbox",       color: "text-gray-400",              icon: null },
@@ -80,9 +78,16 @@ export function DayTaskList({ occurrences, onReorder, onDone, onUndone, onUpdate
               key={occ.task.id}
               task={occ.task}
               taskTags={getTagsForIdea(occ.task.id)}
+              onDone={onDone}
+              onUndone={onUndone}
+              onUpdate={onUpdate}
               onReschedule={onReschedule}
-              onComplete={onDone}
               onCancel={onCancel}
+              today={today}
+              allTags={allTags}
+              onAddTag={onAddTag}
+              onRemoveTag={onRemoveTag}
+              onCreateTag={onCreateTag}
             />
           ))}
         </div>
@@ -94,50 +99,46 @@ export function DayTaskList({ occurrences, onReorder, onDone, onUndone, onUpdate
 function HistoricalOccurrenceRow({
   task,
   taskTags,
+  onDone,
+  onUndone,
+  onUpdate,
   onReschedule,
-  onComplete,
   onCancel,
+  today,
+  allTags,
+  onAddTag,
+  onRemoveTag,
+  onCreateTag,
 }: {
   task: Idea;
   taskTags: Tag[];
+  onDone: (id: string) => void;
+  onUndone: (id: string) => void;
+  onUpdate: (id: string, updates: Partial<Idea>) => void;
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
-  onComplete: (id: string) => void;
   onCancel: (id: string) => Promise<void>;
+  today: string;
+  allTags: Tag[];
+  onAddTag: (ideaId: string, tag: Tag) => Promise<void>;
+  onRemoveTag: (ideaId: string, tagId: string) => Promise<void>;
+  onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
 }) {
-  const meta = getTriageMeta(task);
-  const movedToLabel = task.scheduled_date
-    ? `Moved to ${formatTimelineDate(task.scheduled_date)}`
-    : meta.movedToLabel;
-
   return (
-    <div className="flex flex-col gap-1.5 px-3 py-2">
-      <div className="flex items-center gap-1.5">
-        <span className="text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded-full flex-shrink-0">
-          Deferred
-        </span>
-        <span className="flex-1 text-sm truncate text-gray-700 dark:text-gray-200">
-          {task.text}
-        </span>
-        {taskTags.length > 0 && (
-          <div className="flex gap-1 flex-shrink-0">
-            {taskTags.map((tag) => (
-              <span key={tag.id} className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1">
-                <span className={`w-1.5 h-1.5 rounded-full inline-block flex-shrink-0 ${AREA_DOT_COLORS[tag.area]}`} />
-                {tag.name}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] text-gray-400 dark:text-gray-500">{movedToLabel}</span>
-        <TriageActions
-          task={task}
-          onReschedule={onReschedule}
-          onComplete={async (id) => { onComplete(id); }}
-          onCancel={onCancel}
-        />
-      </div>
+    <div className="px-1">
+      <TimelineTaskRow
+        task={task}
+        onDone={onDone}
+        onUndone={onUndone}
+        onUpdate={onUpdate}
+        onReschedule={onReschedule}
+        today={today}
+        dragControls={useDragControls()}
+        allTags={allTags}
+        taskTags={taskTags}
+        onAddTag={onAddTag}
+        onRemoveTag={onRemoveTag}
+        onCreateTag={onCreateTag}
+      />
     </div>
   );
 }
@@ -249,6 +250,13 @@ function TimelineTaskRow({
         break;
       case "scheduled":
         onUndone(task.id);
+        break;
+      case "deferred":
+        onUpdate(task.id, {
+          status: "deferred",
+          completed_at: null,
+          cancelled_at: null,
+        });
         break;
     }
     setShowStatusPicker(false);

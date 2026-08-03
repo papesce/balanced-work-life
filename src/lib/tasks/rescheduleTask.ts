@@ -137,6 +137,14 @@ export function getDayOccurrences(
   return result;
 }
 
+/** An active occurrence: any occurrence whose task is not completed,
+ * cancelled, or archived. Used by the Timeline "Deferred" filter to show the
+ * same view as All minus inactive tasks. */
+export function isActiveOccurrence(occ: DayOccurrence): boolean {
+  const { task } = occ;
+  return task.status !== "completed" && task.status !== "cancelled" && task.status !== "archived";
+}
+
 export interface TriageMeta {
   originalDate: string | null;
   currentDate: string | null;
