@@ -22,6 +22,7 @@ import { computeReschedulePatch, computeCompletePatch, computeCancelPatch, getDa
 import { useUndoAction } from "@/lib/tasks/undo";
 import { TriageActions } from "@/components/triage/TriageActions";
 import { AREA_DOT_COLORS } from "@/components/shared/TagPicker";
+import { JumpToTodayButton } from "@/components/shared/JumpToTodayButton";
 import { formatDayLabel } from "@/components/planner/plannerUtils";
 
 export default function DailyPlannerPage() {
@@ -264,14 +265,16 @@ function DailyPlannerInner() {
       title="Daily Planner"
       fullWidth
       headerActions={
-        <DateNav
-          activeDate={activeDate}
-          today={today}
-          showDateInput={showDateInput}
-          onShowDateInput={setShowDateInput}
-          onChangeDate={setActiveDate}
-          onGoToday={() => setActiveDate(today)}
-        />
+        <>
+          <DateNav
+            activeDate={activeDate}
+            today={today}
+            showDateInput={showDateInput}
+            onShowDateInput={setShowDateInput}
+            onChangeDate={setActiveDate}
+          />
+          <JumpToTodayButton onClick={() => setActiveDate(today)} isToday={activeDate === today} />
+        </>
       }
     >
       {/* Mobile Tab Control */}

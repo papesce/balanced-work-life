@@ -9,12 +9,10 @@ interface DateNavProps {
   showDateInput: boolean;
   onShowDateInput: (v: boolean) => void;
   onChangeDate: (d: string) => void;
-  onGoToday: () => void;
 }
 
-export function DateNav({ activeDate, today, showDateInput, onShowDateInput, onChangeDate, onGoToday }: DateNavProps) {
+export function DateNav({ activeDate, today, showDateInput, onShowDateInput, onChangeDate }: DateNavProps) {
   const label = formatDayLabel(activeDate, today);
-  const isToday = activeDate === today;
 
   return (
     <div className="flex items-center gap-1">
@@ -42,10 +40,10 @@ export function DateNav({ activeDate, today, showDateInput, onShowDateInput, onC
       ) : (
         <button
           onClick={() => onShowDateInput(true)}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-all cursor-pointer"
+          className="flex items-center justify-center gap-1.5 min-w-[112px] px-2.5 py-1 rounded-lg text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-all cursor-pointer"
         >
           <CalendarDays size={13} className="text-gray-400" />
-          {label}
+          <span className="whitespace-nowrap">{label}</span>
         </button>
       )}
 
@@ -55,15 +53,6 @@ export function DateNav({ activeDate, today, showDateInput, onShowDateInput, onC
       >
         <ChevronRight size={15} />
       </button>
-
-      {!isToday && (
-        <button
-          onClick={onGoToday}
-          className="ml-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/20 transition-all cursor-pointer"
-        >
-          Today
-        </button>
-      )}
     </div>
   );
 }

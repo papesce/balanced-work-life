@@ -10,6 +10,7 @@ import { WeekRingView } from "@/components/balance/WeekRingView";
 import { MonthRingView } from "@/components/balance/MonthRingView";
 import { YearWheelView } from "@/components/balance/YearWheelView";
 import { WindowType, getToday } from "@/lib/dateUtils";
+import { JumpToTodayButton } from "@/components/shared/JumpToTodayButton";
 
 export default function BalancePage() {
   return (
@@ -38,9 +39,7 @@ function BalancePageInner() {
   };
 
   const headerActions = (
-    <button onClick={handleToday} className="focus-button">
-      Jump to Today
-    </button>
+    <JumpToTodayButton onClick={handleToday} isToday={dateParam === getToday()} />
   );
 
   return (

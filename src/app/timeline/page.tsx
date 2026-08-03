@@ -17,6 +17,7 @@ import { DayTaskList } from "@/components/timeline/DayTaskList";
 import { FloatingAddButton } from "@/components/timeline/FloatingAddButton";
 import { QuickAddInput } from "@/components/timeline/QuickAddInput";
 import { UndoBar } from "@/components/shared/UndoBar";
+import { JumpToTodayButton } from "@/components/shared/JumpToTodayButton";
 import { formatTimelineDate, getTimelineKicker } from "@/components/timeline/timelineUtils";
 
 const cardVariants = {
@@ -48,6 +49,7 @@ export default function TimelinePage() {
   const todayRef = useRef<HTMLElement>(null);
   const hasAutoScrolled = useRef(false);
   const rangeMenuRef = useRef<HTMLDivElement>(null);
+  const [todayInView, setTodayInView] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
   const [filter, setFilter] = useState<"all" | "deferred">("all");
   const [deferredRange, setDeferredRange] = useState<DeferredRangeId>("default");
@@ -119,6 +121,17 @@ export default function TimelinePage() {
       return () => clearTimeout(timer);
     }
   }, [loading]);
+
+  useEffect(() => {
+    const el = todayRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setTodayInView(entry.isIntersecting),
+      { rootMargin: "-30% 0px -30% 0px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loading, filter]);
 
   const handleQuickAdd = async (text: string, date: string) => {
     await createIdea(text, null, "bottom", { type: "task", scheduled_date: date, status: "planned" });
@@ -226,12 +239,10 @@ export default function TimelinePage() {
           )}
         </div>
       )}
-      <button
+      <JumpToTodayButton
         onClick={() => todayRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
-        className="focus-button"
-      >
-        Jump to Today
-      </button>
+        isToday={todayInView}
+      />
     </>
   );
 
@@ -305,7 +316,9 @@ export default function TimelinePage() {
 
                 <div className="px-5 pb-2">
                   {dayOccurrences.length === 0 ? (
-                    <p className="text-xs text-gray-400 dark:text-gray-500 italic py-1">No tasks planned</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 italic py-1">
+                      {filter === "deferred" ? "No deferred tasks this day" : "No tasks planned"}
+                    </p>
                   ) : (
                     <DayTaskList
                       occurrences={dayOccurrences}
