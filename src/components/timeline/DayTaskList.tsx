@@ -88,6 +88,7 @@ export function DayTaskList({ occurrences, onReorder, onDone, onUndone, onUpdate
               onAddTag={onAddTag}
               onRemoveTag={onRemoveTag}
               onCreateTag={onCreateTag}
+              isHistorical
             />
           ))}
         </div>
@@ -109,6 +110,7 @@ function HistoricalOccurrenceRow({
   onAddTag,
   onRemoveTag,
   onCreateTag,
+  isHistorical = false,
 }: {
   task: Idea;
   taskTags: Tag[];
@@ -122,6 +124,7 @@ function HistoricalOccurrenceRow({
   onAddTag: (ideaId: string, tag: Tag) => Promise<void>;
   onRemoveTag: (ideaId: string, tagId: string) => Promise<void>;
   onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
+  isHistorical?: boolean;
 }) {
   return (
     <div className="px-1">
@@ -138,6 +141,7 @@ function HistoricalOccurrenceRow({
         onAddTag={onAddTag}
         onRemoveTag={onRemoveTag}
         onCreateTag={onCreateTag}
+        isHistorical={isHistorical}
       />
     </div>
   );
@@ -168,7 +172,7 @@ function DayTaskItem({
 }
 
 function TimelineTaskRow({
-  task, onDone, onUndone, onUpdate, onReschedule, today, dragControls, allTags, taskTags, onAddTag, onRemoveTag, onCreateTag,
+  task, onDone, onUndone, onUpdate, onReschedule, today, dragControls, allTags, taskTags, onAddTag, onRemoveTag, onCreateTag, isHistorical = false,
 }: {
   task: Idea;
   onDone: (id: string) => void;
@@ -182,11 +186,14 @@ function TimelineTaskRow({
   onAddTag: (ideaId: string, tag: Tag) => Promise<void>;
   onRemoveTag: (ideaId: string, tagId: string) => Promise<void>;
   onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
+  isHistorical?: boolean;
 }) {
   const isCompleted = task.status === "completed";
   const isCancelled = task.status === "cancelled";
   const isInProgress = task.status === "in_progress";
   const isPaused = task.status === "paused";
+  const isReschedule = isHistorical || task.status === "deferred" || (task.scheduled_date !== null && task.scheduled_date < today);
+  const dateActionLabel = isReschedule ? "Reschedule" : "Move";
   const statusConfig = STATUS_CONFIG[task.status];
   const [showMenu, setShowMenu] = useState(false);
   const [showTagPicker, setShowTagPicker] = useState(false);
@@ -413,21 +420,21 @@ function TimelineTaskRow({
           >
             {task.scheduled_date !== today && (
               <button
-                onClick={() => { void onReschedule(task.id, { type: "retry_today" }); setShowMenu(false); }}
+                onClick={() => { void onReschedule(task.id, isReschedule ? { type: "retry_today" } : { type: "move", newDate: today }); setShowMenu(false); }}
                 className="flex w-full text-left px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
               >
-                Move to Today
+                {dateActionLabel} to Today
               </button>
             )}
             <div className="relative group/date">
               <button className="flex w-full text-left px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
-                Pick Date
+                {dateActionLabel} Date…
               </button>
               <input
                 type="date"
                 className="absolute left-full top-0 ml-1 opacity-0 w-0 h-0 pointer-events-none group-hover/date:opacity-100 group-hover/date:w-auto group-hover/date:h-auto group-hover/date:pointer-events-auto text-xs border border-black/10 dark:border-white/10 rounded-lg px-2 py-1.5 bg-white/80 dark:bg-gray-800/80 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-violet-500"
                 onChange={(e) => {
-                  if (e.target.value) { void onReschedule(task.id, { type: "reschedule", newDate: e.target.value }); setShowMenu(false); }
+                  if (e.target.value) { void onReschedule(task.id, isReschedule ? { type: "reschedule", newDate: e.target.value } : { type: "move", newDate: e.target.value }); setShowMenu(false); }
                 }}
               />
             </div>

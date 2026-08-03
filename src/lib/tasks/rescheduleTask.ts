@@ -12,6 +12,7 @@ export function computeCancelPatch(): Partial<Idea> {
   return {
     status: "cancelled",
     cancelled_at: new Date().toISOString(),
+    completed_at: null,
   };
 }
 
@@ -40,6 +41,7 @@ export function getContextDate(idea: Idea): string {
 export type RescheduleAction =
   | { type: "retry_today" }
   | { type: "reschedule"; newDate: string }
+  | { type: "move"; newDate: string }
   | { type: "defer" };
 
 export function computeReschedulePatch(
@@ -63,6 +65,11 @@ export function computeReschedulePatch(
         scheduled_date: action.newDate,
         status: "scheduled",
         attempt_dates: updatedAttemptDates,
+      };
+    case "move":
+      return {
+        scheduled_date: action.newDate,
+        status: "scheduled",
       };
     case "defer":
       return {

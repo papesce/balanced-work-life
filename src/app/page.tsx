@@ -122,20 +122,24 @@ function DailyPlannerInner() {
     () => taskIdeas.filter((i) => i.status !== "completed" && i.status !== "cancelled" && i.status !== "archived"),
     [taskIdeas],
   );
+  const scheduledTaskIdeas = useMemo(
+    () => taskIdeas.filter((i) => i.status !== "completed" && i.status !== "archived"),
+    [taskIdeas],
+  );
 
   const doneOnDate = useMemo(
-    () => taskIdeas.filter((i) => i.completed_at && i.scheduled_date === activeDate),
+    () => taskIdeas.filter((i) => i.status === "completed" && i.scheduled_date === activeDate),
     [taskIdeas, activeDate],
   );
 
   const pendingOnDate = useMemo(
-    () => activeTaskIdeas.filter((i) => i.scheduled_date === activeDate && !i.scheduled_time),
-    [activeTaskIdeas, activeDate],
+    () => scheduledTaskIdeas.filter((i) => i.scheduled_date === activeDate && !i.scheduled_time),
+    [scheduledTaskIdeas, activeDate],
   );
 
   const scheduledOnDate = useMemo(
-    () => activeTaskIdeas.filter((i) => i.scheduled_date === activeDate && !!i.scheduled_time),
-    [activeTaskIdeas, activeDate],
+    () => scheduledTaskIdeas.filter((i) => i.scheduled_date === activeDate && !!i.scheduled_time),
+    [scheduledTaskIdeas, activeDate],
   );
 
   const inboxTasks = useMemo(() => activeTaskIdeas.filter((t) => !t.scheduled_date), [activeTaskIdeas]);
