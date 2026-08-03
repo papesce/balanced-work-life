@@ -65,6 +65,12 @@ export function isPast(dateStr: string): boolean {
   return dateStr < getToday();
 }
 
+export function addDays(base: string, days: number): string {
+  const d = new Date(base + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return toLocalDateString(d);
+}
+
 export type WindowType = "day" | "week" | "month" | "year";
 
 export interface DateRange {

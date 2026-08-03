@@ -350,7 +350,16 @@ export function useIdeas() {
   };
 
   const scheduleIdea = async (id: string, date: string | null) => {
-    await updateIdea(id, { scheduled_date: date });
+    const idea = ideas.find((i) => i.id === id);
+    const previousDate = idea?.scheduled_date;
+    if (previousDate && previousDate !== date) {
+      await updateIdea(id, {
+        scheduled_date: date,
+        attempt_dates: [...(idea.attempt_dates ?? []), previousDate],
+      });
+    } else {
+      await updateIdea(id, { scheduled_date: date });
+    }
   };
 
   const toggleCollapse = (id: string) => {

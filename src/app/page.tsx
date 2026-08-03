@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback, useRef, Suspense } from "react";
-import { motion } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Sparkles, Calendar, Layers, Clock, Inbox, BarChart3 } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
@@ -10,21 +9,21 @@ import { useTaskTags } from "@/hooks/useTaskTags";
 import { useDeferredTasks } from "@/hooks/useDeferredTasks";
 import { AppShell } from "@/components/AppShell";
 import { BalanceRing } from "@/components/BalanceRing";
-import { Idea, LifeArea, getAreasForIdea } from "@/lib/types";
-import { getToday, toLocalDateString } from "@/lib/dateUtils";
+import { Idea, LifeArea, Tag, getAreasForIdea } from "@/lib/types";
+import { getToday } from "@/lib/dateUtils";
 import { DateNav } from "@/components/planner/DateNav";
 import { AreaFilters } from "@/components/planner/AreaFilters";
 import { DayslotTimeline } from "@/components/planner/DayslotTimeline";
 import { AreaTaskGroup } from "@/components/planner/AreaTaskGroup";
 import { InboxDeferredPanel } from "@/components/shared/InboxDeferredPanel";
+import { UndoBar } from "@/components/shared/UndoBar";
 import { AREA_ORDER, AREA_LABELS, DEFAULT_TARGETS, LOCAL_STORAGE_TARGETS_KEY } from "@/components/planner/constants";
 import { offsetDate } from "@/components/planner/plannerUtils";
-import { computeReschedulePatch, computeCompletePatch, RescheduleAction } from "@/lib/tasks/rescheduleTask";
-
-type UndoAction = {
-  label: string;
-  run: () => Promise<void>;
-};
+import { computeReschedulePatch, computeCompletePatch, computeCancelPatch, getDayOccurrences, getTriageMeta, DayOccurrence, RescheduleAction } from "@/lib/tasks/rescheduleTask";
+import { useUndoAction } from "@/lib/tasks/undo";
+import { TriageActions } from "@/components/triage/TriageActions";
+import { AREA_DOT_COLORS } from "@/components/shared/TagPicker";
+import { formatDayLabel } from "@/components/planner/plannerUtils";
 
 export default function DailyPlannerPage() {
   return (
@@ -85,15 +84,7 @@ function DailyPlannerInner() {
   const rightColWidthRef = useRef(rightColWidth);
   useEffect(() => { rightColWidthRef.current = rightColWidth; });
 
-  const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
-  const registerUndo = (undo: UndoAction) => setUndoAction(undo);
-  const clearUndo = () => setUndoAction(null);
-  const handleUndo = async () => {
-    if (!undoAction) return;
-    const action = undoAction;
-    setUndoAction(null);
-    await action.run();
-  };
+  const { undoAction, registerUndo, clearUndo, handleUndo } = useUndoAction();
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -150,6 +141,11 @@ function DailyPlannerInner() {
   );
 
   const inboxTasks = useMemo(() => activeTaskIdeas.filter((t) => !t.scheduled_date), [activeTaskIdeas]);
+
+  const deferredOnDate = useMemo(
+    () => getDayOccurrences(taskIdeas, activeDate, today).filter((o) => o.isHistorical),
+    [taskIdeas, activeDate, today],
+  );
 
   const areaTaskCounts = useMemo(() => {
     const counts: Record<LifeArea, { pending: number; scheduled: number; done: number }> = {
@@ -227,6 +223,20 @@ function DailyPlannerInner() {
     await updateIdea(id, patch);
   }, [updateIdea]);
 
+  const handleCancel = useCallback(async (id: string) => {
+    const idea = ideas.find((i) => i.id === id);
+    if (!idea) return;
+    const previous = idea;
+    const patch = computeCancelPatch();
+    await updateIdea(id, patch);
+    registerUndo({
+      label: "Task cancelled",
+      run: async () => {
+        await updateIdea(id, { status: previous.status, cancelled_at: null });
+      },
+    });
+  }, [ideas, updateIdea, registerUndo]);
+
   const handleDeleteTask = useCallback(async (id: string) => {
     const idea = ideas.find((i) => i.id === id);
     await deleteIdea(id);
@@ -289,30 +299,7 @@ function DailyPlannerInner() {
         })}
       </div>
 
-      {undoAction && (
-        <motion.div
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-3 flex items-center justify-between gap-3 rounded-[16px] glass-card border-amber-200/40 dark:border-amber-700/30 px-4 py-2.5"
-        >
-          <span className="text-sm text-amber-800 dark:text-amber-300 font-medium">{undoAction.label}</span>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={handleUndo}
-              className="text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-100/60 dark:hover:bg-amber-900/20 rounded-lg px-2.5 py-1 transition-colors cursor-pointer"
-            >
-              Undo
-            </button>
-            <button
-              onClick={clearUndo}
-              aria-label="Dismiss undo"
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-amber-600 dark:text-amber-400 hover:bg-amber-100/60 dark:hover:bg-amber-900/20 transition-colors cursor-pointer"
-            >
-              <span className="text-sm">&times;</span>
-            </button>
-          </div>
-        </motion.div>
-      )}
+      <UndoBar undoAction={undoAction} onUndo={() => void handleUndo()} onDismiss={clearUndo} />
 
       <div className="flex flex-col md:flex-row gap-5">
         {/* LEFT COLUMN */}
@@ -350,6 +337,17 @@ function DailyPlannerInner() {
               )}
             </div>
           </div>
+
+          {deferredOnDate.length > 0 && (
+            <DeferredOnDateSection
+              occurrences={deferredOnDate}
+              today={today}
+              onReschedule={handleReschedule}
+              onComplete={handleComplete}
+              onCancel={handleCancel}
+              getTagsForIdea={taskTagsHook.getTagsForIdea}
+            />
+          )}
 
           <div className="space-y-4">
             {visibleAreas.map((area) => {
@@ -481,6 +479,7 @@ function DailyPlannerInner() {
                 deferredTasks={deferredTasks}
                 onReschedule={handleReschedule}
                 onComplete={handleComplete}
+                onCancel={handleCancel}
                 getTagsForIdea={taskTagsHook.getTagsForIdea}
                 onRefresh={refetchDeferred}
               />
@@ -489,5 +488,76 @@ function DailyPlannerInner() {
         </div>
       </div>
     </AppShell>
+  );
+}
+
+function DeferredOnDateSection({
+  occurrences,
+  today,
+  onReschedule,
+  onComplete,
+  onCancel,
+  getTagsForIdea,
+}: {
+  occurrences: DayOccurrence[];
+  today: string;
+  onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
+  onComplete: (id: string) => Promise<void>;
+  onCancel: (id: string) => Promise<void>;
+  getTagsForIdea: (ideaId: string) => Tag[];
+}) {
+  return (
+    <div className="glass-card rounded-2xl overflow-hidden border border-amber-200/40 dark:border-amber-800/30">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-amber-200/30 dark:border-amber-800/20 bg-amber-50/40 dark:bg-amber-950/10">
+        <Clock size={13} className="text-amber-500" />
+        <h2 className="text-xs font-bold text-amber-700 dark:text-amber-400">
+          Deferred to this day
+        </h2>
+        <span className="text-[10px] font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full">
+          {occurrences.length}
+        </span>
+      </div>
+      <div className="p-3 space-y-2">
+        {occurrences.map(({ task }) => {
+          const meta = getTriageMeta(task);
+          const tags = getTagsForIdea(task.id);
+          return (
+            <div key={task.id} className="bg-white/60 dark:bg-white/[0.02] border border-black/5 dark:border-white/5 rounded-xl p-3 flex flex-col gap-2">
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-xs text-gray-700 dark:text-gray-200 font-semibold leading-snug flex-1">
+                  {task.text}
+                </span>
+                <span className="text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                  Deferred
+                </span>
+              </div>
+              {tags.length > 0 && (
+                <div className="flex gap-1 flex-wrap">
+                  {tags.map((tag) => (
+                    <span key={tag.id} className="text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                      <span className={`w-1.5 h-1.5 rounded-full inline-block ${AREA_DOT_COLORS[tag.area]}`} />
+                      {tag.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                  {task.scheduled_date
+                    ? `Moved to ${formatDayLabel(task.scheduled_date, today)}`
+                    : meta.movedToLabel}
+                </span>
+                <TriageActions
+                  task={task}
+                  onReschedule={onReschedule}
+                  onComplete={onComplete}
+                  onCancel={onCancel}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

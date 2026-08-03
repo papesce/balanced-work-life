@@ -1,10 +1,31 @@
-import { Idea } from "@/lib/types";
-import { getToday } from "@/lib/dateUtils";
+import { Idea, IdeaStatus } from "@/lib/types";
+import { getToday, addDays } from "@/lib/dateUtils";
 
 export function computeCompletePatch(): Partial<Idea> {
   return {
     status: "completed",
     completed_at: new Date().toISOString(),
+  };
+}
+
+export function computeCancelPatch(): Partial<Idea> {
+  return {
+    status: "cancelled",
+    cancelled_at: new Date().toISOString(),
+  };
+}
+
+/** Clears the scheduled date while preserving it as a historical occurrence. */
+export function computeClearDatePatch(
+  idea: Idea,
+  fallbackStatus: IdeaStatus = "inbox",
+): Partial<Idea> {
+  return {
+    scheduled_date: null,
+    status: fallbackStatus,
+    attempt_dates: idea.scheduled_date
+      ? [...idea.attempt_dates, idea.scheduled_date]
+      : idea.attempt_dates,
   };
 }
 
@@ -50,4 +71,90 @@ export function computeReschedulePatch(
         attempt_dates: updatedAttemptDates,
       };
   }
+}
+
+/** Convenience action builders for the triage queue. */
+export function tomorrowAction(): RescheduleAction {
+  return { type: "reschedule", newDate: addDays(getToday(), 1) };
+}
+
+export function nextWeekAction(): RescheduleAction {
+  return { type: "reschedule", newDate: addDays(getToday(), 7) };
+}
+
+/**
+ * A task may appear on a given day either as its current scheduled
+ * occurrence or as a historical (deferred/moved) occurrence derived from
+ * attempt_dates.
+ */
+export interface DayOccurrence {
+  task: Idea;
+  date: string;
+  isHistorical: boolean;
+}
+
+/** Derives a task's historical occurrence dates from attempt_dates.
+ *
+ * Future moves are excluded (only past/today matter for triage), duplicate
+ * dates are collapsed, and a date that is also the task's current scheduled
+ * date is suppressed in favor of the active occurrence.
+ */
+export function getHistoricalOccurrenceDates(
+  idea: Idea,
+  today: string = getToday(),
+): string[] {
+  const current = idea.scheduled_date;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const d of idea.attempt_dates) {
+    if (!d || d > today) continue;
+    if (current && d === current) continue;
+    if (seen.has(d)) continue;
+    seen.add(d);
+    out.push(d);
+  }
+  return out;
+}
+
+export function getDayOccurrences(
+  ideas: Idea[],
+  date: string,
+  today: string = getToday(),
+  includeInactive = false,
+): DayOccurrence[] {
+  const result: DayOccurrence[] = [];
+  for (const idea of ideas) {
+    if (idea.type !== "task" || idea.status === "archived") continue;
+    if (!includeInactive && (idea.status === "completed" || idea.status === "cancelled")) continue;
+    if (idea.scheduled_date === date) {
+      result.push({ task: idea, date, isHistorical: false });
+      continue;
+    }
+    if (getHistoricalOccurrenceDates(idea, today).includes(date)) {
+      result.push({ task: idea, date, isHistorical: true });
+    }
+  }
+  return result;
+}
+
+export interface TriageMeta {
+  originalDate: string | null;
+  currentDate: string | null;
+  attemptCount: number;
+  movedToLabel: string;
+}
+
+/** Metadata shown on triage rows (original date, current date, age, attempts). */
+export function getTriageMeta(idea: Idea): TriageMeta {
+  const originalDate =
+    idea.attempt_dates.length > 0
+      ? idea.attempt_dates[0]
+      : idea.scheduled_date ?? idea.created_at.slice(0, 10);
+  const currentDate = idea.scheduled_date;
+  return {
+    originalDate,
+    currentDate,
+    attemptCount: idea.attempt_dates.length,
+    movedToLabel: currentDate ? `Moved to ${currentDate}` : "No date",
+  };
 }

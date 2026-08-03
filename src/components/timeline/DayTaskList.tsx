@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef, KeyboardEvent } from "react";
+import { useState, useEffect, useMemo, useRef, KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { Reorder, useDragControls } from "framer-motion";
 import { Check, Star, MoreHorizontal, GripVertical, Play, Pause, X } from "lucide-react";
 import { Idea, IdeaStatus, Tag, LifeArea } from "@/lib/types";
 import { TagPicker, AREA_DOT_COLORS } from "@/components/shared/TagPicker";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
-import { RescheduleAction } from "@/lib/tasks/rescheduleTask";
+import { RescheduleAction, DayOccurrence, getTriageMeta, computeClearDatePatch } from "@/lib/tasks/rescheduleTask";
+import { TriageActions } from "@/components/triage/TriageActions";
+import { formatTimelineDate } from "@/components/timeline/timelineUtils";
 
 const STATUS_CONFIG: Record<IdeaStatus, { label: string; color: string; icon: React.ElementType | null }> = {
   inbox:       { label: "Inbox",       color: "text-gray-400",              icon: null },
@@ -22,12 +24,13 @@ const STATUS_CONFIG: Record<IdeaStatus, { label: string; color: string; icon: Re
 };
 
 interface DayTaskListProps {
-  tasks: Idea[];
+  occurrences: DayOccurrence[];
   onReorder: (reordered: Idea[]) => void;
   onDone: (id: string) => void;
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
+  onCancel: (id: string) => Promise<void>;
   today: string;
   allTags: Tag[];
   getTagsForIdea: (ideaId: string) => Tag[];
@@ -36,33 +39,106 @@ interface DayTaskListProps {
   onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
 }
 
-export function DayTaskList({ tasks, onReorder, onDone, onUndone, onUpdate, onReschedule, today, allTags, getTagsForIdea, onAddTag, onRemoveTag, onCreateTag }: DayTaskListProps) {
-  const [items, setItems] = useState(tasks);
+export function DayTaskList({ occurrences, onReorder, onDone, onUndone, onUpdate, onReschedule, onCancel, today, allTags, getTagsForIdea, onAddTag, onRemoveTag, onCreateTag }: DayTaskListProps) {
+  const currentTasks = useMemo(() => occurrences.filter((o) => !o.isHistorical).map((o) => o.task), [occurrences]);
+  const historical = useMemo(() => occurrences.filter((o) => o.isHistorical), [occurrences]);
+  const [items, setItems] = useState(currentTasks);
   const itemsRef = useRef(items);
 
   useEffect(() => { itemsRef.current = items; }, [items]);
-  useEffect(() => { setItems(tasks); }, [tasks]);
+  useEffect(() => { setItems(currentTasks); }, [currentTasks]);
 
   return (
-    <Reorder.Group axis="y" values={items} onReorder={setItems} className="space-y-0.5" style={{ overflow: "visible" }}>
-      {items.map((task) => (
-        <DayTaskItem
-          key={task.id}
+    <>
+      <Reorder.Group axis="y" values={items} onReorder={setItems} className="space-y-0.5" style={{ overflow: "visible" }}>
+        {items.map((task) => (
+          <DayTaskItem
+            key={task.id}
+            task={task}
+            onReorder={() => onReorder(itemsRef.current)}
+            onDone={onDone}
+            onUndone={onUndone}
+            onUpdate={onUpdate}
+            onReschedule={onReschedule}
+            today={today}
+            allTags={allTags}
+            taskTags={getTagsForIdea(task.id)}
+            onAddTag={onAddTag}
+            onRemoveTag={onRemoveTag}
+            onCreateTag={onCreateTag}
+          />
+        ))}
+      </Reorder.Group>
+
+      {historical.length > 0 && (
+        <div className="mt-2 rounded-xl border border-amber-200/40 dark:border-amber-800/30 bg-amber-50/40 dark:bg-amber-950/10 overflow-hidden">
+          <div className="px-3 pt-2 pb-1 text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+            Deferred from this date
+          </div>
+          {historical.map((occ) => (
+            <HistoricalOccurrenceRow
+              key={occ.task.id}
+              task={occ.task}
+              taskTags={getTagsForIdea(occ.task.id)}
+              onReschedule={onReschedule}
+              onComplete={onDone}
+              onCancel={onCancel}
+            />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function HistoricalOccurrenceRow({
+  task,
+  taskTags,
+  onReschedule,
+  onComplete,
+  onCancel,
+}: {
+  task: Idea;
+  taskTags: Tag[];
+  onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
+  onComplete: (id: string) => void;
+  onCancel: (id: string) => Promise<void>;
+}) {
+  const meta = getTriageMeta(task);
+  const movedToLabel = task.scheduled_date
+    ? `Moved to ${formatTimelineDate(task.scheduled_date)}`
+    : meta.movedToLabel;
+
+  return (
+    <div className="flex flex-col gap-1.5 px-3 py-2">
+      <div className="flex items-center gap-1.5">
+        <span className="text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded-full flex-shrink-0">
+          Deferred
+        </span>
+        <span className="flex-1 text-sm truncate text-gray-700 dark:text-gray-200">
+          {task.text}
+        </span>
+        {taskTags.length > 0 && (
+          <div className="flex gap-1 flex-shrink-0">
+            {taskTags.map((tag) => (
+              <span key={tag.id} className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                <span className={`w-1.5 h-1.5 rounded-full inline-block flex-shrink-0 ${AREA_DOT_COLORS[tag.area]}`} />
+                {tag.name}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] text-gray-400 dark:text-gray-500">{movedToLabel}</span>
+        <TriageActions
           task={task}
-          onReorder={() => onReorder(itemsRef.current)}
-          onDone={onDone}
-          onUndone={onUndone}
-          onUpdate={onUpdate}
           onReschedule={onReschedule}
-          today={today}
-          allTags={allTags}
-          taskTags={getTagsForIdea(task.id)}
-          onAddTag={onAddTag}
-          onRemoveTag={onRemoveTag}
-          onCreateTag={onCreateTag}
+          onComplete={async (id) => { onComplete(id); }}
+          onCancel={onCancel}
         />
-      ))}
-    </Reorder.Group>
+      </div>
+    </div>
   );
 }
 
@@ -348,7 +424,7 @@ function TimelineTaskRow({
               />
             </div>
             <button
-              onClick={() => { onUpdate(task.id, { scheduled_date: null, status: "inbox" }); setShowMenu(false); }}
+              onClick={() => { onUpdate(task.id, computeClearDatePatch(task, "inbox")); setShowMenu(false); }}
               className="flex w-full text-left px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
             >
               Move to Inbox

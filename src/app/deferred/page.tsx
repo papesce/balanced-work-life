@@ -1,24 +1,25 @@
 "use client";
 
-import { useMemo, useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
-import { Clock, ChevronRight, Calendar, History, Check, ExternalLink } from "lucide-react";
+import { Clock, ChevronRight, Calendar, History, ExternalLink } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
-import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { useDeferredTasks, AgeBucket } from "@/hooks/useDeferredTasks";
 import { AppShell } from "@/components/AppShell";
-import { Idea, Tag, getAreasForIdea } from "@/lib/types";
-import { computeReschedulePatch, computeCompletePatch, getContextDate, RescheduleAction } from "@/lib/tasks/rescheduleTask";
+import { Idea, Tag } from "@/lib/types";
+import { computeReschedulePatch, computeCompletePatch, computeCancelPatch, getContextDate, getTriageMeta, RescheduleAction } from "@/lib/tasks/rescheduleTask";
+import { useUndoAction } from "@/lib/tasks/undo";
+import { UndoBar } from "@/components/shared/UndoBar";
+import { TriageActions } from "@/components/triage/TriageActions";
 import { AREA_DOT_COLORS } from "@/components/shared/TagPicker";
-import { getToday } from "@/lib/dateUtils";
+import { formatDate } from "@/lib/dateUtils";
 
 export default function DeferredPage() {
   const { ideas, updateIdea } = useIdeas();
-  const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
   const { overdueBuckets, deferredTasks, loading } = useDeferredTasks();
-  const today = getToday();
+  const { undoAction, registerUndo, clearUndo, handleUndo } = useUndoAction();
 
   const handleReschedule = useCallback(async (id: string, action: RescheduleAction) => {
     const idea = ideas.find((i) => i.id === id);
@@ -31,6 +32,20 @@ export default function DeferredPage() {
     const patch = computeCompletePatch();
     await updateIdea(id, patch);
   }, [updateIdea]);
+
+  const handleCancel = useCallback(async (id: string) => {
+    const idea = ideas.find((i) => i.id === id);
+    if (!idea) return;
+    const previous = idea;
+    const patch = computeCancelPatch();
+    await updateIdea(id, patch);
+    registerUndo({
+      label: "Task cancelled",
+      run: async () => {
+        await updateIdea(id, { status: previous.status, cancelled_at: null });
+      },
+    });
+  }, [ideas, updateIdea, registerUndo]);
 
   if (loading) {
     return (
@@ -45,6 +60,7 @@ export default function DeferredPage() {
   return (
     <AppShell title="Deferred Tasks">
       <div className="space-y-6">
+        <UndoBar undoAction={undoAction} onUndo={() => void handleUndo()} onDismiss={clearUndo} />
         {!hasAny ? (
           <div className="glass-card rounded-2xl text-center py-20 text-gray-400 dark:text-gray-500 border border-dashed border-black/5 dark:border-white/5">
             <Clock size={32} className="mx-auto text-gray-300 dark:text-gray-600 mb-3 opacity-60" />
@@ -57,9 +73,9 @@ export default function DeferredPage() {
               <BucketSection
                 key={bucket.label}
                 bucket={bucket}
-                today={today}
                 onReschedule={handleReschedule}
                 onComplete={handleComplete}
+                onCancel={handleCancel}
                 getTagsForIdea={taskTagsHook.getTagsForIdea}
               />
             ))}
@@ -67,9 +83,9 @@ export default function DeferredPage() {
             {deferredTasks.length > 0 && (
               <DeferredSection
                 tasks={deferredTasks}
-                today={today}
                 onReschedule={handleReschedule}
                 onComplete={handleComplete}
+                onCancel={handleCancel}
                 getTagsForIdea={taskTagsHook.getTagsForIdea}
               />
             )}
@@ -82,15 +98,15 @@ export default function DeferredPage() {
 
 function BucketSection({
   bucket,
-  today,
   onReschedule,
   onComplete,
+  onCancel,
   getTagsForIdea,
 }: {
   bucket: AgeBucket;
-  today: string;
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
   onComplete: (id: string) => Promise<void>;
+  onCancel: (id: string) => Promise<void>;
   getTagsForIdea: (ideaId: string) => Tag[];
 }) {
   return (
@@ -109,9 +125,9 @@ function BucketSection({
           <DeferredTaskRow
             key={task.id}
             task={task}
-            today={today}
             onReschedule={onReschedule}
             onComplete={onComplete}
+            onCancel={onCancel}
             getTagsForIdea={getTagsForIdea}
           />
         ))}
@@ -122,15 +138,15 @@ function BucketSection({
 
 function DeferredSection({
   tasks,
-  today,
   onReschedule,
   onComplete,
+  onCancel,
   getTagsForIdea,
 }: {
   tasks: Idea[];
-  today: string;
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
   onComplete: (id: string) => Promise<void>;
+  onCancel: (id: string) => Promise<void>;
   getTagsForIdea: (ideaId: string) => Tag[];
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -159,9 +175,9 @@ function DeferredSection({
             <DeferredTaskRow
               key={task.id}
               task={task}
-              today={today}
               onReschedule={onReschedule}
               onComplete={onComplete}
+              onCancel={onCancel}
               getTagsForIdea={getTagsForIdea}
             />
           ))}
@@ -173,18 +189,19 @@ function DeferredSection({
 
 function DeferredTaskRow({
   task,
-  today,
   onReschedule,
   onComplete,
+  onCancel,
   getTagsForIdea,
 }: {
   task: Idea;
-  today: string;
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
   onComplete: (id: string) => Promise<void>;
+  onCancel: (id: string) => Promise<void>;
   getTagsForIdea: (ideaId: string) => Tag[];
 }) {
   const tags = getTagsForIdea(task.id);
+  const meta = getTriageMeta(task);
 
   return (
     <div className="bg-white/60 dark:bg-white/[0.02] border border-black/5 dark:border-white/5 rounded-xl p-3 flex flex-col gap-2">
@@ -192,11 +209,25 @@ function DeferredTaskRow({
         <span className="text-xs text-gray-700 dark:text-gray-200 font-semibold leading-snug flex-1">
           {task.text}
         </span>
-        {task.attempt_dates.length > 0 && (
+        {meta.attemptCount > 0 && (
           <span className="text-[9px] font-bold text-gray-400 dark:text-gray-500 flex-shrink-0">
-            {task.attempt_dates.length} attempt{task.attempt_dates.length !== 1 ? "s" : ""}
+            {meta.attemptCount} attempt{meta.attemptCount !== 1 ? "s" : ""}
           </span>
         )}
+      </div>
+
+      <div className="flex items-center gap-2 text-[10px] text-gray-400 dark:text-gray-500">
+        {meta.originalDate && (
+          <span>
+            <span className="font-semibold text-gray-500 dark:text-gray-400">Original:</span> {formatDate(meta.originalDate)}
+          </span>
+        )}
+        {task.scheduled_date && (
+          <span>
+            <span className="font-semibold text-gray-500 dark:text-gray-400">Current:</span> {formatDate(task.scheduled_date)}
+          </span>
+        )}
+        {!task.scheduled_date && <span>{meta.movedToLabel}</span>}
       </div>
 
       {tags.length > 0 && (
@@ -210,45 +241,20 @@ function DeferredTaskRow({
         </div>
       )}
 
-      <div className="flex items-center gap-2 self-end">
-        <button
-          onClick={() => void onComplete(task.id)}
-          className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 px-2 py-1 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-colors cursor-pointer flex items-center gap-1"
-        >
-          <Check size={11} />
-          Completar
-        </button>
+      <div className="flex items-center gap-2 self-end flex-wrap">
         <Link
           href={`/?date=${getContextDate(task)}&highlight=${task.id}`}
           className="text-[10px] font-bold text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 px-2 py-1 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900/20 transition-colors flex items-center gap-1"
         >
           <ExternalLink size={10} />
-          Ver contexto
+          Context
         </Link>
-        <button
-          onClick={() => void onReschedule(task.id, { type: "retry_today" })}
-          className="text-[10px] font-bold text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 px-2 py-1 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-950/20 transition-colors cursor-pointer"
-        >
-          Intentar hoy
-        </button>
-        <div className="relative group/date">
-          <button className="text-[10px] font-bold text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 px-2 py-1 rounded-lg hover:bg-sky-50 dark:hover:bg-sky-950/20 transition-colors cursor-pointer">
-            Reprogramar
-          </button>
-          <input
-            type="date"
-            className="absolute right-0 top-full mt-1 opacity-0 w-0 h-0 pointer-events-none group-hover/date:opacity-100 group-hover/date:w-auto group-hover/date:h-auto group-hover/date:pointer-events-auto text-xs border border-black/10 dark:border-white/10 rounded-lg px-2 py-1.5 bg-white/80 dark:bg-gray-800/80 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-violet-500 z-50"
-            onChange={(e) => {
-              if (e.target.value) void onReschedule(task.id, { type: "reschedule", newDate: e.target.value });
-            }}
-          />
-        </div>
-        <button
-          onClick={() => void onReschedule(task.id, { type: "defer" })}
-          className="text-[10px] font-bold text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 px-2 py-1 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900/20 transition-colors cursor-pointer"
-        >
-          Dejar sin fecha
-        </button>
+        <TriageActions
+          task={task}
+          onReschedule={onReschedule}
+          onComplete={onComplete}
+          onCancel={onCancel}
+        />
       </div>
     </div>
   );

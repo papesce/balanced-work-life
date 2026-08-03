@@ -12,11 +12,13 @@ import { AppShell } from "@/components/AppShell";
 import { MiniBalanceBar } from "@/components/MiniBalanceBar";
 import { Idea } from "@/lib/types";
 import { getToday, getTomorrow, getDatesRange, isPast } from "@/lib/dateUtils";
-import { computeReschedulePatch, computeCompletePatch, RescheduleAction } from "@/lib/tasks/rescheduleTask";
+import { computeReschedulePatch, computeCompletePatch, computeCancelPatch, getDayOccurrences, DayOccurrence, RescheduleAction } from "@/lib/tasks/rescheduleTask";
+import { useUndoAction } from "@/lib/tasks/undo";
 import { DayTaskList } from "@/components/timeline/DayTaskList";
 import { FloatingAddButton } from "@/components/timeline/FloatingAddButton";
 import { QuickAddInput } from "@/components/timeline/QuickAddInput";
 import { InboxDeferredPanel } from "@/components/shared/InboxDeferredPanel";
+import { UndoBar } from "@/components/shared/UndoBar";
 import { formatTimelineDate, getTimelineKicker } from "@/components/timeline/timelineUtils";
 
 const cardVariants = {
@@ -38,6 +40,7 @@ export default function TimelinePage() {
   const todayRef = useRef<HTMLElement>(null);
   const hasAutoScrolled = useRef(false);
   const [fabOpen, setFabOpen] = useState(false);
+  const { undoAction, registerUndo, clearUndo, handleUndo } = useUndoAction();
 
   const today = getToday();
   const tomorrow = getTomorrow();
@@ -45,16 +48,13 @@ export default function TimelinePage() {
   const tasks = useMemo(() => ideas.filter((i) => i.type === "task"), [ideas]);
   const inboxTasks = useMemo(() => tasks.filter((t) => !t.scheduled_date && t.status !== "completed" && t.status !== "cancelled" && t.status !== "archived"), [tasks]);
 
-  const tasksByDate = useMemo(() => {
-    const map: Record<string, Idea[]> = {};
-    for (const task of tasks) {
-      if (task.scheduled_date) {
-        if (!map[task.scheduled_date]) map[task.scheduled_date] = [];
-        map[task.scheduled_date].push(task);
-      }
+  const occurrencesByDate = useMemo(() => {
+    const map: Record<string, DayOccurrence[]> = {};
+    for (const date of dates) {
+      map[date] = getDayOccurrences(tasks, date, today, true);
     }
     return map;
-  }, [tasks]);
+  }, [tasks, dates, today]);
 
   useEffect(() => {
     if (!loading && !hasAutoScrolled.current) {
@@ -81,6 +81,20 @@ export default function TimelinePage() {
     const patch = computeCompletePatch();
     await updateIdea(id, patch);
   }, [updateIdea]);
+
+  const handleCancel = useCallback(async (id: string) => {
+    const idea = ideas.find((i) => i.id === id);
+    if (!idea) return;
+    const previous = idea;
+    const patch = computeCancelPatch();
+    await updateIdea(id, patch);
+    registerUndo({
+      label: "Task cancelled",
+      run: async () => {
+        await updateIdea(id, { status: previous.status, cancelled_at: null });
+      },
+    });
+  }, [ideas, updateIdea, registerUndo]);
 
   const handleFabAdd = async (text: string, date: string | null) => {
     await createIdea(text, null, "bottom", { type: "task", scheduled_date: date, status: date ? "planned" : "inbox" });
@@ -112,6 +126,7 @@ export default function TimelinePage() {
   return (
     <AppShell title="Timeline" headerActions={headerActions}>
       <div className="space-y-4 pb-24">
+        <UndoBar undoAction={undoAction} onUndo={() => void handleUndo()} onDismiss={clearUndo} />
         {(inboxTasks.length > 0 || overdueBuckets.some((b) => b.tasks.length > 0) || deferredTasks.length > 0) && (
           <InboxDeferredPanel
             activeDate={today}
@@ -130,16 +145,18 @@ export default function TimelinePage() {
             deferredTasks={deferredTasks}
             onReschedule={handleReschedule}
             onComplete={handleComplete}
+            onCancel={handleCancel}
             getTagsForIdea={taskTagsHook.getTagsForIdea}
           />
         )}
 
         {dates.map((date, index) => {
-          const dayTasks = tasksByDate[date] ?? [];
+          const dayOccurrences = occurrencesByDate[date] ?? [];
+          const dayTasks = dayOccurrences.filter((o) => !o.isHistorical).map((o) => o.task);
           const isTodayDate = date === today;
           const dateLabel = formatTimelineDate(date);
           const timelineKicker = getTimelineKicker(date, today, tomorrow);
-          const unresolvedCount = dayTasks.filter((t) => t.status !== "completed" && t.status !== "cancelled" && isPast(date)).length;
+          const unresolvedCount = dayOccurrences.filter((o) => !o.isHistorical && o.task.status !== "completed" && o.task.status !== "cancelled" && isPast(date)).length;
 
           return (
             <motion.section
@@ -190,16 +207,17 @@ export default function TimelinePage() {
                 </div>
 
                 <div className="px-5 pb-2">
-                  {dayTasks.length === 0 ? (
+                  {dayOccurrences.length === 0 ? (
                     <p className="text-xs text-gray-400 dark:text-gray-500 italic py-1">No tasks planned</p>
                   ) : (
                     <DayTaskList
-                      tasks={dayTasks}
+                      occurrences={dayOccurrences}
                       onReorder={handleReorderDate(date)}
                       onDone={markDone}
                       onUndone={markUndone}
                       onUpdate={updateIdea}
                       onReschedule={handleReschedule}
+                      onCancel={handleCancel}
                       today={today}
                       allTags={tagsHook.tags}
                       getTagsForIdea={taskTagsHook.getTagsForIdea}

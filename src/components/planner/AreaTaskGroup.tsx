@@ -10,7 +10,7 @@ import { AREA_ICONS, AREA_LABELS } from "./constants";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { formatTime } from "./plannerUtils";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
-import { RescheduleAction } from "@/lib/tasks/rescheduleTask";
+import { RescheduleAction, computeClearDatePatch } from "@/lib/tasks/rescheduleTask";
 
 const STATUS_CONFIG: Record<IdeaStatus, { label: string; color: string; icon: React.ElementType | null }> = {
   inbox:       { label: "Inbox",       color: "text-gray-400",              icon: null },
@@ -591,7 +591,7 @@ function TaskRow({
               className="glass-card-strong rounded-lg py-1 min-w-[160px] shadow-lg border border-black/5 dark:border-white/5"
             >
               <button
-                onClick={() => { onUpdate(task.id, { scheduled_date: null, status: "inbox" }); setShowMenu(false); }}
+                onClick={() => { onUpdate(task.id, computeClearDatePatch(task, "inbox")); setShowMenu(false); }}
                 className="flex w-full text-left px-3 py-1.5 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] font-semibold cursor-pointer"
               >
                 Move to Backlog

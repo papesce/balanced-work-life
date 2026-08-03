@@ -2,11 +2,12 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { Inbox, Clock, ChevronRight, Plus, Check, ExternalLink, RefreshCw } from "lucide-react";
+import { Inbox, Clock, ChevronRight, Plus, ExternalLink, RefreshCw } from "lucide-react";
 import { Idea, Tag } from "@/lib/types";
 import { RescheduleAction, getContextDate } from "@/lib/tasks/rescheduleTask";
 import { AgeBucket } from "@/hooks/useDeferredTasks";
 import { AREA_DOT_COLORS } from "@/components/shared/TagPicker";
+import { TriageActions } from "@/components/triage/TriageActions";
 
 interface InboxDeferredPanelProps {
   compact?: boolean;
@@ -19,6 +20,7 @@ interface InboxDeferredPanelProps {
   deferredTasks: Idea[];
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
   onComplete: (id: string) => Promise<void>;
+  onCancel: (id: string) => Promise<void>;
   getTagsForIdea: (ideaId: string) => Tag[];
   onRefresh?: () => void;
 }
@@ -34,6 +36,7 @@ export function InboxDeferredPanel({
   deferredTasks,
   onReschedule,
   onComplete,
+  onCancel,
   getTagsForIdea,
   onRefresh,
 }: InboxDeferredPanelProps) {
@@ -110,6 +113,7 @@ export function InboxDeferredPanel({
           today={today}
           onReschedule={onReschedule}
           onComplete={onComplete}
+          onCancel={onCancel}
           getTagsForIdea={getTagsForIdea}
         />
       )}
@@ -207,6 +211,7 @@ function DeferredTab({
   today,
   onReschedule,
   onComplete,
+  onCancel,
   getTagsForIdea,
 }: {
   compact: boolean;
@@ -215,6 +220,7 @@ function DeferredTab({
   today: string;
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
   onComplete: (id: string) => Promise<void>;
+  onCancel: (id: string) => Promise<void>;
   getTagsForIdea: (ideaId: string) => Tag[];
 }) {
   const allTasks = useMemo(() => {
@@ -250,6 +256,7 @@ function DeferredTab({
             today={today}
             onReschedule={onReschedule}
             onComplete={onComplete}
+            onCancel={onCancel}
             getTagsForIdea={getTagsForIdea}
           />
         ))}
@@ -278,6 +285,7 @@ function DeferredTab({
                 today={today}
                 onReschedule={onReschedule}
                 onComplete={onComplete}
+                onCancel={onCancel}
                 getTagsForIdea={getTagsForIdea}
               />
             ))}
@@ -304,6 +312,7 @@ function DeferredTab({
                 today={today}
                 onReschedule={onReschedule}
                 onComplete={onComplete}
+                onCancel={onCancel}
                 getTagsForIdea={getTagsForIdea}
               />
             ))}
@@ -320,6 +329,7 @@ function CompactDeferredRow({
   today,
   onReschedule,
   onComplete,
+  onCancel,
   getTagsForIdea,
 }: {
   task: Idea;
@@ -327,10 +337,10 @@ function CompactDeferredRow({
   today: string;
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
   onComplete: (id: string) => Promise<void>;
+  onCancel: (id: string) => Promise<void>;
   getTagsForIdea: (ideaId: string) => Tag[];
 }) {
   const tags = getTagsForIdea(task.id);
-  const [showDatePicker, setShowDatePicker] = useState(false);
 
   return (
     <div className="bg-white/60 dark:bg-white/[0.02] border border-black/5 dark:border-white/5 rounded-xl p-2.5 flex flex-col gap-1.5">
@@ -363,14 +373,7 @@ function CompactDeferredRow({
         </div>
       )}
 
-      <div className="flex items-center gap-1.5 self-end">
-        <button
-          onClick={() => void onComplete(task.id)}
-          className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 px-1.5 py-0.5 rounded hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-colors cursor-pointer flex items-center gap-0.5"
-        >
-          <Check size={10} />
-          Complete
-        </button>
+      <div className="flex items-center gap-1.5 self-end flex-wrap">
         <Link
           href={`/?date=${getContextDate(task)}&highlight=${task.id}`}
           className="text-[9px] font-bold text-gray-400 dark:text-gray-500 hover:text-gray-600 px-1.5 py-0.5 rounded hover:bg-gray-50 dark:hover:bg-gray-900/20 transition-colors flex items-center gap-0.5"
@@ -378,38 +381,13 @@ function CompactDeferredRow({
           <ExternalLink size={9} />
           Context
         </Link>
-        <button
-          onClick={() => void onReschedule(task.id, { type: "retry_today" })}
-          className="text-[9px] font-bold text-violet-600 dark:text-violet-400 hover:text-violet-700 px-1.5 py-0.5 rounded hover:bg-violet-50 dark:hover:bg-violet-950/20 transition-colors cursor-pointer"
-        >
-          Today
-        </button>
-        <div className="relative">
-          <button
-            onClick={() => setShowDatePicker(!showDatePicker)}
-            className="text-[9px] font-bold text-sky-600 dark:text-sky-400 hover:text-sky-700 px-1.5 py-0.5 rounded hover:bg-sky-50 dark:hover:bg-sky-950/20 transition-colors cursor-pointer"
-          >
-            Reschedule
-          </button>
-          {showDatePicker && (
-            <input
-              type="date"
-              autoFocus
-              className="absolute right-0 top-full mt-1 text-xs border border-black/10 dark:border-white/10 rounded-lg px-2 py-1.5 bg-white/80 dark:bg-gray-800/80 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-violet-500 z-50"
-              onChange={(e) => {
-                if (e.target.value) void onReschedule(task.id, { type: "reschedule", newDate: e.target.value });
-                setShowDatePicker(false);
-              }}
-              onBlur={() => setShowDatePicker(false)}
-            />
-          )}
-        </div>
-        <button
-          onClick={() => void onReschedule(task.id, { type: "defer" })}
-          className="text-[9px] font-bold text-gray-400 dark:text-gray-500 hover:text-gray-600 px-1.5 py-0.5 rounded hover:bg-gray-50 dark:hover:bg-gray-900/20 transition-colors cursor-pointer"
-        >
-          No date
-        </button>
+        <TriageActions
+          task={task}
+          onReschedule={onReschedule}
+          onComplete={onComplete}
+          onCancel={onCancel}
+          compact
+        />
       </div>
     </div>
   );
