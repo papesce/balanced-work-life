@@ -559,6 +559,17 @@ function EventCard({
           >
             Change Area...
           </button>
+          <div className="border-t border-black/5 dark:border-white/5 my-1" />
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onUpdateTask(idea.id, { scheduled_time: null });
+              setShowMenu(false);
+            }}
+            className="flex w-full text-left px-3 py-1.5 text-[11px] text-red-500 hover:bg-red-50/50 dark:hover:bg-red-900/20 font-semibold cursor-pointer"
+          >
+            Remove from Timeline
+          </button>
         </div>,
         document.body
       )}

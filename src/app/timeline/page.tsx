@@ -40,6 +40,8 @@ const PAST_RANGES = [
 ] as const;
 
 const FUTURE_RANGES = [
+  { id: "3days", label: "Next 3 Days", days: 3 },
+  { id: "week", label: "Next Week", days: 7 },
   { id: "2weeks", label: "Next 14 Days", days: 14 },
   { id: "month", label: "Next Month", days: 31 },
   { id: "quarter", label: "Next 3 Months", days: 92 },

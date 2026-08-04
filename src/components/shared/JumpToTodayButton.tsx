@@ -7,9 +7,14 @@ interface JumpToTodayButtonProps {
 }
 
 export function JumpToTodayButton({ onClick, isToday = false, label = "Today" }: JumpToTodayButtonProps) {
-  if (isToday) return null;
   return (
-    <button type="button" onClick={onClick} className="focus-button" title="Jump to today">
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={isToday}
+      className="focus-button"
+      title={isToday ? "You're viewing today" : "Jump to today"}
+    >
       {label}
     </button>
   );
