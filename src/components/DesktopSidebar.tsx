@@ -5,15 +5,14 @@ import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { navItems } from "@/lib/navItems";
 import { APP_VERSION } from "@/lib/version";
-import { PanelLeftClose, LogOut } from "lucide-react";
+import { PanelLeftClose } from "lucide-react";
 
 interface DesktopSidebarProps {
-  onSignOut: () => void;
   collapsed: boolean;
   onToggle: () => void;
 }
 
-export function DesktopSidebar({ onSignOut, collapsed, onToggle }: DesktopSidebarProps) {
+export function DesktopSidebar({ collapsed, onToggle }: DesktopSidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -108,20 +107,6 @@ export function DesktopSidebar({ onSignOut, collapsed, onToggle }: DesktopSideba
           );
         })}
       </nav>
-
-      {/* FOOTER */}
-      <div className={`border-t border-black/5 dark:border-white/5 ${collapsed ? "px-2 py-3" : "px-3 py-4"}`}>
-        <button
-          onClick={onSignOut}
-          title={collapsed ? "Sign Out" : undefined}
-          className={`w-full flex items-center rounded-xl text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer ${
-            collapsed ? "justify-center px-0 py-2" : "gap-3 px-3 py-2"
-          }`}
-        >
-          <LogOut size={16} />
-          {!collapsed && <span>Sign Out</span>}
-        </button>
-      </div>
     </aside>
   );
 }

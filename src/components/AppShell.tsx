@@ -1,10 +1,10 @@
 "use client";
 
 import { ReactNode, useState, useEffect, useCallback } from "react";
-import { useAuth } from "@/hooks/useAuth";
 import { Navigation } from "@/components/Navigation";
 import { QuickAddButton } from "@/components/QuickAddButton";
 import { DesktopSidebar } from "@/components/DesktopSidebar";
+import { UserMenu } from "@/components/UserMenu";
 
 const SIDEBAR_KEY = "sidebar-collapsed";
 const COLLAPSE_BELOW = 1024;
@@ -18,8 +18,6 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, title, headerActions, fullWidth, onAdd }: AppShellProps) {
-  const { signOut } = useAuth();
-
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     const saved = localStorage.getItem(SIDEBAR_KEY);
@@ -52,19 +50,14 @@ export function AppShell({ children, title, headerActions, fullWidth, onAdd }: A
 
   return (
     <div className="min-h-screen">
-      <DesktopSidebar onSignOut={signOut} collapsed={collapsed} onToggle={handleToggle} />
+      <DesktopSidebar collapsed={collapsed} onToggle={handleToggle} />
 
       <div className={`${collapsed ? "md:ml-[64px]" : "md:ml-[220px]"} flex flex-col min-h-screen transition-[margin-left] duration-200 ease-in-out`}>
         <header className="sticky top-0 z-40 glass-card-strong border-b border-white/30 dark:border-white/5 px-5 py-3 flex items-center justify-between rounded-none">
           <h1 className="text-[15px] font-bold text-gray-800 dark:text-gray-200 tracking-tight">{title}</h1>
           <div className="flex items-center gap-3">
             {headerActions}
-            <button
-              onClick={signOut}
-              className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 md:hidden transition-colors"
-            >
-              Sign Out
-            </button>
+            <UserMenu />
           </div>
         </header>
 
