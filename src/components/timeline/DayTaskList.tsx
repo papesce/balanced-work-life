@@ -30,6 +30,7 @@ interface DayTaskListProps {
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
   onCancel: (id: string) => Promise<void>;
   today: string;
+  onGoToDate?: (date: string, taskId: string) => void;
   allTags: Tag[];
   getTagsForIdea: (ideaId: string) => Tag[];
   onAddTag: (ideaId: string, tag: Tag) => Promise<void>;
@@ -37,7 +38,7 @@ interface DayTaskListProps {
   onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
 }
 
-export function DayTaskList({ occurrences, onReorder, onDone, onUndone, onUpdate, onReschedule, onCancel, today, allTags, getTagsForIdea, onAddTag, onRemoveTag, onCreateTag }: DayTaskListProps) {
+export function DayTaskList({ occurrences, onReorder, onDone, onUndone, onUpdate, onReschedule, onCancel, today, onGoToDate, allTags, getTagsForIdea, onAddTag, onRemoveTag, onCreateTag }: DayTaskListProps) {
   const currentTasks = useMemo(() => occurrences.filter((o) => !o.isHistorical).map((o) => o.task), [occurrences]);
   const historical = useMemo(() => occurrences.filter((o) => o.isHistorical), [occurrences]);
   const [items, setItems] = useState(currentTasks);
@@ -53,6 +54,7 @@ export function DayTaskList({ occurrences, onReorder, onDone, onUndone, onUpdate
           <DayTaskItem
             key={task.id}
             task={task}
+            occurrenceDate={task.scheduled_date ?? undefined}
             onReorder={() => onReorder(itemsRef.current)}
             onDone={onDone}
             onUndone={onUndone}
@@ -77,6 +79,7 @@ export function DayTaskList({ occurrences, onReorder, onDone, onUndone, onUpdate
             <HistoricalOccurrenceRow
               key={occ.task.id}
               task={occ.task}
+              occurrenceDate={occ.date}
               taskTags={getTagsForIdea(occ.task.id)}
               onDone={onDone}
               onUndone={onUndone}
@@ -84,6 +87,7 @@ export function DayTaskList({ occurrences, onReorder, onDone, onUndone, onUpdate
               onReschedule={onReschedule}
               onCancel={onCancel}
               today={today}
+              onGoToDate={onGoToDate}
               allTags={allTags}
               onAddTag={onAddTag}
               onRemoveTag={onRemoveTag}
@@ -99,6 +103,7 @@ export function DayTaskList({ occurrences, onReorder, onDone, onUndone, onUpdate
 
 function HistoricalOccurrenceRow({
   task,
+  occurrenceDate,
   taskTags,
   onDone,
   onUndone,
@@ -106,6 +111,7 @@ function HistoricalOccurrenceRow({
   onReschedule,
   onCancel,
   today,
+  onGoToDate,
   allTags,
   onAddTag,
   onRemoveTag,
@@ -113,6 +119,7 @@ function HistoricalOccurrenceRow({
   isHistorical = false,
 }: {
   task: Idea;
+  occurrenceDate: string;
   taskTags: Tag[];
   onDone: (id: string) => void;
   onUndone: (id: string) => void;
@@ -120,6 +127,7 @@ function HistoricalOccurrenceRow({
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
   onCancel: (id: string) => Promise<void>;
   today: string;
+  onGoToDate?: (date: string, taskId: string) => void;
   allTags: Tag[];
   onAddTag: (ideaId: string, tag: Tag) => Promise<void>;
   onRemoveTag: (ideaId: string, tagId: string) => Promise<void>;
@@ -130,6 +138,7 @@ function HistoricalOccurrenceRow({
     <div className="px-1">
       <TimelineTaskRow
         task={task}
+        occurrenceDate={occurrenceDate}
         onDone={onDone}
         onUndone={onUndone}
         onUpdate={onUpdate}
@@ -142,15 +151,17 @@ function HistoricalOccurrenceRow({
         onRemoveTag={onRemoveTag}
         onCreateTag={onCreateTag}
         isHistorical={isHistorical}
+        onGoToDate={onGoToDate}
       />
     </div>
   );
 }
 
 function DayTaskItem({
-  task, onReorder, onDone, onUndone, onUpdate, onReschedule, today, allTags, taskTags, onAddTag, onRemoveTag, onCreateTag,
+  task, occurrenceDate, onReorder, onDone, onUndone, onUpdate, onReschedule, today, allTags, taskTags, onAddTag, onRemoveTag, onCreateTag,
 }: {
   task: Idea;
+  occurrenceDate?: string;
   onReorder: () => void;
   onDone: (id: string) => void;
   onUndone: (id: string) => void;
@@ -166,15 +177,16 @@ function DayTaskItem({
   const controls = useDragControls();
   return (
     <Reorder.Item value={task} dragControls={controls} className="relative" onDragEnd={onReorder}>
-      <TimelineTaskRow task={task} onDone={onDone} onUndone={onUndone} onUpdate={onUpdate} onReschedule={onReschedule} today={today} dragControls={controls} allTags={allTags} taskTags={taskTags} onAddTag={onAddTag} onRemoveTag={onRemoveTag} onCreateTag={onCreateTag} />
+      <TimelineTaskRow task={task} occurrenceDate={occurrenceDate} onDone={onDone} onUndone={onUndone} onUpdate={onUpdate} onReschedule={onReschedule} today={today} dragControls={controls} allTags={allTags} taskTags={taskTags} onAddTag={onAddTag} onRemoveTag={onRemoveTag} onCreateTag={onCreateTag} />
     </Reorder.Item>
   );
 }
 
 function TimelineTaskRow({
-  task, onDone, onUndone, onUpdate, onReschedule, today, dragControls, allTags, taskTags, onAddTag, onRemoveTag, onCreateTag, isHistorical = false,
+  task, occurrenceDate, onDone, onUndone, onUpdate, onReschedule, today, dragControls, allTags, taskTags, onAddTag, onRemoveTag, onCreateTag, isHistorical = false, onGoToDate,
 }: {
   task: Idea;
+  occurrenceDate?: string;
   onDone: (id: string) => void;
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
@@ -187,6 +199,7 @@ function TimelineTaskRow({
   onRemoveTag: (ideaId: string, tagId: string) => Promise<void>;
   onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
   isHistorical?: boolean;
+  onGoToDate?: (date: string, taskId: string) => void;
 }) {
   const isCompleted = task.status === "completed";
   const isCancelled = task.status === "cancelled";
@@ -195,6 +208,8 @@ function TimelineTaskRow({
   const isReschedule = isHistorical || task.status === "deferred" || (task.scheduled_date !== null && task.scheduled_date < today);
   const dateActionLabel = isReschedule ? "Reschedule" : "Move";
   const statusConfig = STATUS_CONFIG[task.status];
+  const attemptTarget = task.scheduled_date ?? task.attempt_dates[task.attempt_dates.length - 1];
+  const attemptLabel = task.scheduled_date ? "Go to next attempt" : "Go to last attempt";
   const [showMenu, setShowMenu] = useState(false);
   const [showTagPicker, setShowTagPicker] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -297,6 +312,7 @@ function TimelineTaskRow({
 
   return (
     <div
+      id={occurrenceDate ? `task-${task.id}-${occurrenceDate}` : undefined}
       className={`flex items-center gap-1.5 rounded-xl px-3 py-2 transition-colors group ${isHovered ? "bg-black/[0.03] dark:bg-white/[0.04]" : ""}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -418,6 +434,17 @@ function TimelineTaskRow({
             style={{ position: "fixed", top: menuPos.top, right: menuPos.right, zIndex: 9999 }}
             className="glass-card-strong rounded-xl py-1.5 min-w-[160px] shadow-lg"
           >
+            {isHistorical && onGoToDate && attemptTarget && (
+              <>
+                <button
+                  onClick={() => { onGoToDate(attemptTarget, task.id); setShowMenu(false); }}
+                  className="flex w-full text-left px-3 py-2 text-xs font-medium text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/20"
+                >
+                  {attemptLabel}
+                </button>
+                <div className="border-t border-black/5 dark:border-white/5 my-1" />
+              </>
+            )}
             {task.scheduled_date !== today && (
               <button
                 onClick={() => { void onReschedule(task.id, isReschedule ? { type: "retry_today" } : { type: "move", newDate: today }); setShowMenu(false); }}

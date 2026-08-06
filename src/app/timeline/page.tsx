@@ -278,6 +278,42 @@ export default function TimelinePage() {
     [reorderTasks],
   );
 
+  const scrollToDate = useCallback((targetDate: string) => {
+    document.getElementById(`day-${targetDate}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, []);
+
+  const highlightTask = useCallback((taskId: string, targetDate: string) => {
+    const el = document.getElementById(`task-${taskId}-${targetDate}`);
+    if (!el) {
+      scrollToDate(targetDate);
+      return;
+    }
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("highlight-pulse");
+    const cleanup = () => el.classList.remove("highlight-pulse");
+    el.addEventListener("animationend", cleanup, { once: true });
+    setTimeout(cleanup, 2500);
+  }, [scrollToDate]);
+
+  const handleGoToDate = useCallback((targetDate: string, taskId: string) => {
+    if (dates.includes(targetDate)) {
+      highlightTask(taskId, targetDate);
+      return;
+    }
+    if (targetDate < today) {
+      const needed = Math.round((Date.parse(targetDate + "T00:00:00") - Date.parse(today + "T00:00:00")) / 86400000) * -1;
+      const range = PAST_RANGES.find((r) => r.days >= needed) ?? PAST_RANGES[PAST_RANGES.length - 1];
+      setPastRange(range.id);
+    } else {
+      const needed = Math.round((Date.parse(targetDate + "T00:00:00") - Date.parse(today + "T00:00:00")) / 86400000);
+      const range = FUTURE_RANGES.find((r) => r.days >= needed) ?? FUTURE_RANGES[FUTURE_RANGES.length - 1];
+      setFutureRange(range.id);
+    }
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => highlightTask(taskId, targetDate));
+    });
+  }, [dates, today, highlightTask]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -367,6 +403,7 @@ export default function TimelinePage() {
           return (
             <motion.section
               key={date}
+              id={`day-${date}`}
               ref={isTodayDate ? todayRef : null}
               custom={index}
               variants={cardVariants}
@@ -427,6 +464,7 @@ export default function TimelinePage() {
                       onReschedule={handleReschedule}
                       onCancel={handleCancel}
                       today={today}
+                      onGoToDate={handleGoToDate}
                       allTags={tagsHook.tags}
                       getTagsForIdea={taskTagsHook.getTagsForIdea}
                       onAddTag={taskTagsHook.addTagToTask}
