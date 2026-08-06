@@ -422,8 +422,6 @@ export default function TimelinePage() {
               variants={cardVariants}
               initial="hidden"
               animate="visible"
-              className="relative"
-              style={{ zIndex: 20 - index }}
             >
               <div id={isTodayDate ? "today-card" : undefined} className={`rounded-[20px] transition-all ${isTodayDate ? "glass-card-today" : "glass-card"}`}>
                 <div className="flex items-center justify-between px-5 pt-4 pb-3">
