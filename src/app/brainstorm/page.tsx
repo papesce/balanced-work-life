@@ -195,18 +195,18 @@ export default function BrainstormPage() {
     <div className="flex gap-1">
       <button
         onClick={() => setViewMode("tree")}
-        className={`focus-button ${viewMode === "tree" ? "active" : ""}`}
+        className={`toolbar-btn ${viewMode === "tree" ? "toolbar-btn--accent" : ""}`}
       >
         Tree
       </button>
       <button
         onClick={() => setViewMode("graph")}
         disabled={!hasLinks}
-        className={`focus-button ${
+        className={`toolbar-btn ${
           !hasLinks
             ? "opacity-40 cursor-not-allowed"
             : viewMode === "graph"
-            ? "active"
+            ? "toolbar-btn--accent"
             : ""
         }`}
         title={!hasLinks ? "Link two ideas to unlock" : ""}

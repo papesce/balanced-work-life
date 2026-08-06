@@ -254,6 +254,50 @@ body {
   color: #7c3aed;
 }
 
+/* Toolbar controls (Apple-style unified chrome) */
+.toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2rem;
+  border-radius: 0.5rem;
+  padding: 0 0.625rem;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  gap: 0.375rem;
+  color: #6b7280;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.toolbar-btn:hover {
+  color: #374151;
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
+.toolbar-btn--accent {
+  color: #7c3aed;
+  background: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.22);
+}
+
+.toolbar-btn--accent:hover {
+  color: #6d28d9;
+  background: rgba(139, 92, 246, 0.16);
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
 /* Add task input underline animation */
 .task-input-wrapper {
   position: relative;
@@ -353,5 +397,29 @@ body {
 
   .focus-button:hover {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  .toolbar-btn {
+    color: #9ca3af;
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .toolbar-btn:hover {
+    color: #e5e7eb;
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .toolbar-btn--accent {
+    color: #a78bfa;
+    background: rgba(139, 92, 246, 0.16);
+    border-color: rgba(139, 92, 246, 0.3);
+  }
+
+  .toolbar-btn--accent:hover {
+    color: #c4b5fd;
+    background: rgba(139, 92, 246, 0.24);
+    border-color: rgba(139, 92, 246, 0.4);
   }
 }

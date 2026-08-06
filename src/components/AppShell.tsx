@@ -53,10 +53,16 @@ export function AppShell({ children, title, headerActions, fullWidth, onAdd }: A
       <DesktopSidebar collapsed={collapsed} onToggle={handleToggle} />
 
       <div className={`${collapsed ? "md:ml-[64px]" : "md:ml-[220px]"} flex flex-col min-h-screen transition-[margin-left] duration-200 ease-in-out`}>
-        <header className="sticky top-0 z-40 glass-card-strong border-b border-white/30 dark:border-white/5 px-5 py-3 flex items-center justify-between rounded-none">
-          <h1 className="text-[15px] font-bold text-gray-800 dark:text-gray-200 tracking-tight">{title}</h1>
-          <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-40 glass-card-strong border-b border-white/30 dark:border-white/5 px-4 md:px-5 py-2.5 flex items-center justify-between gap-3 rounded-none">
+          <h1 className="text-[13px] font-semibold text-gray-500 dark:text-gray-400 tracking-tight truncate">{title}</h1>
+          <div className="flex items-center gap-2 shrink-0">
             {headerActions}
+            {headerActions && (
+              <>
+                <div className="w-px h-5 bg-black/[0.06] dark:bg-white/[0.08]" />
+                <div className="w-1" />
+              </>
+            )}
             <UserMenu />
           </div>
         </header>

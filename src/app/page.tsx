@@ -22,7 +22,6 @@ import { computeReschedulePatch, computeCompletePatch, computeCancelPatch, getDa
 import { useUndoAction } from "@/lib/tasks/undo";
 import { TriageActions } from "@/components/triage/TriageActions";
 import { AREA_DOT_COLORS } from "@/components/shared/TagPicker";
-import { JumpToTodayButton } from "@/components/shared/JumpToTodayButton";
 import { formatDayLabel } from "@/components/planner/plannerUtils";
 
 export default function DailyPlannerPage() {
@@ -273,12 +272,11 @@ function DailyPlannerInner() {
             onShowDateInput={setShowDateInput}
             onChangeDate={setActiveDate}
           />
-          <JumpToTodayButton onClick={() => setActiveDate(today)} isToday={activeDate === today} />
         </>
       }
     >
       {/* Mobile Tab Control */}
-      <div className="sticky top-[53px] z-10 md:hidden flex bg-white/60 dark:bg-gray-900/60 backdrop-blur-lg border border-black/5 dark:border-white/5 p-1.5 rounded-2xl mb-4 gap-1 shadow-sm">
+      <div className="sticky top-[52px] z-10 md:hidden flex bg-white/60 dark:bg-gray-900/60 backdrop-blur-lg border border-black/5 dark:border-white/5 p-1.5 rounded-2xl mb-4 gap-1 shadow-sm">
         {[
           { id: "tasks", label: "Tasks", icon: Layers },
           { id: "schedule", label: "Schedule", icon: Clock },

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Download, LogOut, Upload, User as UserIcon } from "lucide-react";
+import { Download, LogOut, Upload, User as UserIcon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
@@ -85,9 +85,9 @@ export function UserMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         title={name}
-        className="flex items-center gap-1 rounded-full p-0.5 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+        className="flex items-center justify-center rounded-full p-0.5 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
       >
-        <span className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-white/60 dark:ring-white/10 flex items-center justify-center bg-violet-100 dark:bg-violet-900/40">
+        <span className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-violet-100 dark:bg-violet-900/40">
           {avatarUrl ? (
             <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
           ) : initials ? (
@@ -96,7 +96,6 @@ export function UserMenu() {
             <UserIcon size={16} className="text-violet-500 dark:text-violet-400" />
           )}
         </span>
-        <ChevronDown size={14} className={`text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
       <AnimatePresence>

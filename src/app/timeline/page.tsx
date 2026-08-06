@@ -104,10 +104,10 @@ function RangeDropdown({
       <button
         type="button"
         onClick={onToggle}
-        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer bg-black/[0.02] dark:bg-white/[0.02] border border-black/5 dark:border-white/5 ${
+        className={`toolbar-btn gap-1.5 px-2.5 ${
           open
-            ? "text-violet-600 dark:text-violet-400"
-            : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            ? "toolbar-btn--accent"
+            : "hover:text-gray-600 dark:hover:text-gray-300"
         }`}
       >
         {icon}
@@ -288,7 +288,7 @@ export default function TimelinePage() {
 
   const headerActions = (
     <>
-      <div className="flex gap-1 p-1 bg-black/[0.02] dark:bg-white/[0.02] border border-black/5 dark:border-white/5 rounded-xl">
+      <div className="flex gap-1 h-8 p-0.5 bg-white/70 dark:bg-gray-900/60 border border-black/5 dark:border-white/5 rounded-lg shadow-sm">
         {[
           { id: "all" as const, label: "All" },
           { id: "deferred" as const, label: "Deferred", icon: Clock },
@@ -299,7 +299,7 @@ export default function TimelinePage() {
             <button
               key={tab.id}
               onClick={() => handleFilterChange(tab.id)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                 isActive
                   ? "bg-white dark:bg-gray-800 shadow-sm text-violet-600 dark:text-violet-400 font-bold"
                   : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"

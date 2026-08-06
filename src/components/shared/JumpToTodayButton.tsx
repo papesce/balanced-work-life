@@ -12,7 +12,7 @@ export function JumpToTodayButton({ onClick, isToday = false, label = "Today" }:
       type="button"
       onClick={onClick}
       disabled={isToday}
-      className="focus-button"
+      className={`toolbar-btn hidden md:inline-flex ${isToday ? "" : "toolbar-btn--accent"}`}
       title={isToday ? "You're viewing today" : "Jump to today"}
     >
       {label}
