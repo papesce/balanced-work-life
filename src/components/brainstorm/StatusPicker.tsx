@@ -34,7 +34,7 @@ export function StatusPicker({ current, onSelect, onClose }: StatusPickerProps) 
   return (
     <div
       ref={ref}
-      className="absolute left-0 top-full mt-1 z-50 glass-card-strong rounded-xl py-1 min-w-[150px] shadow-lg"
+      className="absolute left-0 top-full mt-1 z-50 glass-card-strong rounded-xl py-1 min-w-[160px] shadow-lg border border-black/5 dark:border-white/5"
     >
       {STATUS_OPTIONS.map(({ value, label, icon: Icon, color, bg }) => {
         const isActive = current === value;
@@ -42,7 +42,7 @@ export function StatusPicker({ current, onSelect, onClose }: StatusPickerProps) 
           <button
             key={value}
             onClick={() => onSelect(value)}
-            className={`flex w-full items-center gap-2 px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${isActive ? bg + " " + color : color}`}
+            className={`flex w-full items-center gap-2 px-3 py-1.5 text-xs font-semibold transition-colors rounded-lg cursor-pointer hover:bg-black/[0.06] dark:hover:bg-white/[0.08] ${isActive ? bg + " " + color : color}`}
           >
             {Icon && (
               <span className="w-4 h-4 flex items-center justify-center">
