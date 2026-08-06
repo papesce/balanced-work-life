@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { AppShell } from "@/components/AppShell";
@@ -34,8 +34,11 @@ function BalancePageInner() {
     router.replace(`/balance?${params.toString()}`);
   };
 
+  const [flashKey, setFlashKey] = useState(0);
+
   const handleToday = () => {
     handleChange(windowParam, getToday());
+    setFlashKey((k) => k + 1);
   };
 
   const headerActions = (
@@ -61,7 +64,7 @@ function BalancePageInner() {
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.2 }}
         >
-          {windowParam === "day" && <DayCalendarView referenceDate={dateParam} />}
+          {windowParam === "day" && <DayCalendarView referenceDate={dateParam} flashKey={flashKey} />}
           {windowParam === "week" && <WeekRingView referenceDate={dateParam} />}
           {windowParam === "month" && <MonthRingView referenceDate={dateParam} />}
           {windowParam === "year" && <YearWheelView referenceDate={dateParam} />}

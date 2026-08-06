@@ -295,6 +295,16 @@ export default function TimelinePage() {
     setTimeout(cleanup, 2500);
   }, [scrollToDate]);
 
+  const flashToday = () => {
+    const el = document.getElementById("today-card");
+    if (!el) return;
+    el.classList.remove("today-recenter-flash");
+    void el.offsetWidth;
+    el.classList.add("today-recenter-flash");
+    const cleanup = () => el.classList.remove("today-recenter-flash");
+    el.addEventListener("animationend", cleanup, { once: true });
+  };
+
   const handleGoToDate = useCallback((targetDate: string, taskId: string) => {
     if (dates.includes(targetDate)) {
       highlightTask(taskId, targetDate);
@@ -374,7 +384,10 @@ export default function TimelinePage() {
         icon={<CalendarRange size={13} />}
       />
       <JumpToTodayButton
-        onClick={() => todayRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
+        onClick={() => {
+          todayRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+          flashToday();
+        }}
         isToday={todayInView}
       />
     </>
@@ -412,7 +425,7 @@ export default function TimelinePage() {
               className="relative"
               style={{ zIndex: 20 - index }}
             >
-              <div className={`rounded-[20px] transition-all ${isTodayDate ? "glass-card-today" : "glass-card"}`}>
+              <div id={isTodayDate ? "today-card" : undefined} className={`rounded-[20px] transition-all ${isTodayDate ? "glass-card-today" : "glass-card"}`}>
                 <div className="flex items-center justify-between px-5 pt-4 pb-3">
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col">

@@ -11,10 +11,11 @@ export function JumpToTodayButton({ onClick, isToday = false, label = "Today" }:
     <button
       type="button"
       onClick={onClick}
-      disabled={isToday}
-      className={`toolbar-btn hidden md:inline-flex ${isToday ? "" : "toolbar-btn--accent"}`}
-      title={isToday ? "You're viewing today" : "Jump to today"}
+      className={`toolbar-btn hidden md:inline-flex ${isToday ? "toolbar-btn--latched" : "toolbar-btn--accent"}`}
+      title={isToday ? "Re-center on today" : "Jump to today"}
+      aria-pressed={isToday}
     >
+      {isToday && <span className="toolbar-btn__dot" aria-hidden="true" />}
       {label}
     </button>
   );

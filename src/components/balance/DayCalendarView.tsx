@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useCalendarData } from "@/hooks/useCalendarData";
 import { MiniRing } from "./MiniRing";
@@ -9,11 +10,25 @@ const DAY_HEADERS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 interface DayCalendarViewProps {
   referenceDate: string;
+  flashKey?: number;
 }
 
-export function DayCalendarView({ referenceDate }: DayCalendarViewProps) {
+export function DayCalendarView({ referenceDate, flashKey = 0 }: DayCalendarViewProps) {
   const { loading, dayData, monthLabel } = useCalendarData(referenceDate);
   const today = getToday();
+
+  const prevFlashKey = useRef(flashKey);
+  useEffect(() => {
+    if (prevFlashKey.current === flashKey) return;
+    prevFlashKey.current = flashKey;
+    const el = document.getElementById("balance-today-cell");
+    if (!el) return;
+    el.classList.remove("today-recenter-flash");
+    void el.offsetWidth;
+    el.classList.add("today-recenter-flash");
+    const cleanup = () => el.classList.remove("today-recenter-flash");
+    el.addEventListener("animationend", cleanup, { once: true });
+  }, [flashKey]);
 
   if (loading) {
     return (
@@ -52,6 +67,7 @@ export function DayCalendarView({ referenceDate }: DayCalendarViewProps) {
           return (
             <Link
               key={date}
+              id={isToday ? "balance-today-cell" : undefined}
               href={`/?date=${date}`}
               className="flex flex-col items-center gap-0.5 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] rounded-lg transition-colors cursor-pointer p-1 -m-1"
             >

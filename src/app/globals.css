@@ -280,12 +280,6 @@ body {
   border-color: rgba(0, 0, 0, 0.1);
 }
 
-.toolbar-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
-  pointer-events: none;
-}
-
 .toolbar-btn--accent {
   color: #7c3aed;
   background: rgba(139, 92, 246, 0.1);
@@ -296,6 +290,26 @@ body {
   color: #6d28d9;
   background: rgba(139, 92, 246, 0.16);
   border-color: rgba(139, 92, 246, 0.3);
+}
+
+.toolbar-btn--latched {
+  color: #ffffff;
+  background: #7c3aed;
+  border-color: #6d28d9;
+}
+
+.toolbar-btn--latched:hover {
+  color: #ffffff;
+  background: #6d28d9;
+  border-color: #5b21b6;
+}
+
+.toolbar-btn__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: currentColor;
+  flex-shrink: 0;
 }
 
 /* Add task input underline animation */
@@ -334,6 +348,20 @@ body {
 .highlight-pulse {
   animation: highlight-pulse 0.8s ease-in-out 2;
   border-radius: 10px;
+}
+
+/* Re-center flash for the Today button (keeps the element's own radius/background) */
+@keyframes today-recenter-flash {
+  0%, 100% {
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.18);
+  }
+}
+
+.today-recenter-flash {
+  animation: today-recenter-flash 0.8s ease-in-out 2;
 }
 
 /* Dark mode overrides */
@@ -421,5 +449,17 @@ body {
     color: #c4b5fd;
     background: rgba(139, 92, 246, 0.24);
     border-color: rgba(139, 92, 246, 0.4);
+  }
+
+  .toolbar-btn--latched {
+    color: #ffffff;
+    background: #8b5cf6;
+    border-color: #7c3aed;
+  }
+
+  .toolbar-btn--latched:hover {
+    color: #ffffff;
+    background: #7c3aed;
+    border-color: #6d28d9;
   }
 }
