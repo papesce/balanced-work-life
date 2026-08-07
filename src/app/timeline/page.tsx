@@ -300,14 +300,17 @@ function TimelineInner() {
   }
 
   const headerActions = (
+    <DateNav
+      activeDate={anchor}
+      today={today}
+      showDateInput={showDateInput}
+      onShowDateInput={setShowDateInput}
+      onChangeDate={handleAnchorChange}
+    />
+  );
+
+  const headerStartActions = (
     <>
-      <DateNav
-        activeDate={anchor}
-        today={today}
-        showDateInput={showDateInput}
-        onShowDateInput={setShowDateInput}
-        onChangeDate={handleAnchorChange}
-      />
       <div className="flex gap-1 h-8 p-0.5 bg-white/70 dark:bg-gray-900/60 border border-black/5 dark:border-white/5 rounded-lg shadow-sm">
         {[
           { id: "all" as const, label: "All" },
@@ -361,7 +364,7 @@ function TimelineInner() {
   );
 
   return (
-    <AppShell title="Timeline" headerActions={headerActions}>
+    <AppShell title="Timeline" headerActions={headerActions} headerStartActions={headerStartActions}>
       <div className="space-y-4 pb-24">
         <UndoBar undoAction={undoAction} onUndo={() => void handleUndo()} onDismiss={clearUndo} />
 
@@ -391,7 +394,9 @@ function TimelineInner() {
               initial="hidden"
               animate="visible"
             >
-              <div id={isAnchorDate ? "anchor-card" : undefined} className={`rounded-[20px] transition-all ${isAnchorDate ? "glass-card-today" : "glass-card"}`}>
+              <div id={isAnchorDate ? "anchor-card" : undefined} className={`rounded-[20px] transition-all ${
+                isAnchorDate ? "glass-card-anchor" : isTodayDate ? "glass-card-today" : "glass-card"
+              }`}>
                 <div className="flex items-center justify-between px-5 pt-4 pb-3">
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col">
@@ -400,8 +405,15 @@ function TimelineInner() {
                       }`}>
                         {timelineKicker}
                       </span>
-                      <span className="text-[22px] font-bold text-gray-900 dark:text-gray-100 leading-tight">
-                        {dateLabel}
+                      <span className="flex items-center gap-2">
+                        <span className="text-[22px] font-bold text-gray-900 dark:text-gray-100 leading-tight">
+                          {dateLabel}
+                        </span>
+                        {isTodayDate && (
+                          <span className="bg-emerald-100/80 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                            Today
+                          </span>
+                        )}
                       </span>
                     </div>
                     {unresolvedCount > 0 && (

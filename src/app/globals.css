@@ -109,13 +109,22 @@ body {
   box-shadow: 4px 0 32px rgba(0, 0, 0, 0.04);
 }
 
-/* Today card highlight */
-.glass-card-today {
+/* Selected (anchor) day card highlight */
+.glass-card-anchor {
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   border: 1px solid rgba(139, 92, 246, 0.25);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 0 0 1.5px rgba(139, 92, 246, 0.2);
+}
+
+/* Today card highlight (when not the selected anchor) */
+.glass-card-today {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06), inset 4px 0 0 0 rgba(16, 185, 129, 0.85);
 }
 
 /* No scrollbar utility */
@@ -411,10 +420,16 @@ body {
     box-shadow: 4px 0 32px rgba(0, 0, 0, 0.3);
   }
 
-  .glass-card-today {
+  .glass-card-anchor {
     background: rgba(30, 30, 48, 0.8);
     border: 1px solid rgba(139, 92, 246, 0.35);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1.5px rgba(139, 92, 246, 0.3);
+  }
+
+  .glass-card-today {
+    background: rgba(30, 30, 48, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 4px 0 0 0 rgba(16, 185, 129, 0.85);
   }
 
   .focus-button {

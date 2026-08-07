@@ -13,11 +13,12 @@ interface AppShellProps {
   children: ReactNode;
   title: string;
   headerActions?: ReactNode;
+  headerStartActions?: ReactNode;
   fullWidth?: boolean;
   onAdd?: (text: string, scheduledDate: string | null) => Promise<unknown>;
 }
 
-export function AppShell({ children, title, headerActions, fullWidth, onAdd }: AppShellProps) {
+export function AppShell({ children, title, headerActions, headerStartActions, fullWidth, onAdd }: AppShellProps) {
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     const saved = localStorage.getItem(SIDEBAR_KEY);
@@ -53,8 +54,13 @@ export function AppShell({ children, title, headerActions, fullWidth, onAdd }: A
       <DesktopSidebar collapsed={collapsed} onToggle={handleToggle} />
 
       <div className={`${collapsed ? "md:ml-[64px]" : "md:ml-[220px]"} flex flex-col min-h-screen transition-[margin-left] duration-200 ease-in-out`}>
-        <header className="sticky top-0 z-40 glass-card-strong border-b border-white/30 dark:border-white/5 px-4 md:px-5 py-2.5 flex items-center justify-between gap-3 rounded-none">
-          <h1 className="text-[13px] font-semibold text-gray-500 dark:text-gray-400 tracking-tight truncate">{title}</h1>
+        <header className="sticky top-0 z-40 glass-card-strong border-b border-white/30 dark:border-white/5 px-4 md:px-5 py-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-none">
+          <div className="flex items-center gap-2 min-w-0">
+            <h1 className="text-[13px] font-semibold text-gray-500 dark:text-gray-400 tracking-tight truncate">{title}</h1>
+            {headerStartActions && (
+              <div className="flex flex-wrap items-center gap-1.5">{headerStartActions}</div>
+            )}
+          </div>
           <div className="flex items-center gap-2 shrink-0">
             {headerActions}
             {headerActions && (
