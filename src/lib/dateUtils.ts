@@ -51,10 +51,11 @@ export function formatDate(dateStr: string): string {
   });
 }
 
-export function getDatesRange(daysBack: number, daysForward: number): string[] {
+export function getDatesRange(daysBack: number, daysForward: number, anchor = getToday()): string[] {
   const dates: string[] = [];
+  const base = new Date(anchor + "T00:00:00");
   for (let i = -daysBack; i <= daysForward; i++) {
-    const d = new Date();
+    const d = new Date(base);
     d.setDate(d.getDate() + i);
     dates.push(toLocalDateString(d));
   }

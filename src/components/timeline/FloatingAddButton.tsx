@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus } from "lucide-react";
-import { getToday, getTomorrow } from "@/lib/dateUtils";
+import { getTomorrow } from "@/lib/dateUtils";
 
 interface FloatingAddButtonProps {
   open: boolean;
@@ -17,10 +17,17 @@ export function FloatingAddButton({ open, onOpen, onClose, onAdd, today }: Float
   const [text, setText] = useState("");
   const [when, setWhen] = useState<"today" | "tomorrow" | "inbox">("today");
   const inputRef = useRef<HTMLInputElement>(null);
+  const [prevOpen, setPrevOpen] = useState(open);
+
+  if (prevOpen !== open) {
+    setPrevOpen(open);
+    if (!open) { setText(""); setWhen("today"); }
+  }
 
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 50);
-    else { setText(""); setWhen("today"); }
+    if (!open) return;
+    const t = setTimeout(() => inputRef.current?.focus(), 50);
+    return () => clearTimeout(t);
   }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {

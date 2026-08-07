@@ -28,7 +28,6 @@ interface DayTaskListProps {
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
-  onCancel: (id: string) => Promise<void>;
   today: string;
   onGoToDate?: (date: string, taskId: string) => void;
   allTags: Tag[];
@@ -38,14 +37,18 @@ interface DayTaskListProps {
   onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
 }
 
-export function DayTaskList({ occurrences, onReorder, onDone, onUndone, onUpdate, onReschedule, onCancel, today, onGoToDate, allTags, getTagsForIdea, onAddTag, onRemoveTag, onCreateTag }: DayTaskListProps) {
+export function DayTaskList({ occurrences, onReorder, onDone, onUndone, onUpdate, onReschedule, today, onGoToDate, allTags, getTagsForIdea, onAddTag, onRemoveTag, onCreateTag }: DayTaskListProps) {
   const currentTasks = useMemo(() => occurrences.filter((o) => !o.isHistorical).map((o) => o.task), [occurrences]);
   const historical = useMemo(() => occurrences.filter((o) => o.isHistorical), [occurrences]);
   const [items, setItems] = useState(currentTasks);
+  const [prevTasks, setPrevTasks] = useState(currentTasks);
   const itemsRef = useRef(items);
 
+  if (prevTasks !== currentTasks) {
+    setPrevTasks(currentTasks);
+    setItems(currentTasks);
+  }
   useEffect(() => { itemsRef.current = items; }, [items]);
-  useEffect(() => { setItems(currentTasks); }, [currentTasks]);
 
   return (
     <>
@@ -85,7 +88,6 @@ export function DayTaskList({ occurrences, onReorder, onDone, onUndone, onUpdate
               onUndone={onUndone}
               onUpdate={onUpdate}
               onReschedule={onReschedule}
-              onCancel={onCancel}
               today={today}
               onGoToDate={onGoToDate}
               allTags={allTags}
@@ -109,7 +111,6 @@ function HistoricalOccurrenceRow({
   onUndone,
   onUpdate,
   onReschedule,
-  onCancel,
   today,
   onGoToDate,
   allTags,
@@ -125,7 +126,6 @@ function HistoricalOccurrenceRow({
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
-  onCancel: (id: string) => Promise<void>;
   today: string;
   onGoToDate?: (date: string, taskId: string) => void;
   allTags: Tag[];

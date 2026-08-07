@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useRef, useEffect, useState, useCallback, type ReactNode, type RefObject } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useRef, useEffect, useState, useCallback, Suspense, type ReactNode, type RefObject } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Sparkles, Clock, CalendarRange, ChevronDown } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
@@ -11,13 +11,12 @@ import { AppShell } from "@/components/AppShell";
 import { MiniBalanceBar } from "@/components/MiniBalanceBar";
 import { Idea } from "@/lib/types";
 import { getToday, getTomorrow, getDatesRange, isPast } from "@/lib/dateUtils";
-import { computeReschedulePatch, computeCancelPatch, getDayOccurrences, isActiveOccurrence, DayOccurrence, RescheduleAction } from "@/lib/tasks/rescheduleTask";
+import { computeReschedulePatch, getDayOccurrences, isActiveOccurrence, DayOccurrence, RescheduleAction } from "@/lib/tasks/rescheduleTask";
 import { useUndoAction } from "@/lib/tasks/undo";
 import { DayTaskList } from "@/components/timeline/DayTaskList";
-import { FloatingAddButton } from "@/components/timeline/FloatingAddButton";
 import { QuickAddInput } from "@/components/timeline/QuickAddInput";
 import { UndoBar } from "@/components/shared/UndoBar";
-import { JumpToTodayButton } from "@/components/shared/JumpToTodayButton";
+import { DateNav } from "@/components/planner/DateNav";
 import { formatTimelineDate, getTimelineKicker } from "@/components/timeline/timelineUtils";
 
 const cardVariants = {
@@ -138,30 +137,40 @@ function RangeDropdown({
 }
 
 export default function TimelinePage() {
+  return (
+    <Suspense>
+      <TimelineInner />
+    </Suspense>
+  );
+}
+
+function TimelineInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { ideas, loading, createIdea, markDone, markUndone, updateIdea, reorderTasks, smartSortTasks } = useIdeas();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
-  const todayRef = useRef<HTMLElement>(null);
+  const anchorRef = useRef<HTMLElement>(null);
   const hasAutoScrolled = useRef(false);
   const pastMenuRef = useRef<HTMLDivElement>(null);
   const futureMenuRef = useRef<HTMLDivElement>(null);
-  const [todayInView, setTodayInView] = useState(false);
-  const [fabOpen, setFabOpen] = useState(false);
+  const [showDateInput, setShowDateInput] = useState(false);
   const [openMenu, setOpenMenu] = useState<"past" | "future" | null>(null);
   const [filter, setFilter] = useState<"all" | "deferred">(() => loadPrefs().filter);
   const [pastRange, setPastRange] = useState<PastRangeId>(() => loadPrefs().pastRange);
   const [futureRange, setFutureRange] = useState<FutureRangeId>(() => loadPrefs().futureRange);
-  const { undoAction, registerUndo, clearUndo, handleUndo } = useUndoAction();
+  const { undoAction, clearUndo, handleUndo } = useUndoAction();
 
   const today = getToday();
   const tomorrow = getTomorrow();
+  const anchorParam = searchParams.get("date");
+  const anchor = anchorParam && /^\d{4}-\d{2}-\d{2}$/.test(anchorParam) ? anchorParam : today;
   const lookbackDays = PAST_RANGES.find((r) => r.id === pastRange)?.days ?? 3;
   const forwardDays = FUTURE_RANGES.find((r) => r.id === futureRange)?.days ?? 14;
   const extendedRange = lookbackDays !== 3 || forwardDays !== 14;
   const dates = useMemo(
-    () => getDatesRange(lookbackDays, forwardDays),
-    [lookbackDays, forwardDays],
+    () => getDatesRange(lookbackDays, forwardDays, anchor),
+    [lookbackDays, forwardDays, anchor],
   );
   const tasks = useMemo(() => ideas.filter((i) => i.type === "task"), [ideas]);
 
@@ -178,26 +187,26 @@ export default function TimelinePage() {
 
   const rangeCounts = useMemo(() => {
     const dateCounts: Record<string, number> = {};
-    const spanDates = getDatesRange(MAX_LOOKBACK_DAYS, MAX_FORWARD_DAYS);
+    const spanDates = getDatesRange(MAX_LOOKBACK_DAYS, MAX_FORWARD_DAYS, anchor);
     for (const date of spanDates) {
       const occs = getDayOccurrences(tasks, date, today, true);
       dateCounts[date] = filter === "deferred" ? occs.filter(isActiveOccurrence).length : occs.length;
     }
-    const countPast = (days: number) => getDatesRange(days, 0).reduce((n, d) => (d < today ? n + (dateCounts[d] ?? 0) : n), 0);
-    const countFuture = (days: number) => getDatesRange(0, days).reduce((n, d) => (d > today ? n + (dateCounts[d] ?? 0) : n), 0);
+    const countPast = (days: number) => getDatesRange(days, 0, anchor).reduce((n, d) => (d < anchor ? n + (dateCounts[d] ?? 0) : n), 0);
+    const countFuture = (days: number) => getDatesRange(0, days, anchor).reduce((n, d) => (d > anchor ? n + (dateCounts[d] ?? 0) : n), 0);
     const past: Record<string, number> = {};
     const future: Record<string, number> = {};
     for (const r of PAST_RANGES) past[r.id] = countPast(r.days);
     for (const r of FUTURE_RANGES) future[r.id] = countFuture(r.days);
     return { past, future };
-  }, [tasks, today, filter]);
+  }, [tasks, anchor, today, filter]);
 
   const visibleDates = useMemo(
     () =>
       extendedRange && dates.length > MAX_SHOW_ALL_DAYS
-        ? dates.filter((d) => d === today || (occurrencesByDate[d]?.length ?? 0) > 0)
+        ? dates.filter((d) => d === anchor || (occurrencesByDate[d]?.length ?? 0) > 0)
         : dates,
-    [dates, occurrencesByDate, extendedRange, today],
+    [dates, occurrencesByDate, extendedRange, anchor],
   );
 
   const noDeferredActivity = extendedRange && !visibleDates.some((d) => (occurrencesByDate[d]?.length ?? 0) > 0);
@@ -224,25 +233,13 @@ export default function TimelinePage() {
   }, [openMenu]);
 
   useEffect(() => {
-    if (!loading && !hasAutoScrolled.current) {
-      const timer = setTimeout(() => {
-        todayRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-        hasAutoScrolled.current = true;
-      }, 100);
-      return () => clearTimeout(timer);
-    }
+    if (loading || hasAutoScrolled.current) return;
+    const timer = setTimeout(() => {
+      anchorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      hasAutoScrolled.current = true;
+    }, 100);
+    return () => clearTimeout(timer);
   }, [loading]);
-
-  useEffect(() => {
-    const el = todayRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => setTodayInView(entry.isIntersecting),
-      { rootMargin: "-30% 0px -30% 0px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [loading, filter]);
 
   const handleQuickAdd = async (text: string, date: string) => {
     await createIdea(text, null, "bottom", { type: "task", scheduled_date: date, status: "planned" });
@@ -255,75 +252,44 @@ export default function TimelinePage() {
     await updateIdea(id, patch);
   }, [ideas, updateIdea]);
 
-  const handleCancel = useCallback(async (id: string) => {
-    const idea = ideas.find((i) => i.id === id);
-    if (!idea) return;
-    const previous = idea;
-    const patch = computeCancelPatch();
-    await updateIdea(id, patch);
-    registerUndo({
-      label: "Task cancelled",
-      run: async () => {
-        await updateIdea(id, { status: previous.status, cancelled_at: null });
-      },
-    });
-  }, [ideas, updateIdea, registerUndo]);
-
-  const handleFabAdd = async (text: string, date: string | null) => {
-    await createIdea(text, null, "bottom", { type: "task", scheduled_date: date, status: date ? "planned" : "inbox" });
-    setFabOpen(false);
-  };
-
   const handleReorderDate = useCallback(
-    (date: string) => (reordered: Idea[]) => { reorderTasks(reordered.map((t) => t.id)); },
+    (reordered: Idea[]) => { reorderTasks(reordered.map((t) => t.id)); },
     [reorderTasks],
   );
 
-  const scrollToDate = useCallback((targetDate: string) => {
-    document.getElementById(`day-${targetDate}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, []);
-
-  const highlightTask = useCallback((taskId: string, targetDate: string) => {
-    const el = document.getElementById(`task-${taskId}-${targetDate}`);
-    if (!el) {
-      scrollToDate(targetDate);
-      return;
-    }
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
+  const pulseTask = useCallback((taskId: string, date: string) => {
+    const el = document.getElementById(`task-${taskId}-${date}`);
+    if (!el) return;
     el.classList.add("highlight-pulse");
     const cleanup = () => el.classList.remove("highlight-pulse");
     el.addEventListener("animationend", cleanup, { once: true });
     setTimeout(cleanup, 2500);
-  }, [scrollToDate]);
+  }, []);
 
-  const flashToday = () => {
-    const el = document.getElementById("today-card");
-    if (!el) return;
-    el.classList.remove("today-recenter-flash");
-    void el.offsetWidth;
-    el.classList.add("today-recenter-flash");
-    const cleanup = () => el.classList.remove("today-recenter-flash");
-    el.addEventListener("animationend", cleanup, { once: true });
-  };
+  const recenterOn = useCallback((d: string, onDone?: () => void) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document.getElementById(`day-${d}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        onDone?.();
+      });
+    });
+  }, []);
+
+  const setAnchorParam = useCallback((d: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("date", d);
+    router.replace(`/timeline?${params.toString()}`, { scroll: false });
+  }, [router, searchParams]);
+
+  const handleAnchorChange = useCallback((d: string) => {
+    setAnchorParam(d);
+    recenterOn(d);
+  }, [setAnchorParam, recenterOn]);
 
   const handleGoToDate = useCallback((targetDate: string, taskId: string) => {
-    if (dates.includes(targetDate)) {
-      highlightTask(taskId, targetDate);
-      return;
-    }
-    if (targetDate < today) {
-      const needed = Math.round((Date.parse(targetDate + "T00:00:00") - Date.parse(today + "T00:00:00")) / 86400000) * -1;
-      const range = PAST_RANGES.find((r) => r.days >= needed) ?? PAST_RANGES[PAST_RANGES.length - 1];
-      setPastRange(range.id);
-    } else {
-      const needed = Math.round((Date.parse(targetDate + "T00:00:00") - Date.parse(today + "T00:00:00")) / 86400000);
-      const range = FUTURE_RANGES.find((r) => r.days >= needed) ?? FUTURE_RANGES[FUTURE_RANGES.length - 1];
-      setFutureRange(range.id);
-    }
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => highlightTask(taskId, targetDate));
-    });
-  }, [dates, today, highlightTask]);
+    setAnchorParam(targetDate);
+    recenterOn(targetDate, () => pulseTask(taskId, targetDate));
+  }, [setAnchorParam, recenterOn, pulseTask]);
 
   if (loading) {
     return (
@@ -335,6 +301,13 @@ export default function TimelinePage() {
 
   const headerActions = (
     <>
+      <DateNav
+        activeDate={anchor}
+        today={today}
+        showDateInput={showDateInput}
+        onShowDateInput={setShowDateInput}
+        onChangeDate={handleAnchorChange}
+      />
       <div className="flex gap-1 h-8 p-0.5 bg-white/70 dark:bg-gray-900/60 border border-black/5 dark:border-white/5 rounded-lg shadow-sm">
         {[
           { id: "all" as const, label: "All" },
@@ -384,13 +357,6 @@ export default function TimelinePage() {
         menuRef={futureMenuRef}
         icon={<CalendarRange size={13} />}
       />
-      <JumpToTodayButton
-        onClick={() => {
-          todayRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-          flashToday();
-        }}
-        isToday={todayInView}
-      />
     </>
   );
 
@@ -409,6 +375,7 @@ export default function TimelinePage() {
           visibleDates.map((date, index) => {
           const dayOccurrences = occurrencesByDate[date] ?? [];
           const dayTasks = dayOccurrences.filter((o) => !o.isHistorical).map((o) => o.task);
+          const isAnchorDate = date === anchor;
           const isTodayDate = date === today;
           const dateLabel = formatTimelineDate(date);
           const timelineKicker = getTimelineKicker(date, today, tomorrow);
@@ -418,18 +385,18 @@ export default function TimelinePage() {
             <motion.section
               key={date}
               id={`day-${date}`}
-              ref={isTodayDate ? todayRef : null}
+              ref={isAnchorDate ? anchorRef : null}
               custom={index}
               variants={cardVariants}
               initial="hidden"
               animate="visible"
             >
-              <div id={isTodayDate ? "today-card" : undefined} className={`rounded-[20px] transition-all ${isTodayDate ? "glass-card-today" : "glass-card"}`}>
+              <div id={isAnchorDate ? "anchor-card" : undefined} className={`rounded-[20px] transition-all ${isAnchorDate ? "glass-card-today" : "glass-card"}`}>
                 <div className="flex items-center justify-between px-5 pt-4 pb-3">
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col">
                       <span className={`text-[10px] font-semibold tracking-[0.12em] uppercase ${
-                        isTodayDate ? "text-violet-600 dark:text-violet-400" : "text-gray-400 dark:text-gray-500"
+                        isAnchorDate ? "text-violet-600 dark:text-violet-400" : "text-gray-400 dark:text-gray-500"
                       }`}>
                         {timelineKicker}
                       </span>
@@ -469,12 +436,11 @@ export default function TimelinePage() {
                   ) : (
                     <DayTaskList
                       occurrences={dayOccurrences}
-                      onReorder={handleReorderDate(date)}
+                      onReorder={handleReorderDate}
                       onDone={markDone}
                       onUndone={markUndone}
                       onUpdate={updateIdea}
                       onReschedule={handleReschedule}
-                      onCancel={handleCancel}
                       today={today}
                       onGoToDate={handleGoToDate}
                       allTags={tagsHook.tags}
@@ -500,14 +466,6 @@ export default function TimelinePage() {
         })
         )}
       </div>
-
-      {/* <FloatingAddButton
-        open={fabOpen}
-        onOpen={() => setFabOpen(true)}
-        onClose={() => setFabOpen(false)}
-        onAdd={handleFabAdd}
-        today={today}
-      /> */}
     </AppShell>
   );
 }
