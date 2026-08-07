@@ -203,12 +203,20 @@ export function useIdeas() {
         .map((i) => reorderedSiblings.find((s) => s.id === i.id) ?? i)
         .concat(idea)
     );
-    await supabase.from("ideas").insert(idea);
+    const { error } = await supabase.from("ideas").insert(idea);
+    if (error) {
+      setIdeas((prev) => prev.filter((i) => i.id !== id));
+      console.error("Failed to create idea", error);
+      throw error;
+    }
     for (const sibling of reorderedSiblings) {
-      await supabase
+      const { error: siblingError } = await supabase
         .from("ideas")
         .update({ sort_order: sibling.sort_order })
         .eq("id", sibling.id);
+      if (siblingError) {
+        console.error("Failed to reorder sibling ideas", siblingError);
+      }
     }
     return id;
   };

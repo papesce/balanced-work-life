@@ -22,6 +22,11 @@ export function getAreasForIdea(tags: Tag[]): LifeArea[] {
   return [...new Set(tags.map((t) => t.area))];
 }
 
+/** Returns the tag that represents a task in single-tag contexts. Non-system tags take precedence, falling back to the system tag. */
+export function getPrimaryTagForIdea(tags: Tag[]): Tag | null {
+  return tags.find((t) => !t.is_system) ?? tags.find((t) => t.is_system) ?? null;
+}
+
 export interface Idea {
   id: string;
   user_id: string;

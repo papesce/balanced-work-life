@@ -40,11 +40,13 @@ interface AreaTaskGroupProps {
   getTagsForIdea?: (ideaId: string) => Tag[];
   allTags?: Tag[];
   onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
+  onAddTag?: (ideaId: string, tag: Tag) => Promise<void>;
+  onRemoveTag?: (ideaId: string, tagId: string) => Promise<void>;
 }
 
 export function AreaTaskGroup({
   area, activeDate, pendingTasks, doneTasks,
-  onDone, onUndone, onUpdate, onReschedule, onDelete, onAddTask, onReorderTasks, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag,
+  onDone, onUndone, onUpdate, onReschedule, onDelete, onAddTask, onReorderTasks, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag, onAddTag, onRemoveTag,
 }: AreaTaskGroupProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const Icon = AREA_ICONS[area];
@@ -96,10 +98,12 @@ export function AreaTaskGroup({
             getTagsForIdea={getTagsForIdea}
             allTags={allTags}
             onCreateTag={onCreateTag}
+            onAddTag={onAddTag}
+            onRemoveTag={onRemoveTag}
           />
         )}
         {doneTasks.map((task) => (
-          <TaskRow key={task.id} task={task} area={area} onDone={onDone} onUndone={onUndone} onUpdate={onUpdate} onDelete={onDelete} onMoveTaskBetweenAreas={onMoveTaskBetweenAreas} getTagsForIdea={getTagsForIdea} allTags={allTags} onCreateTag={onCreateTag} />
+          <TaskRow key={task.id} task={task} area={area} onDone={onDone} onUndone={onUndone} onUpdate={onUpdate} onDelete={onDelete} onMoveTaskBetweenAreas={onMoveTaskBetweenAreas} getTagsForIdea={getTagsForIdea} allTags={allTags} onCreateTag={onCreateTag} onAddTag={onAddTag} onRemoveTag={onRemoveTag} />
         ))}
         {pendingTasks.length === 0 && doneTasks.length === 0 && (
           <div className="px-5 py-4 text-xs text-gray-400 dark:text-gray-500 italic">No tasks planned for this day</div>
@@ -124,7 +128,7 @@ export function AreaTaskGroup({
 }
 
 function PendingTaskList({
-  tasks, area, onReorder, onDone, onUndone, onUpdate, onDelete, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag,
+  tasks, area, onReorder, onDone, onUndone, onUpdate, onDelete, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag, onAddTag, onRemoveTag,
 }: {
   tasks: Idea[];
   area: LifeArea;
@@ -137,6 +141,8 @@ function PendingTaskList({
   getTagsForIdea?: (ideaId: string) => Tag[];
   allTags?: Tag[];
   onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
+  onAddTag?: (ideaId: string, tag: Tag) => Promise<void>;
+  onRemoveTag?: (ideaId: string, tagId: string) => Promise<void>;
 }) {
   const [items, setItems] = useState(tasks);
   const itemsRef = useRef(items);
@@ -161,6 +167,8 @@ function PendingTaskList({
           getTagsForIdea={getTagsForIdea}
           allTags={allTags}
           onCreateTag={onCreateTag}
+          onAddTag={onAddTag}
+          onRemoveTag={onRemoveTag}
         />
       ))}
     </Reorder.Group>
@@ -168,7 +176,7 @@ function PendingTaskList({
 }
 
 function ReorderItemWrapper({
-  task, area, onReorder, itemsRef, onDone, onUndone, onUpdate, onDelete, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag,
+  task, area, onReorder, itemsRef, onDone, onUndone, onUpdate, onDelete, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag, onAddTag, onRemoveTag,
 }: {
   task: Idea;
   area: LifeArea;
@@ -182,6 +190,8 @@ function ReorderItemWrapper({
   getTagsForIdea?: (ideaId: string) => Tag[];
   allTags?: Tag[];
   onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
+  onAddTag?: (ideaId: string, tag: Tag) => Promise<void>;
+  onRemoveTag?: (ideaId: string, tagId: string) => Promise<void>;
 }) {
   const dragControls = useDragControls();
 
@@ -204,6 +214,8 @@ function ReorderItemWrapper({
         getTagsForIdea={getTagsForIdea}
         allTags={allTags}
         onCreateTag={onCreateTag}
+        onAddTag={onAddTag}
+        onRemoveTag={onRemoveTag}
         showDragHandle
         dragControls={dragControls}
       />
@@ -212,7 +224,7 @@ function ReorderItemWrapper({
 }
 
 function TaskRow({
-  task, area, onDone, onUndone, onUpdate, onDelete, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag, showDragHandle, dragControls,
+  task, area, onDone, onUndone, onUpdate, onDelete, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag, onAddTag, onRemoveTag, showDragHandle, dragControls,
 }: {
   task: Idea;
   area: LifeArea;
@@ -224,6 +236,8 @@ function TaskRow({
   getTagsForIdea?: (ideaId: string) => Tag[];
   allTags?: Tag[];
   onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
+  onAddTag?: (ideaId: string, tag: Tag) => Promise<void>;
+  onRemoveTag?: (ideaId: string, tagId: string) => Promise<void>;
   showDragHandle?: boolean;
   dragControls?: ReturnType<typeof useDragControls>;
 }) {
@@ -366,13 +380,13 @@ function TaskRow({
   };
 
   const handleTagSelected = async (tag: Tag) => {
-    if (tag.area === area || !onMoveTaskBetweenAreas) return;
-    onMoveTaskBetweenAreas(task.id, area, tag.area);
+    if (onAddTag) {
+      await onAddTag(task.id, tag);
+    }
     setShowAreaPicker(false);
   };
 
   const taskTags = getTagsForIdea?.(task.id) ?? [];
-  const currentSystemTag = taskTags.find((t) => t.is_system);
 
   return (
     <div
@@ -640,9 +654,12 @@ function TaskRow({
         >
           <TagPicker
             allTags={allTags ?? []}
-            selectedTags={currentSystemTag ? [currentSystemTag] : []}
+            selectedTags={taskTags}
             onAdd={handleTagSelected}
-            onRemove={() => {}}
+            onRemove={async (tagId) => {
+              if (onRemoveTag) await onRemoveTag(task.id, tagId);
+              setShowAreaPicker(false);
+            }}
             onCreateTag={onCreateTag ?? (async () => null)}
             onClose={() => setShowAreaPicker(false)}
           />

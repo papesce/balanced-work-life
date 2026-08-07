@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { DailyTimeline } from "@papesce/dayslot";
 import type { TimelineEvent, DailyTimelineHandle } from "@papesce/dayslot";
 import "@papesce/dayslot/style.css";
-import { Idea, IdeaStatus, LifeArea, getAreasForIdea, Tag } from "@/lib/types";
+import { Idea, IdeaStatus, LifeArea, getAreasForIdea, getPrimaryTagForIdea, Tag } from "@/lib/types";
 import { AREA_LABELS } from "./constants";
 import {
   minutesToTimeString,
@@ -102,6 +102,7 @@ function SlotForm({
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const areaBtnRef = useRef<HTMLButtonElement>(null);
   const [areaPickerPos, setAreaPickerPos] = useState<{ top: number; left: number } | null>(null);
+  const submittingRef = useRef(false);
 
   const timeStr = minutesToTimeString(startMinute);
 
@@ -112,9 +113,14 @@ function SlotForm({
   );
 
   const handleAdd = async () => {
-    if (!text.trim()) return;
-    const id = await onCreateTask(text.trim(), timeStr, selectedArea ?? undefined);
+    if (!text.trim() || submittingRef.current) return;
+    submittingRef.current = true;
     close();
+    try {
+      await onCreateTask(text.trim(), timeStr, selectedArea ?? undefined);
+    } catch (err) {
+      console.error("Failed to create scheduled task", err);
+    }
   };
 
   return (
@@ -286,7 +292,6 @@ export function DayslotTimeline({
         <EventCard
           idea={idea}
           event={event}
-          area={area}
           areaTags={tagsForIdea}
           allTags={tags}
           bgClass={bgClass}
@@ -334,7 +339,6 @@ export function DayslotTimeline({
 function EventCard({
   idea,
   event,
-  area,
   areaTags,
   allTags,
   bgClass,
@@ -350,7 +354,6 @@ function EventCard({
 }: {
   idea: Idea;
   event: TimelineEvent;
-  area: LifeArea;
   areaTags: Tag[];
   allTags: Tag[];
   bgClass: string;
@@ -460,19 +463,14 @@ function EventCard({
   }, [showAreaPicker]);
 
   const handleTagSelected = useCallback(async (tag: Tag) => {
-    if (tag.area === area) return;
-    const currentAreaTag = areaTags.find((t) => t.is_system);
-    if (currentAreaTag && onRemoveTag) {
-      await onRemoveTag(idea.id, currentAreaTag.id);
-    }
     if (onAddTag) {
       await onAddTag(idea.id, tag);
     }
     setShowMenu(false);
     setShowAreaPicker(false);
-  }, [area, areaTags, idea.id, onAddTag, onRemoveTag]);
+  }, [idea.id, onAddTag]);
 
-  const currentSystemTag = areaTags.find((t) => t.is_system);
+  const primaryTag = getPrimaryTagForIdea(areaTags);
 
   return (
     <div
@@ -509,7 +507,7 @@ function EventCard({
               className="w-1.5 h-1.5 rounded-full inline-block"
               style={{ background: accentColor }}
             />
-            {event.category}
+            {primaryTag?.name ?? event.category}
           </button>
           {(() => {
             const statusCfg = STATUS_CONFIG[idea.status] || STATUS_CONFIG.planned;
@@ -578,9 +576,13 @@ function EventCard({
         <div style={{ position: "fixed", top: areaPickerPos.top, left: areaPickerPos.left, zIndex: 10000 }}>
           <TagPicker
             allTags={allTags}
-            selectedTags={currentSystemTag ? [currentSystemTag] : []}
+            selectedTags={areaTags}
             onAdd={handleTagSelected}
-            onRemove={() => {}}
+            onRemove={async (tagId) => {
+              if (onRemoveTag) await onRemoveTag(idea.id, tagId);
+              setShowAreaPicker(false);
+              setShowMenu(false);
+            }}
             onCreateTag={onCreateTag ?? (async () => null)}
             onClose={() => { setShowAreaPicker(false); setShowMenu(false); }}
           />

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Sparkles, Calendar, Layers, Clock, Inbox, BarChart3 } from "lucide-react";
+import { Sparkles, Layers, Clock, Inbox, BarChart3 } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
@@ -17,7 +17,6 @@ import { AreaTaskGroup } from "@/components/planner/AreaTaskGroup";
 import { InboxPanel } from "@/components/shared/InboxPanel";
 import { UndoBar } from "@/components/shared/UndoBar";
 import { AREA_ORDER, AREA_LABELS, DEFAULT_TARGETS, LOCAL_STORAGE_TARGETS_KEY } from "@/components/planner/constants";
-import { offsetDate } from "@/components/planner/plannerUtils";
 import { computeReschedulePatch, computeCompletePatch, computeCancelPatch, getDayOccurrences, getTriageMeta, DayOccurrence, RescheduleAction } from "@/lib/tasks/rescheduleTask";
 import { useUndoAction } from "@/lib/tasks/undo";
 import { TriageActions } from "@/components/triage/TriageActions";
@@ -182,6 +181,9 @@ function DailyPlannerInner() {
     for (const area of AREA_ORDER) counts[area] = areaTaskCounts[area].pending + areaTaskCounts[area].scheduled + areaTaskCounts[area].done;
     return counts;
   }, [areaTaskCounts]);
+
+  const dayIsEmpty =
+    pendingOnDate.length === 0 && scheduledOnDate.length === 0 && doneOnDate.length === 0;
 
   const visibleAreas = selectedArea ? [selectedArea] : AREA_ORDER;
 
@@ -362,7 +364,7 @@ function DailyPlannerInner() {
                 const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(t.id));
                 return areas.length === 0 ? area === "life" : areas.includes(area);
               });
-              if (pending.length === 0 && done.length === 0 && selectedArea !== area) return null;
+              if (pending.length === 0 && done.length === 0 && selectedArea !== area && !dayIsEmpty) return null;
               return (
                 <AreaTaskGroup
                   key={area}
@@ -381,19 +383,11 @@ function DailyPlannerInner() {
                   getTagsForIdea={taskTagsHook.getTagsForIdea}
                   allTags={tagsHook.tags}
                   onCreateTag={tagsHook.createTag}
+                  onAddTag={async (ideaId, tag) => { await taskTagsHook.addTagToTask(ideaId, tag); }}
+                  onRemoveTag={async (ideaId, tagId) => { await taskTagsHook.removeTagFromTask(ideaId, tagId); }}
                 />
               );
             })}
-
-            {pendingOnDate.length === 0 && scheduledOnDate.length === 0 && doneOnDate.length === 0 && (
-              <div className="glass-card rounded-2xl text-center py-20 text-gray-400 dark:text-gray-500 border border-dashed border-black/5 dark:border-white/5">
-                <Calendar size={32} className="mx-auto text-gray-300 dark:text-gray-600 mb-3 opacity-60" />
-                <p className="text-sm font-semibold mb-1">
-                  No tasks planned for {activeDate === today ? "today" : activeDate === offsetDate(today, 1) ? "tomorrow" : activeDate}
-                </p>
-                <p className="text-xs">Create a task in one of the areas, or pull from your backlog.</p>
-              </div>
-            )}
           </div>
         </div>
 

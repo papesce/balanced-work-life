@@ -50,6 +50,7 @@ export function TagPicker({
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [newArea, setNewArea] = useState<LifeArea>("life");
+  const [hoveredTagId, setHoveredTagId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -69,13 +70,14 @@ export function TagPicker({
   const handleToggle = useCallback(
     (tag: Tag) => {
       if (selectedIds.has(tag.id)) {
+        if (selectedTags.length <= 1) return;
         onRemove(tag.id);
       } else {
         onAdd(tag);
         onClose();
       }
     },
-    [selectedIds, onAdd, onRemove, onClose]
+    [selectedIds, selectedTags, onAdd, onRemove, onClose]
   );
 
   const handleCreate = async () => {
@@ -116,10 +118,17 @@ export function TagPicker({
             <button
               key={tag.id}
               onClick={() => handleToggle(tag)}
-              className="flex items-center gap-2 w-full text-left text-sm px-3 py-1.5 rounded-md mx-1 transition-colors"
+              onMouseEnter={() => setHoveredTagId(tag.id)}
+              onMouseLeave={() => setHoveredTagId(null)}
+              className="flex items-center gap-2 w-full text-left text-sm px-3 py-1.5 rounded-md mx-1 cursor-pointer transition-colors"
+              title={
+                selectedIds.has(tag.id) && selectedTags.length === 1
+                  ? "A task must keep at least one area/tag"
+                  : undefined
+              }
               style={{
                 width: "calc(100% - 8px)",
-                background: areaBg(area, 0.12),
+                background: areaBg(area, hoveredTagId === tag.id ? 0.24 : 0.12),
               }}
             >
               <span className={`flex-none w-3.5 h-3.5 rounded border flex items-center justify-center ${
@@ -153,10 +162,10 @@ export function TagPicker({
               <button
                 key={area}
                 onClick={() => setNewArea(area)}
-                className={`text-[10px] px-1.5 py-0.5 rounded-full border transition-colors ${
+                className={`text-[10px] px-1.5 py-0.5 rounded-full border cursor-pointer transition-colors ${
                   newArea === area
                     ? `${AREA_COLORS[area]} border-current font-medium`
-                    : "text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-700"
+                    : "text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-700 hover:text-gray-600 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"
                 }`}
               >
                 {AREA_LABELS[area]}
@@ -166,7 +175,7 @@ export function TagPicker({
           <div className="flex gap-1.5 pt-0.5">
             <button
               onClick={() => void handleCreate()}
-              className="text-xs px-2 py-0.5 rounded bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium"
+              className="text-xs px-2 py-0.5 rounded bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium cursor-pointer hover:opacity-80 transition-opacity"
             >
               Add
             </button>
@@ -181,7 +190,7 @@ export function TagPicker({
       ) : (
         <button
           onClick={() => setCreating(true)}
-          className="flex items-center gap-1.5 w-full text-left text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 px-3 py-1.5 border-t border-black/5 dark:border-white/5 mt-1"
+          className="flex items-center gap-1.5 w-full text-left text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 px-3 py-1.5 border-t border-black/5 dark:border-white/5 mt-1 cursor-pointer transition-colors"
         >
           <Plus size={12} />
           New tag
