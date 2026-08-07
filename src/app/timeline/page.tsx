@@ -26,7 +26,7 @@ const cardVariants = {
     ({
       opacity: 1,
       y: 0,
-      transition: { delay: i * 0.06, duration: 0.35, ease: "easeOut" },
+      transition: { delay: Math.min(i, 5) * 0.06, duration: 0.35, ease: "easeOut" },
     }) as const,
 };
 
@@ -52,6 +52,7 @@ type FutureRangeId = (typeof FUTURE_RANGES)[number]["id"];
 
 const MAX_LOOKBACK_DAYS = PAST_RANGES[PAST_RANGES.length - 1].days;
 const MAX_FORWARD_DAYS = FUTURE_RANGES[FUTURE_RANGES.length - 1].days;
+const MAX_SHOW_ALL_DAYS = 60;
 
 const TIMELINE_PREFS_KEY = "timeline-prefs";
 
@@ -193,7 +194,7 @@ export default function TimelinePage() {
 
   const visibleDates = useMemo(
     () =>
-      extendedRange
+      extendedRange && dates.length > MAX_SHOW_ALL_DAYS
         ? dates.filter((d) => d === today || (occurrencesByDate[d]?.length ?? 0) > 0)
         : dates,
     [dates, occurrencesByDate, extendedRange, today],

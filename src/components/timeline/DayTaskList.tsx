@@ -212,10 +212,13 @@ function TimelineTaskRow({
   const attemptLabel = task.scheduled_date ? "Go to next attempt" : "Go to last attempt";
   const [showMenu, setShowMenu] = useState(false);
   const [showTagPicker, setShowTagPicker] = useState(false);
+  const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const statusTriggerRef = useRef<HTMLButtonElement>(null);
+  const [statusPickerPos, setStatusPickerPos] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -250,7 +253,16 @@ function TimelineTaskRow({
     }
   }, [isEditing]);
 
-  const [showStatusPicker, setShowStatusPicker] = useState(false);
+  useEffect(() => {
+    if (!showStatusPicker) return;
+    const close = () => setShowStatusPicker(false);
+    window.addEventListener("scroll", close, { capture: true, passive: true });
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, { capture: true });
+      window.removeEventListener("resize", close);
+    };
+  }, [showStatusPicker]);
 
   const handleStatusSelect = (status: IdeaStatus) => {
     const now = new Date().toISOString();
@@ -388,7 +400,13 @@ function TimelineTaskRow({
 
       <div className="relative flex-shrink-0">
         <button
-          onClick={() => setShowStatusPicker((v) => !v)}
+          ref={statusTriggerRef}
+          onClick={() => {
+            if (showStatusPicker) { setShowStatusPicker(false); return; }
+            const rect = statusTriggerRef.current?.getBoundingClientRect();
+            if (rect) setStatusPickerPos({ top: rect.bottom + 4, left: rect.left });
+            setShowStatusPicker(true);
+          }}
           className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full transition-all cursor-pointer hover:opacity-80"
           style={{
             background: isCompleted ? "#f5f3ff" : isCancelled ? "#fef2f2" : isPaused ? "#fff7ed" : isInProgress ? "#fefce8" : "rgba(0,0,0,0.05)",
@@ -397,14 +415,15 @@ function TimelineTaskRow({
         >
           {statusConfig.label}
         </button>
-        {showStatusPicker && (
-          <div className="absolute right-0 top-full mt-1 z-50">
+        {showStatusPicker && statusPickerPos && createPortal(
+          <div style={{ position: "fixed", top: statusPickerPos.top, left: statusPickerPos.left, zIndex: 9999 }}>
             <StatusPicker
               current={task.status}
               onSelect={handleStatusSelect}
               onClose={() => setShowStatusPicker(false)}
             />
-          </div>
+          </div>,
+          document.body
         )}
       </div>
 
