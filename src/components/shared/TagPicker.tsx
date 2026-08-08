@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Plus, Check } from "lucide-react";
 import { Tag, LifeArea } from "@/lib/types";
 import { AREA_ORDER, AREA_LABELS } from "@/components/planner/constants";
@@ -36,6 +37,8 @@ interface TagPickerProps {
   onRemove: (tagId: string) => void;
   onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
   onClose: () => void;
+  /** When set, renders in a fixed-position portal so the menu paints above everything. */
+  fixedPosition?: { top: number; left: number };
 }
 
 export function TagPicker({
@@ -45,6 +48,7 @@ export function TagPicker({
   onRemove,
   onCreateTag,
   onClose,
+  fixedPosition,
 }: TagPickerProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [creating, setCreating] = useState(false);
@@ -60,6 +64,17 @@ export function TagPicker({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [onClose]);
+
+  useEffect(() => {
+    if (!fixedPosition) return;
+    const close = () => onClose();
+    window.addEventListener("scroll", close, { capture: true, passive: true });
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, { capture: true });
+      window.removeEventListener("resize", close);
+    };
+  }, [fixedPosition, onClose]);
 
   useEffect(() => {
     if (creating) inputRef.current?.focus();
@@ -103,10 +118,11 @@ export function TagPicker({
 
   const areasWithTags = AREA_ORDER.filter((a) => tagsByArea[a].length > 0);
 
-  return (
+  const content = (
     <div
       ref={ref}
-      className="absolute left-0 top-full mt-1 z-50 glass-card-strong rounded-xl shadow-lg min-w-[200px] max-w-[260px] py-2"
+      className={`${fixedPosition ? "fixed z-[9999]" : "absolute left-0 top-full mt-1 z-50"} glass-card-strong rounded-xl shadow-lg min-w-[200px] max-w-[260px] py-2`}
+      style={fixedPosition ? { top: fixedPosition.top, left: fixedPosition.left } : undefined}
     >
       {areasWithTags.length === 0 && !creating && (
         <p className="text-xs text-gray-400 dark:text-gray-500 px-3 py-1">No tags yet</p>
@@ -198,4 +214,6 @@ export function TagPicker({
       )}
     </div>
   );
+
+  return fixedPosition ? createPortal(content, document.body) : content;
 }

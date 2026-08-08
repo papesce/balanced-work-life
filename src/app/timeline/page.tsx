@@ -10,7 +10,7 @@ import { useTaskTags } from "@/hooks/useTaskTags";
 import { AppShell } from "@/components/AppShell";
 import { MiniBalanceBar } from "@/components/MiniBalanceBar";
 import { Idea } from "@/lib/types";
-import { getToday, getTomorrow, getDatesRange, isPast } from "@/lib/dateUtils";
+import { getToday, getTomorrow, getDatesRange, isPast, isPlanDate } from "@/lib/dateUtils";
 import { computeReschedulePatch, getDayOccurrences, isActiveOccurrence, DayOccurrence, RescheduleAction } from "@/lib/tasks/rescheduleTask";
 import { useUndoAction } from "@/lib/tasks/undo";
 import { DayTaskList } from "@/components/timeline/DayTaskList";
@@ -52,6 +52,12 @@ type FutureRangeId = (typeof FUTURE_RANGES)[number]["id"];
 const MAX_LOOKBACK_DAYS = PAST_RANGES[PAST_RANGES.length - 1].days;
 const MAX_FORWARD_DAYS = FUTURE_RANGES[FUTURE_RANGES.length - 1].days;
 const MAX_SHOW_ALL_DAYS = 60;
+const FOCUS_BACK_DAYS = 7;
+const FOCUS_FORWARD_DAYS = 31;
+
+type RenderUnit =
+  | { kind: "day"; date: string }
+  | { kind: "gap"; count: number };
 
 const TIMELINE_PREFS_KEY = "timeline-prefs";
 
@@ -172,25 +178,26 @@ function TimelineInner() {
     () => getDatesRange(lookbackDays, forwardDays, anchor),
     [lookbackDays, forwardDays, anchor],
   );
+  const hasRevisitDates = dates.some((d) => d <= today);
+  const effectiveFilter = hasRevisitDates ? filter : "all";
   const tasks = useMemo(() => ideas.filter((i) => i.type === "task"), [ideas]);
 
   const occurrencesByDate = useMemo(() => {
     const map: Record<string, DayOccurrence[]> = {};
     for (const date of dates) {
       const occurrences = getDayOccurrences(tasks, date, today, true);
-      map[date] = filter === "deferred"
+      map[date] = effectiveFilter === "deferred" && date <= today
         ? occurrences.filter(isActiveOccurrence)
         : occurrences;
     }
     return map;
-  }, [tasks, dates, today, filter]);
+  }, [tasks, dates, today, effectiveFilter]);
 
   const rangeCounts = useMemo(() => {
     const dateCounts: Record<string, number> = {};
     const spanDates = getDatesRange(MAX_LOOKBACK_DAYS, MAX_FORWARD_DAYS, anchor);
     for (const date of spanDates) {
-      const occs = getDayOccurrences(tasks, date, today, true);
-      dateCounts[date] = filter === "deferred" ? occs.filter(isActiveOccurrence).length : occs.length;
+      dateCounts[date] = getDayOccurrences(tasks, date, today, true).length;
     }
     const countPast = (days: number) => getDatesRange(days, 0, anchor).reduce((n, d) => (d < anchor ? n + (dateCounts[d] ?? 0) : n), 0);
     const countFuture = (days: number) => getDatesRange(0, days, anchor).reduce((n, d) => (d > anchor ? n + (dateCounts[d] ?? 0) : n), 0);
@@ -199,17 +206,40 @@ function TimelineInner() {
     for (const r of PAST_RANGES) past[r.id] = countPast(r.days);
     for (const r of FUTURE_RANGES) future[r.id] = countFuture(r.days);
     return { past, future };
-  }, [tasks, anchor, today, filter]);
+  }, [tasks, anchor, today]);
 
-  const visibleDates = useMemo(
-    () =>
-      extendedRange && dates.length > MAX_SHOW_ALL_DAYS
-        ? dates.filter((d) => d === anchor || (occurrencesByDate[d]?.length ?? 0) > 0)
-        : dates,
-    [dates, occurrencesByDate, extendedRange, anchor],
-  );
+  const renderPlan = useMemo((): RenderUnit[] => {
+    if (!extendedRange || dates.length <= MAX_SHOW_ALL_DAYS) {
+      return dates.map((d) => ({ kind: "day", date: d }));
+    }
+    const anchorIndex = dates.indexOf(anchor);
+    const plan: RenderUnit[] = [];
+    let gapCount = 0;
+    const flushGap = () => {
+      if (gapCount > 0) {
+        plan.push({ kind: "gap", count: gapCount });
+        gapCount = 0;
+      }
+    };
+    dates.forEach((date, i) => {
+      const hasOccurrences = (occurrencesByDate[date]?.length ?? 0) > 0;
+      const withinFocus =
+        anchorIndex >= 0 && i >= anchorIndex - FOCUS_BACK_DAYS && i <= anchorIndex + FOCUS_FORWARD_DAYS;
+      if (hasOccurrences || withinFocus) {
+        flushGap();
+        plan.push({ kind: "day", date });
+      } else {
+        gapCount += 1;
+      }
+    });
+    flushGap();
+    return plan;
+  }, [dates, occurrencesByDate, extendedRange, anchor]);
 
-  const noDeferredActivity = extendedRange && !visibleDates.some((d) => (occurrencesByDate[d]?.length ?? 0) > 0);
+  const noDeferredActivity =
+    effectiveFilter === "deferred" &&
+    extendedRange &&
+    !dates.some((d) => (occurrencesByDate[d]?.length ?? 0) > 0);
 
   const handleFilterChange = (id: "all" | "deferred") => {
     setFilter(id);
@@ -318,11 +348,21 @@ function TimelineInner() {
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = filter === tab.id;
+          const isDisabled = tab.id === "deferred" && !hasRevisitDates;
           return (
             <button
               key={tab.id}
-              onClick={() => handleFilterChange(tab.id)}
-              className={`flex items-center gap-1.5 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+              onClick={() => {
+                if (isDisabled) return;
+                handleFilterChange(tab.id);
+              }}
+              disabled={isDisabled}
+              title={isDisabled ? "Deferred applies to past dates" : undefined}
+              className={`flex items-center gap-1.5 px-2.5 rounded-md text-xs font-semibold transition-all ${
+                isDisabled
+                  ? "opacity-40 cursor-not-allowed"
+                  : "cursor-pointer"
+              } ${
                 isActive
                   ? "bg-white dark:bg-gray-800 shadow-sm text-violet-600 dark:text-violet-400 font-bold"
                   : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -375,7 +415,19 @@ function TimelineInner() {
             <p className="text-xs">No tasks found in the selected range.</p>
           </div>
         ) : (
-          visibleDates.map((date, index) => {
+          renderPlan.map((unit, index) => {
+          if (unit.kind === "gap") {
+            return (
+              <div key={`gap-${index}`} className="flex items-center justify-center py-1">
+                <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-gray-300 dark:text-gray-600">
+                  <div className="h-px w-8 bg-black/10 dark:bg-white/10" />
+                  +{unit.count} empty {unit.count === 1 ? "day" : "days"}
+                  <div className="h-px w-8 bg-black/10 dark:bg-white/10" />
+                </div>
+              </div>
+            );
+          }
+          const date = unit.date;
           const dayOccurrences = occurrencesByDate[date] ?? [];
           const dayTasks = dayOccurrences.filter((o) => !o.isHistorical).map((o) => o.task);
           const isAnchorDate = date === anchor;
@@ -443,7 +495,7 @@ function TimelineInner() {
                 <div className="px-5 pb-2">
                   {dayOccurrences.length === 0 ? (
                     <p className="text-xs text-gray-400 dark:text-gray-500 italic py-1">
-                      {filter === "deferred" ? "No deferred tasks this day" : "No tasks planned"}
+                      {effectiveFilter === "deferred" ? "No deferred tasks this day" : "No tasks planned"}
                     </p>
                   ) : (
                     <DayTaskList
@@ -464,14 +516,14 @@ function TimelineInner() {
                   )}
                 </div>
 
-                {filter === "all" && (
+                {effectiveFilter === "all" || isPlanDate(date) ? (
                   <div className="px-5 pb-4 pt-1">
                     <QuickAddInput
                       placeholder={`+ Add task for ${isTodayDate ? "today" : dateLabel}...`}
                       onAdd={(text) => handleQuickAdd(text, date)}
                     />
                   </div>
-                )}
+                ) : null}
               </div>
             </motion.section>
           );

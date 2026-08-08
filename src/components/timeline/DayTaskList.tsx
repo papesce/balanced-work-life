@@ -219,6 +219,8 @@ function TimelineTaskRow({
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const statusTriggerRef = useRef<HTMLButtonElement>(null);
   const [statusPickerPos, setStatusPickerPos] = useState<{ top: number; left: number } | null>(null);
+  const tagTriggerRef = useRef<HTMLButtonElement>(null);
+  const [tagPickerPos, setTagPickerPos] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -381,12 +383,18 @@ function TimelineTaskRow({
           </span>
         ))}
         <button
-          onClick={() => setShowTagPicker((v) => !v)}
+          ref={tagTriggerRef}
+          onClick={() => {
+            if (showTagPicker) { setShowTagPicker(false); return; }
+            const rect = tagTriggerRef.current?.getBoundingClientRect();
+            if (rect) setTagPickerPos({ top: rect.bottom + 4, left: rect.left });
+            setShowTagPicker(true);
+          }}
           className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-black/5 dark:bg-white/5 text-gray-400 dark:text-gray-500 hover:bg-black/10 dark:hover:bg-white/10"
         >
           {taskTags.length === 0 ? "tag" : "+"}
         </button>
-        {showTagPicker && (
+        {showTagPicker && tagPickerPos && (
           <TagPicker
             allTags={allTags}
             selectedTags={taskTags}
@@ -394,6 +402,7 @@ function TimelineTaskRow({
             onRemove={(tagId) => { void onRemoveTag(task.id, tagId); }}
             onCreateTag={onCreateTag}
             onClose={() => setShowTagPicker(false)}
+            fixedPosition={tagPickerPos}
           />
         )}
       </div>

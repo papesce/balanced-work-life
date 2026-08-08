@@ -66,6 +66,16 @@ export function isPast(dateStr: string): boolean {
   return dateStr < getToday();
 }
 
+/** Revisit zone: dates on or before today where deferred/historical occurrences make sense. */
+export function isRevisitDate(dateStr: string, today: string = getToday()): boolean {
+  return dateStr <= today;
+}
+
+/** Plan zone: dates after today where the Deferred filter should not apply. */
+export function isPlanDate(dateStr: string, today: string = getToday()): boolean {
+  return dateStr > today;
+}
+
 export function addDays(base: string, days: number): string {
   const d = new Date(base + "T00:00:00");
   d.setDate(d.getDate() + days);
