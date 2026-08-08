@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useEffect, useState, useCallback, Suspense, type ReactNode, type RefObject } from "react";
+import { useMemo, useRef, useEffect, useState, useCallback, Suspense, type RefObject } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Sparkles, Clock, CalendarRange, ChevronDown } from "lucide-react";
@@ -10,7 +10,7 @@ import { useTaskTags } from "@/hooks/useTaskTags";
 import { AppShell } from "@/components/AppShell";
 import { MiniBalanceBar } from "@/components/MiniBalanceBar";
 import { Idea } from "@/lib/types";
-import { getToday, getTomorrow, getDatesRange, isPast, isPlanDate } from "@/lib/dateUtils";
+import { getToday, getTomorrow, getDatesRange, isPast, isPlanDate, addDays } from "@/lib/dateUtils";
 import { computeReschedulePatch, getDayOccurrences, isActiveOccurrence, DayOccurrence, RescheduleAction } from "@/lib/tasks/rescheduleTask";
 import { useUndoAction } from "@/lib/tasks/undo";
 import { DayTaskList } from "@/components/timeline/DayTaskList";
@@ -30,20 +30,20 @@ const cardVariants = {
 };
 
 const PAST_RANGES = [
-  { id: "3days", label: "Past 3 Days", days: 3 },
-  { id: "week", label: "Last Week", days: 7 },
-  { id: "month", label: "Last Month", days: 31 },
-  { id: "quarter", label: "Last 3 Months", days: 92 },
-  { id: "6months", label: "Last 6 Months", days: 183 },
-  { id: "year", label: "Last Year", days: 366 },
+  { id: "3days", label: "3 days before", days: 3 },
+  { id: "week", label: "1 week before", days: 7 },
+  { id: "month", label: "1 month before", days: 31 },
+  { id: "quarter", label: "3 months before", days: 92 },
+  { id: "6months", label: "6 months before", days: 183 },
+  { id: "year", label: "1 year before", days: 366 },
 ] as const;
 
 const FUTURE_RANGES = [
-  { id: "3days", label: "Next 3 Days", days: 3 },
-  { id: "week", label: "Next Week", days: 7 },
-  { id: "2weeks", label: "Next 14 Days", days: 14 },
-  { id: "month", label: "Next Month", days: 31 },
-  { id: "quarter", label: "Next 3 Months", days: 92 },
+  { id: "3days", label: "3 days after", days: 3 },
+  { id: "week", label: "1 week after", days: 7 },
+  { id: "2weeks", label: "2 weeks after", days: 14 },
+  { id: "month", label: "1 month after", days: 31 },
+  { id: "quarter", label: "3 months after", days: 92 },
 ] as const;
 
 type PastRangeId = (typeof PAST_RANGES)[number]["id"];
@@ -85,26 +85,80 @@ function loadPrefs(): TimelinePrefs {
   }
 }
 
-function RangeDropdown({
+function RangeColumn({
+  title,
   options,
   selectedId,
   counts,
-  open,
-  onToggle,
+  spans,
   onSelect,
-  menuRef,
-  icon,
 }: {
+  title: string;
   options: readonly { id: string; label: string; days: number }[];
   selectedId: string;
   counts: Record<string, number>;
+  spans: Record<string, string>;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div>
+      <div className="px-2.5 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+        {title}
+      </div>
+      <div className="space-y-0.5">
+        {options.map((r) => (
+          <button
+            key={r.id}
+            onClick={() => onSelect(r.id)}
+            className={`w-full flex items-center justify-between gap-3 text-left px-2.5 py-1.5 text-[11px] rounded-lg font-semibold cursor-pointer ${
+              r.id === selectedId
+                ? "text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/20"
+                : "text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
+            }`}
+          >
+            <span>{r.label}</span>
+            <span className="flex items-center gap-2 text-[10px] text-gray-400 font-medium tabular-nums">
+              <span>{spans[r.id]}</span>
+              <span>({counts[r.id] ?? 0})</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RangeWindowDropdown({
+  pastOptions,
+  futureOptions,
+  selectedPastId,
+  selectedFutureId,
+  pastCounts,
+  futureCounts,
+  pastSpans,
+  futureSpans,
+  open,
+  onToggle,
+  onSelectPast,
+  onSelectFuture,
+  menuRef,
+}: {
+  pastOptions: readonly { id: string; label: string; days: number }[];
+  futureOptions: readonly { id: string; label: string; days: number }[];
+  selectedPastId: string;
+  selectedFutureId: string;
+  pastCounts: Record<string, number>;
+  futureCounts: Record<string, number>;
+  pastSpans: Record<string, string>;
+  futureSpans: Record<string, string>;
   open: boolean;
   onToggle: () => void;
-  onSelect: (id: string) => void;
+  onSelectPast: (id: string) => void;
+  onSelectFuture: (id: string) => void;
   menuRef: RefObject<HTMLDivElement | null>;
-  icon?: ReactNode;
 }) {
-  const selected = options.find((o) => o.id === selectedId) ?? options[0];
+  const selectedPast = pastOptions.find((o) => o.id === selectedPastId) ?? pastOptions[0];
+  const selectedFuture = futureOptions.find((o) => o.id === selectedFutureId) ?? futureOptions[0];
   return (
     <div ref={menuRef} className="relative">
       <button
@@ -116,26 +170,30 @@ function RangeDropdown({
             : "hover:text-gray-600 dark:hover:text-gray-300"
         }`}
       >
-        {icon}
-        <span>{selected.label} ({counts[selected.id] ?? 0})</span>
+        <CalendarRange size={13} />
+        <span>{selectedPast.label} · {selectedFuture.label}</span>
         <ChevronDown size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1.5 z-50 glass-card-strong rounded-xl p-1.5 shadow-xl border border-black/5 dark:border-white/5 min-w-[160px] space-y-0.5">
-          {options.map((r) => (
-            <button
-              key={r.id}
-              onClick={() => onSelect(r.id)}
-              className={`w-full flex items-center justify-between gap-3 text-left px-2.5 py-1.5 text-[11px] rounded-lg font-semibold cursor-pointer ${
-                r.id === selectedId
-                  ? "text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/20"
-                  : "text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
-              }`}
-            >
-              <span>{r.label}</span>
-              <span className="text-gray-400">({counts[r.id] ?? 0})</span>
-            </button>
-          ))}
+        <div className="absolute right-0 top-full mt-1.5 z-50 glass-card-strong rounded-xl p-1.5 shadow-xl border border-black/5 dark:border-white/5 min-w-[340px]">
+          <div className="grid grid-cols-2 gap-1.5">
+            <RangeColumn
+              title="Before"
+              options={pastOptions}
+              selectedId={selectedPastId}
+              counts={pastCounts}
+              spans={pastSpans}
+              onSelect={onSelectPast}
+            />
+            <RangeColumn
+              title="After"
+              options={futureOptions}
+              selectedId={selectedFutureId}
+              counts={futureCounts}
+              spans={futureSpans}
+              onSelect={onSelectFuture}
+            />
+          </div>
         </div>
       )}
     </div>
@@ -156,11 +214,10 @@ function TimelineInner() {
   const { ideas, loading, createIdea, markDone, markUndone, updateIdea, reorderTasks, smartSortTasks } = useIdeas();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
-  const pastMenuRef = useRef<HTMLDivElement>(null);
-  const futureMenuRef = useRef<HTMLDivElement>(null);
+  const windowMenuRef = useRef<HTMLDivElement>(null);
   const scrolledAnchorRef = useRef<string | null>(null);
   const [showDateInput, setShowDateInput] = useState(false);
-  const [openMenu, setOpenMenu] = useState<"past" | "future" | null>(null);
+  const [windowMenuOpen, setWindowMenuOpen] = useState(false);
   const [filter, setFilter] = useState<"all" | "deferred">(() => loadPrefs().filter);
   const [pastRange, setPastRange] = useState<PastRangeId>(() => loadPrefs().pastRange);
   const [futureRange, setFutureRange] = useState<FutureRangeId>(() => loadPrefs().futureRange);
@@ -196,7 +253,10 @@ function TimelineInner() {
     const dateCounts: Record<string, number> = {};
     const spanDates = getDatesRange(MAX_LOOKBACK_DAYS, MAX_FORWARD_DAYS, anchor);
     for (const date of spanDates) {
-      dateCounts[date] = getDayOccurrences(tasks, date, today, true).length;
+      const occs = getDayOccurrences(tasks, date, today, true);
+      dateCounts[date] = effectiveFilter === "deferred" && date <= today
+        ? occs.filter(isActiveOccurrence).length
+        : occs.length;
     }
     const countPast = (days: number) => getDatesRange(days, 0, anchor).reduce((n, d) => (d < anchor ? n + (dateCounts[d] ?? 0) : n), 0);
     const countFuture = (days: number) => getDatesRange(0, days, anchor).reduce((n, d) => (d > anchor ? n + (dateCounts[d] ?? 0) : n), 0);
@@ -205,7 +265,21 @@ function TimelineInner() {
     for (const r of PAST_RANGES) past[r.id] = countPast(r.days);
     for (const r of FUTURE_RANGES) future[r.id] = countFuture(r.days);
     return { past, future };
-  }, [tasks, anchor, today]);
+  }, [tasks, anchor, today, effectiveFilter]);
+
+  const rangeSpans = useMemo(() => {
+    const formatSpan = (d: string) =>
+      new Date(d + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const past: Record<string, string> = {};
+    const future: Record<string, string> = {};
+    for (const r of PAST_RANGES) {
+      past[r.id] = `${formatSpan(addDays(anchor, -r.days))} – ${formatSpan(addDays(anchor, -1))}`;
+    }
+    for (const r of FUTURE_RANGES) {
+      future[r.id] = `${formatSpan(addDays(anchor, 1))} – ${formatSpan(addDays(anchor, r.days))}`;
+    }
+    return { past, future };
+  }, [anchor]);
 
   const renderPlan = useMemo((): RenderUnit[] => {
     if (!extendedRange || dates.length <= MAX_SHOW_ALL_DAYS) {
@@ -251,15 +325,23 @@ function TimelineInner() {
   }, [filter, pastRange, futureRange]);
 
   useEffect(() => {
-    if (!openMenu) return;
+    if (!windowMenuOpen) return;
     const handler = (e: PointerEvent) => {
       const target = e.target as Node;
-      if (openMenu === "past" && pastMenuRef.current && !pastMenuRef.current.contains(target)) setOpenMenu(null);
-      if (openMenu === "future" && futureMenuRef.current && !futureMenuRef.current.contains(target)) setOpenMenu(null);
+      if (windowMenuRef.current && !windowMenuRef.current.contains(target)) setWindowMenuOpen(false);
     };
     document.addEventListener("pointerdown", handler);
     return () => document.removeEventListener("pointerdown", handler);
-  }, [openMenu]);
+  }, [windowMenuOpen]);
+
+  useEffect(() => {
+    if (!windowMenuOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setWindowMenuOpen(false);
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [windowMenuOpen]);
 
   useEffect(() => {
     if (loading) return;
@@ -383,31 +465,20 @@ function TimelineInner() {
           );
         })}
       </div>
-      <RangeDropdown
-        options={PAST_RANGES}
-        selectedId={pastRange}
-        counts={rangeCounts.past}
-        open={openMenu === "past"}
-        onToggle={() => setOpenMenu((v) => (v === "past" ? null : "past"))}
-        onSelect={(id) => {
-          setPastRange(id as PastRangeId);
-          setOpenMenu(null);
-        }}
-        menuRef={pastMenuRef}
-        icon={<Clock size={13} />}
-      />
-      <RangeDropdown
-        options={FUTURE_RANGES}
-        selectedId={futureRange}
-        counts={rangeCounts.future}
-        open={openMenu === "future"}
-        onToggle={() => setOpenMenu((v) => (v === "future" ? null : "future"))}
-        onSelect={(id) => {
-          setFutureRange(id as FutureRangeId);
-          setOpenMenu(null);
-        }}
-        menuRef={futureMenuRef}
-        icon={<CalendarRange size={13} />}
+      <RangeWindowDropdown
+        pastOptions={PAST_RANGES}
+        futureOptions={FUTURE_RANGES}
+        selectedPastId={pastRange}
+        selectedFutureId={futureRange}
+        pastCounts={rangeCounts.past}
+        futureCounts={rangeCounts.future}
+        pastSpans={rangeSpans.past}
+        futureSpans={rangeSpans.future}
+        open={windowMenuOpen}
+        onToggle={() => setWindowMenuOpen((v) => !v)}
+        onSelectPast={(id) => setPastRange(id as PastRangeId)}
+        onSelectFuture={(id) => setFutureRange(id as FutureRangeId)}
+        menuRef={windowMenuRef}
       />
     </>
   );
