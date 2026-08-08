@@ -11,6 +11,7 @@ import { TagPicker } from "@/components/shared/TagPicker";
 import { formatTime } from "./plannerUtils";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { RescheduleAction, computeClearDatePatch } from "@/lib/tasks/rescheduleTask";
+import { getToday } from "@/lib/dateUtils";
 
 const STATUS_CONFIG: Record<IdeaStatus, { label: string; color: string; icon: React.ElementType | null }> = {
   inbox:       { label: "Inbox",       color: "text-gray-400",              icon: null },
@@ -94,6 +95,7 @@ export function AreaTaskGroup({
             onUndone={onUndone}
             onUpdate={onUpdate}
             onDelete={onDelete}
+            onReschedule={onReschedule}
             onMoveTaskBetweenAreas={onMoveTaskBetweenAreas}
             getTagsForIdea={getTagsForIdea}
             allTags={allTags}
@@ -103,7 +105,7 @@ export function AreaTaskGroup({
           />
         )}
         {doneTasks.map((task) => (
-          <TaskRow key={task.id} task={task} area={area} onDone={onDone} onUndone={onUndone} onUpdate={onUpdate} onDelete={onDelete} onMoveTaskBetweenAreas={onMoveTaskBetweenAreas} getTagsForIdea={getTagsForIdea} allTags={allTags} onCreateTag={onCreateTag} onAddTag={onAddTag} onRemoveTag={onRemoveTag} />
+          <TaskRow key={task.id} task={task} area={area} onDone={onDone} onUndone={onUndone} onUpdate={onUpdate} onDelete={onDelete} onReschedule={onReschedule} onMoveTaskBetweenAreas={onMoveTaskBetweenAreas} getTagsForIdea={getTagsForIdea} allTags={allTags} onCreateTag={onCreateTag} onAddTag={onAddTag} onRemoveTag={onRemoveTag} />
         ))}
         {pendingTasks.length === 0 && doneTasks.length === 0 && (
           <div className="px-5 py-4 text-xs text-gray-400 dark:text-gray-500 italic">No tasks planned for this day</div>
@@ -128,7 +130,7 @@ export function AreaTaskGroup({
 }
 
 function PendingTaskList({
-  tasks, area, onReorder, onDone, onUndone, onUpdate, onDelete, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag, onAddTag, onRemoveTag,
+  tasks, area, onReorder, onDone, onUndone, onUpdate, onDelete, onReschedule, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag, onAddTag, onRemoveTag,
 }: {
   tasks: Idea[];
   area: LifeArea;
@@ -137,6 +139,7 @@ function PendingTaskList({
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onDelete: (id: string) => void;
+  onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
   onMoveTaskBetweenAreas?: (taskId: string, fromArea: LifeArea, toArea: LifeArea) => void;
   getTagsForIdea?: (ideaId: string) => Tag[];
   allTags?: Tag[];
@@ -163,6 +166,7 @@ function PendingTaskList({
           onUndone={onUndone}
           onUpdate={onUpdate}
           onDelete={onDelete}
+          onReschedule={onReschedule}
           onMoveTaskBetweenAreas={onMoveTaskBetweenAreas}
           getTagsForIdea={getTagsForIdea}
           allTags={allTags}
@@ -176,7 +180,7 @@ function PendingTaskList({
 }
 
 function ReorderItemWrapper({
-  task, area, onReorder, itemsRef, onDone, onUndone, onUpdate, onDelete, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag, onAddTag, onRemoveTag,
+  task, area, onReorder, itemsRef, onDone, onUndone, onUpdate, onDelete, onReschedule, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag, onAddTag, onRemoveTag,
 }: {
   task: Idea;
   area: LifeArea;
@@ -186,6 +190,7 @@ function ReorderItemWrapper({
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onDelete: (id: string) => void;
+  onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
   onMoveTaskBetweenAreas?: (taskId: string, fromArea: LifeArea, toArea: LifeArea) => void;
   getTagsForIdea?: (ideaId: string) => Tag[];
   allTags?: Tag[];
@@ -210,6 +215,7 @@ function ReorderItemWrapper({
         onUndone={onUndone}
         onUpdate={onUpdate}
         onDelete={onDelete}
+        onReschedule={onReschedule}
         onMoveTaskBetweenAreas={onMoveTaskBetweenAreas}
         getTagsForIdea={getTagsForIdea}
         allTags={allTags}
@@ -224,7 +230,7 @@ function ReorderItemWrapper({
 }
 
 function TaskRow({
-  task, area, onDone, onUndone, onUpdate, onDelete, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag, onAddTag, onRemoveTag, showDragHandle, dragControls,
+  task, area, onDone, onUndone, onUpdate, onDelete, onReschedule, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag, onAddTag, onRemoveTag, showDragHandle, dragControls,
 }: {
   task: Idea;
   area: LifeArea;
@@ -232,6 +238,7 @@ function TaskRow({
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onDelete: (id: string) => void;
+  onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
   onMoveTaskBetweenAreas?: (taskId: string, fromArea: LifeArea, toArea: LifeArea) => void;
   getTagsForIdea?: (ideaId: string) => Tag[];
   allTags?: Tag[];
@@ -267,6 +274,20 @@ function TaskRow({
   const [areaPickerPos, setAreaPickerPos] = useState<{ top: number; left: number } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const deleteConfirmRef = useRef<HTMLDivElement>(null);
+  const [showDateInput, setShowDateInput] = useState(false);
+  const dateInputRef = useRef<HTMLInputElement>(null);
+  const isReschedule = task.status === "deferred" || (task.scheduled_date !== null && task.scheduled_date < getToday());
+  const dateActionLabel = isReschedule ? "Reschedule" : "Move";
+
+  useEffect(() => {
+    if (!showDateInput || !dateInputRef.current) return;
+    const input = dateInputRef.current;
+    input.focus();
+    if (typeof input.showPicker === "function") {
+      const picker = input.showPicker() as unknown as Promise<void> | undefined;
+      picker?.catch?.(() => {});
+    }
+  }, [showDateInput]);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -592,6 +613,7 @@ function TaskRow({
               if (showMenu) { setShowMenu(false); return; }
               const rect = menuTriggerRef.current?.getBoundingClientRect();
               if (rect) setMenuPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
+              setShowDateInput(false);
               setShowMenu(true);
             }}
             className="text-gray-300 dark:text-gray-600 hover:text-gray-500 cursor-pointer md:opacity-50 md:hover:opacity-100"
@@ -610,6 +632,38 @@ function TaskRow({
               >
                 Move to Backlog
               </button>
+              <div className="border-t border-black/5 dark:border-white/5 my-1" />
+              {task.scheduled_date !== getToday() && (
+                <button
+                  onClick={() => { void onReschedule(task.id, isReschedule ? { type: "retry_today" } : { type: "move", newDate: getToday() }); setShowMenu(false); }}
+                  className="flex w-full text-left px-3 py-1.5 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] font-semibold cursor-pointer"
+                >
+                  {dateActionLabel} to Today
+                </button>
+              )}
+              <button
+                onClick={() => setShowDateInput((v) => !v)}
+                className={`flex w-full text-left px-3 py-1.5 text-[11px] font-semibold cursor-pointer ${
+                  showDateInput
+                    ? "text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/20"
+                    : "text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
+                }`}
+              >
+                {dateActionLabel} Date…
+              </button>
+              {showDateInput && (
+                <div className="px-2.5 pb-1.5">
+                  <input
+                    ref={dateInputRef}
+                    type="date"
+                    autoFocus
+                    className="w-full text-xs border border-black/10 dark:border-white/10 rounded-lg px-2 py-1.5 bg-white/80 dark:bg-gray-800/80 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    onChange={(e) => {
+                      if (e.target.value) { void onReschedule(task.id, isReschedule ? { type: "reschedule", newDate: e.target.value } : { type: "move", newDate: e.target.value }); setShowMenu(false); }
+                    }}
+                  />
+                </div>
+              )}
               <button
                 onClick={() => { setShowDeleteConfirm(true); setShowMenu(false); }}
                 className="flex w-full text-left px-3 py-1.5 text-[11px] text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 font-bold cursor-pointer"
