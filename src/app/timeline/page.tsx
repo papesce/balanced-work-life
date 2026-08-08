@@ -156,10 +156,9 @@ function TimelineInner() {
   const { ideas, loading, createIdea, markDone, markUndone, updateIdea, reorderTasks, smartSortTasks } = useIdeas();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
-  const anchorRef = useRef<HTMLElement>(null);
-  const hasAutoScrolled = useRef(false);
   const pastMenuRef = useRef<HTMLDivElement>(null);
   const futureMenuRef = useRef<HTMLDivElement>(null);
+  const scrolledAnchorRef = useRef<string | null>(null);
   const [showDateInput, setShowDateInput] = useState(false);
   const [openMenu, setOpenMenu] = useState<"past" | "future" | null>(null);
   const [filter, setFilter] = useState<"all" | "deferred">(() => loadPrefs().filter);
@@ -263,13 +262,14 @@ function TimelineInner() {
   }, [openMenu]);
 
   useEffect(() => {
-    if (loading || hasAutoScrolled.current) return;
+    if (loading) return;
+    if (scrolledAnchorRef.current === anchor) return;
     const timer = setTimeout(() => {
-      anchorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      hasAutoScrolled.current = true;
-    }, 100);
+      document.getElementById(`day-${anchor}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      scrolledAnchorRef.current = anchor;
+    }, 80);
     return () => clearTimeout(timer);
-  }, [loading]);
+  }, [anchor, loading]);
 
   const handleQuickAdd = async (text: string, date: string) => {
     await createIdea(text, null, "bottom", { type: "task", scheduled_date: date, status: "planned" });
@@ -296,13 +296,22 @@ function TimelineInner() {
     setTimeout(cleanup, 2500);
   }, []);
 
-  const recenterOn = useCallback((d: string, onDone?: () => void) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        document.getElementById(`day-${d}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  const scrollToDate = useCallback((d: string, onDone?: () => void) => {
+    let attempts = 0;
+    const tryScroll = () => {
+      const el = document.getElementById(`day-${d}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        scrolledAnchorRef.current = d;
         onDone?.();
-      });
-    });
+        return;
+      }
+      if (attempts < 30) {
+        attempts += 1;
+        requestAnimationFrame(tryScroll);
+      }
+    };
+    tryScroll();
   }, []);
 
   const setAnchorParam = useCallback((d: string) => {
@@ -313,13 +322,13 @@ function TimelineInner() {
 
   const handleAnchorChange = useCallback((d: string) => {
     setAnchorParam(d);
-    recenterOn(d);
-  }, [setAnchorParam, recenterOn]);
+    scrollToDate(d);
+  }, [setAnchorParam, scrollToDate]);
 
   const handleGoToDate = useCallback((targetDate: string, taskId: string) => {
     setAnchorParam(targetDate);
-    recenterOn(targetDate, () => pulseTask(taskId, targetDate));
-  }, [setAnchorParam, recenterOn, pulseTask]);
+    scrollToDate(targetDate, () => pulseTask(taskId, targetDate));
+  }, [setAnchorParam, scrollToDate, pulseTask]);
 
   if (loading) {
     return (
@@ -440,7 +449,6 @@ function TimelineInner() {
             <motion.section
               key={date}
               id={`day-${date}`}
-              ref={isAnchorDate ? anchorRef : null}
               custom={index}
               variants={cardVariants}
               initial="hidden"
