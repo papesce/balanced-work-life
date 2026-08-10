@@ -567,38 +567,38 @@ function TaskRow({
         </span>
       )}
 
-      <div className="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
-        {onMoveTaskBetweenAreas && (() => {
-          const taskTags = getTagsForIdea?.(task.id) ?? [];
-          const nonSystemTags = taskTags.filter((t) => !t.is_system);
-          return (
-            <div className="flex items-center gap-1">
-              <button
-                ref={areaDotRef}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (showAreaPicker) { setShowAreaPicker(false); return; }
-                  const rect = areaDotRef.current?.getBoundingClientRect();
-                  if (rect) setAreaPickerPos({ top: rect.bottom + 4, left: rect.left });
-                  setShowAreaPicker(true);
-                }}
-                className="w-2 h-2 rounded-full cursor-pointer hover:scale-150 transition-transform flex-shrink-0"
-                style={{ background: areaColors[area]?.dot }}
-                title="Change area"
-              />
-              {nonSystemTags.map((tag) => (
-                <span
-                  key={tag.id}
-                  className="text-[9px] font-bold px-1 py-0.5 rounded-full flex-shrink-0"
-                  style={{ background: `${areaColors[tag.area]?.dot}15`, color: areaColors[tag.area]?.dot }}
-                >
-                  {tag.name}
-                </span>
-              ))}
-            </div>
-          );
-        })()}
+      {onMoveTaskBetweenAreas && (() => {
+        const taskTags = getTagsForIdea?.(task.id) ?? [];
+        const nonSystemTags = taskTags.filter((t) => !t.is_system);
+        return (
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button
+              ref={areaDotRef}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (showAreaPicker) { setShowAreaPicker(false); return; }
+                const rect = areaDotRef.current?.getBoundingClientRect();
+                if (rect) setAreaPickerPos({ top: rect.bottom + 4, left: rect.left });
+                setShowAreaPicker(true);
+              }}
+              className="w-2 h-2 rounded-full cursor-pointer hover:scale-150 transition-transform flex-shrink-0"
+              style={{ background: areaColors[area]?.dot }}
+              title="Change area"
+            />
+            {nonSystemTags.map((tag) => (
+              <span
+                key={tag.id}
+                className="text-[9px] font-bold px-1 py-0.5 rounded-full flex-shrink-0"
+                style={{ background: `${areaColors[tag.area]?.dot}15`, color: areaColors[tag.area]?.dot }}
+              >
+                {tag.name}
+              </span>
+            ))}
+          </div>
+        );
+      })()}
 
+      <div className="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
         <button
           onClick={() => onUpdate(task.id, { is_priority: !task.is_priority })}
           className={`cursor-pointer ${task.is_priority ? "text-amber-400" : "text-gray-300 dark:text-gray-600 hover:text-gray-400"}`}
