@@ -151,7 +151,11 @@ function PendingTaskList({
   const itemsRef = useRef(items);
 
   useEffect(() => { itemsRef.current = items; }, [items]);
-  useEffect(() => { setItems(tasks); }, [tasks]);
+  const [prevTasks, setPrevTasks] = useState(tasks);
+  if (tasks !== prevTasks) {
+    setPrevTasks(tasks);
+    setItems(tasks);
+  }
 
   return (
     <Reorder.Group axis="y" values={items} onReorder={setItems} style={{ overflow: "visible" }}>

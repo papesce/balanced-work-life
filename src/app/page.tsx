@@ -40,10 +40,12 @@ function DailyPlannerInner() {
   const [activeDate, setActiveDate] = useState<string>(() => searchParams.get("date") ?? getToday());
   const highlightId = searchParams.get("highlight");
 
-  useEffect(() => {
-    const d = searchParams.get("date");
-    if (d) setActiveDate(d);
-  }, [searchParams]);
+  const urlDate = searchParams.get("date");
+  const [prevUrlDate, setPrevUrlDate] = useState(urlDate);
+  if (urlDate !== prevUrlDate) {
+    setPrevUrlDate(urlDate);
+    if (urlDate) setActiveDate(urlDate);
+  }
 
   useEffect(() => {
     if (!highlightId || loading) return;
@@ -66,7 +68,15 @@ function DailyPlannerInner() {
   const [selectedArea, setSelectedArea] = useState<LifeArea | null>(null);
   const [activeMobileTab, setActiveMobileTab] = useState<"tasks" | "schedule" | "backlog" | "balance">("tasks");
   const [rightPanelTab, setRightPanelTab] = useState<"schedule" | "backlog">("schedule");
-  const [targets, setTargets] = useState<Record<LifeArea, number>>(DEFAULT_TARGETS);
+  const [targets] = useState<Record<LifeArea, number>>(() => {
+    try {
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem(LOCAL_STORAGE_TARGETS_KEY);
+        if (stored) return JSON.parse(stored) as Record<LifeArea, number>;
+      }
+    } catch {}
+    return DEFAULT_TARGETS;
+  });
   const [showDateInput, setShowDateInput] = useState(false);
   const [rightColWidth, setRightColWidth] = useState<number>(() => {
     if (typeof window !== "undefined") {
@@ -108,13 +118,6 @@ function DailyPlannerInner() {
   }, []);
 
   const today = getToday();
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(LOCAL_STORAGE_TARGETS_KEY);
-      if (stored) setTargets(JSON.parse(stored));
-    } catch {}
-  }, []);
 
   const taskIdeas = useMemo(() => ideas.filter((i) => i.type === "task"), [ideas]);
   const activeTaskIdeas = useMemo(
