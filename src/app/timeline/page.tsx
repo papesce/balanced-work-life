@@ -227,6 +227,7 @@ function TimelineInner() {
   const tomorrow = getTomorrow();
   const anchorParam = searchParams.get("date");
   const anchor = anchorParam && /^\d{4}-\d{2}-\d{2}$/.test(anchorParam) ? anchorParam : today;
+  const highlightId = searchParams.get("highlight");
   const lookbackDays = PAST_RANGES.find((r) => r.id === pastRange)?.days ?? 3;
   const forwardDays = FUTURE_RANGES.find((r) => r.id === futureRange)?.days ?? 14;
   const extendedRange = lookbackDays !== 3 || forwardDays !== 14;
@@ -352,6 +353,32 @@ function TimelineInner() {
     }, 80);
     return () => clearTimeout(timer);
   }, [anchor, loading]);
+
+  useEffect(() => {
+    if (!highlightId || loading) return;
+    let attempts = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const tryPulse = () => {
+      const el = document.getElementById(`task-${highlightId}-${anchor}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("highlight-pulse");
+        const cleanup = () => el.classList.remove("highlight-pulse");
+        el.addEventListener("animationend", cleanup, { once: true });
+        timer = setTimeout(cleanup, 2500);
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete("highlight");
+        router.replace(`/timeline?${params.toString()}`, { scroll: false });
+        return;
+      }
+      if (attempts < 30) {
+        attempts += 1;
+        timer = setTimeout(tryPulse, 100);
+      }
+    };
+    timer = setTimeout(tryPulse, 120);
+    return () => { if (timer) clearTimeout(timer); };
+  }, [highlightId, anchor, loading, router, searchParams]);
 
   const handleQuickAdd = async (text: string, date: string) => {
     await createIdea(text, null, "bottom", { type: "task", scheduled_date: date, status: "planned" });

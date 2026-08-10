@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Sparkles, Layers, Clock, Inbox, BarChart3, CalendarDays } from "lucide-react";
+import { Sparkles, Layers, Clock, Inbox, BarChart3 } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
@@ -277,15 +277,6 @@ function DailyPlannerInner() {
             onShowDateInput={setShowDateInput}
             onChangeDate={setActiveDate}
           />
-          <button
-            type="button"
-            onClick={() => router.push(`/timeline?date=${activeDate}`)}
-            className="toolbar-btn toolbar-btn--accent gap-1.5 px-2.5"
-            title="View this day on the Timeline"
-          >
-            <CalendarDays size={13} />
-            <span>Timeline</span>
-          </button>
         </>
       }
     >

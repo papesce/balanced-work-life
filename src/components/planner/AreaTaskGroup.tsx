@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { Reorder, useDragControls } from "framer-motion";
 import { Check, Star, MoreHorizontal, GripVertical, Clock, Play, Pause, X } from "lucide-react";
 import { areaColors } from "@/styles/tokens";
@@ -282,6 +283,7 @@ function TaskRow({
   const dateInputRef = useRef<HTMLInputElement>(null);
   const isReschedule = task.status === "deferred" || (task.scheduled_date !== null && task.scheduled_date < getToday());
   const dateActionLabel = isReschedule ? "Reschedule" : "Move";
+  const router = useRouter();
 
   useEffect(() => {
     if (!showDateInput || !dateInputRef.current) return;
@@ -630,6 +632,17 @@ function TaskRow({
               style={{ position: "fixed", top: menuPos.top, right: menuPos.right, zIndex: 9999 }}
               className="glass-card-strong rounded-lg py-1 min-w-[160px] shadow-lg border border-black/5 dark:border-white/5"
             >
+              {task.scheduled_date && (
+                <>
+                  <button
+                    onClick={() => { router.push(`/timeline?date=${task.scheduled_date}&highlight=${task.id}`); setShowMenu(false); }}
+                    className="flex w-full text-left px-3 py-1.5 text-[11px] text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/20 font-semibold cursor-pointer"
+                  >
+                    Reveal in Timeline
+                  </button>
+                  <div className="border-t border-black/5 dark:border-white/5 my-1" />
+                </>
+              )}
               <button
                 onClick={() => { onUpdate(task.id, computeClearDatePatch(task, "inbox")); setShowMenu(false); }}
                 className="flex w-full text-left px-3 py-1.5 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] font-semibold cursor-pointer"
