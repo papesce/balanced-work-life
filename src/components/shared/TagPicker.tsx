@@ -39,6 +39,8 @@ interface TagPickerProps {
   onClose: () => void;
   /** When set, renders in a fixed-position portal so the menu paints above everything. */
   fixedPosition?: { top: number; left: number };
+  /** When set, only one tag can be selected: renders radios and clicking a new tag is exclusive (parent clears the rest). */
+  singleSelect?: boolean;
 }
 
 export function TagPicker({
@@ -49,6 +51,7 @@ export function TagPicker({
   onCreateTag,
   onClose,
   fixedPosition,
+  singleSelect = false,
 }: TagPickerProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [creating, setCreating] = useState(false);
@@ -85,6 +88,7 @@ export function TagPicker({
   const handleToggle = useCallback(
     (tag: Tag) => {
       if (selectedIds.has(tag.id)) {
+        if (singleSelect) return;
         if (selectedTags.length <= 1) return;
         onRemove(tag.id);
       } else {
@@ -92,7 +96,7 @@ export function TagPicker({
         onClose();
       }
     },
-    [selectedIds, selectedTags, onAdd, onRemove, onClose]
+    [selectedIds, selectedTags, onAdd, onRemove, onClose, singleSelect]
   );
 
   const handleCreate = async () => {
@@ -147,12 +151,20 @@ export function TagPicker({
                 background: areaBg(area, hoveredTagId === tag.id ? 0.24 : 0.12),
               }}
             >
-              <span className={`flex-none w-3.5 h-3.5 rounded border flex items-center justify-center ${
-                selectedIds.has(tag.id)
-                  ? "bg-current border-current"
-                  : "border-gray-300 dark:border-gray-600"
+              <span className={`flex-none w-3.5 h-3.5 flex items-center justify-center ${
+                singleSelect
+                  ? "rounded-full border-2 " + (
+                      selectedIds.has(tag.id)
+                        ? "border-current ring-2 ring-inset ring-current"
+                        : "border-gray-300 dark:border-gray-600"
+                    )
+                  : "rounded border " + (
+                      selectedIds.has(tag.id)
+                        ? "bg-current border-current"
+                        : "border-gray-300 dark:border-gray-600"
+                    )
               }`}>
-                {selectedIds.has(tag.id) && <Check size={9} className="text-white" strokeWidth={3} />}
+                {!singleSelect && selectedIds.has(tag.id) && <Check size={9} className="text-white" strokeWidth={3} />}
               </span>
               <span className="text-gray-700 dark:text-gray-200">{tag.name}</span>
             </button>

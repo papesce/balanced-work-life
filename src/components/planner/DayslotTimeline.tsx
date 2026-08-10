@@ -177,6 +177,7 @@ function SlotForm({
             onRemove={() => {}}
             onCreateTag={onCreateTag ?? (async () => null)}
             onClose={() => setShowAreaPicker(false)}
+            singleSelect
           />
         </div>,
         document.body
@@ -462,13 +463,18 @@ function EventCard({
     setShowAreaPicker(true);
   }, [showAreaPicker]);
 
-  const handleTagSelected = useCallback(async (tag: Tag) => {
+  const handleExclusiveTagSelected = useCallback(async (tag: Tag) => {
+    for (const existing of areaTags) {
+      if (existing.id !== tag.id && onRemoveTag) {
+        await onRemoveTag(idea.id, existing.id);
+      }
+    }
     if (onAddTag) {
       await onAddTag(idea.id, tag);
     }
     setShowMenu(false);
     setShowAreaPicker(false);
-  }, [idea.id, onAddTag]);
+  }, [idea.id, areaTags, onAddTag, onRemoveTag]);
 
   const primaryTag = getPrimaryTagForIdea(areaTags);
 
@@ -577,7 +583,7 @@ function EventCard({
           <TagPicker
             allTags={allTags}
             selectedTags={areaTags}
-            onAdd={handleTagSelected}
+            onAdd={handleExclusiveTagSelected}
             onRemove={async (tagId) => {
               if (onRemoveTag) await onRemoveTag(idea.id, tagId);
               setShowAreaPicker(false);
@@ -585,6 +591,7 @@ function EventCard({
             }}
             onCreateTag={onCreateTag ?? (async () => null)}
             onClose={() => { setShowAreaPicker(false); setShowMenu(false); }}
+            singleSelect
           />
         </div>,
         document.body
