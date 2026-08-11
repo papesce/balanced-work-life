@@ -191,9 +191,9 @@ function DailyPlannerInner() {
 
   const handleAddToArea = async (text: string, area: LifeArea) => {
     const id = await createIdea(text, null, "bottom", { type: "task", scheduled_date: activeDate, status: "planned" });
-    // Auto-tag with the system tag for this area if it exists
+    // Auto-tag with the system tag for this area (created on demand if missing)
     if (id) {
-      const systemTag = tagsHook.tags.find((t) => t.is_system && t.area === area);
+      const systemTag = await tagsHook.getOrCreateSystemTag(area);
       if (systemTag) await taskTagsHook.addTagToTask(id, systemTag);
     }
   };
@@ -201,7 +201,7 @@ function DailyPlannerInner() {
   const handleMoveTaskBetweenAreas = async (taskId: string, fromArea: LifeArea, toArea: LifeArea) => {
     const sourceTag = tagsHook.tags.find((t) => t.is_system && t.area === fromArea);
     if (sourceTag) await taskTagsHook.removeTagFromTask(taskId, sourceTag.id).catch(() => {});
-    const targetTag = tagsHook.tags.find((t) => t.is_system && t.area === toArea);
+    const targetTag = await tagsHook.getOrCreateSystemTag(toArea);
     if (targetTag) await taskTagsHook.addTagToTask(taskId, targetTag).catch(() => {});
   };
 
@@ -212,7 +212,7 @@ function DailyPlannerInner() {
   const handleCreateScheduledTask = async (text: string, time: string, area?: LifeArea) => {
     const id = await createIdea(text, null, "bottom", { type: "task", scheduled_date: activeDate, scheduled_time: time, status: "scheduled" });
     if (id && area) {
-      const tag = tagsHook.tags.find((t) => t.is_system && t.area === area);
+      const tag = await tagsHook.getOrCreateSystemTag(area);
       if (tag) await taskTagsHook.addTagToTask(id, tag);
     }
   };

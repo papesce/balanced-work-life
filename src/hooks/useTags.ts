@@ -62,6 +62,38 @@ export function useTags() {
     return tag;
   };
 
+  const getOrCreateSystemTag = async (area: LifeArea): Promise<Tag | null> => {
+    if (!user) return null;
+    const existing = tags.find((t) => t.is_system && t.area === area);
+    if (existing) return existing;
+    const now = new Date().toISOString();
+    const tag: Tag = {
+      id: uuidv4(),
+      user_id: user.id,
+      name: area,
+      area,
+      is_system: true,
+      created_at: now,
+    };
+    setTags((prev) => [...prev, tag].sort((a, b) => a.name.localeCompare(b.name)));
+    const { error } = await supabase.from("tags").insert(tag);
+    if (error) {
+      setTags((prev) => prev.filter((t) => t.id !== tag.id));
+      const { data } = await supabase
+        .from("tags")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("is_system", true)
+        .eq("area", area)
+        .limit(1)
+        .maybeSingle();
+      if (data) return data as Tag;
+      console.error("Failed to create system tag", error);
+      return null;
+    }
+    return tag;
+  };
+
   const deleteTag = async (id: string) => {
     const previous = tags.find((t) => t.id === id);
     setTags((prev) => prev.filter((t) => t.id !== id));
@@ -73,5 +105,5 @@ export function useTags() {
     }
   };
 
-  return { tags, loading, createTag, deleteTag, refetch: fetchTags };
+  return { tags, loading, createTag, getOrCreateSystemTag, deleteTag, refetch: fetchTags };
 }

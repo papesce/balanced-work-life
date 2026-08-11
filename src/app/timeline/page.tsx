@@ -9,7 +9,7 @@ import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { AppShell } from "@/components/AppShell";
 import { MiniBalanceBar } from "@/components/MiniBalanceBar";
-import { Idea } from "@/lib/types";
+import { Idea, LifeArea } from "@/lib/types";
 import { getToday, getTomorrow, getDatesRange, isPast, isPlanDate, addDays } from "@/lib/dateUtils";
 import { computeReschedulePatch, getDayOccurrences, isActiveOccurrence, DayOccurrence, RescheduleAction } from "@/lib/tasks/rescheduleTask";
 import { useUndoAction } from "@/lib/tasks/undo";
@@ -221,6 +221,7 @@ function TimelineInner() {
   const [filter, setFilter] = useState<"all" | "deferred">(() => loadPrefs().filter);
   const [pastRange, setPastRange] = useState<PastRangeId>(() => loadPrefs().pastRange);
   const [futureRange, setFutureRange] = useState<FutureRangeId>(() => loadPrefs().futureRange);
+  const [quickAddArea, setQuickAddArea] = useState<LifeArea | null>(null);
   const { undoAction, clearUndo, handleUndo } = useUndoAction();
 
   const today = getToday();
@@ -380,8 +381,12 @@ function TimelineInner() {
     return () => { if (timer) clearTimeout(timer); };
   }, [highlightId, anchor, loading, router, searchParams]);
 
-  const handleQuickAdd = async (text: string, date: string) => {
-    await createIdea(text, null, "bottom", { type: "task", scheduled_date: date, status: "planned" });
+  const handleQuickAdd = async (text: string, date: string, area: LifeArea | null) => {
+    const id = await createIdea(text, null, "bottom", { type: "task", scheduled_date: date, status: "planned" });
+    if (id && area) {
+      const tag = await tagsHook.getOrCreateSystemTag(area);
+      if (tag) await taskTagsHook.addTagToTask(id, tag);
+    }
   };
 
   const handleReschedule = useCallback(async (id: string, action: RescheduleAction) => {
@@ -626,7 +631,9 @@ function TimelineInner() {
                   <div className="px-5 pb-4 pt-1">
                     <QuickAddInput
                       placeholder={`+ Add task for ${isTodayDate ? "today" : dateLabel}...`}
-                      onAdd={(text) => handleQuickAdd(text, date)}
+                      area={quickAddArea}
+                      onAreaChange={setQuickAddArea}
+                      onAdd={(text) => handleQuickAdd(text, date, quickAddArea)}
                     />
                   </div>
                 ) : null}
