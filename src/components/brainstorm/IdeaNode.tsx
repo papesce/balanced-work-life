@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronRight, ChevronDown, GripVertical, Link2, ArrowUpDown, Calendar, Trash2 } from "lucide-react";
 import { IdeaNode as IdeaNodeType, Idea, IdeaLink, IdeaType, Tag, LinkType, IdeaStatus, LifeArea } from "@/lib/types";
 import { TypePicker } from "./TypePicker";
@@ -118,6 +119,7 @@ export function IdeaNode({
   onRemoveTag,
   onCreateTag,
 }: IdeaNodeProps) {
+  const router = useRouter();
   const nodeTags = getTagsForIdea(node.id);
   const isEditing = editingId === node.id;
   const isSelected = selectedId === node.id;
@@ -485,13 +487,19 @@ export function IdeaNode({
 
         {/* Scheduled date chip */}
         {node.scheduled_date && (
-          <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 border ${
-            node.scheduled_date === todayString
-              ? "text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-500/20 border-violet-200 dark:border-violet-500/30"
-              : "text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700"
-          }`}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push(`/timeline?date=${node.scheduled_date}&highlight=${node.id}`);
+            }}
+            title="Open in timeline"
+            className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 border cursor-pointer transition-colors hover:border-violet-400 dark:hover:border-violet-500 hover:text-violet-700 dark:hover:text-violet-300 ${
+              node.scheduled_date === todayString
+                ? "text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-500/20 border-violet-200 dark:border-violet-500/30"
+                : "text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700"
+            }`}>
             {formatScheduleDate(node.scheduled_date, todayString)}
-          </span>
+          </button>
         )}
 
         {/* Actions (visible on hover) */}
