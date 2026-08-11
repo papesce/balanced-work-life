@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "./useAuth";
-import { Idea, LifeArea, Tag, getAreasForIdea } from "@/lib/types";
+import { LifeArea } from "@/lib/types";
 import {
   WindowType,
   getWindowRange,
@@ -11,12 +10,7 @@ import {
   getWindowLabel,
 } from "@/lib/dateUtils";
 import { AREA_ORDER, DEFAULT_TARGETS, LOCAL_STORAGE_TARGETS_KEY } from "@/lib/constants";
-
-interface TaskTagRow {
-  idea_id: string;
-  tag_id: string;
-  tags: Tag;
-}
+import { emptyAreaCounts, fetchTasksWithTags, getEffectiveAreasForIdea } from "@/lib/taskTags";
 
 export interface RadarDataPoint {
   area: LifeArea;
@@ -34,10 +28,6 @@ export interface BalanceData {
   radarData: RadarDataPoint[];
   buckets: BucketData[];
   windowLabel: string;
-}
-
-function emptyAreaCounts(): Record<LifeArea, number> {
-  return { work: 0, health: 0, relationships: 0, growth: 0, finances: 0, life: 0 };
 }
 
 function loadTargets(): Record<LifeArea, number> {
@@ -65,33 +55,7 @@ export function useBalanceData(windowType: WindowType, referenceDate: string): B
 
       const { start, end } = getWindowRange(windowType, referenceDate);
 
-      // Fetch tasks in range
-      const { data: ideasData } = await supabase
-        .from("ideas")
-        .select("id, scheduled_date, type, status")
-        .eq("user_id", user.id)
-        .eq("type", "task")
-        .gte("scheduled_date", start)
-        .lte("scheduled_date", end);
-
-      const tasks = (ideasData ?? []) as Pick<Idea, "id" | "scheduled_date" | "type" | "status">[];
-      const taskIds = tasks.map((t) => t.id);
-
-      // Fetch tags for those tasks
-      const tagsByIdea = new Map<string, Tag[]>();
-      if (taskIds.length > 0) {
-        const { data: taskTagData } = await supabase
-          .from("task_tags")
-          .select("idea_id, tag_id, tags(*)")
-          .in("idea_id", taskIds)
-          .eq("tags.user_id", user.id);
-
-        for (const row of (taskTagData ?? []) as unknown as TaskTagRow[]) {
-          if (!row.tags) continue;
-          const existing = tagsByIdea.get(row.idea_id) ?? [];
-          tagsByIdea.set(row.idea_id, [...existing, row.tags]);
-        }
-      }
+      const { tasks, tagsByIdea } = await fetchTasksWithTags(user.id, { start, end });
 
       const targets = loadTargets();
 
@@ -99,8 +63,7 @@ export function useBalanceData(windowType: WindowType, referenceDate: string): B
       const totalCounts = emptyAreaCounts();
       for (const task of tasks) {
         const tags = tagsByIdea.get(task.id) ?? [];
-        const areas = getAreasForIdea(tags);
-        const effectiveAreas = areas.length > 0 ? areas : (["life"] as LifeArea[]);
+        const effectiveAreas = getEffectiveAreasForIdea(tags);
         for (const area of effectiveAreas) totalCounts[area]++;
       }
 
@@ -119,8 +82,7 @@ export function useBalanceData(windowType: WindowType, referenceDate: string): B
           if (!task.scheduled_date) continue;
           if (task.scheduled_date >= b.start && task.scheduled_date <= b.end) {
             const tags = tagsByIdea.get(task.id) ?? [];
-            const areas = getAreasForIdea(tags);
-            const effectiveAreas = areas.length > 0 ? areas : (["life"] as LifeArea[]);
+            const effectiveAreas = getEffectiveAreasForIdea(tags);
             for (const area of effectiveAreas) counts[area]++;
           }
         }

@@ -1,25 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "./useAuth";
-import { Idea, LifeArea, Tag, getAreasForIdea } from "@/lib/types";
-import { getWindowRange, toLocalDateString, getMonthCalendarGrid } from "@/lib/dateUtils";
-
-interface TaskTagRow {
-  idea_id: string;
-  tag_id: string;
-  tags: Tag;
-}
+import { LifeArea } from "@/lib/types";
+import { getWindowRange, getMonthCalendarGrid } from "@/lib/dateUtils";
+import { emptyAreaCounts, fetchTasksWithTags, getEffectiveAreasForIdea } from "@/lib/taskTags";
 
 export interface DayData {
   date: string;
   counts: Record<LifeArea, number>;
   isCurrentMonth: boolean;
-}
-
-function emptyAreaCounts(): Record<LifeArea, number> {
-  return { work: 0, health: 0, relationships: 0, growth: 0, finances: 0, life: 0 };
 }
 
 export function useCalendarData(referenceDate: string): {
@@ -43,31 +33,7 @@ export function useCalendarData(referenceDate: string): {
 
       const { start, end } = getWindowRange("month", referenceDate);
 
-      const { data: ideasData } = await supabase
-        .from("ideas")
-        .select("id, scheduled_date, type, status")
-        .eq("user_id", user.id)
-        .eq("type", "task")
-        .gte("scheduled_date", start)
-        .lte("scheduled_date", end);
-
-      const tasks = (ideasData ?? []) as Pick<Idea, "id" | "scheduled_date" | "type" | "status">[];
-      const taskIds = tasks.map((t) => t.id);
-
-      const tagsByIdea = new Map<string, Tag[]>();
-      if (taskIds.length > 0) {
-        const { data: taskTagData } = await supabase
-          .from("task_tags")
-          .select("idea_id, tag_id, tags(*)")
-          .in("idea_id", taskIds)
-          .eq("tags.user_id", user.id);
-
-        for (const row of (taskTagData ?? []) as unknown as TaskTagRow[]) {
-          if (!row.tags) continue;
-          const existing = tagsByIdea.get(row.idea_id) ?? [];
-          tagsByIdea.set(row.idea_id, [...existing, row.tags]);
-        }
-      }
+      const { tasks, tagsByIdea } = await fetchTasksWithTags(user.id, { start, end });
 
       const dayMap = new Map<string, Record<LifeArea, number>>();
       for (const task of tasks) {
@@ -77,8 +43,7 @@ export function useCalendarData(referenceDate: string): {
         }
         const counts = dayMap.get(task.scheduled_date)!;
         const tags = tagsByIdea.get(task.id) ?? [];
-        const areas = getAreasForIdea(tags);
-        const effectiveAreas = areas.length > 0 ? areas : (["life"] as LifeArea[]);
+        const effectiveAreas = getEffectiveAreasForIdea(tags);
         for (const area of effectiveAreas) counts[area]++;
       }
 

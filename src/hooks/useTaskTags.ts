@@ -3,11 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "./useAuth";
-import { Tag, TaskTag } from "@/lib/types";
-
-interface TaskTagRow extends TaskTag {
-  tags: Tag;
-}
+import { Tag } from "@/lib/types";
+import { fetchTagsByIdea } from "@/lib/taskTags";
 
 export function useTaskTags() {
   const { user } = useAuth();
@@ -17,11 +14,7 @@ export function useTaskTags() {
 
   const fetchTaskTags = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from("task_tags")
-      .select("idea_id, tag_id, tags(*)")
-      .eq("tags.user_id", user.id);
-    if (data) setTagsByIdea(buildMap(data as unknown as TaskTagRow[]));
+    setTagsByIdea(await fetchTagsByIdea(user.id));
     setLoading(false);
   }, [user]);
 
@@ -30,12 +23,9 @@ export function useTaskTags() {
     let cancelled = false;
 
     const load = async () => {
-      const { data } = await supabase
-        .from("task_tags")
-        .select("idea_id, tag_id, tags(*)")
-        .eq("tags.user_id", user.id);
+      const map = await fetchTagsByIdea(user.id);
       if (cancelled) return;
-      if (data) setTagsByIdea(buildMap(data as unknown as TaskTagRow[]));
+      setTagsByIdea(map);
       setLoading(false);
     };
 
@@ -90,14 +80,4 @@ export function useTaskTags() {
   };
 
   return { tagsByIdea, loading, getTagsForIdea, addTagToTask, removeTagFromTask, refetch: fetchTaskTags };
-}
-
-function buildMap(rows: TaskTagRow[]): Map<string, Tag[]> {
-  const map = new Map<string, Tag[]>();
-  for (const row of rows) {
-    if (!row.tags) continue;
-    const existing = map.get(row.idea_id) ?? [];
-    map.set(row.idea_id, [...existing, row.tags]);
-  }
-  return map;
 }

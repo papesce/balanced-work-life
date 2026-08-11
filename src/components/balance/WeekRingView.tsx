@@ -1,101 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/hooks/useAuth";
-import { Idea, LifeArea, Tag, getAreasForIdea } from "@/lib/types";
-import { getToday, getWeeksInMonth, getWindowRange } from "@/lib/dateUtils";
+import { useWeekData } from "@/hooks/useWeekData";
+import { LifeArea } from "@/lib/types";
+import { getToday, getWindowRange } from "@/lib/dateUtils";
 import { MiniRing } from "./MiniRing";
 import { AREA_LABELS, AREA_ORDER } from "@/lib/constants";
 import { areaColors } from "@/styles/tokens";
-
-interface WeekBucket {
-  label: string;
-  start: string;
-  end: string;
-  counts: Record<LifeArea, number>;
-}
-
-interface TaskTagRow {
-  idea_id: string;
-  tag_id: string;
-  tags: Tag;
-}
-
-function emptyAreaCounts(): Record<LifeArea, number> {
-  return { work: 0, health: 0, relationships: 0, growth: 0, finances: 0, life: 0 };
-}
 
 interface WeekRingViewProps {
   referenceDate: string;
 }
 
 export function WeekRingView({ referenceDate }: WeekRingViewProps) {
-  const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [weeks, setWeeks] = useState<WeekBucket[]>([]);
+  const { loading, weeks } = useWeekData(referenceDate);
   const currentMondayStr = getWindowRange("week", getToday()).start;
-
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-
-    const fetchData = async () => {
-      setLoading(true);
-
-      const weekDefs = getWeeksInMonth(referenceDate);
-      const rangeStart = weekDefs[0].start;
-      const rangeEnd = weekDefs[weekDefs.length - 1].end;
-
-      const { data: ideasData } = await supabase
-        .from("ideas")
-        .select("id, scheduled_date")
-        .eq("user_id", user.id)
-        .eq("type", "task")
-        .gte("scheduled_date", rangeStart)
-        .lte("scheduled_date", rangeEnd);
-
-      const tasks = (ideasData ?? []) as Pick<Idea, "id" | "scheduled_date">[];
-      const taskIds = tasks.map((t) => t.id);
-
-      const tagsByIdea = new Map<string, Tag[]>();
-      if (taskIds.length > 0) {
-        const { data: taskTagData } = await supabase
-          .from("task_tags")
-          .select("idea_id, tag_id, tags(*)")
-          .in("idea_id", taskIds)
-          .eq("tags.user_id", user.id);
-
-        for (const row of (taskTagData ?? []) as unknown as TaskTagRow[]) {
-          if (!row.tags) continue;
-          const existing = tagsByIdea.get(row.idea_id) ?? [];
-          tagsByIdea.set(row.idea_id, [...existing, row.tags]);
-        }
-      }
-
-      const result: WeekBucket[] = weekDefs.map((w) => {
-        const counts = emptyAreaCounts();
-        for (const task of tasks) {
-          if (!task.scheduled_date) continue;
-          if (task.scheduled_date >= w.start && task.scheduled_date <= w.end) {
-            const tags = tagsByIdea.get(task.id) ?? [];
-            const areas = getAreasForIdea(tags);
-            const effectiveAreas = areas.length > 0 ? areas : (["life"] as LifeArea[]);
-            for (const area of effectiveAreas) counts[area]++;
-          }
-        }
-        return { ...w, counts };
-      });
-
-      if (!cancelled) {
-        setWeeks(result);
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-    return () => { cancelled = true; };
-  }, [user, referenceDate]);
 
   if (loading) {
     return (
