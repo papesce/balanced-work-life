@@ -4,11 +4,13 @@ import { useState } from "react";
 import { IdeaNode as IdeaNodeType, Idea, IdeaLink, Tag, LifeArea, LinkType } from "@/lib/types";
 import { IdeaNode } from "./IdeaNode";
 import { getToday } from "@/lib/dateUtils";
+import type { IdeasScope } from "@/hooks/useIdeas";
 
 interface IdeaTreeProps {
   tree: IdeaNodeType[];
   ideas: Idea[];
   links: IdeaLink[];
+  scope: IdeasScope;
   createIdea: (text: string, parentId?: string | null, position?: "top" | "bottom") => Promise<string>;
   updateIdea: (id: string, updates: Partial<Idea>) => Promise<void>;
   deleteIdea: (id: string) => Promise<void>;
@@ -44,6 +46,7 @@ export function IdeaTree({
   tree,
   ideas,
   links,
+  scope,
   createIdea,
   updateIdea,
   deleteIdea,
@@ -68,7 +71,7 @@ export function IdeaTree({
   const [showArea, setShowArea] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [timeFilter, setTimeFilter] = useState<"all" | "today">("all");
+  const [showToday, setShowToday] = useState(false);
   const [hideDone, setHideDone] = useState(false);
   const todayString = getToday();
 
@@ -91,16 +94,16 @@ export function IdeaTree({
 
   let filteredTree = searchFiltered;
 
-  if (timeFilter === "today" || hideDone) {
+  if (showToday || hideDone) {
     const passingIds = new Set<string>();
     for (const idea of ideas) {
       let passes = true;
-      if (timeFilter === "today" && idea.scheduled_date !== todayString) passes = false;
+      if (showToday && idea.scheduled_date !== todayString) passes = false;
       if (hideDone && (idea.status === "completed" || idea.status === "cancelled")) passes = false;
       if (passes) passingIds.add(idea.id);
     }
     const visibleIds = new Set(passingIds);
-    if (timeFilter === "today") {
+    if (showToday) {
       for (const id of passingIds) {
         for (const aid of getAncestorIds(id, ideas)) visibleIds.add(aid);
       }
@@ -173,45 +176,36 @@ export function IdeaTree({
 
         <div className="flex gap-1">
           <button
-            onClick={() => setTimeFilter("all")}
+            onClick={() => setShowToday(!showToday)}
             className={`text-xs px-2.5 py-1 rounded-full border ${
-              timeFilter === "all"
-                ? "bg-white dark:bg-gray-700 border-indigo-300 dark:border-indigo-500/50 text-indigo-700 dark:text-indigo-300 font-medium"
-                : "bg-gray-100 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"
-            }`}
-          >
-            All
-          </button>
-          <button
-            onClick={() => setTimeFilter("today")}
-            className={`text-xs px-2.5 py-1 rounded-full border ${
-              timeFilter === "today"
+              showToday
                 ? "bg-white dark:bg-gray-700 border-indigo-300 dark:border-indigo-500/50 text-indigo-700 dark:text-indigo-300 font-medium"
                 : "bg-gray-100 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"
             }`}
           >
             Today
           </button>
+          <button
+            onClick={() => setHideDone(!hideDone)}
+            className={`text-xs px-2.5 py-1 rounded-full border ${
+              hideDone
+                ? "bg-white dark:bg-gray-700 border-indigo-300 dark:border-indigo-500/50 text-indigo-700 dark:text-indigo-300 font-medium"
+                : "bg-gray-100 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"
+            }`}
+          >
+            Hide done
+          </button>
         </div>
-
-        <span className="text-gray-200">|</span>
-
-        <button
-          onClick={() => setHideDone(!hideDone)}
-          className={`text-xs px-2.5 py-1 rounded-full border ${
-            hideDone
-              ? "bg-white dark:bg-gray-700 border-indigo-300 dark:border-indigo-500/50 text-indigo-700 dark:text-indigo-300 font-medium"
-              : "bg-gray-100 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"
-          }`}
-        >
-          Hide done
-        </button>
       </div>
 
 
       {filteredTree.length === 0 ? (
         <p className="text-sm text-gray-400 italic py-4">
-          {search ? "No matching ideas" : "No ideas yet. Click \"+ New idea\" to start."}
+          {search
+            ? "No matching ideas"
+            : scope === "this_month"
+            ? "No ideas this month. Click \"+ New idea\" to add one, or switch to All to see everything."
+            : "No ideas yet. Click \"+ New idea\" to start."}
         </p>
       ) : (
         <div className="space-y-0.5">

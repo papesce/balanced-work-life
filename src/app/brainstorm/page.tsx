@@ -10,6 +10,7 @@ import { AppShell } from "@/components/AppShell";
 import { IdeaTree } from "@/components/brainstorm/IdeaTree";
 import { GraphView } from "@/components/brainstorm/GraphView";
 import { Idea, LinkType } from "@/lib/types";
+import type { IdeasScope } from "@/hooks/useIdeas";
 
 type UndoAction = {
   label: string;
@@ -27,7 +28,8 @@ function getDescendantIdeaIds(rootId: string, ideas: Idea[]): Set<string> {
 }
 
 export default function BrainstormPage() {
-  const ideasHook = useIdeas();
+  const [timeScope, setTimeScope] = useState<IdeasScope>("this_month");
+  const ideasHook = useIdeas({ scope: timeScope });
   const linksHook = useIdeaLinks();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
@@ -192,27 +194,48 @@ export default function BrainstormPage() {
   }
 
   const headerActions = (
-    <div className="flex gap-1">
-      <button
-        onClick={() => setViewMode("tree")}
-        className={`toolbar-btn ${viewMode === "tree" ? "toolbar-btn--accent" : ""}`}
-      >
-        Tree
-      </button>
-      <button
-        onClick={() => setViewMode("graph")}
-        disabled={!hasLinks}
-        className={`toolbar-btn ${
-          !hasLinks
-            ? "opacity-40 cursor-not-allowed"
-            : viewMode === "graph"
-            ? "toolbar-btn--accent"
-            : ""
-        }`}
-        title={!hasLinks ? "Link two ideas to unlock" : ""}
-      >
-        Graph
-      </button>
+    <div className="flex items-center gap-2">
+      <div className="flex gap-1">
+        <button
+          onClick={() => setTimeScope("this_month")}
+          className={`toolbar-btn ${
+            timeScope === "this_month" ? "toolbar-btn--accent" : ""
+          }`}
+          title="Only load ideas scheduled this month or unscheduled and active"
+        >
+          This month
+        </button>
+        <button
+          onClick={() => setTimeScope("all")}
+          className={`toolbar-btn ${timeScope === "all" ? "toolbar-btn--accent" : ""}`}
+          title="Load every idea"
+        >
+          All
+        </button>
+      </div>
+      <span className="text-gray-200">|</span>
+      <div className="flex gap-1">
+        <button
+          onClick={() => setViewMode("tree")}
+          className={`toolbar-btn ${viewMode === "tree" ? "toolbar-btn--accent" : ""}`}
+        >
+          Tree
+        </button>
+        <button
+          onClick={() => setViewMode("graph")}
+          disabled={!hasLinks}
+          className={`toolbar-btn ${
+            !hasLinks
+              ? "opacity-40 cursor-not-allowed"
+              : viewMode === "graph"
+              ? "toolbar-btn--accent"
+              : ""
+          }`}
+          title={!hasLinks ? "Link two ideas to unlock" : ""}
+        >
+          Graph
+        </button>
+      </div>
     </div>
   );
 
@@ -247,6 +270,7 @@ export default function BrainstormPage() {
           tree={ideasHook.tree}
           ideas={ideasHook.ideas}
           links={linksHook.links}
+          scope={timeScope}
           createIdea={createIdea}
           updateIdea={updateIdea}
           deleteIdea={deleteIdea}

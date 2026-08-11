@@ -5,9 +5,23 @@ import { v4 as uuidv4 } from "uuid";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "./useAuth";
 import { Idea, IdeaNode } from "@/lib/types";
+import { getToday, getWindowRange } from "@/lib/dateUtils";
 
 const STORAGE_KEY = "brainstorm-tree-overrides";
 const DEFAULT_EXPAND_DEPTH = 1;
+
+export type IdeasScope = "all" | "this_month";
+
+function buildScopedQuery(userId: string, scope: IdeasScope) {
+  let query = supabase.from("ideas").select("*").eq("user_id", userId);
+  if (scope === "this_month") {
+    const { start, end } = getWindowRange("month", getToday());
+    query = query.or(
+      `and(scheduled_date.gte.${start},scheduled_date.lte.${end}),and(scheduled_date.is.null,status.not.in.(completed,cancelled,archived))`
+    );
+  }
+  return query;
+}
 
 type OverrideState = "expanded" | "collapsed";
 export type CreateIdeaPosition = "top" | "bottom";
@@ -106,7 +120,8 @@ function sortIdeasForInsert(ideas: Idea[]): Idea[] {
   return [...ideas].sort((a, b) => depthOf(a) - depthOf(b));
 }
 
-export function useIdeas() {
+export function useIdeas(options: { scope?: IdeasScope } = {}) {
+  const { scope = "all" } = options;
   const { user } = useAuth();
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
@@ -125,25 +140,22 @@ export function useIdeas() {
 
   const fetchIdeas = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from("ideas")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("sort_order", { ascending: true });
+    const { data } = await buildScopedQuery(user.id, scope).order("sort_order", {
+      ascending: true,
+    });
     if (data) setIdeas(data as Idea[]);
     setLoading(false);
-  }, [user]);
+  }, [user, scope]);
 
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
 
     const loadIdeas = async () => {
-      const { data } = await supabase
-        .from("ideas")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("sort_order", { ascending: true });
+      setLoading(true);
+      const { data } = await buildScopedQuery(user.id, scope).order("sort_order", {
+        ascending: true,
+      });
       if (cancelled) return;
       if (data) setIdeas(data as Idea[]);
       setLoading(false);
@@ -154,7 +166,7 @@ export function useIdeas() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, scope]);
 
   const createIdea = async (
     text: string,
