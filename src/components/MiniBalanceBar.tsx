@@ -21,9 +21,6 @@ export function MiniBalanceBar({ tasks, getTagsForIdea, date }: MiniBalanceBarPr
   };
   const segments = useMemo(() => {
     const activeTasks = tasks.filter((t) => t.status !== "archived" && t.status !== "cancelled");
-    const total = activeTasks.length;
-    if (total === 0) return [];
-
     const counts: Record<LifeArea, number> = {
       work: 0,
       health: 0,
@@ -36,12 +33,13 @@ export function MiniBalanceBar({ tasks, getTagsForIdea, date }: MiniBalanceBarPr
     for (const task of activeTasks) {
       const tags = getTagsForIdea ? getTagsForIdea(task.id) : [];
       const areas = getAreasForIdea(tags);
-      if (areas.length === 0) {
-        counts["life"]++;
-      } else {
-        for (const area of areas) counts[area]++;
-      }
+      const effectiveAreas = areas.length > 0 ? areas : (["life"] as LifeArea[]);
+      const minutes = task.duration_minutes ?? 30;
+      for (const area of effectiveAreas) counts[area] += minutes;
     }
+
+    const total = AREA_ORDER.reduce((s, area) => s + counts[area], 0);
+    if (total === 0) return [];
 
     return AREA_ORDER.map((area) => {
       const count = counts[area];
@@ -53,7 +51,7 @@ export function MiniBalanceBar({ tasks, getTagsForIdea, date }: MiniBalanceBarPr
         color: areaColors[area]?.dot || "#cbd5e1",
       };
     }).filter((s) => s.count > 0);
-  }, [tasks]);
+  }, [tasks, getTagsForIdea]);
 
   if (segments.length === 0) {
     return (
