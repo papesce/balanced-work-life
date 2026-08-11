@@ -11,7 +11,7 @@ import { AREA_ICONS, AREA_LABELS, STATUS_CONFIG } from "@/lib/constants";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { formatTime } from "./plannerUtils";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
-import { RescheduleAction, computeClearDatePatch } from "@/lib/tasks/rescheduleTask";
+import { RescheduleAction } from "@/lib/tasks/rescheduleTask";
 import { getToday } from "@/lib/dateUtils";
 
 interface AreaTaskGroupProps {
@@ -631,12 +631,6 @@ function TaskRow({
                   <div className="border-t border-black/5 dark:border-white/5 my-1" />
                 </>
               )}
-              <button
-                onClick={() => { onUpdate(task.id, computeClearDatePatch(task, "inbox")); setShowMenu(false); }}
-                className="flex w-full text-left px-3 py-1.5 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] font-semibold cursor-pointer"
-              >
-                Move to Backlog
-              </button>
               <div className="border-t border-black/5 dark:border-white/5 my-1" />
               {task.scheduled_date !== getToday() && (
                 <button

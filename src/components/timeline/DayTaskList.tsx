@@ -8,7 +8,7 @@ import { Idea, IdeaStatus, Tag, LifeArea } from "@/lib/types";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { AREA_DOT_COLORS, STATUS_CONFIG } from "@/lib/constants";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
-import { RescheduleAction, DayOccurrence, computeClearDatePatch } from "@/lib/tasks/rescheduleTask";
+import { RescheduleAction, DayOccurrence } from "@/lib/tasks/rescheduleTask";
 
 interface DayTaskListProps {
   occurrences: DayOccurrence[];
@@ -482,12 +482,6 @@ function TimelineTaskRow({
                 }}
               />
             </div>
-            <button
-              onClick={() => { onUpdate(task.id, computeClearDatePatch(task, "inbox")); setShowMenu(false); }}
-              className="flex w-full text-left px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
-            >
-              Move to Inbox
-            </button>
 
             <div className="border-t border-black/5 dark:border-white/5 my-1" />
             <button

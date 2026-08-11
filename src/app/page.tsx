@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Sparkles, Layers, Clock, Inbox, BarChart3 } from "lucide-react";
+import { Sparkles, Layers, Clock, BarChart3 } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
@@ -14,7 +14,6 @@ import { DateNav } from "@/components/planner/DateNav";
 import { AreaFilters } from "@/components/planner/AreaFilters";
 import { DayslotTimeline } from "@/components/planner/DayslotTimeline";
 import { AreaTaskGroup } from "@/components/planner/AreaTaskGroup";
-import { InboxPanel } from "@/components/shared/InboxPanel";
 import { UndoBar } from "@/components/shared/UndoBar";
 import { AREA_DOT_COLORS, AREA_ORDER, AREA_LABELS, DEFAULT_TARGETS, LOCAL_STORAGE_TARGETS_KEY } from "@/lib/constants";
 import { computeReschedulePatch, computeCompletePatch, computeCancelPatch, getDayOccurrences, getTriageMeta, DayOccurrence, RescheduleAction } from "@/lib/tasks/rescheduleTask";
@@ -65,8 +64,7 @@ function DailyPlannerInner() {
   }, [highlightId, loading, router, searchParams]);
 
   const [selectedArea, setSelectedArea] = useState<LifeArea | null>(null);
-  const [activeMobileTab, setActiveMobileTab] = useState<"tasks" | "schedule" | "backlog" | "balance">("tasks");
-  const [rightPanelTab, setRightPanelTab] = useState<"schedule" | "backlog">("schedule");
+  const [activeMobileTab, setActiveMobileTab] = useState<"tasks" | "schedule" | "balance">("tasks");
   const [targets] = useState<Record<LifeArea, number>>(() => {
     try {
       if (typeof window !== "undefined") {
@@ -119,10 +117,6 @@ function DailyPlannerInner() {
   const today = getToday();
 
   const taskIdeas = useMemo(() => ideas.filter((i) => i.type === "task"), [ideas]);
-  const activeTaskIdeas = useMemo(
-    () => taskIdeas.filter((i) => i.status !== "completed" && i.status !== "cancelled" && i.status !== "archived"),
-    [taskIdeas],
-  );
   const scheduledTaskIdeas = useMemo(
     () => taskIdeas.filter((i) => i.status !== "completed" && i.status !== "archived"),
     [taskIdeas],
@@ -142,8 +136,6 @@ function DailyPlannerInner() {
     () => scheduledTaskIdeas.filter((i) => i.scheduled_date === activeDate && !!i.scheduled_time),
     [scheduledTaskIdeas, activeDate],
   );
-
-  const inboxTasks = useMemo(() => activeTaskIdeas.filter((t) => !t.scheduled_date), [activeTaskIdeas]);
 
   const deferredOnDate = useMemo(
     () => getDayOccurrences(taskIdeas, activeDate, today).filter((o) => o.isHistorical),
@@ -294,7 +286,6 @@ function DailyPlannerInner() {
         {[
           { id: "tasks", label: "Tasks", icon: Layers },
           { id: "schedule", label: "Schedule", icon: Clock },
-          { id: "backlog", label: "Backlog", icon: Inbox },
           { id: "balance", label: "Balance", icon: BarChart3 },
         ].map((tab) => {
           const Icon = tab.icon;
@@ -417,73 +408,25 @@ function DailyPlannerInner() {
 
         {/* RIGHT COLUMN */}
         <div style={{ "--right-col-width": `${rightColWidth}px` } as React.CSSProperties} className={`resizable-right-col flex-shrink-0 flex flex-col gap-4 w-full ${
-          activeMobileTab === "schedule" || activeMobileTab === "backlog" ? "block" : "hidden lg:flex"
+          activeMobileTab === "schedule" ? "block" : "hidden lg:flex"
         }`}>
-          <div className="glass-card rounded-2xl p-1 flex gap-1 border border-black/5 dark:border-white/5">
-            {[
-              { id: "schedule", label: "Schedule View", icon: Clock },
-              { id: "backlog", label: "Backlog Inbox", icon: Inbox },
-            ].map((tab) => {
-              const Icon = tab.icon;
-              const isActive = (activeMobileTab === "schedule" || activeMobileTab === "backlog")
-                ? activeMobileTab === tab.id
-                : rightPanelTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => {
-                    if (activeMobileTab === "schedule" || activeMobileTab === "backlog") {
-                      setActiveMobileTab(tab.id as typeof activeMobileTab);
-                    } else {
-                      setRightPanelTab(tab.id as typeof rightPanelTab);
-                    }
-                  }}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                    isActive
-                      ? "bg-white dark:bg-gray-800 shadow-sm text-violet-600 dark:text-violet-400 font-bold"
-                      : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                  }`}
-                >
-                  <Icon size={13} />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
           <div className="flex-1 min-h-[400px]">
-            {((activeMobileTab === "schedule") || (activeMobileTab !== "backlog" && rightPanelTab === "schedule")) ? (
-              <DayslotTimeline
-                activeDate={activeDate}
-                allTasks={[...pendingOnDate, ...scheduledOnDate, ...doneOnDate]}
-                onUpdateTask={updateIdea}
-                onCreateTask={handleCreateScheduledTask}
-                getTagsForIdea={taskTagsHook.getTagsForIdea}
-                tags={tagsHook.tags}
-                selectedArea={selectedArea}
-                onChangeTaskArea={handleMoveTaskBetweenAreas}
-                onAddTag={async (ideaId, tag) => { await taskTagsHook.addTagToTask(ideaId, tag); }}
-                onRemoveTag={async (ideaId, tagId) => { await taskTagsHook.removeTagFromTask(ideaId, tagId); }}
-                onCreateTag={async (name, area) => {
-                  const tag = await tagsHook.createTag(name, area);
-                  return tag ?? null;
-                }}
-              />
-            ) : (
-              <InboxPanel
-                inboxTasks={inboxTasks}
-                onCreateInboxTask={async (text) => {
-                  await createIdea(text, null, "top", { type: "task", status: "inbox" });
-                }}
-                onScheduleToDate={async (id) => {
-                  const idea = ideas.find((i) => i.id === id);
-                  if (!idea) return;
-                  const patch = computeReschedulePatch(idea, { type: "reschedule", newDate: activeDate });
-                  await updateIdea(id, patch);
-                }}
-                getTagsForIdea={taskTagsHook.getTagsForIdea}
-              />
-            )}
+            <DayslotTimeline
+              activeDate={activeDate}
+              allTasks={[...pendingOnDate, ...scheduledOnDate, ...doneOnDate]}
+              onUpdateTask={updateIdea}
+              onCreateTask={handleCreateScheduledTask}
+              getTagsForIdea={taskTagsHook.getTagsForIdea}
+              tags={tagsHook.tags}
+              selectedArea={selectedArea}
+              onChangeTaskArea={handleMoveTaskBetweenAreas}
+              onAddTag={async (ideaId, tag) => { await taskTagsHook.addTagToTask(ideaId, tag); }}
+              onRemoveTag={async (ideaId, tagId) => { await taskTagsHook.removeTagFromTask(ideaId, tagId); }}
+              onCreateTag={async (name, area) => {
+                const tag = await tagsHook.createTag(name, area);
+                return tag ?? null;
+              }}
+            />
           </div>
         </div>
       </div>

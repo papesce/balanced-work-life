@@ -1,4 +1,4 @@
-import { Idea, IdeaStatus } from "@/lib/types";
+import { Idea } from "@/lib/types";
 import { getToday, addDays } from "@/lib/dateUtils";
 
 export function computeCompletePatch(): Partial<Idea> {
@@ -13,20 +13,6 @@ export function computeCancelPatch(): Partial<Idea> {
     status: "cancelled",
     cancelled_at: new Date().toISOString(),
     completed_at: null,
-  };
-}
-
-/** Clears the scheduled date while preserving it as a historical occurrence. */
-export function computeClearDatePatch(
-  idea: Idea,
-  fallbackStatus: IdeaStatus = "inbox",
-): Partial<Idea> {
-  return {
-    scheduled_date: null,
-    status: fallbackStatus,
-    attempt_dates: idea.scheduled_date
-      ? [...idea.attempt_dates, idea.scheduled_date]
-      : idea.attempt_dates,
   };
 }
 
