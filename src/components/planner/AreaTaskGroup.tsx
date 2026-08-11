@@ -4,27 +4,15 @@ import { useState, useEffect, useRef, KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Reorder, useDragControls } from "framer-motion";
-import { Check, Star, MoreHorizontal, GripVertical, Clock, Play, Pause, X } from "lucide-react";
+import { Star, MoreHorizontal, GripVertical, Clock } from "lucide-react";
 import { areaColors } from "@/styles/tokens";
 import { Idea, IdeaStatus, LifeArea, Tag } from "@/lib/types";
-import { AREA_ICONS, AREA_LABELS } from "./constants";
+import { AREA_ICONS, AREA_LABELS, STATUS_CONFIG } from "@/lib/constants";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { formatTime } from "./plannerUtils";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { RescheduleAction, computeClearDatePatch } from "@/lib/tasks/rescheduleTask";
 import { getToday } from "@/lib/dateUtils";
-
-const STATUS_CONFIG: Record<IdeaStatus, { label: string; color: string; icon: React.ElementType | null }> = {
-  inbox:       { label: "Inbox",       color: "text-gray-400",              icon: null },
-  planned:     { label: "Planned",     color: "text-sky-500",               icon: null },
-  scheduled:   { label: "Scheduled",   color: "text-blue-500",              icon: null },
-  in_progress: { label: "In Progress", color: "text-amber-500",             icon: Play },
-  paused:      { label: "Paused",      color: "text-orange-400",            icon: Pause },
-  completed:   { label: "Completed",   color: "text-violet-600",            icon: Check },
-  cancelled:   { label: "Cancelled",   color: "text-red-500",               icon: X },
-  archived:    { label: "Archived",    color: "text-gray-400",              icon: null },
-  deferred:    { label: "Deferred",    color: "text-amber-600",             icon: null },
-};
 
 interface AreaTaskGroupProps {
   area: LifeArea;
@@ -443,7 +431,7 @@ function TaskRow({
       )}
 
       {statusConfig.icon && (
-        <statusConfig.icon size={12} strokeWidth={2} className={`flex-shrink-0 ${statusConfig.color}`} />
+        <statusConfig.icon size={12} strokeWidth={2} className={`flex-shrink-0 ${statusConfig.textClass}`} />
       )}
       {isEditing ? (
         <input

@@ -3,25 +3,8 @@
 import { useBalanceData } from "@/hooks/useBalanceData";
 import { MiniRing } from "./MiniRing";
 import { LifeArea } from "@/lib/types";
-import { AREA_ORDER, DEFAULT_TARGETS, LOCAL_STORAGE_TARGETS_KEY } from "@/components/planner/constants";
-
-const AREA_COLORS: Record<LifeArea, string> = {
-  work: "#4F6BED",
-  health: "#EF4444",
-  relationships: "#EC4899",
-  growth: "#F59E0B",
-  finances: "#10B981",
-  life: "#8B5CF6",
-};
-
-const AREA_LABELS: Record<LifeArea, string> = {
-  work: "Work",
-  health: "Health",
-  relationships: "Relationships",
-  growth: "Growth",
-  finances: "Finances",
-  life: "Life",
-};
+import { AREA_LABELS, AREA_ORDER, DEFAULT_TARGETS, LOCAL_STORAGE_TARGETS_KEY } from "@/lib/constants";
+import { areaColors } from "@/styles/tokens";
 
 function loadTargets(): Record<LifeArea, number> {
   if (typeof window === "undefined") return DEFAULT_TARGETS;
@@ -93,7 +76,7 @@ export function YearWheelView({ referenceDate }: YearWheelViewProps) {
                 <div className="flex items-center gap-2">
                   <div
                     className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                    style={{ background: AREA_COLORS[area] }}
+                    style={{ background: areaColors[area]?.dot }}
                   />
                   <span className="text-gray-600 dark:text-gray-300 font-medium">
                     {AREA_LABELS[area]}
@@ -122,7 +105,7 @@ export function YearWheelView({ referenceDate }: YearWheelViewProps) {
                   className="absolute left-0 top-0 h-full rounded-full transition-all"
                   style={{
                     width: `${barActual}%`,
-                    background: AREA_COLORS[area],
+                    background: areaColors[area]?.dot,
                     opacity: 0.7,
                   }}
                 />

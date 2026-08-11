@@ -2,7 +2,7 @@
 
 import { areaColors } from "@/styles/tokens";
 import { LifeArea } from "@/lib/types";
-import { AREA_ORDER, AREA_LABELS, AREA_ICONS } from "./constants";
+import { AREA_ORDER, AREA_LABELS, AREA_ICONS } from "@/lib/constants";
 
 interface AreaFiltersProps {
   areaTaskCounts: Record<LifeArea, { pending: number; scheduled: number; done: number }>;

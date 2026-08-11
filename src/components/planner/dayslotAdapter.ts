@@ -1,6 +1,6 @@
 import { Idea, LifeArea, getAreasForIdea } from "@/lib/types";
 import { Tag } from "@/lib/types";
-import { AREA_LABELS } from "./constants";
+import { AREA_LABELS } from "@/lib/constants";
 
 export interface TimelineEvent {
   id: string;

@@ -1,15 +1,7 @@
 "use client";
 
 import { LifeArea } from "@/lib/types";
-
-const AREA_COLORS: Record<LifeArea, string> = {
-  work: "#4F6BED",
-  health: "#EF4444",
-  relationships: "#EC4899",
-  growth: "#F59E0B",
-  finances: "#10B981",
-  life: "#8B5CF6",
-};
+import { areaColors } from "@/styles/tokens";
 
 interface MiniRingProps {
   counts: Record<LifeArea, number>;
@@ -66,7 +58,7 @@ export function MiniRing({
             cy={cx}
             r={r}
             fill="none"
-            stroke={AREA_COLORS[area]}
+            stroke={areaColors[area]?.dot}
             strokeWidth={sw}
             strokeDasharray={`${Math.max(0, arc - gap)} ${circ - Math.max(0, arc - gap)}`}
             strokeDashoffset={`${-segOffset}`}

@@ -5,7 +5,7 @@ import { LifeArea } from "@/lib/types";
 
 const AREAS: { value: LifeArea; label: string; color: string }[] = [
   { value: "work", label: "Work", color: "text-blue-700 dark:text-blue-300" },
-  { value: "life", label: "Life", color: "text-green-700 dark:text-green-300" },
+  { value: "life", label: "Life", color: "text-violet-700 dark:text-violet-300" },
   { value: "health", label: "Health", color: "text-red-700 dark:text-red-300" },
   { value: "relationships", label: "Relationships", color: "text-pink-700 dark:text-pink-300" },
   { value: "growth", label: "Growth", color: "text-amber-700 dark:text-amber-300" },

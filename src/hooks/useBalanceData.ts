@@ -10,7 +10,7 @@ import {
   getWindowBuckets,
   getWindowLabel,
 } from "@/lib/dateUtils";
-import { AREA_ORDER, DEFAULT_TARGETS, LOCAL_STORAGE_TARGETS_KEY } from "@/components/planner/constants";
+import { AREA_ORDER, DEFAULT_TARGETS, LOCAL_STORAGE_TARGETS_KEY } from "@/lib/constants";
 
 interface TaskTagRow {
   idea_id: string;

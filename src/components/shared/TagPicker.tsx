@@ -4,26 +4,8 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Plus, Check } from "lucide-react";
 import { Tag, LifeArea } from "@/lib/types";
-import { AREA_ORDER, AREA_LABELS } from "@/components/planner/constants";
+import { AREA_LABELS, AREA_ORDER, AREA_TEXT_COLORS } from "@/lib/constants";
 import { areaColors } from "@/styles/tokens";
-
-const AREA_COLORS: Record<LifeArea, string> = {
-  work: "text-blue-700 dark:text-blue-300",
-  health: "text-red-700 dark:text-red-300",
-  relationships: "text-pink-700 dark:text-pink-300",
-  growth: "text-amber-700 dark:text-amber-300",
-  finances: "text-emerald-700 dark:text-emerald-300",
-  life: "text-green-700 dark:text-green-300",
-};
-
-export const AREA_DOT_COLORS: Record<LifeArea, string> = {
-  work: "bg-blue-500",
-  health: "bg-red-500",
-  relationships: "bg-pink-500",
-  growth: "bg-amber-500",
-  finances: "bg-emerald-500",
-  life: "bg-green-500",
-};
 
 function areaBg(area: LifeArea, opacity: number): string {
   const base = areaColors[area]?.bg ?? "rgba(0,0,0,0)";
@@ -192,7 +174,7 @@ export function TagPicker({
                 onClick={() => setNewArea(area)}
                 className={`text-[10px] px-1.5 py-0.5 rounded-full border cursor-pointer transition-colors ${
                   newArea === area
-                    ? `${AREA_COLORS[area]} border-current font-medium`
+                    ? `${AREA_TEXT_COLORS[area]} border-current font-medium`
                     : "text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-700 hover:text-gray-600 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"
                 }`}
               >

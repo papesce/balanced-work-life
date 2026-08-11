@@ -6,25 +6,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { Idea, LifeArea, Tag, getAreasForIdea } from "@/lib/types";
 import { getToday, getWeeksInMonth, getWindowRange } from "@/lib/dateUtils";
 import { MiniRing } from "./MiniRing";
-import { AREA_ORDER } from "@/components/planner/constants";
-
-const AREA_COLORS: Record<LifeArea, string> = {
-  work: "#4F6BED",
-  health: "#EF4444",
-  relationships: "#EC4899",
-  growth: "#F59E0B",
-  finances: "#10B981",
-  life: "#8B5CF6",
-};
-
-const AREA_LABELS: Record<LifeArea, string> = {
-  work: "Work",
-  health: "Health",
-  relationships: "Relationships",
-  growth: "Growth",
-  finances: "Finances",
-  life: "Life",
-};
+import { AREA_LABELS, AREA_ORDER } from "@/lib/constants";
+import { areaColors } from "@/styles/tokens";
 
 interface WeekBucket {
   label: string;
@@ -155,7 +138,7 @@ export function WeekRingView({ referenceDate }: WeekRingViewProps) {
                       <div key={area} className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                         <div
                           className="w-2 h-2 rounded-full flex-shrink-0"
-                          style={{ background: AREA_COLORS[area] }}
+                          style={{ background: areaColors[area]?.dot }}
                         />
                         {AREA_LABELS[area]} {w.counts[area]}
                       </div>

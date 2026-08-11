@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Inbox, Plus, ChevronRight } from "lucide-react";
 import { Idea, Tag } from "@/lib/types";
-import { AREA_DOT_COLORS } from "@/components/shared/TagPicker";
+import { AREA_DOT_COLORS } from "@/lib/constants";
 
 interface InboxPanelProps {
   inboxTasks: Idea[];

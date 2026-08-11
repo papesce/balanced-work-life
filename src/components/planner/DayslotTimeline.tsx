@@ -6,7 +6,7 @@ import { DailyTimeline } from "@papesce/dayslot";
 import type { TimelineEvent, DailyTimelineHandle } from "@papesce/dayslot";
 import "@papesce/dayslot/style.css";
 import { Idea, IdeaStatus, LifeArea, getAreasForIdea, getPrimaryTagForIdea, Tag } from "@/lib/types";
-import { AREA_LABELS } from "./constants";
+import { AREA_LABELS, STATUS_CONFIG } from "@/lib/constants";
 import {
   minutesToTimeString,
   parseTimeToMinutes,
@@ -58,18 +58,6 @@ const AREA_BG_CLASSES: Record<LifeArea, string> = {
   growth: "bg-amber-50/65 border-amber-200/40 dark:bg-amber-950/15 dark:border-amber-900/25 text-amber-700 dark:text-amber-300",
   finances: "bg-emerald-50/65 border-emerald-200/40 dark:bg-emerald-950/15 dark:border-emerald-900/25 text-emerald-700 dark:text-emerald-300",
   life: "bg-violet-50/65 border-violet-200/40 dark:bg-violet-950/15 dark:border-violet-900/25 text-violet-700 dark:text-violet-300",
-};
-
-const STATUS_CONFIG: Record<IdeaStatus, { label: string; color: string; bg: string }> = {
-  inbox:       { label: "Inbox",       color: "#9ca3af", bg: "rgba(0,0,0,0.05)" },
-  planned:     { label: "Planned",     color: "#0ea5e9", bg: "rgba(14,165,233,0.1)" },
-  scheduled:   { label: "Scheduled",   color: "#3b82f6", bg: "rgba(59,130,246,0.1)" },
-  in_progress: { label: "In Progress", color: "#d97706", bg: "rgba(217,119,6,0.1)" },
-  paused:      { label: "Paused",      color: "#f97316", bg: "rgba(249,115,22,0.1)" },
-  completed:   { label: "Completed",   color: "#7c3aed", bg: "rgba(124,58,237,0.1)" },
-  cancelled:   { label: "Cancelled",   color: "#ef4444", bg: "rgba(239,68,68,0.1)" },
-  archived:    { label: "Archived",    color: "#9ca3af", bg: "rgba(0,0,0,0.05)" },
-  deferred:    { label: "Deferred",    color: "#d97706", bg: "rgba(217,119,6,0.1)" },
 };
 
 function getCategoryColor(areas: LifeArea[]): string | undefined {
@@ -527,7 +515,7 @@ function EventCard({
                   handleOpenStatusPicker();
                 }}
                 className="event-status-badge text-[9px] font-bold px-1.5 py-0.5 rounded-full cursor-pointer hover:brightness-95 transition-all"
-                style={{ color: statusCfg.color, background: statusCfg.bg }}
+                style={{ color: statusCfg.hex, background: statusCfg.bg }}
               >
                 {statusCfg.label}
               </button>

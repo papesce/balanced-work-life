@@ -5,17 +5,7 @@ import { Tag, X, Plus } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { useTags } from "@/hooks/useTags";
 import { LifeArea } from "@/lib/types";
-import { AREA_LABELS, AREA_ORDER } from "@/components/planner/constants";
-import { AREA_DOT_COLORS } from "@/components/shared/TagPicker";
-
-const AREA_TEXT: Record<LifeArea, string> = {
-  work: "text-blue-600 dark:text-blue-400",
-  health: "text-red-600 dark:text-red-400",
-  relationships: "text-pink-600 dark:text-pink-400",
-  growth: "text-amber-600 dark:text-amber-400",
-  finances: "text-emerald-600 dark:text-emerald-400",
-  life: "text-green-600 dark:text-green-400",
-};
+import { AREA_DOT_COLORS, AREA_LABELS, AREA_ORDER, AREA_TEXT_COLORS } from "@/lib/constants";
 
 export default function TagsSettingsPage() {
   const { tags, loading, createTag, deleteTag } = useTags();
@@ -85,7 +75,7 @@ export default function TagsSettingsPage() {
                       newArea === area
                         ? "border-current bg-black/5 dark:bg-white/10"
                         : "border-black/10 dark:border-white/10 text-gray-400 hover:border-current"
-                    } ${AREA_TEXT[area]}`}
+                    } ${AREA_TEXT_COLORS[area]}`}
                   >
                     <span className={`w-1.5 h-1.5 rounded-full ${AREA_DOT_COLORS[area]}`} />
                     {AREA_LABELS[area]}
@@ -123,7 +113,7 @@ export default function TagsSettingsPage() {
                 <div key={area} className="glass-card rounded-2xl border border-black/5 dark:border-white/5 overflow-hidden">
                   <div className="flex items-center gap-2 px-4 py-2.5 border-b border-black/5 dark:border-white/5 bg-black/[0.01] dark:bg-white/[0.01]">
                     <span className={`w-2 h-2 rounded-full ${AREA_DOT_COLORS[area]}`} />
-                    <span className={`text-xs font-bold ${AREA_TEXT[area]}`}>{AREA_LABELS[area]}</span>
+                    <span className={`text-xs font-bold ${AREA_TEXT_COLORS[area]}`}>{AREA_LABELS[area]}</span>
                     <span className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold">{areaTags.length}</span>
                   </div>
                   <div className="divide-y divide-black/[0.03] dark:divide-white/[0.03]">

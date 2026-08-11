@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
-import { ChevronRight, ChevronDown, GripVertical, Link2, ArrowUpDown, Calendar, Trash2, Play, Pause, Check, X } from "lucide-react";
+import { ChevronRight, ChevronDown, GripVertical, Link2, ArrowUpDown, Calendar, Trash2 } from "lucide-react";
 import { IdeaNode as IdeaNodeType, Idea, IdeaLink, IdeaType, Tag, LinkType, IdeaStatus, LifeArea } from "@/lib/types";
 import { TypePicker } from "./TypePicker";
-import { TagPicker, AREA_DOT_COLORS } from "@/components/shared/TagPicker";
+import { TagPicker } from "@/components/shared/TagPicker";
+import { AREA_DOT_COLORS, STATUS_CONFIG } from "@/lib/constants";
 import { StatusPicker } from "./StatusPicker";
 import { LinkPanel } from "./LinkPanel";
 import { IdeaComposer } from "./IdeaComposer";
@@ -84,18 +85,6 @@ const STATUS_LABELS: Record<IdeaStatus, string> = {
   cancelled: "Cancelled",
   archived: "Archived",
   deferred: "Deferred",
-};
-
-const STATUS_ICON: Record<IdeaStatus, { icon: React.ElementType | null; color: string }> = {
-  inbox:       { icon: null, color: "text-gray-400" },
-  planned:     { icon: null, color: "text-sky-500" },
-  scheduled:   { icon: null, color: "text-blue-500" },
-  in_progress: { icon: Play, color: "text-amber-500" },
-  paused:      { icon: Pause, color: "text-orange-400" },
-  completed:   { icon: Check, color: "text-violet-600" },
-  cancelled:   { icon: X,     color: "text-red-500" },
-  archived:    { icon: null, color: "text-gray-400" },
-  deferred:    { icon: null, color: "text-amber-600" },
 };
 
 export function IdeaNode({
@@ -353,7 +342,7 @@ export function IdeaNode({
         </span>
 
         {/* Status icon */}
-        {!isAncestorOnly && STATUS_ICON[node.status].icon && (
+        {!isAncestorOnly && STATUS_CONFIG[node.status].icon && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -363,10 +352,10 @@ export function IdeaNode({
                 onMarkDone(node.id);
               }
             }}
-            className={`flex-shrink-0 flex items-center justify-center w-4 h-4 ${STATUS_ICON[node.status].color}`}
+            className={`flex-shrink-0 flex items-center justify-center w-4 h-4 ${STATUS_CONFIG[node.status].textClass}`}
           >
             {(() => {
-              const Icon = STATUS_ICON[node.status].icon;
+              const Icon = STATUS_CONFIG[node.status].icon;
               return Icon ? <Icon size={14} strokeWidth={2.5} /> : null;
             })()}
           </button>
@@ -498,7 +487,7 @@ export function IdeaNode({
         {node.scheduled_date && (
           <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 border ${
             node.scheduled_date === todayString
-              ? "text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-500/20 border-green-200 dark:border-green-500/30"
+              ? "text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-500/20 border-violet-200 dark:border-violet-500/30"
               : "text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700"
           }`}>
             {formatScheduleDate(node.scheduled_date, todayString)}

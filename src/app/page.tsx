@@ -16,11 +16,10 @@ import { DayslotTimeline } from "@/components/planner/DayslotTimeline";
 import { AreaTaskGroup } from "@/components/planner/AreaTaskGroup";
 import { InboxPanel } from "@/components/shared/InboxPanel";
 import { UndoBar } from "@/components/shared/UndoBar";
-import { AREA_ORDER, AREA_LABELS, DEFAULT_TARGETS, LOCAL_STORAGE_TARGETS_KEY } from "@/components/planner/constants";
+import { AREA_DOT_COLORS, AREA_ORDER, AREA_LABELS, DEFAULT_TARGETS, LOCAL_STORAGE_TARGETS_KEY } from "@/lib/constants";
 import { computeReschedulePatch, computeCompletePatch, computeCancelPatch, getDayOccurrences, getTriageMeta, DayOccurrence, RescheduleAction } from "@/lib/tasks/rescheduleTask";
 import { useUndoAction } from "@/lib/tasks/undo";
 import { TriageActions } from "@/components/triage/TriageActions";
-import { AREA_DOT_COLORS } from "@/components/shared/TagPicker";
 import { formatDayLabel } from "@/components/planner/plannerUtils";
 
 export default function DailyPlannerPage() {
@@ -245,13 +244,23 @@ function DailyPlannerInner() {
   }, [ideas, updateIdea, registerUndo]);
 
   const handleDeleteTask = useCallback(async (id: string) => {
-    const idea = ideas.find((i) => i.id === id);
+    const collectSubtree = (rootId: string): Set<string> => {
+      const ids = new Set<string>();
+      const walk = (nodeId: string) => {
+        ids.add(nodeId);
+        ideas.filter((i) => i.parent_id === nodeId).forEach((child) => walk(child.id));
+      };
+      walk(rootId);
+      return ids;
+    };
+    const deletedIds = collectSubtree(id);
+    const deletedIdeas = ideas.filter((i) => deletedIds.has(i.id));
     await deleteIdea(id);
-    if (!idea) return;
+    if (deletedIdeas.length === 0) return;
     registerUndo({
-      label: "Task deleted",
+      label: deletedIdeas.length > 1 ? "Tasks deleted" : "Task deleted",
       run: async () => {
-        await restoreIdeas([idea]);
+        await restoreIdeas(deletedIdeas);
       },
     });
   }, [ideas, deleteIdea, restoreIdeas]);

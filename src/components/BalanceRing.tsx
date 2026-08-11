@@ -1,6 +1,8 @@
 "use client";
 
 import { LifeArea } from "@/lib/types";
+import { AREA_LABELS } from "@/lib/constants";
+import { areaColors } from "@/styles/tokens";
 
 interface BalanceRingProps {
   counts: Record<LifeArea, number>;
@@ -8,24 +10,6 @@ interface BalanceRingProps {
   statLabel: string;
   statSub: string;
 }
-
-const AREA_COLORS: Record<LifeArea, string> = {
-  work: "#4F6BED",
-  health: "#EF4444",
-  relationships: "#EC4899",
-  growth: "#F59E0B",
-  finances: "#10B981",
-  life: "#8B5CF6",
-};
-
-const AREA_LABELS: Record<LifeArea, string> = {
-  work: "Work",
-  health: "Health",
-  relationships: "Relationships",
-  growth: "Growth",
-  finances: "Finances",
-  life: "Life",
-};
 
 const CIRC = 2 * Math.PI * 60;
 const GAP = 4;
@@ -65,7 +49,7 @@ export function BalanceRing({ counts, modeLabel, statLabel, statSub }: BalanceRi
               cy="80"
               r="60"
               fill="none"
-              stroke={AREA_COLORS[area]}
+              stroke={areaColors[area]?.dot}
               strokeWidth="18"
               strokeDasharray={`${Math.max(0, arc - GAP)} ${CIRC - Math.max(0, arc - GAP)}`}
               strokeDashoffset={`${-segOffset}`}
@@ -93,7 +77,7 @@ export function BalanceRing({ counts, modeLabel, statLabel, statSub }: BalanceRi
       <div className="flex flex-wrap justify-center gap-3 mb-5">
         {areas.map(([area, count]) => (
           <div key={area} className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
-            <div className="w-2.5 h-2.5 rounded-full" style={{ background: AREA_COLORS[area] }} />
+            <div className="w-2.5 h-2.5 rounded-full" style={{ background: areaColors[area]?.dot }} />
             {AREA_LABELS[area]} — {count}
           </div>
         ))}

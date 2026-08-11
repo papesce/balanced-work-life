@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Idea, LifeArea, Tag, getAreasForIdea } from "@/lib/types";
 import { areaColors } from "@/styles/tokens";
+import { AREA_LABELS, AREA_ORDER } from "@/lib/constants";
 import { getToday } from "@/lib/dateUtils";
 
 interface MiniBalanceBarProps {
@@ -11,17 +12,6 @@ interface MiniBalanceBarProps {
   getTagsForIdea?: (ideaId: string) => Tag[];
   date?: string;
 }
-
-const AREA_ORDER: LifeArea[] = ["work", "health", "relationships", "growth", "finances", "life"];
-
-const AREA_LABELS: Record<LifeArea, string> = {
-  work: "Work",
-  health: "Health",
-  relationships: "Relationships",
-  growth: "Growth",
-  finances: "Finances",
-  life: "Life",
-};
 
 export function MiniBalanceBar({ tasks, getTagsForIdea, date }: MiniBalanceBarProps) {
   const router = useRouter();

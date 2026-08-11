@@ -11,7 +11,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { BucketData } from "@/hooks/useBalanceData";
-import { AREA_ORDER, AREA_LABELS } from "@/components/planner/constants";
+import { AREA_ORDER, AREA_LABELS } from "@/lib/constants";
 import { areaColors } from "@/styles/tokens";
 import { LifeArea } from "@/lib/types";
 
