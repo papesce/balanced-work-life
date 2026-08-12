@@ -24,7 +24,7 @@ export function DateNav({ activeDate, today, showDateInput, onShowDateInput, onC
         <button
           type="button"
           onClick={() => onChangeDate(today)}
-          className="toolbar-btn toolbar-btn--accent hidden md:inline-flex"
+          className="toolbar-btn toolbar-btn--accent hidden md:inline-flex mr-1"
         >
           Today
         </button>
@@ -61,7 +61,7 @@ export function DateNav({ activeDate, today, showDateInput, onShowDateInput, onC
             onClick={() => onShowDateInput(true)}
             className={`${segButton} min-w-[96px] text-xs font-semibold`}
           >
-            <CalendarDays size={13} className="text-gray-400 dark:text-gray-500" />
+            <CalendarDays size={13} className="text-gray-400 dark:text-gray-500 mr-1" />
             <span className="whitespace-nowrap">{label}</span>
           </button>
         )}

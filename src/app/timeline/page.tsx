@@ -3,7 +3,7 @@
 import { useMemo, useRef, useEffect, useState, useCallback, Suspense, type RefObject } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Sparkles, Clock, CalendarRange, ChevronDown } from "lucide-react";
+import { Sparkles, Clock, CalendarRange, ChevronDown, ChevronUp } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
@@ -216,12 +216,14 @@ function TimelineInner() {
   const taskTagsHook = useTaskTags();
   const windowMenuRef = useRef<HTMLDivElement>(null);
   const scrolledAnchorRef = useRef<string | null>(null);
+  const anchorRef = useRef<HTMLDivElement>(null);
   const [showDateInput, setShowDateInput] = useState(false);
   const [windowMenuOpen, setWindowMenuOpen] = useState(false);
   const [filter, setFilter] = useState<"all" | "deferred">(() => loadPrefs().filter);
   const [pastRange, setPastRange] = useState<PastRangeId>(() => loadPrefs().pastRange);
   const [futureRange, setFutureRange] = useState<FutureRangeId>(() => loadPrefs().futureRange);
   const [quickAddArea, setQuickAddArea] = useState<LifeArea | null>(null);
+  const [anchorVisible, setAnchorVisible] = useState(true);
   const { undoAction, clearUndo, handleUndo } = useUndoAction();
 
   const today = getToday();
@@ -444,6 +446,22 @@ function TimelineInner() {
     scrollToDate(targetDate, () => pulseTask(taskId, targetDate));
   }, [setAnchorParam, scrollToDate, pulseTask]);
 
+  // Track anchor visibility in viewport
+  useEffect(() => {
+    const handleScroll = () => {
+      if (anchorRef.current) {
+        const rect = anchorRef.current.getBoundingClientRect();
+        const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
+        setAnchorVisible(isVisible);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    handleScroll(); // Initial check
+
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [anchor]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -552,6 +570,7 @@ function TimelineInner() {
             <motion.section
               key={date}
               id={`day-${date}`}
+              ref={isAnchorDate ? anchorRef : null}
               custom={index}
               variants={cardVariants}
               initial="hidden"
@@ -643,6 +662,19 @@ function TimelineInner() {
         })
         )}
       </div>
+
+      {/* Floating button to navigate back to the selected date */}
+      {!anchorVisible && (
+        <button
+          onClick={() => {
+            anchorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+          }}
+          className="fixed bottom-6 right-6 z-50 bg-violet-600 hover:bg-violet-700 text-white p-3 rounded-full shadow-lg transition-all hover:scale-110 flex items-center justify-center"
+          aria-label={`Jump to ${formatTimelineDate(anchor)}`}
+        >
+          <ChevronUpDown size={20} />
+        </button>
+      )}
     </AppShell>
   );
 }
