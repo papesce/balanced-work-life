@@ -460,7 +460,7 @@ function TimelineInner() {
     handleScroll(); // Initial check
 
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [anchor]);
+  }, [anchor, anchorRef]);
 
   if (loading) {
     return (
@@ -664,7 +664,7 @@ function TimelineInner() {
       </div>
 
       {/* Floating button to navigate back to the selected date */}
-      {!anchorVisible && (
+      {anchor !== today && (
         <button
           onClick={() => {
             anchorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
