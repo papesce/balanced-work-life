@@ -20,7 +20,7 @@
     "format:check": "prettier --check .",
     "precommit": "sh scripts/precommit-check.sh",
     "check": "pnpm format:check && pnpm lint && pnpm exec tsc --noEmit && pnpm build",
-    "prepare": "git config core.hooksPath .githooks",
+    "prepare": "if [ -d .git ]; then git config core.hooksPath .githooks; fi",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "changeset publish"
