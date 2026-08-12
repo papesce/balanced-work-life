@@ -3,12 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "./useAuth";
 import { LifeArea } from "@/lib/types";
-import {
-  WindowType,
-  getWindowRange,
-  getWindowBuckets,
-  getWindowLabel,
-} from "@/lib/dateUtils";
+import { WindowType, getWindowRange, getWindowBuckets, getWindowLabel } from "@/lib/dateUtils";
 import { AREA_ORDER, DEFAULT_TARGETS, LOCAL_STORAGE_TARGETS_KEY } from "@/lib/constants";
 import { emptyAreaCounts, fetchTasksWithTags, getEffectiveAreasForIdea } from "@/lib/taskTags";
 
@@ -97,7 +92,9 @@ export function useBalanceData(windowType: WindowType, referenceDate: string): B
     };
 
     void run();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [user, windowType, referenceDate]);
 
   return { loading, radarData, buckets, windowLabel };

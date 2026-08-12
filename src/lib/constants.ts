@@ -12,7 +12,14 @@ import {
 } from "lucide-react";
 import { IdeaStatus, LifeArea } from "@/lib/types";
 
-export const AREA_ORDER: LifeArea[] = ["work", "health", "relationships", "growth", "finances", "life"];
+export const AREA_ORDER: LifeArea[] = [
+  "work",
+  "health",
+  "relationships",
+  "growth",
+  "finances",
+  "life",
+];
 
 export const AREA_LABELS: Record<LifeArea, string> = {
   work: "Work",
@@ -54,15 +61,69 @@ export const STATUS_CONFIG: Record<
   IdeaStatus,
   { label: string; textClass: string; hex: string; bg: string; icon: React.ElementType | null }
 > = {
-  inbox:       { label: "Inbox",       textClass: "text-gray-400",   hex: "#9ca3af", bg: "rgba(0,0,0,0.05)",    icon: null },
-  planned:     { label: "Planned",     textClass: "text-sky-500",    hex: "#0ea5e9", bg: "rgba(14,165,233,0.1)", icon: null },
-  scheduled:   { label: "Scheduled",   textClass: "text-blue-500",   hex: "#3b82f6", bg: "rgba(59,130,246,0.1)", icon: null },
-  in_progress: { label: "In Progress", textClass: "text-amber-500",  hex: "#d97706", bg: "rgba(217,119,6,0.1)",  icon: Play },
-  paused:      { label: "Paused",      textClass: "text-orange-400", hex: "#f97316", bg: "rgba(249,115,22,0.1)", icon: Pause },
-  completed:   { label: "Completed",   textClass: "text-violet-600", hex: "#7c3aed", bg: "rgba(124,58,237,0.1)", icon: Check },
-  cancelled:   { label: "Cancelled",   textClass: "text-red-500",    hex: "#ef4444", bg: "rgba(239,68,68,0.1)",  icon: X },
-  archived:    { label: "Archived",    textClass: "text-gray-400",   hex: "#9ca3af", bg: "rgba(0,0,0,0.05)",    icon: null },
-  deferred:    { label: "Deferred",    textClass: "text-amber-600",  hex: "#d97706", bg: "rgba(217,119,6,0.1)",  icon: null },
+  inbox: {
+    label: "Inbox",
+    textClass: "text-gray-400",
+    hex: "#9ca3af",
+    bg: "rgba(0,0,0,0.05)",
+    icon: null,
+  },
+  planned: {
+    label: "Planned",
+    textClass: "text-sky-500",
+    hex: "#0ea5e9",
+    bg: "rgba(14,165,233,0.1)",
+    icon: null,
+  },
+  scheduled: {
+    label: "Scheduled",
+    textClass: "text-blue-500",
+    hex: "#3b82f6",
+    bg: "rgba(59,130,246,0.1)",
+    icon: null,
+  },
+  in_progress: {
+    label: "In Progress",
+    textClass: "text-amber-500",
+    hex: "#d97706",
+    bg: "rgba(217,119,6,0.1)",
+    icon: Play,
+  },
+  paused: {
+    label: "Paused",
+    textClass: "text-orange-400",
+    hex: "#f97316",
+    bg: "rgba(249,115,22,0.1)",
+    icon: Pause,
+  },
+  completed: {
+    label: "Completed",
+    textClass: "text-violet-600",
+    hex: "#7c3aed",
+    bg: "rgba(124,58,237,0.1)",
+    icon: Check,
+  },
+  cancelled: {
+    label: "Cancelled",
+    textClass: "text-red-500",
+    hex: "#ef4444",
+    bg: "rgba(239,68,68,0.1)",
+    icon: X,
+  },
+  archived: {
+    label: "Archived",
+    textClass: "text-gray-400",
+    hex: "#9ca3af",
+    bg: "rgba(0,0,0,0.05)",
+    icon: null,
+  },
+  deferred: {
+    label: "Deferred",
+    textClass: "text-amber-600",
+    hex: "#d97706",
+    bg: "rgba(217,119,6,0.1)",
+    icon: null,
+  },
 };
 
 export const DEFAULT_TARGETS: Record<LifeArea, number> = {
@@ -77,7 +138,20 @@ export const DEFAULT_TARGETS: Record<LifeArea, number> = {
 export const LOCAL_STORAGE_TARGETS_KEY = "daily-planner-area-targets";
 
 export const SCHEDULE_HOURS = [
-  "07:00", "08:00", "09:00", "10:00", "11:00",
-  "12:00", "13:00", "14:00", "15:00", "16:00",
-  "17:00", "18:00", "19:00", "20:00", "21:00", "22:00",
+  "07:00",
+  "08:00",
+  "09:00",
+  "10:00",
+  "11:00",
+  "12:00",
+  "13:00",
+  "14:00",
+  "15:00",
+  "16:00",
+  "17:00",
+  "18:00",
+  "19:00",
+  "20:00",
+  "21:00",
+  "22:00",
 ];

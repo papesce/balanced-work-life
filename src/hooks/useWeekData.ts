@@ -57,7 +57,9 @@ export function useWeekData(referenceDate: string): {
     };
 
     void fetchData();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [user, referenceDate]);
 
   return { loading, weeks };

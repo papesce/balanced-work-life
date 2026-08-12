@@ -17,20 +17,22 @@ export function UndoBar({
     <motion.div
       initial={{ opacity: 0, y: -4 }}
       animate={{ opacity: 1, y: 0 }}
-      className="mb-3 flex items-center justify-between gap-3 rounded-[16px] glass-card border-amber-200/40 dark:border-amber-700/30 px-4 py-2.5"
+      className="glass-card mb-3 flex items-center justify-between gap-3 rounded-[16px] border-amber-200/40 px-4 py-2.5 dark:border-amber-700/30"
     >
-      <span className="text-sm text-amber-800 dark:text-amber-300 font-medium">{undoAction.label}</span>
+      <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
+        {undoAction.label}
+      </span>
       <div className="flex items-center gap-1.5">
         <button
           onClick={onUndo}
-          className="text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-100/60 dark:hover:bg-amber-900/20 rounded-lg px-2.5 py-1 transition-colors cursor-pointer"
+          className="cursor-pointer rounded-lg px-2.5 py-1 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100/60 dark:text-amber-400 dark:hover:bg-amber-900/20"
         >
           Undo
         </button>
         <button
           onClick={onDismiss}
           aria-label="Dismiss undo"
-          className="w-7 h-7 flex items-center justify-center rounded-lg text-amber-600 dark:text-amber-400 hover:bg-amber-100/60 dark:hover:bg-amber-900/20 transition-colors cursor-pointer"
+          className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-amber-600 transition-colors hover:bg-amber-100/60 dark:text-amber-400 dark:hover:bg-amber-900/20"
         >
           <span className="text-sm">&times;</span>
         </button>

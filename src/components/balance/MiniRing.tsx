@@ -42,14 +42,7 @@ export function MiniRing({
       viewBox={`0 0 ${size} ${size}`}
       style={{ opacity: dimmed ? 0.25 : 1 }}
     >
-      <circle
-        cx={cx}
-        cy={cx}
-        r={r}
-        fill="none"
-        stroke="var(--ring-bg, #e5e7eb)"
-        strokeWidth={sw}
-      />
+      <circle cx={cx} cy={cx} r={r} fill="none" stroke="var(--ring-bg, #e5e7eb)" strokeWidth={sw} />
       {total > 0 &&
         segments.map(({ area, arc, offset: segOffset }) => (
           <circle

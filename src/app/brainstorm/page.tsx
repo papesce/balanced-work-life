@@ -49,7 +49,7 @@ export default function BrainstormPage() {
   const createIdea = async (
     text: string,
     parentId?: string | null,
-    position?: "top" | "bottom"
+    position?: "top" | "bottom",
   ): Promise<string> => {
     const id = await ideasHook.createIdea(text, parentId, position);
     if (id) {
@@ -112,7 +112,7 @@ export default function BrainstormPage() {
   const createLink = async (
     sourceId: string,
     targetId: string,
-    linkType: LinkType
+    linkType: LinkType,
   ): Promise<string> => {
     const id = await linksHook.createLink(sourceId, targetId, linkType);
     if (id) {
@@ -147,7 +147,10 @@ export default function BrainstormPage() {
     registerUndo({
       label: "Idea completed",
       run: async () => {
-        await ideasHook.updateIdea(id, { status: previous.status, completed_at: previous.completed_at });
+        await ideasHook.updateIdea(id, {
+          status: previous.status,
+          completed_at: previous.completed_at,
+        });
       },
     });
   };
@@ -160,7 +163,10 @@ export default function BrainstormPage() {
     registerUndo({
       label: "Idea reopened",
       run: async () => {
-        await ideasHook.updateIdea(id, { status: previous.status, completed_at: previous.completed_at });
+        await ideasHook.updateIdea(id, {
+          status: previous.status,
+          completed_at: previous.completed_at,
+        });
       },
     });
   };
@@ -187,7 +193,7 @@ export default function BrainstormPage() {
 
   if (ideasHook.loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center">
         <div className="animate-pulse text-gray-400 dark:text-gray-500">Loading...</div>
       </div>
     );
@@ -198,9 +204,7 @@ export default function BrainstormPage() {
       <div className="flex gap-1">
         <button
           onClick={() => setTimeScope("this_month")}
-          className={`toolbar-btn ${
-            timeScope === "this_month" ? "toolbar-btn--accent" : ""
-          }`}
+          className={`toolbar-btn ${timeScope === "this_month" ? "toolbar-btn--accent" : ""}`}
           title="Only load ideas scheduled this month or unscheduled and active"
         >
           This month
@@ -226,10 +230,10 @@ export default function BrainstormPage() {
           disabled={!hasLinks}
           className={`toolbar-btn ${
             !hasLinks
-              ? "opacity-40 cursor-not-allowed"
+              ? "cursor-not-allowed opacity-40"
               : viewMode === "graph"
-              ? "toolbar-btn--accent"
-              : ""
+                ? "toolbar-btn--accent"
+                : ""
           }`}
           title={!hasLinks ? "Link two ideas to unlock" : ""}
         >
@@ -245,20 +249,22 @@ export default function BrainstormPage() {
         <motion.div
           initial={{ opacity: 0, y: -4 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-3 flex items-center justify-between gap-3 rounded-[16px] glass-card border-amber-200/40 dark:border-amber-700/30 px-4 py-2.5"
+          className="glass-card mb-3 flex items-center justify-between gap-3 rounded-[16px] border-amber-200/40 px-4 py-2.5 dark:border-amber-700/30"
         >
-          <span className="text-sm text-amber-800 dark:text-amber-300 font-medium">{undoAction.label}</span>
+          <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
+            {undoAction.label}
+          </span>
           <div className="flex items-center gap-1.5">
             <button
               onClick={handleUndo}
-              className="text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-100/60 dark:hover:bg-amber-900/20 rounded-lg px-2.5 py-1 transition-colors"
+              className="rounded-lg px-2.5 py-1 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100/60 dark:text-amber-400 dark:hover:bg-amber-900/20"
             >
               Undo
             </button>
             <button
               onClick={clearUndo}
               aria-label="Dismiss undo"
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-amber-600 dark:text-amber-400 hover:bg-amber-100/60 dark:hover:bg-amber-900/20 transition-colors"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-amber-600 transition-colors hover:bg-amber-100/60 dark:text-amber-400 dark:hover:bg-amber-900/20"
             >
               <span className="text-sm">×</span>
             </button>

@@ -30,10 +30,7 @@ export type RescheduleAction =
   | { type: "move"; newDate: string }
   | { type: "defer" };
 
-export function computeReschedulePatch(
-  idea: Idea,
-  action: RescheduleAction,
-): Partial<Idea> {
+export function computeReschedulePatch(idea: Idea, action: RescheduleAction): Partial<Idea> {
   const previousDate = idea.scheduled_date;
   const updatedAttemptDates = previousDate
     ? [...idea.attempt_dates, previousDate]
@@ -92,10 +89,7 @@ export interface DayOccurrence {
  * dates are collapsed, and a date that is also the task's current scheduled
  * date is suppressed in favor of the active occurrence.
  */
-export function getHistoricalOccurrenceDates(
-  idea: Idea,
-  today: string = getToday(),
-): string[] {
+export function getHistoricalOccurrenceDates(idea: Idea, today: string = getToday()): string[] {
   const current = idea.scheduled_date;
   const seen = new Set<string>();
   const out: string[] = [];
@@ -150,7 +144,7 @@ export function getTriageMeta(idea: Idea): TriageMeta {
   const originalDate =
     idea.attempt_dates.length > 0
       ? idea.attempt_dates[0]
-      : idea.scheduled_date ?? idea.created_at.slice(0, 10);
+      : (idea.scheduled_date ?? idea.created_at.slice(0, 10));
   const currentDate = idea.scheduled_date;
   return {
     originalDate,

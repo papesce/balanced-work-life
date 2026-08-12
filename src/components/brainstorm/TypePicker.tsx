@@ -31,13 +31,13 @@ export function TypePicker({ current, onSelect, onClose }: TypePickerProps) {
   return (
     <div
       ref={ref}
-      className="absolute right-0 top-full mt-1 z-50 glass-card-strong rounded-xl py-1 min-w-[130px]"
+      className="glass-card-strong absolute top-full right-0 z-50 mt-1 min-w-[130px] rounded-xl py-1"
     >
       {TYPES.map(({ value, label, color }) => (
         <button
           key={value}
           onClick={() => onSelect(value)}
-          className={`block w-full text-left text-sm px-3 py-1.5 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] ${
+          className={`block w-full px-3 py-1.5 text-left text-sm hover:bg-black/[0.03] dark:hover:bg-white/[0.06] ${
             current === value ? "font-medium" : ""
           } ${color}`}
         >
@@ -47,7 +47,7 @@ export function TypePicker({ current, onSelect, onClose }: TypePickerProps) {
       {current && (
         <button
           onClick={() => onSelect(null)}
-          className="block w-full text-left text-sm px-3 py-1.5 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] text-gray-400 dark:text-gray-500 italic border-t border-black/5 dark:border-white/5 mt-1"
+          className="mt-1 block w-full border-t border-black/5 px-3 py-1.5 text-left text-sm text-gray-400 italic hover:bg-black/[0.03] dark:border-white/5 dark:text-gray-500 dark:hover:bg-white/[0.06]"
         >
           Clear
         </button>

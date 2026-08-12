@@ -13,10 +13,7 @@ export function useIdeaLinks() {
 
   const fetchLinks = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from("idea_links")
-      .select("*")
-      .eq("user_id", user.id);
+    const { data } = await supabase.from("idea_links").select("*").eq("user_id", user.id);
     if (data) setLinks(data as IdeaLink[]);
     setLoading(false);
   }, [user]);
@@ -26,10 +23,7 @@ export function useIdeaLinks() {
     let cancelled = false;
 
     const loadLinks = async () => {
-      const { data } = await supabase
-        .from("idea_links")
-        .select("*")
-        .eq("user_id", user.id);
+      const { data } = await supabase.from("idea_links").select("*").eq("user_id", user.id);
       if (cancelled) return;
       if (data) setLinks(data as IdeaLink[]);
       setLoading(false);
@@ -45,7 +39,7 @@ export function useIdeaLinks() {
   const createLink = async (
     sourceId: string,
     targetId: string,
-    linkType: LinkType
+    linkType: LinkType,
   ): Promise<string> => {
     if (!user) return "";
     const id = uuidv4();
@@ -70,10 +64,10 @@ export function useIdeaLinks() {
 
   const removeLinksForIdeaIds = (ideaIds: Set<string>): IdeaLink[] => {
     const removed = links.filter(
-      (link) => ideaIds.has(link.source_id) || ideaIds.has(link.target_id)
+      (link) => ideaIds.has(link.source_id) || ideaIds.has(link.target_id),
     );
     setLinks((prev) =>
-      prev.filter((link) => !ideaIds.has(link.source_id) && !ideaIds.has(link.target_id))
+      prev.filter((link) => !ideaIds.has(link.source_id) && !ideaIds.has(link.target_id)),
     );
     return removed;
   };
@@ -81,20 +75,15 @@ export function useIdeaLinks() {
   const restoreLinks = async (restoredLinks: IdeaLink[]): Promise<void> => {
     if (restoredLinks.length === 0) return;
     const restoredIds = new Set(restoredLinks.map((link) => link.id));
-    setLinks((prev) => [
-      ...prev.filter((link) => !restoredIds.has(link.id)),
-      ...restoredLinks,
-    ]);
+    setLinks((prev) => [...prev.filter((link) => !restoredIds.has(link.id)), ...restoredLinks]);
     await supabase.from("idea_links").upsert(restoredLinks);
   };
 
   const getLinksForIdea = useCallback(
     (ideaId: string): IdeaLink[] => {
-      return links.filter(
-        (l) => l.source_id === ideaId || l.target_id === ideaId
-      );
+      return links.filter((l) => l.source_id === ideaId || l.target_id === ideaId);
     },
-    [links]
+    [links],
   );
 
   return {

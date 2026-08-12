@@ -30,8 +30,10 @@ export function YearPicker({ year, onSelect }: YearPickerProps) {
     updatePosition();
     function handleClickOutside(e: MouseEvent) {
       if (
-        panelRef.current && !panelRef.current.contains(e.target as Node) &&
-        btnRef.current && !btnRef.current.contains(e.target as Node)
+        panelRef.current &&
+        !panelRef.current.contains(e.target as Node) &&
+        btnRef.current &&
+        !btnRef.current.contains(e.target as Node)
       ) {
         setOpen(false);
       }
@@ -57,7 +59,7 @@ export function YearPicker({ year, onSelect }: YearPickerProps) {
           setPageStart(year - Math.floor(PAGE_SIZE / 2));
           setOpen(!open);
         }}
-        className="text-sm font-semibold text-gray-700 dark:text-gray-300 hover:text-violet-600 dark:hover:text-violet-400 transition-colors min-w-[120px] text-center"
+        className="min-w-[120px] text-center text-sm font-semibold text-gray-700 transition-colors hover:text-violet-600 dark:text-gray-300 dark:hover:text-violet-400"
       >
         {year}
       </button>
@@ -71,14 +73,20 @@ export function YearPicker({ year, onSelect }: YearPickerProps) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -4, scale: 0.97 }}
               transition={{ duration: 0.15 }}
-              style={{ position: "fixed", top: pos.top, left: pos.left, transform: "translateX(-50%)", zIndex: 9999 }}
-              className="glass-card rounded-2xl p-4 shadow-lg w-[280px]"
+              style={{
+                position: "fixed",
+                top: pos.top,
+                left: pos.left,
+                transform: "translateX(-50%)",
+                zIndex: 9999,
+              }}
+              className="glass-card w-[280px] rounded-2xl p-4 shadow-lg"
             >
               {/* Year nav */}
-              <div className="flex items-center justify-between mb-3">
+              <div className="mb-3 flex items-center justify-between">
                 <button
                   onClick={() => setPageStart((s) => s - PAGE_SIZE)}
-                  className="p-1 rounded-lg text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-700 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-300"
                 >
                   <ChevronLeft size={16} />
                 </button>
@@ -87,7 +95,7 @@ export function YearPicker({ year, onSelect }: YearPickerProps) {
                 </span>
                 <button
                   onClick={() => setPageStart((s) => s + PAGE_SIZE)}
-                  className="p-1 rounded-lg text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-700 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-300"
                 >
                   <ChevronRight size={16} />
                 </button>
@@ -104,10 +112,10 @@ export function YearPicker({ year, onSelect }: YearPickerProps) {
                         onSelect(y);
                         setOpen(false);
                       }}
-                      className={`py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      className={`rounded-lg py-1.5 text-xs font-medium transition-colors ${
                         selected
                           ? "bg-violet-500 text-white"
-                          : "text-gray-600 dark:text-gray-400 hover:bg-violet-100 dark:hover:bg-violet-900/30 hover:text-violet-700 dark:hover:text-violet-300"
+                          : "text-gray-600 hover:bg-violet-100 hover:text-violet-700 dark:text-gray-400 dark:hover:bg-violet-900/30 dark:hover:text-violet-300"
                       }`}
                     >
                       {y}
@@ -118,7 +126,7 @@ export function YearPicker({ year, onSelect }: YearPickerProps) {
             </motion.div>
           )}
         </AnimatePresence>,
-        document.body
+        document.body,
       )}
     </>
   );

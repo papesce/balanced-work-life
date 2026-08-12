@@ -11,7 +11,11 @@ interface IdeaTreeProps {
   ideas: Idea[];
   links: IdeaLink[];
   scope: IdeasScope;
-  createIdea: (text: string, parentId?: string | null, position?: "top" | "bottom") => Promise<string>;
+  createIdea: (
+    text: string,
+    parentId?: string | null,
+    position?: "top" | "bottom",
+  ) => Promise<string>;
   updateIdea: (id: string, updates: Partial<Idea>) => Promise<void>;
   deleteIdea: (id: string) => Promise<void>;
   moveIdea: (id: string, newParentId: string | null, newSortOrder: number) => Promise<void>;
@@ -33,7 +37,7 @@ interface IdeaTreeProps {
 
 function getAncestorIds(ideaId: string, ideas: Idea[]): Set<string> {
   const ancestors = new Set<string>();
-  const ideaMap = new Map(ideas.map(i => [i.id, i]));
+  const ideaMap = new Map(ideas.map((i) => [i.id, i]));
   let current = ideaMap.get(ideaId);
   while (current?.parent_id) {
     ancestors.add(current.parent_id);
@@ -122,19 +126,19 @@ export function IdeaTree({
       <div className="flex items-center gap-2">
         <button
           onClick={handleAddRoot}
-          className="text-sm px-3 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+          className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700"
         >
           + New idea
         </button>
         <button
           onClick={expandAll}
-          className="text-sm px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700"
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
         >
           Expand
         </button>
         <button
           onClick={collapseAll}
-          className="text-sm px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700"
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
         >
           Collapse
         </button>
@@ -143,7 +147,7 @@ export function IdeaTree({
           placeholder="Search..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 min-w-[120px] text-sm px-3 py-1.5 border border-black/10 dark:border-white/10 rounded-lg outline-none focus:border-indigo-500 dark:focus:border-indigo-400 bg-white/60 dark:bg-gray-800/60 text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+          className="min-w-[120px] flex-1 rounded-lg border border-black/10 bg-white/60 px-3 py-1.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-indigo-500 dark:border-white/10 dark:bg-gray-800/60 dark:text-gray-200 dark:placeholder:text-gray-500 dark:focus:border-indigo-400"
         />
       </div>
 
@@ -152,20 +156,20 @@ export function IdeaTree({
         <div className="flex gap-1">
           <button
             onClick={() => setShowType(!showType)}
-            className={`text-xs px-2.5 py-1 rounded-full border ${
+            className={`rounded-full border px-2.5 py-1 text-xs ${
               showType
-                ? "bg-white dark:bg-gray-700 border-indigo-300 dark:border-indigo-500/50 text-indigo-700 dark:text-indigo-300 font-medium"
-                : "bg-gray-100 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"
+                ? "border-indigo-300 bg-white font-medium text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
+                : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
             }`}
           >
             Type
           </button>
           <button
             onClick={() => setShowArea(!showArea)}
-            className={`text-xs px-2.5 py-1 rounded-full border ${
+            className={`rounded-full border px-2.5 py-1 text-xs ${
               showArea
-                ? "bg-white dark:bg-gray-700 border-indigo-300 dark:border-indigo-500/50 text-indigo-700 dark:text-indigo-300 font-medium"
-                : "bg-gray-100 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"
+                ? "border-indigo-300 bg-white font-medium text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
+                : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
             }`}
           >
             Area
@@ -177,20 +181,20 @@ export function IdeaTree({
         <div className="flex gap-1">
           <button
             onClick={() => setShowToday(!showToday)}
-            className={`text-xs px-2.5 py-1 rounded-full border ${
+            className={`rounded-full border px-2.5 py-1 text-xs ${
               showToday
-                ? "bg-white dark:bg-gray-700 border-indigo-300 dark:border-indigo-500/50 text-indigo-700 dark:text-indigo-300 font-medium"
-                : "bg-gray-100 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"
+                ? "border-indigo-300 bg-white font-medium text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
+                : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
             }`}
           >
             Today
           </button>
           <button
             onClick={() => setHideDone(!hideDone)}
-            className={`text-xs px-2.5 py-1 rounded-full border ${
+            className={`rounded-full border px-2.5 py-1 text-xs ${
               hideDone
-                ? "bg-white dark:bg-gray-700 border-indigo-300 dark:border-indigo-500/50 text-indigo-700 dark:text-indigo-300 font-medium"
-                : "bg-gray-100 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"
+                ? "border-indigo-300 bg-white font-medium text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
+                : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
             }`}
           >
             Hide done
@@ -198,14 +202,13 @@ export function IdeaTree({
         </div>
       </div>
 
-
       {filteredTree.length === 0 ? (
-        <p className="text-sm text-gray-400 italic py-4">
+        <p className="py-4 text-sm text-gray-400 italic">
           {search
             ? "No matching ideas"
             : scope === "this_month"
-            ? "No ideas this month. Click \"+ New idea\" to add one, or switch to All to see everything."
-            : "No ideas yet. Click \"+ New idea\" to start."}
+              ? 'No ideas this month. Click "+ New idea" to add one, or switch to All to see everything.'
+              : 'No ideas yet. Click "+ New idea" to start.'}
         </p>
       ) : (
         <div className="space-y-0.5">

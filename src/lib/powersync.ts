@@ -1,9 +1,4 @@
-import {
-  WASQLitePowerSyncDatabaseOpenFactory,
-  column,
-  Schema,
-  Table,
-} from "@powersync/web";
+import { WASQLitePowerSyncDatabaseOpenFactory, column, Schema, Table } from "@powersync/web";
 import { supabase } from "./supabase";
 
 export const IdeasTable = new Table(
@@ -31,7 +26,7 @@ export const IdeasTable = new Table(
     created_at: column.text,
     updated_at: column.text,
   },
-  { indexes: {} }
+  { indexes: {} },
 );
 
 export const IdeaLinksTable = new Table(
@@ -42,7 +37,7 @@ export const IdeaLinksTable = new Table(
     link_type: column.text,
     created_at: column.text,
   },
-  { indexes: {} }
+  { indexes: {} },
 );
 
 export const TagsTable = new Table(
@@ -53,7 +48,7 @@ export const TagsTable = new Table(
     is_system: column.integer,
     created_at: column.text,
   },
-  { indexes: {} }
+  { indexes: {} },
 );
 
 export const TaskTagsTable = new Table(
@@ -61,7 +56,7 @@ export const TaskTagsTable = new Table(
     idea_id: column.text,
     tag_id: column.text,
   },
-  { indexes: {} }
+  { indexes: {} },
 );
 
 export const AppSchema = new Schema({
@@ -91,7 +86,11 @@ export class SupabaseConnector {
     const batch = await database.getCrudBatch(100);
     if (!batch) return;
 
-    const ops = (batch as { crud: Array<{ op: string; table: string; id: string; opData?: Record<string, unknown> }> }).crud;
+    const ops = (
+      batch as {
+        crud: Array<{ op: string; table: string; id: string; opData?: Record<string, unknown> }>;
+      }
+    ).crud;
     for (const op of ops) {
       const { op: operation, table, id, opData } = op;
       switch (operation) {

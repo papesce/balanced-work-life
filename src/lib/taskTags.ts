@@ -28,7 +28,10 @@ export function buildTagsByIdeaMap(rows: TaskTagRow[]): Map<string, Tag[]> {
   return map;
 }
 
-export async function fetchTagsByIdea(userId: string, ideaIds?: string[]): Promise<Map<string, Tag[]>> {
+export async function fetchTagsByIdea(
+  userId: string,
+  ideaIds?: string[],
+): Promise<Map<string, Tag[]>> {
   if (ideaIds && ideaIds.length === 0) return new Map();
   let query = supabase
     .from("task_tags")
@@ -46,18 +49,20 @@ export interface TasksWithTags {
 
 export async function fetchTasksWithTags(
   userId: string,
-  options: { start?: string; end?: string; select?: string } = {}
+  options: { start?: string; end?: string; select?: string } = {},
 ): Promise<TasksWithTags> {
   const { start, end, select = "id, scheduled_date, type, status" } = options;
-  let query = supabase
-    .from("ideas")
-    .select(select)
-    .eq("user_id", userId)
-    .eq("type", "task");
+  let query = supabase.from("ideas").select(select).eq("user_id", userId).eq("type", "task");
   if (start) query = query.gte("scheduled_date", start);
   if (end) query = query.lte("scheduled_date", end);
 
   const { data } = await query;
   const tasks = (data ?? []) as unknown as RangedTask[];
-  return { tasks, tagsByIdea: await fetchTagsByIdea(userId, tasks.map((t) => t.id)) };
+  return {
+    tasks,
+    tagsByIdea: await fetchTagsByIdea(
+      userId,
+      tasks.map((t) => t.id),
+    ),
+  };
 }

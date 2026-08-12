@@ -1,15 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { BucketData } from "@/hooks/useBalanceData";
 import { AREA_ORDER, AREA_LABELS } from "@/lib/constants";
 import { areaColors } from "@/styles/tokens";
@@ -34,7 +26,7 @@ export function BalanceTimelineChart({ buckets }: BalanceTimelineChartProps) {
 
   if (!hasData) {
     return (
-      <div className="flex items-center justify-center h-full min-h-[220px] text-sm text-gray-400 dark:text-gray-500 italic">
+      <div className="flex h-full min-h-[220px] items-center justify-center text-sm text-gray-400 italic dark:text-gray-500">
         No tasks in this period
       </div>
     );

@@ -48,7 +48,7 @@ function BalancePageInner() {
   return (
     <AppShell title="Life Compass" headerActions={headerActions}>
       <div className="space-y-6 pb-24">
-        <div className="glass-card px-5 py-4 rounded-[20px]">
+        <div className="glass-card rounded-[20px] px-5 py-4">
           <BalanceWindowToggle
             window={windowParam}
             referenceDate={dateParam}
@@ -56,20 +56,22 @@ function BalancePageInner() {
           />
         </div>
 
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={`${windowParam}-${dateParam}`}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.2 }}
-        >
-          {windowParam === "day" && <DayCalendarView referenceDate={dateParam} flashKey={flashKey} />}
-          {windowParam === "week" && <WeekRingView referenceDate={dateParam} />}
-          {windowParam === "month" && <MonthRingView referenceDate={dateParam} />}
-          {windowParam === "year" && <YearWheelView referenceDate={dateParam} />}
-        </motion.div>
-      </AnimatePresence>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={`${windowParam}-${dateParam}`}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+          >
+            {windowParam === "day" && (
+              <DayCalendarView referenceDate={dateParam} flashKey={flashKey} />
+            )}
+            {windowParam === "week" && <WeekRingView referenceDate={dateParam} />}
+            {windowParam === "month" && <MonthRingView referenceDate={dateParam} />}
+            {windowParam === "year" && <YearWheelView referenceDate={dateParam} />}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </AppShell>
   );

@@ -5,12 +5,16 @@ import { createPortal } from "react-dom";
 import { DailyTimeline } from "@papesce/dayslot";
 import type { TimelineEvent, DailyTimelineHandle } from "@papesce/dayslot";
 import "@papesce/dayslot/style.css";
-import { Idea, IdeaStatus, LifeArea, getAreasForIdea, getPrimaryTagForIdea, Tag } from "@/lib/types";
-import { AREA_LABELS, STATUS_CONFIG } from "@/lib/constants";
 import {
-  minutesToTimeString,
-  parseTimeToMinutes,
-} from "./dayslotAdapter";
+  Idea,
+  IdeaStatus,
+  LifeArea,
+  getAreasForIdea,
+  getPrimaryTagForIdea,
+  Tag,
+} from "@/lib/types";
+import { AREA_LABELS, STATUS_CONFIG } from "@/lib/constants";
+import { minutesToTimeString, parseTimeToMinutes } from "./dayslotAdapter";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 
@@ -53,10 +57,14 @@ const AREA_ACCENT_COLORS: Record<LifeArea, string> = {
 
 const AREA_BG_CLASSES: Record<LifeArea, string> = {
   work: "bg-blue-50/65 border-blue-200/40 dark:bg-blue-950/15 dark:border-blue-900/25 text-blue-700 dark:text-blue-300",
-  health: "bg-red-50/65 border-red-200/40 dark:bg-red-950/15 dark:border-red-900/25 text-red-700 dark:text-red-300",
-  relationships: "bg-pink-50/65 border-pink-200/40 dark:bg-pink-950/15 dark:border-pink-900/25 text-pink-700 dark:text-pink-300",
-  growth: "bg-amber-50/65 border-amber-200/40 dark:bg-amber-950/15 dark:border-amber-900/25 text-amber-700 dark:text-amber-300",
-  finances: "bg-emerald-50/65 border-emerald-200/40 dark:bg-emerald-950/15 dark:border-emerald-900/25 text-emerald-700 dark:text-emerald-300",
+  health:
+    "bg-red-50/65 border-red-200/40 dark:bg-red-950/15 dark:border-red-900/25 text-red-700 dark:text-red-300",
+  relationships:
+    "bg-pink-50/65 border-pink-200/40 dark:bg-pink-950/15 dark:border-pink-900/25 text-pink-700 dark:text-pink-300",
+  growth:
+    "bg-amber-50/65 border-amber-200/40 dark:bg-amber-950/15 dark:border-amber-900/25 text-amber-700 dark:text-amber-300",
+  finances:
+    "bg-emerald-50/65 border-emerald-200/40 dark:bg-emerald-950/15 dark:border-emerald-900/25 text-emerald-700 dark:text-emerald-300",
   life: "bg-violet-50/65 border-violet-200/40 dark:bg-violet-950/15 dark:border-violet-900/25 text-violet-700 dark:text-violet-300",
 };
 
@@ -114,7 +122,7 @@ function SlotForm({
   };
 
   return (
-    <div className="w-full flex flex-col gap-1.5 bg-black/[0.02] dark:bg-white/[0.02] p-2 rounded-xl border border-black/5 dark:border-white/5">
+    <div className="flex w-full flex-col gap-1.5 rounded-xl border border-black/5 bg-black/[0.02] p-2 dark:border-white/5 dark:bg-white/[0.02]">
       <input
         type="text"
         placeholder={`Add task at ${timeStr}...`}
@@ -124,54 +132,66 @@ function SlotForm({
           if (e.key === "Enter" && text.trim()) void handleAdd();
           if (e.key === "Escape") close();
         }}
-        className="w-full bg-white/80 dark:bg-gray-800/80 border border-black/10 dark:border-white/10 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-violet-500 text-gray-800 dark:text-gray-200"
+        className="w-full rounded-lg border border-black/10 bg-white/80 px-2 py-1 text-xs text-gray-800 focus:ring-1 focus:ring-violet-500 focus:outline-none dark:border-white/10 dark:bg-gray-800/80 dark:text-gray-200"
         autoFocus
       />
       <div className="flex items-center justify-between gap-2">
         <button
           ref={areaBtnRef}
           onClick={() => {
-            if (showAreaPicker) { setShowAreaPicker(false); return; }
+            if (showAreaPicker) {
+              setShowAreaPicker(false);
+              return;
+            }
             const rect = areaBtnRef.current?.getBoundingClientRect();
             if (rect) setAreaPickerPos({ top: rect.bottom + 4, left: rect.left });
             setShowAreaPicker(true);
           }}
-          className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-black/10 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+          className="cursor-pointer rounded-full border border-black/10 px-2 py-0.5 text-[10px] font-bold text-gray-600 hover:bg-black/5 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/5"
         >
           Area: {selectedArea ? AREA_LABELS[selectedArea] : "Life"}
         </button>
         <div className="flex items-center gap-2">
           <button
             onClick={close}
-            className="text-[10px] text-gray-400 hover:text-gray-600 px-2 py-1 cursor-pointer"
+            className="cursor-pointer px-2 py-1 text-[10px] text-gray-400 hover:text-gray-600"
           >
             Cancel
           </button>
           <button
             onClick={() => void handleAdd()}
-            className="text-[10px] bg-violet-600 text-white px-2.5 py-1 rounded-lg hover:bg-violet-700 font-bold cursor-pointer"
+            className="cursor-pointer rounded-lg bg-violet-600 px-2.5 py-1 text-[10px] font-bold text-white hover:bg-violet-700"
           >
             Add
           </button>
         </div>
       </div>
-      {showAreaPicker && areaPickerPos && createPortal(
-        <div style={{ position: "fixed", top: areaPickerPos.top, left: areaPickerPos.left, zIndex: 10000 }}>
-          <TagPicker
-            allTags={tags}
-            selectedTags={areaSystemTag ? [areaSystemTag] : []}
-            onAdd={(tag) => {
-              setSelectedArea(tag.area);
-              setShowAreaPicker(false);
+      {showAreaPicker &&
+        areaPickerPos &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              top: areaPickerPos.top,
+              left: areaPickerPos.left,
+              zIndex: 10000,
             }}
-            onRemove={() => {}}
-            onCreateTag={onCreateTag ?? (async () => null)}
-            onClose={() => setShowAreaPicker(false)}
-            singleSelect
-          />
-        </div>,
-        document.body
-      )}
+          >
+            <TagPicker
+              allTags={tags}
+              selectedTags={areaSystemTag ? [areaSystemTag] : []}
+              onAdd={(tag) => {
+                setSelectedArea(tag.area);
+                setShowAreaPicker(false);
+              }}
+              onRemove={() => {}}
+              onCreateTag={onCreateTag ?? (async () => null)}
+              onClose={() => setShowAreaPicker(false)}
+              singleSelect
+            />
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -183,9 +203,7 @@ function taskToEvent(idea: Idea, tags: Tag[]): TimelineEvent {
   return {
     id: idea.id,
     title: idea.text,
-    startMinute: idea.scheduled_time
-      ? parseTimeToMinutes(idea.scheduled_time)
-      : 480,
+    startMinute: idea.scheduled_time ? parseTimeToMinutes(idea.scheduled_time) : 480,
     durationMinutes: idea.duration_minutes ?? 30,
     color: getCategoryColor(effectiveAreas),
     category: getCategoryLabel(effectiveAreas),
@@ -298,11 +316,21 @@ export function DayslotTimeline({
         />
       );
     },
-    [scheduledTasks, getTagsForIdea, tags, scrollEl, onUpdateTask, onChangeTaskArea, onAddTag, onRemoveTag, onCreateTag],
+    [
+      scheduledTasks,
+      getTagsForIdea,
+      tags,
+      scrollEl,
+      onUpdateTask,
+      onChangeTaskArea,
+      onAddTag,
+      onRemoveTag,
+      onCreateTag,
+    ],
   );
 
   return (
-    <div className="glass-card rounded-2xl overflow-hidden border border-black/5 dark:border-white/5">
+    <div className="glass-card overflow-hidden rounded-2xl border border-black/5 dark:border-white/5">
       <DailyTimeline
         events={events}
         startHour={7}
@@ -365,10 +393,18 @@ function EventCard({
   const showAreaPickerRef = useRef(false);
   const showStatusPickerRef = useRef(false);
 
-  useEffect(() => { showMenuRef.current = showMenu; }, [showMenu]);
-  useEffect(() => { showAreaPickerRef.current = showAreaPicker; }, [showAreaPicker]);
-  useEffect(() => { showStatusPickerRef.current = showStatusPicker; }, [showStatusPicker]);
-  const [statusPickerPos, setStatusPickerPos] = useState<{ top: number; left: number } | null>(null);
+  useEffect(() => {
+    showMenuRef.current = showMenu;
+  }, [showMenu]);
+  useEffect(() => {
+    showAreaPickerRef.current = showAreaPicker;
+  }, [showAreaPicker]);
+  useEffect(() => {
+    showStatusPickerRef.current = showStatusPicker;
+  }, [showStatusPicker]);
+  const [statusPickerPos, setStatusPickerPos] = useState<{ top: number; left: number } | null>(
+    null,
+  );
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const areaBtnRef = useRef<HTMLButtonElement>(null);
@@ -407,33 +443,44 @@ function EventCard({
     return () => scrollElement.removeEventListener("scroll", handler);
   }, [scrollElement]);
 
-  const handleStatusSelect = useCallback((status: IdeaStatus) => {
-    const now = new Date().toISOString();
-    switch (status) {
-      case "completed":
-        onUpdateTask(idea.id, { status: "completed", completed_at: now });
-        break;
-      case "cancelled":
-        onUpdateTask(idea.id, { status: "cancelled", cancelled_at: now });
-        break;
-      case "in_progress":
-        onUpdateTask(idea.id, { status: "in_progress" });
-        break;
-      case "paused":
-        onUpdateTask(idea.id, { status: "paused", paused_at: now });
-        break;
-      case "planned":
-      case "scheduled":
-      case "inbox":
-      case "deferred":
-        onUpdateTask(idea.id, { status, completed_at: null, cancelled_at: null, paused_at: null });
-        break;
-    }
-    setShowStatusPicker(false);
-  }, [idea.id, onUpdateTask]);
+  const handleStatusSelect = useCallback(
+    (status: IdeaStatus) => {
+      const now = new Date().toISOString();
+      switch (status) {
+        case "completed":
+          onUpdateTask(idea.id, { status: "completed", completed_at: now });
+          break;
+        case "cancelled":
+          onUpdateTask(idea.id, { status: "cancelled", cancelled_at: now });
+          break;
+        case "in_progress":
+          onUpdateTask(idea.id, { status: "in_progress" });
+          break;
+        case "paused":
+          onUpdateTask(idea.id, { status: "paused", paused_at: now });
+          break;
+        case "planned":
+        case "scheduled":
+        case "inbox":
+        case "deferred":
+          onUpdateTask(idea.id, {
+            status,
+            completed_at: null,
+            cancelled_at: null,
+            paused_at: null,
+          });
+          break;
+      }
+      setShowStatusPicker(false);
+    },
+    [idea.id, onUpdateTask],
+  );
 
   const handleOpenStatusPicker = useCallback(() => {
-    if (showStatusPicker) { setShowStatusPicker(false); return; }
+    if (showStatusPicker) {
+      setShowStatusPicker(false);
+      return;
+    }
     const rect = statusBtnRef.current?.getBoundingClientRect();
     if (rect) setStatusPickerPos({ top: rect.bottom + 4, left: rect.left });
     setShowStatusPicker(true);
@@ -447,24 +494,30 @@ function EventCard({
   }, []);
 
   const handleOpenAreaPicker = useCallback(() => {
-    if (showAreaPicker) { setShowAreaPicker(false); return; }
+    if (showAreaPicker) {
+      setShowAreaPicker(false);
+      return;
+    }
     const rect = areaBtnRef.current?.getBoundingClientRect();
     if (rect) setAreaPickerPos({ top: rect.bottom + 4, left: rect.left });
     setShowAreaPicker(true);
   }, [showAreaPicker]);
 
-  const handleExclusiveTagSelected = useCallback(async (tag: Tag) => {
-    for (const existing of areaTags) {
-      if (existing.id !== tag.id && onRemoveTag) {
-        await onRemoveTag(idea.id, existing.id);
+  const handleExclusiveTagSelected = useCallback(
+    async (tag: Tag) => {
+      for (const existing of areaTags) {
+        if (existing.id !== tag.id && onRemoveTag) {
+          await onRemoveTag(idea.id, existing.id);
+        }
       }
-    }
-    if (onAddTag) {
-      await onAddTag(idea.id, tag);
-    }
-    setShowMenu(false);
-    setShowAreaPicker(false);
-  }, [idea.id, areaTags, onAddTag, onRemoveTag]);
+      if (onAddTag) {
+        await onAddTag(idea.id, tag);
+      }
+      setShowMenu(false);
+      setShowAreaPicker(false);
+    },
+    [idea.id, areaTags, onAddTag, onRemoveTag],
+  );
 
   const primaryTag = getPrimaryTagForIdea(areaTags);
 
@@ -475,32 +528,28 @@ function EventCard({
       onContextMenu={handleContextMenu}
     >
       <div
-        className="w-1 flex-shrink-0 rounded-l-full my-1.5 ml-1.5"
+        className="my-1.5 ml-1.5 w-1 flex-shrink-0 rounded-l-full"
         style={{ background: accentColor }}
       />
-      <div className="flex-1 flex flex-col justify-between min-w-0 px-2 py-1.5">
+      <div className="flex min-w-0 flex-1 flex-col justify-between px-2 py-1.5">
         <span
-          className={`text-[10px] font-bold leading-tight break-words ${
-            isCompleted
-              ? "line-through opacity-50"
-              : isCancelled
-                ? "opacity-50"
-                : ""
+          className={`text-[10px] leading-tight font-bold break-words ${
+            isCompleted ? "line-through opacity-50" : isCancelled ? "opacity-50" : ""
           }`}
         >
           {event.title}
         </span>
-        <div className="flex items-center justify-between mt-auto pt-1 pb-2">
+        <div className="mt-auto flex items-center justify-between pt-1 pb-2">
           <button
             ref={areaBtnRef}
             onClick={(e) => {
               e.stopPropagation();
               handleOpenAreaPicker();
             }}
-            className="text-[9px] font-bold opacity-60 hover:opacity-100 flex items-center gap-1 cursor-pointer"
+            className="flex cursor-pointer items-center gap-1 text-[9px] font-bold opacity-60 hover:opacity-100"
           >
             <span
-              className="w-1.5 h-1.5 rounded-full inline-block"
+              className="inline-block h-1.5 w-1.5 rounded-full"
               style={{ background: accentColor }}
             />
             {primaryTag?.name ?? event.category}
@@ -514,7 +563,7 @@ function EventCard({
                   e.stopPropagation();
                   handleOpenStatusPicker();
                 }}
-                className="event-status-badge text-[9px] font-bold px-1.5 py-0.5 rounded-full cursor-pointer hover:brightness-95 transition-all"
+                className="event-status-badge cursor-pointer rounded-full px-1.5 py-0.5 text-[9px] font-bold transition-all hover:brightness-95"
                 style={{ color: statusCfg.hex, background: statusCfg.bg }}
               >
                 {statusCfg.label}
@@ -522,81 +571,107 @@ function EventCard({
             );
           })()}
           {event.durationMinutes > 0 && (
-            <span className="text-[9px] bg-black/5 dark:bg-white/10 px-1.5 py-0.5 rounded font-bold tabular-nums">
+            <span className="rounded bg-black/5 px-1.5 py-0.5 text-[9px] font-bold tabular-nums dark:bg-white/10">
               {event.durationMinutes}m
             </span>
           )}
         </div>
       </div>
 
-      {showMenu && menuPos && createPortal(
-        <div
-          ref={menuRef}
-          style={{ position: "fixed", top: menuPos.top, left: menuPos.left, zIndex: 9999 }}
-          className="glass-card-strong rounded-lg py-1 min-w-[160px] shadow-lg border border-black/5 dark:border-white/5"
-        >
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleOpenStatusPicker();
-            }}
-            className="flex w-full text-left px-3 py-1.5 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] font-semibold cursor-pointer"
+      {showMenu &&
+        menuPos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{ position: "fixed", top: menuPos.top, left: menuPos.left, zIndex: 9999 }}
+            className="glass-card-strong min-w-[160px] rounded-lg border border-black/5 py-1 shadow-lg dark:border-white/5"
           >
-            Change Status...
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleOpenAreaPicker();
-            }}
-            className="flex w-full text-left px-3 py-1.5 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] font-semibold cursor-pointer"
-          >
-            Change Area...
-          </button>
-          <div className="border-t border-black/5 dark:border-white/5 my-1" />
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onUpdateTask(idea.id, { scheduled_time: null });
-              setShowMenu(false);
-            }}
-            className="flex w-full text-left px-3 py-1.5 text-[11px] text-red-500 hover:bg-red-50/50 dark:hover:bg-red-900/20 font-semibold cursor-pointer"
-          >
-            Remove from Timeline
-          </button>
-        </div>,
-        document.body
-      )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenStatusPicker();
+              }}
+              className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+            >
+              Change Status...
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenAreaPicker();
+              }}
+              className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+            >
+              Change Area...
+            </button>
+            <div className="my-1 border-t border-black/5 dark:border-white/5" />
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpdateTask(idea.id, { scheduled_time: null });
+                setShowMenu(false);
+              }}
+              className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-red-500 hover:bg-red-50/50 dark:hover:bg-red-900/20"
+            >
+              Remove from Timeline
+            </button>
+          </div>,
+          document.body,
+        )}
 
-      {showAreaPicker && areaPickerPos && createPortal(
-        <div style={{ position: "fixed", top: areaPickerPos.top, left: areaPickerPos.left, zIndex: 10000 }}>
-          <TagPicker
-            allTags={allTags}
-            selectedTags={areaTags}
-            onAdd={handleExclusiveTagSelected}
-            onRemove={async (tagId) => {
-              if (onRemoveTag) await onRemoveTag(idea.id, tagId);
-              setShowAreaPicker(false);
-              setShowMenu(false);
+      {showAreaPicker &&
+        areaPickerPos &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              top: areaPickerPos.top,
+              left: areaPickerPos.left,
+              zIndex: 10000,
             }}
-            onCreateTag={onCreateTag ?? (async () => null)}
-            onClose={() => { setShowAreaPicker(false); setShowMenu(false); }}
-            singleSelect
-          />
-        </div>,
-        document.body
-      )}
+          >
+            <TagPicker
+              allTags={allTags}
+              selectedTags={areaTags}
+              onAdd={handleExclusiveTagSelected}
+              onRemove={async (tagId) => {
+                if (onRemoveTag) await onRemoveTag(idea.id, tagId);
+                setShowAreaPicker(false);
+                setShowMenu(false);
+              }}
+              onCreateTag={onCreateTag ?? (async () => null)}
+              onClose={() => {
+                setShowAreaPicker(false);
+                setShowMenu(false);
+              }}
+              singleSelect
+            />
+          </div>,
+          document.body,
+        )}
 
-      {showStatusPicker && statusPickerPos && createPortal(
-        <div style={{ position: "fixed", top: statusPickerPos.top, left: statusPickerPos.left, zIndex: 10000 }}>
-          <StatusPicker
-            current={idea.status}
-            onSelect={handleStatusSelect}
-            onClose={() => { setShowStatusPicker(false); setShowMenu(false); }}
-          />
-        </div>,
-        document.body
-      )}
+      {showStatusPicker &&
+        statusPickerPos &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              top: statusPickerPos.top,
+              left: statusPickerPos.left,
+              zIndex: 10000,
+            }}
+          >
+            <StatusPicker
+              current={idea.status}
+              onSelect={handleStatusSelect}
+              onClose={() => {
+                setShowStatusPicker(false);
+                setShowMenu(false);
+              }}
+            />
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

@@ -17,15 +17,15 @@ export function WeekRingView({ referenceDate }: WeekRingViewProps) {
 
   if (loading) {
     return (
-      <div className="glass-card rounded-[20px] px-5 py-8 flex items-center justify-center">
-        <div className="animate-pulse text-gray-400 dark:text-gray-500 text-sm">Loading…</div>
+      <div className="glass-card flex items-center justify-center rounded-[20px] px-5 py-8">
+        <div className="animate-pulse text-sm text-gray-400 dark:text-gray-500">Loading…</div>
       </div>
     );
   }
 
   return (
-    <div className="glass-card rounded-[20px] px-4 py-5 space-y-3">
-      <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+    <div className="glass-card space-y-3 rounded-[20px] px-4 py-5">
+      <h2 className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
         Weekly Balance
       </h2>
       <div className="space-y-3">
@@ -39,13 +39,13 @@ export function WeekRingView({ referenceDate }: WeekRingViewProps) {
               className={[
                 "flex items-center gap-4 rounded-2xl px-4 py-3 transition-colors",
                 isCurrent
-                  ? "bg-violet-500/10 dark:bg-violet-400/10 ring-1 ring-violet-400/30"
+                  ? "bg-violet-500/10 ring-1 ring-violet-400/30 dark:bg-violet-400/10"
                   : "bg-black/[0.02] dark:bg-white/[0.03]",
               ].join(" ")}
             >
               <MiniRing counts={w.counts} size={72} showTotal />
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 text-xs font-medium text-gray-600 dark:text-gray-300">
                   {w.label}
                 </div>
                 {total === 0 ? (
@@ -53,9 +53,12 @@ export function WeekRingView({ referenceDate }: WeekRingViewProps) {
                 ) : (
                   <div className="flex flex-wrap gap-x-3 gap-y-1">
                     {activeAreas.map((area) => (
-                      <div key={area} className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                      <div
+                        key={area}
+                        className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400"
+                      >
                         <div
-                          className="w-2 h-2 rounded-full flex-shrink-0"
+                          className="h-2 w-2 flex-shrink-0 rounded-full"
                           style={{ background: areaColors[area]?.dot }}
                         />
                         {AREA_LABELS[area]} {w.counts[area]}

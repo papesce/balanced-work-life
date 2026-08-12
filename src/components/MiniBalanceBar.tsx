@@ -57,7 +57,7 @@ export function MiniBalanceBar({ tasks, getTagsForIdea, date }: MiniBalanceBarPr
     return (
       <button
         onClick={handleClick}
-        className="w-20 h-1.5 rounded-full bg-gray-200/50 dark:bg-gray-800/50 border border-dashed border-gray-300/30 dark:border-gray-700/30 cursor-pointer hover:opacity-70 transition-opacity"
+        className="h-1.5 w-20 cursor-pointer rounded-full border border-dashed border-gray-300/30 bg-gray-200/50 transition-opacity hover:opacity-70 dark:border-gray-700/30 dark:bg-gray-800/50"
         title="No tasks planned — view balance"
         aria-label="View balance"
       />
@@ -67,11 +67,11 @@ export function MiniBalanceBar({ tasks, getTagsForIdea, date }: MiniBalanceBarPr
   return (
     <button
       onClick={handleClick}
-      className="flex flex-col items-end gap-1 group relative cursor-pointer"
+      className="group relative flex cursor-pointer flex-col items-end gap-1"
       aria-label="View balance for this day"
     >
       {/* Segmented bar */}
-      <div className="w-24 h-1.5 rounded-full overflow-hidden flex bg-gray-100 dark:bg-gray-800/40 hover:opacity-80 transition-opacity">
+      <div className="flex h-1.5 w-24 overflow-hidden rounded-full bg-gray-100 transition-opacity hover:opacity-80 dark:bg-gray-800/40">
         {segments.map((seg) => (
           <div
             key={seg.area}
@@ -86,15 +86,15 @@ export function MiniBalanceBar({ tasks, getTagsForIdea, date }: MiniBalanceBarPr
       </div>
 
       {/* Tooltip on hover */}
-      <div className="absolute right-0 bottom-full mb-1.5 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50">
-        <div className="glass-card-strong px-2 py-1.5 rounded-lg shadow-lg text-[9px] font-semibold flex flex-col gap-1 min-w-[100px] border border-black/5 dark:border-white/5">
+      <div className="pointer-events-none absolute right-0 bottom-full z-50 mb-1.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+        <div className="glass-card-strong flex min-w-[100px] flex-col gap-1 rounded-lg border border-black/5 px-2 py-1.5 text-[9px] font-semibold shadow-lg dark:border-white/5">
           {segments.map((seg) => (
             <div key={seg.area} className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-1">
-                <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: seg.color }} />
+                <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: seg.color }} />
                 <span className="text-gray-600 dark:text-gray-300">{AREA_LABELS[seg.area]}</span>
               </div>
-              <span className="text-gray-400 dark:text-gray-500 font-bold">{seg.count}</span>
+              <span className="font-bold text-gray-400 dark:text-gray-500">{seg.count}</span>
             </div>
           ))}
         </div>

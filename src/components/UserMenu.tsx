@@ -42,9 +42,15 @@ export function UserMenu() {
     try {
       const data = await buildBackupData(user);
       downloadBackup(data);
-      setStatus({ type: "success", text: `Exported ${data.ideas.length} ideas and ${data.ideaLinks.length} links.` });
+      setStatus({
+        type: "success",
+        text: `Exported ${data.ideas.length} ideas and ${data.ideaLinks.length} links.`,
+      });
     } catch (err) {
-      setStatus({ type: "error", text: `Export failed: ${err instanceof Error ? err.message : "Unknown error"}` });
+      setStatus({
+        type: "error",
+        text: `Export failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+      });
     } finally {
       setBusy(null);
     }
@@ -58,9 +64,15 @@ export function UserMenu() {
       const data = await parseBackupFile(file);
       await restoreIdeas(data.ideas);
       await restoreLinks(data.ideaLinks);
-      setStatus({ type: "success", text: `Imported ${data.ideas.length} ideas and ${data.ideaLinks.length} links.` });
+      setStatus({
+        type: "success",
+        text: `Imported ${data.ideas.length} ideas and ${data.ideaLinks.length} links.`,
+      });
     } catch (err) {
-      setStatus({ type: "error", text: `Import failed: ${err instanceof Error ? err.message : "Unknown error"}` });
+      setStatus({
+        type: "error",
+        text: `Import failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+      });
     } finally {
       setBusy(null);
     }
@@ -73,9 +85,11 @@ export function UserMenu() {
 
   const avatarUrl = (user?.user_metadata?.avatar_url as string | undefined) ?? null;
   const email = user?.email ?? "";
-  const name = (user?.user_metadata?.full_name as string | undefined) || email.split("@")[0] || "Account";
+  const name =
+    (user?.user_metadata?.full_name as string | undefined) || email.split("@")[0] || "Account";
   const nameParts = name.split(" ");
-  const initials = `${nameParts[0]?.[0] ?? ""}${nameParts.length > 1 ? nameParts[nameParts.length - 1][0] : ""}`.toUpperCase();
+  const initials =
+    `${nameParts[0]?.[0] ?? ""}${nameParts.length > 1 ? nameParts[nameParts.length - 1][0] : ""}`.toUpperCase();
 
   return (
     <div ref={menuRef} className="relative">
@@ -85,13 +99,15 @@ export function UserMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         title={name}
-        className="flex items-center justify-center rounded-full p-0.5 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+        className="flex cursor-pointer items-center justify-center rounded-full p-0.5 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
       >
-        <span className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-violet-100 dark:bg-violet-900/40">
+        <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-violet-100 dark:bg-violet-900/40">
           {avatarUrl ? (
-            <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+            <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
           ) : initials ? (
-            <span className="text-[11px] font-bold text-violet-600 dark:text-violet-400">{initials}</span>
+            <span className="text-[11px] font-bold text-violet-600 dark:text-violet-400">
+              {initials}
+            </span>
           ) : (
             <UserIcon size={16} className="text-violet-500 dark:text-violet-400" />
           )}
@@ -106,20 +122,20 @@ export function UserMenu() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-0 top-full mt-2 z-50 glass-card-strong rounded-xl p-1.5 shadow-xl border border-black/5 dark:border-white/5 min-w-[230px]"
+            className="glass-card-strong absolute top-full right-0 z-50 mt-2 min-w-[230px] rounded-xl border border-black/5 p-1.5 shadow-xl dark:border-white/5"
           >
             <div className="px-2.5 pt-2 pb-1.5">
-              <p className="text-sm font-bold text-gray-800 dark:text-gray-200 truncate">{name}</p>
-              <p className="text-[11px] text-gray-400 dark:text-gray-500 truncate">{email}</p>
+              <p className="truncate text-sm font-bold text-gray-800 dark:text-gray-200">{name}</p>
+              <p className="truncate text-[11px] text-gray-400 dark:text-gray-500">{email}</p>
             </div>
-            <div className="mx-1 border-t border-black/5 dark:border-white/5 my-1" />
+            <div className="mx-1 my-1 border-t border-black/5 dark:border-white/5" />
 
             <button
               type="button"
               role="menuitem"
               onClick={handleExport}
               disabled={busy !== null}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-semibold text-gray-700 dark:text-gray-200 rounded-lg hover:bg-black/[0.03] dark:hover:bg-white/[0.04] disabled:opacity-50 cursor-pointer"
+              className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-black/[0.03] disabled:opacity-50 dark:text-gray-200 dark:hover:bg-white/[0.04]"
             >
               {busy === "export" ? (
                 <Upload size={14} className="animate-pulse" />
@@ -131,9 +147,13 @@ export function UserMenu() {
 
             <label
               role="menuitem"
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-semibold text-gray-700 dark:text-gray-200 rounded-lg hover:bg-black/[0.03] dark:hover:bg-white/[0.04] cursor-pointer"
+              className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-black/[0.03] dark:text-gray-200 dark:hover:bg-white/[0.04]"
             >
-              {busy === "import" ? <Upload size={14} className="animate-pulse" /> : <Upload size={14} />}
+              {busy === "import" ? (
+                <Upload size={14} className="animate-pulse" />
+              ) : (
+                <Upload size={14} />
+              )}
               {busy === "import" ? "Importing..." : "Import backup"}
               <input
                 ref={fileInputRef}
@@ -149,13 +169,13 @@ export function UserMenu() {
               />
             </label>
 
-            <div className="mx-1 border-t border-black/5 dark:border-white/5 my-1" />
+            <div className="mx-1 my-1 border-t border-black/5 dark:border-white/5" />
 
             <button
               type="button"
               role="menuitem"
               onClick={handleSignOut}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-bold text-red-500 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 cursor-pointer"
+              className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-bold text-red-500 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"
             >
               <LogOut size={14} />
               Sign Out
@@ -163,7 +183,7 @@ export function UserMenu() {
 
             {status && (
               <p
-                className={`mx-1 mt-1 px-2.5 py-1.5 text-[11px] font-medium rounded-lg ${
+                className={`mx-1 mt-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium ${
                   status.type === "success"
                     ? "text-emerald-700 dark:text-emerald-400"
                     : "text-red-600 dark:text-red-400"

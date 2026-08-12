@@ -24,13 +24,7 @@ function getDescendantIds(ideaId: string, ideas: Idea[]) {
   return descendants;
 }
 
-export function MoveIdeaPanel({
-  idea,
-  ideas,
-  onMove,
-  onMoved,
-  onClose,
-}: MoveIdeaPanelProps) {
+export function MoveIdeaPanel({ idea, ideas, onMove, onMoved, onClose }: MoveIdeaPanelProps) {
   const ref = useRef<HTMLDivElement>(null);
   const excludedIds = getDescendantIds(idea.id, ideas);
   excludedIds.add(idea.id);
@@ -58,9 +52,11 @@ export function MoveIdeaPanel({
   return (
     <div
       ref={ref}
-      className="absolute right-0 top-full mt-1 z-50 glass-card-strong rounded-xl p-3 min-w-[340px] max-w-[420px]"
+      className="glass-card-strong absolute top-full right-0 z-50 mt-1 max-w-[420px] min-w-[340px] rounded-xl p-3"
     >
-      <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Move this idea</div>
+      <div className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+        Move this idea
+      </div>
       <IdeaSearchPicker
         ideas={ideas}
         excludeIds={excludedIds}
@@ -69,13 +65,13 @@ export function MoveIdeaPanel({
           <>
             <button
               onClick={() => moveBelow(target)}
-              className="text-xs px-2 py-1 rounded-lg border border-black/10 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:text-indigo-700 dark:hover:text-indigo-400 hover:border-indigo-200 dark:hover:border-indigo-500/30 hover:bg-indigo-50/50 dark:hover:bg-indigo-500/10"
+              className="rounded-lg border border-black/10 px-2 py-1 text-xs text-gray-600 hover:border-indigo-200 hover:bg-indigo-50/50 hover:text-indigo-700 dark:border-white/10 dark:text-gray-300 dark:hover:border-indigo-500/30 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400"
             >
               Below
             </button>
             <button
               onClick={() => moveAsChild(target)}
-              className="text-xs px-2 py-1 rounded-lg border border-black/10 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:text-indigo-700 dark:hover:text-indigo-400 hover:border-indigo-200 dark:hover:border-indigo-500/30 hover:bg-indigo-50/50 dark:hover:bg-indigo-500/10"
+              className="rounded-lg border border-black/10 px-2 py-1 text-xs text-gray-600 hover:border-indigo-200 hover:bg-indigo-50/50 hover:text-indigo-700 dark:border-white/10 dark:text-gray-300 dark:hover:border-indigo-500/30 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400"
             >
               As child
             </button>

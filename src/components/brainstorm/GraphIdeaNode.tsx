@@ -16,16 +16,12 @@ function GraphIdeaNodeComponent({ data }: NodeProps) {
 
   return (
     <>
-      <Handle type="target" position={Position.Left} className="!w-2 !h-2 !bg-gray-400" />
-      <div
-        className={`px-3 py-2 rounded-lg border shadow-sm max-w-[180px] ${bgClass}`}
-      >
-        <div className="text-xs text-gray-800 truncate">{nodeData.label}</div>
-        {nodeData.type && (
-          <div className="text-[10px] text-gray-500 mt-0.5">{nodeData.type}</div>
-        )}
+      <Handle type="target" position={Position.Left} className="!h-2 !w-2 !bg-gray-400" />
+      <div className={`max-w-[180px] rounded-lg border px-3 py-2 shadow-sm ${bgClass}`}>
+        <div className="truncate text-xs text-gray-800">{nodeData.label}</div>
+        {nodeData.type && <div className="mt-0.5 text-[10px] text-gray-500">{nodeData.type}</div>}
       </div>
-      <Handle type="source" position={Position.Right} className="!w-2 !h-2 !bg-gray-400" />
+      <Handle type="source" position={Position.Right} className="!h-2 !w-2 !bg-gray-400" />
     </>
   );
 }

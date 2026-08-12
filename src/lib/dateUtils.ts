@@ -51,7 +51,11 @@ export function formatDate(dateStr: string): string {
   });
 }
 
-export function getDatesRange(daysBack: number, daysForward: number, anchor = getToday()): string[] {
+export function getDatesRange(
+  daysBack: number,
+  daysForward: number,
+  anchor = getToday(),
+): string[] {
   const dates: string[] = [];
   const base = new Date(anchor + "T00:00:00");
   for (let i = -daysBack; i <= daysForward; i++) {
@@ -124,7 +128,7 @@ export function getWeeksInMonth(referenceDate: string): DateBucket[] {
   const buckets: DateBucket[] = [];
   const cur = new Date(gridStart);
 
-  while (cur <= lastOfMonth || (cur.getDay() !== 1)) {
+  while (cur <= lastOfMonth || cur.getDay() !== 1) {
     const weekStart = new Date(cur);
     const weekEnd = new Date(cur);
     weekEnd.setDate(cur.getDate() + 6);
@@ -218,7 +222,20 @@ export function getWindowBuckets(window: WindowType, referenceDate: string): Dat
 
   // year — 12 monthly buckets
   const year = ref.getFullYear();
-  const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthLabels = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
   return monthLabels.map((label, i) => {
     const first = new Date(year, i, 1);
     const last = new Date(year, i + 1, 0);

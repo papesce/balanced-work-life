@@ -15,8 +15,22 @@ import { AreaFilters } from "@/components/planner/AreaFilters";
 import { DayslotTimeline } from "@/components/planner/DayslotTimeline";
 import { AreaTaskGroup } from "@/components/planner/AreaTaskGroup";
 import { UndoBar } from "@/components/shared/UndoBar";
-import { AREA_DOT_COLORS, AREA_ORDER, AREA_LABELS, DEFAULT_TARGETS, LOCAL_STORAGE_TARGETS_KEY } from "@/lib/constants";
-import { computeReschedulePatch, computeCompletePatch, computeCancelPatch, getDayOccurrences, getTriageMeta, DayOccurrence, RescheduleAction } from "@/lib/tasks/rescheduleTask";
+import {
+  AREA_DOT_COLORS,
+  AREA_ORDER,
+  AREA_LABELS,
+  DEFAULT_TARGETS,
+  LOCAL_STORAGE_TARGETS_KEY,
+} from "@/lib/constants";
+import {
+  computeReschedulePatch,
+  computeCompletePatch,
+  computeCancelPatch,
+  getDayOccurrences,
+  getTriageMeta,
+  DayOccurrence,
+  RescheduleAction,
+} from "@/lib/tasks/rescheduleTask";
 import { useUndoAction } from "@/lib/tasks/undo";
 import { TriageActions } from "@/components/triage/TriageActions";
 import { formatDayLabel } from "@/components/planner/plannerUtils";
@@ -30,12 +44,25 @@ export default function DailyPlannerPage() {
 }
 
 function DailyPlannerInner() {
-  const { ideas, loading, createIdea, updateIdea, deleteIdea, markDone, markUndone, reorderTasks, smartSortTasks, restoreIdeas } = useIdeas();
+  const {
+    ideas,
+    loading,
+    createIdea,
+    updateIdea,
+    deleteIdea,
+    markDone,
+    markUndone,
+    reorderTasks,
+    smartSortTasks,
+    restoreIdeas,
+  } = useIdeas();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [activeDate, setActiveDate] = useState<string>(() => searchParams.get("date") ?? getToday());
+  const [activeDate, setActiveDate] = useState<string>(
+    () => searchParams.get("date") ?? getToday(),
+  );
   const highlightId = searchParams.get("highlight");
 
   const urlDate = searchParams.get("date");
@@ -86,7 +113,9 @@ function DailyPlannerInner() {
     return 360;
   });
   const rightColWidthRef = useRef(rightColWidth);
-  useEffect(() => { rightColWidthRef.current = rightColWidth; });
+  useEffect(() => {
+    rightColWidthRef.current = rightColWidth;
+  });
 
   const { undoAction, registerUndo, clearUndo, handleUndo } = useUndoAction();
 
@@ -171,8 +200,17 @@ function DailyPlannerInner() {
   }, [pendingOnDate, scheduledOnDate, doneOnDate, taskTagsHook]);
 
   const balanceRingCounts = useMemo(() => {
-    const counts: Record<LifeArea, number> = { work: 0, health: 0, relationships: 0, growth: 0, finances: 0, life: 0 };
-    for (const area of AREA_ORDER) counts[area] = areaTaskCounts[area].pending + areaTaskCounts[area].scheduled + areaTaskCounts[area].done;
+    const counts: Record<LifeArea, number> = {
+      work: 0,
+      health: 0,
+      relationships: 0,
+      growth: 0,
+      finances: 0,
+      life: 0,
+    };
+    for (const area of AREA_ORDER)
+      counts[area] =
+        areaTaskCounts[area].pending + areaTaskCounts[area].scheduled + areaTaskCounts[area].done;
     return counts;
   }, [areaTaskCounts]);
 
@@ -182,7 +220,11 @@ function DailyPlannerInner() {
   const visibleAreas = selectedArea ? [selectedArea] : AREA_ORDER;
 
   const handleAddToArea = async (text: string, area: LifeArea) => {
-    const id = await createIdea(text, null, "bottom", { type: "task", scheduled_date: activeDate, status: "planned" });
+    const id = await createIdea(text, null, "bottom", {
+      type: "task",
+      scheduled_date: activeDate,
+      status: "planned",
+    });
     // Auto-tag with the system tag for this area (created on demand if missing)
     if (id) {
       const systemTag = await tagsHook.getOrCreateSystemTag(area);
@@ -190,7 +232,11 @@ function DailyPlannerInner() {
     }
   };
 
-  const handleMoveTaskBetweenAreas = async (taskId: string, fromArea: LifeArea, toArea: LifeArea) => {
+  const handleMoveTaskBetweenAreas = async (
+    taskId: string,
+    fromArea: LifeArea,
+    toArea: LifeArea,
+  ) => {
     const sourceTag = tagsHook.tags.find((t) => t.is_system && t.area === fromArea);
     if (sourceTag) await taskTagsHook.removeTagFromTask(taskId, sourceTag.id).catch(() => {});
     const targetTag = await tagsHook.getOrCreateSystemTag(toArea);
@@ -198,68 +244,89 @@ function DailyPlannerInner() {
   };
 
   const handleAdd = async (text: string, scheduledDate: string | null) => {
-    await createIdea(text, null, "top", { type: "task", scheduled_date: scheduledDate ?? activeDate, status: "planned" });
+    await createIdea(text, null, "top", {
+      type: "task",
+      scheduled_date: scheduledDate ?? activeDate,
+      status: "planned",
+    });
   };
 
   const handleCreateScheduledTask = async (text: string, time: string, area?: LifeArea) => {
-    const id = await createIdea(text, null, "bottom", { type: "task", scheduled_date: activeDate, scheduled_time: time, status: "scheduled" });
+    const id = await createIdea(text, null, "bottom", {
+      type: "task",
+      scheduled_date: activeDate,
+      scheduled_time: time,
+      status: "scheduled",
+    });
     if (id && area) {
       const tag = await tagsHook.getOrCreateSystemTag(area);
       if (tag) await taskTagsHook.addTagToTask(id, tag);
     }
   };
 
-  const handleReschedule = useCallback(async (id: string, action: RescheduleAction) => {
-    const idea = ideas.find((i) => i.id === id);
-    if (!idea) return;
-    const patch = computeReschedulePatch(idea, action);
-    await updateIdea(id, patch);
-  }, [ideas, updateIdea]);
+  const handleReschedule = useCallback(
+    async (id: string, action: RescheduleAction) => {
+      const idea = ideas.find((i) => i.id === id);
+      if (!idea) return;
+      const patch = computeReschedulePatch(idea, action);
+      await updateIdea(id, patch);
+    },
+    [ideas, updateIdea],
+  );
 
-  const handleComplete = useCallback(async (id: string) => {
-    const patch = computeCompletePatch();
-    await updateIdea(id, patch);
-  }, [updateIdea]);
+  const handleComplete = useCallback(
+    async (id: string) => {
+      const patch = computeCompletePatch();
+      await updateIdea(id, patch);
+    },
+    [updateIdea],
+  );
 
-  const handleCancel = useCallback(async (id: string) => {
-    const idea = ideas.find((i) => i.id === id);
-    if (!idea) return;
-    const previous = idea;
-    const patch = computeCancelPatch();
-    await updateIdea(id, patch);
-    registerUndo({
-      label: "Task cancelled",
-      run: async () => {
-        await updateIdea(id, { status: previous.status, cancelled_at: null });
-      },
-    });
-  }, [ideas, updateIdea, registerUndo]);
+  const handleCancel = useCallback(
+    async (id: string) => {
+      const idea = ideas.find((i) => i.id === id);
+      if (!idea) return;
+      const previous = idea;
+      const patch = computeCancelPatch();
+      await updateIdea(id, patch);
+      registerUndo({
+        label: "Task cancelled",
+        run: async () => {
+          await updateIdea(id, { status: previous.status, cancelled_at: null });
+        },
+      });
+    },
+    [ideas, updateIdea, registerUndo],
+  );
 
-  const handleDeleteTask = useCallback(async (id: string) => {
-    const collectSubtree = (rootId: string): Set<string> => {
-      const ids = new Set<string>();
-      const walk = (nodeId: string) => {
-        ids.add(nodeId);
-        ideas.filter((i) => i.parent_id === nodeId).forEach((child) => walk(child.id));
+  const handleDeleteTask = useCallback(
+    async (id: string) => {
+      const collectSubtree = (rootId: string): Set<string> => {
+        const ids = new Set<string>();
+        const walk = (nodeId: string) => {
+          ids.add(nodeId);
+          ideas.filter((i) => i.parent_id === nodeId).forEach((child) => walk(child.id));
+        };
+        walk(rootId);
+        return ids;
       };
-      walk(rootId);
-      return ids;
-    };
-    const deletedIds = collectSubtree(id);
-    const deletedIdeas = ideas.filter((i) => deletedIds.has(i.id));
-    await deleteIdea(id);
-    if (deletedIdeas.length === 0) return;
-    registerUndo({
-      label: deletedIdeas.length > 1 ? "Tasks deleted" : "Task deleted",
-      run: async () => {
-        await restoreIdeas(deletedIdeas);
-      },
-    });
-  }, [ideas, deleteIdea, restoreIdeas]);
+      const deletedIds = collectSubtree(id);
+      const deletedIdeas = ideas.filter((i) => deletedIds.has(i.id));
+      await deleteIdea(id);
+      if (deletedIdeas.length === 0) return;
+      registerUndo({
+        label: deletedIdeas.length > 1 ? "Tasks deleted" : "Task deleted",
+        run: async () => {
+          await restoreIdeas(deletedIdeas);
+        },
+      });
+    },
+    [ideas, deleteIdea, restoreIdeas],
+  );
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center">
         <div className="animate-pulse text-gray-400 dark:text-gray-500">Loading planner...</div>
       </div>
     );
@@ -282,7 +349,7 @@ function DailyPlannerInner() {
       }
     >
       {/* Mobile Tab Control */}
-      <div className="sticky top-[52px] z-10 md:hidden flex bg-white/60 dark:bg-gray-900/60 backdrop-blur-lg border border-black/5 dark:border-white/5 p-1.5 rounded-2xl mb-4 gap-1 shadow-sm">
+      <div className="sticky top-[52px] z-10 mb-4 flex gap-1 rounded-2xl border border-black/5 bg-white/60 p-1.5 shadow-sm backdrop-blur-lg md:hidden dark:border-white/5 dark:bg-gray-900/60">
         {[
           { id: "tasks", label: "Tasks", icon: Layers },
           { id: "schedule", label: "Schedule", icon: Clock },
@@ -294,10 +361,10 @@ function DailyPlannerInner() {
             <button
               key={tab.id}
               onClick={() => setActiveMobileTab(tab.id as typeof activeMobileTab)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold transition-all duration-200 cursor-pointer ${
+              className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl py-2 text-[11px] font-bold transition-all duration-200 ${
                 isActive
-                  ? "bg-violet-600 dark:bg-violet-500 shadow-md text-white dark:text-white"
-                  : "text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                  ? "bg-violet-600 text-white shadow-md dark:bg-violet-500 dark:text-white"
+                  : "text-gray-500 hover:bg-black/[0.04] dark:text-gray-400 dark:hover:bg-white/[0.06]"
               }`}
             >
               <Icon size={14} strokeWidth={isActive ? 2.5 : 2} />
@@ -309,10 +376,17 @@ function DailyPlannerInner() {
 
       <UndoBar undoAction={undoAction} onUndo={() => void handleUndo()} onDismiss={clearUndo} />
 
-      <div className="flex flex-col md:flex-row gap-5">
+      <div className="flex flex-col gap-5 md:flex-row">
         {/* LEFT COLUMN */}
-        <div className={`w-full md:w-[260px] flex-shrink-0 space-y-4 ${activeMobileTab === "balance" ? "block" : "hidden md:block"} md:sticky md:top-[53px] md:self-start`}>
-          <BalanceRing counts={balanceRingCounts} modeLabel="Work-Life Balance Ring" statLabel="Total Minutes" statSub="scheduled today" />
+        <div
+          className={`w-full flex-shrink-0 space-y-4 md:w-[260px] ${activeMobileTab === "balance" ? "block" : "hidden md:block"} md:sticky md:top-[53px] md:self-start`}
+        >
+          <BalanceRing
+            counts={balanceRingCounts}
+            modeLabel="Work-Life Balance Ring"
+            statLabel="Total Minutes"
+            statSub="scheduled today"
+          />
           <AreaFilters
             areaTaskCounts={areaTaskCounts}
             selectedArea={selectedArea}
@@ -322,21 +396,24 @@ function DailyPlannerInner() {
         </div>
 
         {/* MIDDLE COLUMN */}
-        <div className={`flex-1 min-w-0 space-y-4 ${activeMobileTab === "tasks" ? "block" : "hidden md:block"}`}>
-          <div className="glass-card rounded-2xl p-4 flex items-center justify-between gap-4 border border-black/5 dark:border-white/5">
+        <div
+          className={`min-w-0 flex-1 space-y-4 ${activeMobileTab === "tasks" ? "block" : "hidden md:block"}`}
+        >
+          <div className="glass-card flex items-center justify-between gap-4 rounded-2xl border border-black/5 p-4 dark:border-white/5">
             <div className="flex flex-col">
               <h2 className="text-xs font-bold text-gray-700 dark:text-gray-200">
                 {selectedArea ? `${AREA_LABELS[selectedArea]} Focus` : "Today's Agenda"}
               </h2>
-              <p className="text-[10px] text-gray-400 dark:text-gray-500 font-medium mt-0.5">
-                {pendingOnDate.length + scheduledOnDate.length} pending tasks · {doneOnDate.length} completed
+              <p className="mt-0.5 text-[10px] font-medium text-gray-400 dark:text-gray-500">
+                {pendingOnDate.length + scheduledOnDate.length} pending tasks · {doneOnDate.length}{" "}
+                completed
               </p>
             </div>
             <div className="flex items-center gap-2">
               {pendingOnDate.length > 0 && (
                 <button
                   onClick={() => smartSortTasks(pendingOnDate)}
-                  className="flex items-center gap-1.5 text-[11px] font-bold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/20 hover:bg-violet-100 dark:hover:bg-violet-900/30 px-3 py-1.5 rounded-xl transition-all cursor-pointer"
+                  className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-violet-50 px-3 py-1.5 text-[11px] font-bold text-violet-600 transition-all hover:bg-violet-100 dark:bg-violet-950/20 dark:text-violet-400 dark:hover:bg-violet-900/30"
                   title="Prioritize tasks by priority score"
                 >
                   <Sparkles size={12} />
@@ -367,7 +444,8 @@ function DailyPlannerInner() {
                 const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(t.id));
                 return areas.length === 0 ? area === "life" : areas.includes(area);
               });
-              if (pending.length === 0 && done.length === 0 && selectedArea !== area && !dayIsEmpty) return null;
+              if (pending.length === 0 && done.length === 0 && selectedArea !== area && !dayIsEmpty)
+                return null;
               return (
                 <AreaTaskGroup
                   key={area}
@@ -386,8 +464,12 @@ function DailyPlannerInner() {
                   getTagsForIdea={taskTagsHook.getTagsForIdea}
                   allTags={tagsHook.tags}
                   onCreateTag={tagsHook.createTag}
-                  onAddTag={async (ideaId, tag) => { await taskTagsHook.addTagToTask(ideaId, tag); }}
-                  onRemoveTag={async (ideaId, tagId) => { await taskTagsHook.removeTagFromTask(ideaId, tagId); }}
+                  onAddTag={async (ideaId, tag) => {
+                    await taskTagsHook.addTagToTask(ideaId, tag);
+                  }}
+                  onRemoveTag={async (ideaId, tagId) => {
+                    await taskTagsHook.removeTagFromTask(ideaId, tagId);
+                  }}
                 />
               );
             })}
@@ -397,20 +479,23 @@ function DailyPlannerInner() {
         {/* RESIZE HANDLE */}
         <div
           onMouseDown={handleResizeStart}
-          className="w-3 flex-shrink-0 cursor-col-resize group hidden md:flex items-center justify-center"
+          className="group hidden w-3 flex-shrink-0 cursor-col-resize items-center justify-center md:flex"
         >
-          <div className="flex flex-col gap-[3px] group-hover:opacity-100 opacity-40 transition-opacity">
-            <div className="w-[3px] h-[3px] rounded-full bg-gray-400 dark:bg-gray-500 group-hover:bg-violet-400" />
-            <div className="w-[3px] h-[3px] rounded-full bg-gray-400 dark:bg-gray-500 group-hover:bg-violet-400" />
-            <div className="w-[3px] h-[3px] rounded-full bg-gray-400 dark:bg-gray-500 group-hover:bg-violet-400" />
+          <div className="flex flex-col gap-[3px] opacity-40 transition-opacity group-hover:opacity-100">
+            <div className="h-[3px] w-[3px] rounded-full bg-gray-400 group-hover:bg-violet-400 dark:bg-gray-500" />
+            <div className="h-[3px] w-[3px] rounded-full bg-gray-400 group-hover:bg-violet-400 dark:bg-gray-500" />
+            <div className="h-[3px] w-[3px] rounded-full bg-gray-400 group-hover:bg-violet-400 dark:bg-gray-500" />
           </div>
         </div>
 
         {/* RIGHT COLUMN */}
-        <div style={{ "--right-col-width": `${rightColWidth}px` } as React.CSSProperties} className={`resizable-right-col flex-shrink-0 flex flex-col gap-4 w-full ${
-          activeMobileTab === "schedule" ? "block" : "hidden lg:flex"
-        }`}>
-          <div className="flex-1 min-h-[400px]">
+        <div
+          style={{ "--right-col-width": `${rightColWidth}px` } as React.CSSProperties}
+          className={`resizable-right-col flex w-full flex-shrink-0 flex-col gap-4 ${
+            activeMobileTab === "schedule" ? "block" : "hidden lg:flex"
+          }`}
+        >
+          <div className="min-h-[400px] flex-1">
             <DayslotTimeline
               activeDate={activeDate}
               allTasks={[...pendingOnDate, ...scheduledOnDate, ...doneOnDate]}
@@ -420,8 +505,12 @@ function DailyPlannerInner() {
               tags={tagsHook.tags}
               selectedArea={selectedArea}
               onChangeTaskArea={handleMoveTaskBetweenAreas}
-              onAddTag={async (ideaId, tag) => { await taskTagsHook.addTagToTask(ideaId, tag); }}
-              onRemoveTag={async (ideaId, tagId) => { await taskTagsHook.removeTagFromTask(ideaId, tagId); }}
+              onAddTag={async (ideaId, tag) => {
+                await taskTagsHook.addTagToTask(ideaId, tag);
+              }}
+              onRemoveTag={async (ideaId, tagId) => {
+                await taskTagsHook.removeTagFromTask(ideaId, tagId);
+              }}
               onCreateTag={async (name, area) => {
                 const tag = await tagsHook.createTag(name, area);
                 return tag ?? null;
@@ -450,41 +539,49 @@ function DeferredOnDateSection({
   getTagsForIdea: (ideaId: string) => Tag[];
 }) {
   return (
-    <div className="glass-card rounded-2xl overflow-hidden border border-amber-200/40 dark:border-amber-800/30">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-amber-200/30 dark:border-amber-800/20 bg-amber-50/40 dark:bg-amber-950/10">
+    <div className="glass-card overflow-hidden rounded-2xl border border-amber-200/40 dark:border-amber-800/30">
+      <div className="flex items-center gap-2 border-b border-amber-200/30 bg-amber-50/40 px-4 py-3 dark:border-amber-800/20 dark:bg-amber-950/10">
         <Clock size={13} className="text-amber-500" />
         <h2 className="text-xs font-bold text-amber-700 dark:text-amber-400">
           Deferred to this day
         </h2>
-        <span className="text-[10px] font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full">
+        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:bg-amber-900/40 dark:text-amber-400">
           {occurrences.length}
         </span>
       </div>
-      <div className="p-3 space-y-2">
+      <div className="space-y-2 p-3">
         {occurrences.map(({ task }) => {
           const meta = getTriageMeta(task);
           const tags = getTagsForIdea(task.id);
           return (
-            <div key={task.id} className="bg-white/60 dark:bg-white/[0.02] border border-black/5 dark:border-white/5 rounded-xl p-3 flex flex-col gap-2">
+            <div
+              key={task.id}
+              className="flex flex-col gap-2 rounded-xl border border-black/5 bg-white/60 p-3 dark:border-white/5 dark:bg-white/[0.02]"
+            >
               <div className="flex items-start justify-between gap-2">
-                <span className="text-xs text-gray-700 dark:text-gray-200 font-semibold leading-snug flex-1">
+                <span className="flex-1 text-xs leading-snug font-semibold text-gray-700 dark:text-gray-200">
                   {task.text}
                 </span>
-                <span className="text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                <span className="flex-shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
                   Deferred
                 </span>
               </div>
               {tags.length > 0 && (
-                <div className="flex gap-1 flex-wrap">
+                <div className="flex flex-wrap gap-1">
                   {tags.map((tag) => (
-                    <span key={tag.id} className="text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                      <span className={`w-1.5 h-1.5 rounded-full inline-block ${AREA_DOT_COLORS[tag.area]}`} />
+                    <span
+                      key={tag.id}
+                      className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold"
+                    >
+                      <span
+                        className={`inline-block h-1.5 w-1.5 rounded-full ${AREA_DOT_COLORS[tag.area]}`}
+                      />
                       {tag.name}
                     </span>
                   ))}
                 </div>
               )}
-              <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[10px] text-gray-400 dark:text-gray-500">
                   {task.scheduled_date
                     ? `Moved to ${formatDayLabel(task.scheduled_date, today)}`

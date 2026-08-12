@@ -21,7 +21,10 @@ export function FloatingAddButton({ open, onOpen, onClose, onAdd, today }: Float
 
   if (prevOpen !== open) {
     setPrevOpen(open);
-    if (!open) { setText(""); setWhen("today"); }
+    if (!open) {
+      setText("");
+      setWhen("today");
+    }
   }
 
   useEffect(() => {
@@ -57,7 +60,7 @@ export function FloatingAddButton({ open, onOpen, onClose, onAdd, today }: Float
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 16, scale: 0.97 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="fixed bottom-24 right-6 z-50 w-80 glass-card-strong rounded-2xl p-4 shadow-2xl border border-white/20 dark:border-white/10"
+              className="glass-card-strong fixed right-6 bottom-24 z-50 w-80 rounded-2xl border border-white/20 p-4 shadow-2xl dark:border-white/10"
             >
               <form onSubmit={handleSubmit} className="space-y-3">
                 <input
@@ -66,7 +69,7 @@ export function FloatingAddButton({ open, onOpen, onClose, onAdd, today }: Float
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   placeholder="What needs to be done?"
-                  className="w-full bg-white/60 dark:bg-gray-800/60 border border-black/10 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-violet-500/30 focus:outline-none placeholder:text-gray-300 dark:placeholder:text-gray-500"
+                  className="w-full rounded-xl border border-black/10 bg-white/60 px-3.5 py-2.5 text-sm text-gray-800 placeholder:text-gray-300 focus:ring-2 focus:ring-violet-500/30 focus:outline-none dark:border-white/10 dark:bg-gray-800/60 dark:text-gray-200 dark:placeholder:text-gray-500"
                 />
 
                 <div className="flex gap-1.5">
@@ -81,10 +84,10 @@ export function FloatingAddButton({ open, onOpen, onClose, onAdd, today }: Float
                         key={opt}
                         type="button"
                         onClick={() => setWhen(opt)}
-                        className={`flex-1 text-[11px] px-2 py-1.5 rounded-lg border transition-all font-medium ${
+                        className={`flex-1 rounded-lg border px-2 py-1.5 text-[11px] font-medium transition-all ${
                           when === opt
-                            ? "bg-violet-100/80 dark:bg-violet-500/20 border-violet-200 dark:border-violet-500/30 text-violet-700 dark:text-violet-400"
-                            : "border-black/10 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-white/5"
+                            ? "border-violet-200 bg-violet-100/80 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/20 dark:text-violet-400"
+                            : "border-black/10 text-gray-500 hover:bg-white/60 dark:border-white/10 dark:text-gray-400 dark:hover:bg-white/5"
                         }`}
                       >
                         {labels[opt]}
@@ -97,14 +100,14 @@ export function FloatingAddButton({ open, onOpen, onClose, onAdd, today }: Float
                   <button
                     type="button"
                     onClick={onClose}
-                    className="flex-1 py-2 border border-black/10 dark:border-white/10 rounded-xl text-sm text-gray-500 dark:text-gray-400 hover:bg-white/40 dark:hover:bg-white/5 transition-all"
+                    className="flex-1 rounded-xl border border-black/10 py-2 text-sm text-gray-500 transition-all hover:bg-white/40 dark:border-white/10 dark:text-gray-400 dark:hover:bg-white/5"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={!text.trim()}
-                    className="flex-1 py-2 bg-violet-600 text-white text-sm font-medium rounded-xl hover:bg-violet-700 transition-all disabled:opacity-40"
+                    className="flex-1 rounded-xl bg-violet-600 py-2 text-sm font-medium text-white transition-all hover:bg-violet-700 disabled:opacity-40"
                   >
                     Add
                   </button>
@@ -118,7 +121,7 @@ export function FloatingAddButton({ open, onOpen, onClose, onAdd, today }: Float
       <motion.button
         onClick={open ? onClose : onOpen}
         whileTap={{ scale: 0.92 }}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-violet-600 hover:bg-violet-700 text-white rounded-full shadow-lg flex items-center justify-center transition-colors"
+        className="fixed right-6 bottom-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-violet-600 text-white shadow-lg transition-colors hover:bg-violet-700"
         aria-label="Add task"
       >
         <motion.div animate={{ rotate: open ? 45 : 0 }} transition={{ duration: 0.2 }}>

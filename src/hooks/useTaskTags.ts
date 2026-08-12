@@ -30,12 +30,17 @@ export function useTaskTags() {
     };
 
     void load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
-  const getTagsForIdea = useCallback((ideaId: string): Tag[] => {
-    return tagsByIdea.get(ideaId) ?? [];
-  }, [tagsByIdea]);
+  const getTagsForIdea = useCallback(
+    (ideaId: string): Tag[] => {
+      return tagsByIdea.get(ideaId) ?? [];
+    },
+    [tagsByIdea],
+  );
 
   const addTagToTask = async (ideaId: string, tag: Tag) => {
     setTagsByIdea((prev) => {
@@ -45,14 +50,15 @@ export function useTaskTags() {
       next.set(ideaId, [...current, tag]);
       return next;
     });
-    const { error } = await supabase
-      .from("task_tags")
-      .insert({ idea_id: ideaId, tag_id: tag.id });
+    const { error } = await supabase.from("task_tags").insert({ idea_id: ideaId, tag_id: tag.id });
     if (error) {
       setTagsByIdea((prev) => {
         const next = new Map(prev);
         const current = next.get(ideaId) ?? [];
-        next.set(ideaId, current.filter((t) => t.id !== tag.id));
+        next.set(
+          ideaId,
+          current.filter((t) => t.id !== tag.id),
+        );
         return next;
       });
       console.error("Failed to add tag to task", error);
@@ -64,7 +70,10 @@ export function useTaskTags() {
     const previous = tagsByIdea.get(ideaId);
     setTagsByIdea((prev) => {
       const next = new Map(prev);
-      next.set(ideaId, (next.get(ideaId) ?? []).filter((t) => t.id !== tagId));
+      next.set(
+        ideaId,
+        (next.get(ideaId) ?? []).filter((t) => t.id !== tagId),
+      );
       return next;
     });
     const { error } = await supabase
@@ -79,5 +88,12 @@ export function useTaskTags() {
     }
   };
 
-  return { tagsByIdea, loading, getTagsForIdea, addTagToTask, removeTagFromTask, refetch: fetchTaskTags };
+  return {
+    tagsByIdea,
+    loading,
+    getTagsForIdea,
+    addTagToTask,
+    removeTagFromTask,
+    refetch: fetchTaskTags,
+  };
 }

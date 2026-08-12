@@ -24,16 +24,16 @@ Personal productivity PWA. Single user, auth required. All data lives in a singl
 
 ### Routes
 
-| Route | Description |
-|---|---|
-| `/` | Daily Planner — area-grouped tasks for a selected date |
-| `/timeline` | Multi-day task cards with inline editing |
-| `/deferred` | Overdue + deferred tasks with reschedule actions |
-| `/horizon` | Short/medium/long-term planning columns |
-| `/brainstorm` | Hierarchical idea tree + graph view (xyflow) |
-| `/balance` | Life area balance ring visualizations (day/week/month/year) |
-| `/settings/tags` | Tag management |
-| `/backup` | Data export |
+| Route            | Description                                                 |
+| ---------------- | ----------------------------------------------------------- |
+| `/`              | Daily Planner — area-grouped tasks for a selected date      |
+| `/timeline`      | Multi-day task cards with inline editing                    |
+| `/deferred`      | Overdue + deferred tasks with reschedule actions            |
+| `/horizon`       | Short/medium/long-term planning columns                     |
+| `/brainstorm`    | Hierarchical idea tree + graph view (xyflow)                |
+| `/balance`       | Life area balance ring visualizations (day/week/month/year) |
+| `/settings/tags` | Tag management                                              |
+| `/backup`        | Data export                                                 |
 
 ### Data flow
 

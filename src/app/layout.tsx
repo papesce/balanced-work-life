@@ -82,11 +82,11 @@ export default function RootLayout({
           }
         `}</style>
       </head>
-      <body className="min-h-full flex flex-col font-sans">
+      <body className="flex min-h-full flex-col font-sans">
         <div className="background-mesh">
           <div className="blob-3" />
         </div>
-        <div className="relative z-10 flex-1 flex flex-col">
+        <div className="relative z-10 flex flex-1 flex-col">
           <Providers>{children}</Providers>
         </div>
       </body>

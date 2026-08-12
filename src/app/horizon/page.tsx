@@ -15,9 +15,18 @@ const HORIZONS: { key: IdeaHorizon; label: string }[] = [
 ];
 
 const TYPE_BADGE: Record<string, { label: string; className: string }> = {
-  project: { label: "Project", className: "bg-blue-100/80 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" },
-  initiative: { label: "Initiative", className: "bg-violet-100/80 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400" },
-  task: { label: "Task", className: "bg-gray-100/80 text-gray-500 dark:bg-gray-800/40 dark:text-gray-400" },
+  project: {
+    label: "Project",
+    className: "bg-blue-100/80 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
+  },
+  initiative: {
+    label: "Initiative",
+    className: "bg-violet-100/80 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400",
+  },
+  task: {
+    label: "Task",
+    className: "bg-gray-100/80 text-gray-500 dark:bg-gray-800/40 dark:text-gray-400",
+  },
 };
 
 function HorizonColumn({
@@ -34,17 +43,17 @@ function HorizonColumn({
   onItemPress: (idea: Idea) => void;
 }) {
   return (
-    <div className="glass-card rounded-2xl flex flex-col flex-1 min-w-0">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-black/5 dark:border-white/5">
+    <div className="glass-card flex min-w-0 flex-1 flex-col rounded-2xl">
+      <div className="flex items-center justify-between border-b border-black/5 px-4 py-3 dark:border-white/5">
         <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{label}</span>
-        <span className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 bg-black/[0.04] dark:bg-white/[0.06] px-2 py-0.5 rounded-full">
+        <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-[11px] font-semibold text-gray-400 dark:bg-white/[0.06] dark:text-gray-500">
           {items.length}
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto max-h-[calc(100vh-220px)] min-h-[120px]">
+      <div className="max-h-[calc(100vh-220px)] min-h-[120px] flex-1 overflow-y-auto">
         {items.length === 0 ? (
-          <p className="text-xs text-gray-400 dark:text-gray-500 italic px-4 py-6 text-center">
+          <p className="px-4 py-6 text-center text-xs text-gray-400 italic dark:text-gray-500">
             No items yet
           </p>
         ) : (
@@ -57,7 +66,7 @@ function HorizonColumn({
                 <button
                   key={item.id}
                   onClick={() => onItemPress(item)}
-                  className="w-full text-left flex items-center gap-2 px-4 py-2.5 hover:bg-black/[0.015] dark:hover:bg-white/[0.015] transition-colors group"
+                  className="group flex w-full items-center gap-2 px-4 py-2.5 text-left transition-colors hover:bg-black/[0.015] dark:hover:bg-white/[0.015]"
                 >
                   <span
                     role="button"
@@ -67,7 +76,7 @@ function HorizonColumn({
                       console.log("Toggle priority:", item.id);
                     }}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
+                      if (e.key === "Enter" || e.key === " ") {
                         e.stopPropagation();
                         console.log("Toggle priority:", item.id);
                       }
@@ -79,24 +88,26 @@ function HorizonColumn({
                       className={
                         item.is_priority
                           ? "fill-amber-400 text-amber-400"
-                          : "text-gray-300 dark:text-gray-600 group-hover:text-gray-400 dark:group-hover:text-gray-500"
+                          : "text-gray-300 group-hover:text-gray-400 dark:text-gray-600 dark:group-hover:text-gray-500"
                       }
                     />
                   </span>
 
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm text-gray-800 dark:text-gray-200 truncate block">
+                  <div className="min-w-0 flex-1">
+                    <span className="block truncate text-sm text-gray-800 dark:text-gray-200">
                       {item.text || "Untitled"}
                     </span>
                     {(badge || parent) && (
-                      <div className="flex items-center gap-1.5 mt-0.5">
+                      <div className="mt-0.5 flex items-center gap-1.5">
                         {badge && (
-                          <span className={`text-[10px] font-semibold px-1.5 py-0 rounded-full ${badge.className}`}>
+                          <span
+                            className={`rounded-full px-1.5 py-0 text-[10px] font-semibold ${badge.className}`}
+                          >
                             {badge.label}
                           </span>
                         )}
                         {parent && (
-                          <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate">
+                          <span className="truncate text-[10px] text-gray-400 dark:text-gray-500">
                             {parent.text || "Untitled parent"}
                           </span>
                         )}
@@ -110,11 +121,8 @@ function HorizonColumn({
         )}
       </div>
 
-      <div className="px-4 py-2 border-t border-black/[0.02] dark:border-white/[0.02]">
-        <QuickAddInput
-          placeholder={`+ Add to ${label.toLowerCase()}...`}
-          onAdd={onAdd}
-        />
+      <div className="border-t border-black/[0.02] px-4 py-2 dark:border-white/[0.02]">
+        <QuickAddInput placeholder={`+ Add to ${label.toLowerCase()}...`} onAdd={onAdd} />
       </div>
     </div>
   );
@@ -137,9 +145,9 @@ export default function HorizonPage() {
           i.horizon &&
           i.status !== "completed" &&
           i.status !== "cancelled" &&
-          i.status !== "archived"
+          i.status !== "archived",
       ),
-    [ideas]
+    [ideas],
   );
 
   const ideasByHorizon = useMemo(() => {
@@ -176,7 +184,7 @@ export default function HorizonPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center">
         <div className="animate-pulse text-gray-400 dark:text-gray-500">Loading horizon...</div>
       </div>
     );
@@ -185,15 +193,15 @@ export default function HorizonPage() {
   return (
     <AppShell title="Horizon" fullWidth>
       {/* Mobile tab bar */}
-      <div className="sticky top-[53px] z-10 md:hidden flex bg-black/[0.03] dark:bg-white/[0.04] p-1 rounded-xl mb-4 gap-1">
+      <div className="sticky top-[53px] z-10 mb-4 flex gap-1 rounded-xl bg-black/[0.03] p-1 md:hidden dark:bg-white/[0.04]">
         {HORIZONS.map((h) => (
           <button
             key={h.key}
             onClick={() => setActiveTab(h.key)}
-            className={`flex-1 text-xs font-semibold py-2 rounded-lg transition-all ${
+            className={`flex-1 rounded-lg py-2 text-xs font-semibold transition-all ${
               activeTab === h.key
-                ? "bg-violet-100/80 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300"
-                : "text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                ? "bg-violet-100/80 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
+                : "text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
             }`}
           >
             {h.label}
@@ -202,7 +210,7 @@ export default function HorizonPage() {
       </div>
 
       {/* Desktop: three columns stacked vertically */}
-      <div className="hidden md:flex md:flex-col gap-5">
+      <div className="hidden gap-5 md:flex md:flex-col">
         {HORIZONS.map((h, i) => (
           <motion.div
             key={h.key}

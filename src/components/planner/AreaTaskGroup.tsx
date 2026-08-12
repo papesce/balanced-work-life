@@ -35,8 +35,23 @@ interface AreaTaskGroupProps {
 }
 
 export function AreaTaskGroup({
-  area, activeDate, pendingTasks, doneTasks,
-  onDone, onUndone, onUpdate, onReschedule, onDelete, onAddTask, onReorderTasks, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag, onAddTag, onRemoveTag,
+  area,
+  activeDate,
+  pendingTasks,
+  doneTasks,
+  onDone,
+  onUndone,
+  onUpdate,
+  onReschedule,
+  onDelete,
+  onAddTask,
+  onReorderTasks,
+  onMoveTaskBetweenAreas,
+  getTagsForIdea,
+  allTags,
+  onCreateTag,
+  onAddTag,
+  onRemoveTag,
 }: AreaTaskGroupProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const Icon = AREA_ICONS[area];
@@ -44,10 +59,13 @@ export function AreaTaskGroup({
 
   return (
     <div
-      className={`glass-card rounded-2xl border border-black/5 dark:border-white/5 transition-all duration-200 ${
-        isDragOver ? "ring-2 ring-violet-500/50 bg-violet-500/[0.03] scale-[1.005]" : ""
+      className={`glass-card rounded-2xl border border-black/5 transition-all duration-200 dark:border-white/5 ${
+        isDragOver ? "scale-[1.005] bg-violet-500/[0.03] ring-2 ring-violet-500/50" : ""
       }`}
-      onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setIsDragOver(true);
+      }}
       onDragLeave={() => setIsDragOver(false)}
       onDrop={(e) => {
         e.preventDefault();
@@ -62,15 +80,21 @@ export function AreaTaskGroup({
       }}
     >
       <div
-        className="flex items-center gap-2 px-4 py-3 border-b border-black/5 dark:border-white/5 bg-black/[0.01] dark:bg-white/[0.01] rounded-t-2xl"
+        className="flex items-center gap-2 rounded-t-2xl border-b border-black/5 bg-black/[0.01] px-4 py-3 dark:border-white/5 dark:bg-white/[0.01]"
         style={{ borderLeftWidth: 3, borderLeftColor: color, borderLeftStyle: "solid" }}
       >
-        <div className="w-5.5 h-5.5 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: areaColors[area]?.bg }}>
+        <div
+          className="flex h-5.5 w-5.5 flex-shrink-0 items-center justify-center rounded-lg"
+          style={{ background: areaColors[area]?.bg }}
+        >
           <Icon size={12} style={{ color }} />
         </div>
-        <span className="text-xs font-bold text-gray-700 dark:text-gray-200">{AREA_LABELS[area]}</span>
-        <span className="text-[10px] text-gray-400 dark:text-gray-500 ml-1 font-semibold">
-          {pendingTasks.length} pending{doneTasks.length > 0 ? ` · ${doneTasks.length} completed` : ""}
+        <span className="text-xs font-bold text-gray-700 dark:text-gray-200">
+          {AREA_LABELS[area]}
+        </span>
+        <span className="ml-1 text-[10px] font-semibold text-gray-400 dark:text-gray-500">
+          {pendingTasks.length} pending
+          {doneTasks.length > 0 ? ` · ${doneTasks.length} completed` : ""}
         </span>
       </div>
 
@@ -94,18 +118,35 @@ export function AreaTaskGroup({
           />
         )}
         {doneTasks.map((task) => (
-          <TaskRow key={task.id} task={task} area={area} onDone={onDone} onUndone={onUndone} onUpdate={onUpdate} onDelete={onDelete} onReschedule={onReschedule} onMoveTaskBetweenAreas={onMoveTaskBetweenAreas} getTagsForIdea={getTagsForIdea} allTags={allTags} onCreateTag={onCreateTag} onAddTag={onAddTag} onRemoveTag={onRemoveTag} />
+          <TaskRow
+            key={task.id}
+            task={task}
+            area={area}
+            onDone={onDone}
+            onUndone={onUndone}
+            onUpdate={onUpdate}
+            onDelete={onDelete}
+            onReschedule={onReschedule}
+            onMoveTaskBetweenAreas={onMoveTaskBetweenAreas}
+            getTagsForIdea={getTagsForIdea}
+            allTags={allTags}
+            onCreateTag={onCreateTag}
+            onAddTag={onAddTag}
+            onRemoveTag={onRemoveTag}
+          />
         ))}
         {pendingTasks.length === 0 && doneTasks.length === 0 && (
-          <div className="px-5 py-4 text-xs text-gray-400 dark:text-gray-500 italic">No tasks planned for this day</div>
+          <div className="px-5 py-4 text-xs text-gray-400 italic dark:text-gray-500">
+            No tasks planned for this day
+          </div>
         )}
       </div>
 
-      <div className="px-4 py-2 bg-black/[0.01] dark:bg-white/[0.01] border-t border-black/[0.02] dark:border-white/[0.02] rounded-b-2xl">
+      <div className="rounded-b-2xl border-t border-black/[0.02] bg-black/[0.01] px-4 py-2 dark:border-white/[0.02] dark:bg-white/[0.01]">
         <input
           type="text"
           placeholder={`+ Add to ${AREA_LABELS[area]}...`}
-          className="w-full bg-transparent border-none text-xs py-1.5 focus:ring-0 placeholder:text-gray-400 dark:placeholder:text-gray-600 text-gray-700 dark:text-gray-300 outline-none font-medium"
+          className="w-full border-none bg-transparent py-1.5 text-xs font-medium text-gray-700 outline-none placeholder:text-gray-400 focus:ring-0 dark:text-gray-300 dark:placeholder:text-gray-600"
           onKeyDown={(e) => {
             if (e.key === "Enter" && e.currentTarget.value.trim()) {
               void onAddTask(e.currentTarget.value.trim(), area);
@@ -119,7 +160,20 @@ export function AreaTaskGroup({
 }
 
 function PendingTaskList({
-  tasks, area, onReorder, onDone, onUndone, onUpdate, onDelete, onReschedule, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag, onAddTag, onRemoveTag,
+  tasks,
+  area,
+  onReorder,
+  onDone,
+  onUndone,
+  onUpdate,
+  onDelete,
+  onReschedule,
+  onMoveTaskBetweenAreas,
+  getTagsForIdea,
+  allTags,
+  onCreateTag,
+  onAddTag,
+  onRemoveTag,
 }: {
   tasks: Idea[];
   area: LifeArea;
@@ -139,7 +193,9 @@ function PendingTaskList({
   const [items, setItems] = useState(tasks);
   const itemsRef = useRef(items);
 
-  useEffect(() => { itemsRef.current = items; }, [items]);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
   const [prevTasks, setPrevTasks] = useState(tasks);
   if (tasks !== prevTasks) {
     setPrevTasks(tasks);
@@ -173,7 +229,21 @@ function PendingTaskList({
 }
 
 function ReorderItemWrapper({
-  task, area, onReorder, itemsRef, onDone, onUndone, onUpdate, onDelete, onReschedule, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag, onAddTag, onRemoveTag,
+  task,
+  area,
+  onReorder,
+  itemsRef,
+  onDone,
+  onUndone,
+  onUpdate,
+  onDelete,
+  onReschedule,
+  onMoveTaskBetweenAreas,
+  getTagsForIdea,
+  allTags,
+  onCreateTag,
+  onAddTag,
+  onRemoveTag,
 }: {
   task: Idea;
   area: LifeArea;
@@ -223,7 +293,21 @@ function ReorderItemWrapper({
 }
 
 function TaskRow({
-  task, area, onDone, onUndone, onUpdate, onDelete, onReschedule, onMoveTaskBetweenAreas, getTagsForIdea, allTags, onCreateTag, onAddTag, onRemoveTag, showDragHandle, dragControls,
+  task,
+  area,
+  onDone,
+  onUndone,
+  onUpdate,
+  onDelete,
+  onReschedule,
+  onMoveTaskBetweenAreas,
+  getTagsForIdea,
+  allTags,
+  onCreateTag,
+  onAddTag,
+  onRemoveTag,
+  showDragHandle,
+  dragControls,
 }: {
   task: Idea;
   area: LifeArea;
@@ -249,7 +333,9 @@ function TaskRow({
   const [showMenu, setShowMenu] = useState(false);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
-  const [statusPickerPos, setStatusPickerPos] = useState<{ top: number; left: number } | null>(null);
+  const [statusPickerPos, setStatusPickerPos] = useState<{ top: number; left: number } | null>(
+    null,
+  );
   const statusTriggerRef = useRef<HTMLButtonElement>(null);
   const statusPickerRef = useRef<HTMLDivElement>(null);
   const [showDurationDropdown, setShowDurationDropdown] = useState(false);
@@ -269,7 +355,9 @@ function TaskRow({
   const deleteConfirmRef = useRef<HTMLDivElement>(null);
   const [showDateInput, setShowDateInput] = useState(false);
   const dateInputRef = useRef<HTMLInputElement>(null);
-  const isReschedule = task.status === "deferred" || (task.scheduled_date !== null && task.scheduled_date < getToday());
+  const isReschedule =
+    task.status === "deferred" ||
+    (task.scheduled_date !== null && task.scheduled_date < getToday());
   const dateActionLabel = isReschedule ? "Reschedule" : "Move";
   const router = useRouter();
 
@@ -318,21 +406,35 @@ function TaskRow({
 
   useEffect(() => {
     const handler = (e: PointerEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node) &&
-          menuTriggerRef.current && !menuTriggerRef.current.contains(e.target as Node)) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node) &&
+        menuTriggerRef.current &&
+        !menuTriggerRef.current.contains(e.target as Node)
+      ) {
         setShowMenu(false);
       }
-      if (statusPickerRef.current && !statusPickerRef.current.contains(e.target as Node) &&
-          statusTriggerRef.current && !statusTriggerRef.current.contains(e.target as Node)) {
+      if (
+        statusPickerRef.current &&
+        !statusPickerRef.current.contains(e.target as Node) &&
+        statusTriggerRef.current &&
+        !statusTriggerRef.current.contains(e.target as Node)
+      ) {
         setShowStatusPicker(false);
       }
-      if (durationRef.current && !durationRef.current.contains(e.target as Node)) setShowDurationDropdown(false);
-      if (areaPickerRef.current && !areaPickerRef.current.contains(e.target as Node) &&
-          areaDotRef.current && !areaDotRef.current.contains(e.target as Node)) {
+      if (durationRef.current && !durationRef.current.contains(e.target as Node))
+        setShowDurationDropdown(false);
+      if (
+        areaPickerRef.current &&
+        !areaPickerRef.current.contains(e.target as Node) &&
+        areaDotRef.current &&
+        !areaDotRef.current.contains(e.target as Node)
+      ) {
         setShowAreaPicker(false);
       }
     };
-    if (showMenu || showStatusPicker || showDurationDropdown || showAreaPicker) document.addEventListener("pointerdown", handler);
+    if (showMenu || showStatusPicker || showDurationDropdown || showAreaPicker)
+      document.addEventListener("pointerdown", handler);
     return () => document.removeEventListener("pointerdown", handler);
   }, [showMenu, showStatusPicker, showDurationDropdown, showAreaPicker]);
 
@@ -412,7 +514,7 @@ function TaskRow({
         e.dataTransfer.setData("text/lifearea", area);
         e.dataTransfer.effectAllowed = "move";
       }}
-      className="flex items-center gap-2 px-4 py-2.5 hover:bg-black/[0.015] dark:hover:bg-white/[0.015] transition-colors group cursor-grab active:cursor-grabbing"
+      className="group flex cursor-grab items-center gap-2 px-4 py-2.5 transition-colors hover:bg-black/[0.015] active:cursor-grabbing dark:hover:bg-white/[0.015]"
     >
       {showDragHandle && (
         <div
@@ -424,14 +526,18 @@ function TaskRow({
             e.stopPropagation();
           }}
           draggable={false}
-          className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-400 transition-colors flex-shrink-0 md:opacity-0 md:group-hover:opacity-100"
+          className="flex-shrink-0 cursor-grab text-gray-300 transition-colors hover:text-gray-400 active:cursor-grabbing md:opacity-0 md:group-hover:opacity-100 dark:text-gray-600"
         >
           <GripVertical size={11} />
         </div>
       )}
 
       {statusConfig.icon && (
-        <statusConfig.icon size={12} strokeWidth={2} className={`flex-shrink-0 ${statusConfig.textClass}`} />
+        <statusConfig.icon
+          size={12}
+          strokeWidth={2}
+          className={`flex-shrink-0 ${statusConfig.textClass}`}
+        />
       )}
       {isEditing ? (
         <input
@@ -441,16 +547,19 @@ function TaskRow({
           onChange={(e) => setEditText(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={handleConfirmEdit}
-          className="flex-1 text-[13px] px-1.5 py-0.5 border border-violet-300 dark:border-violet-600 rounded-lg outline-none focus:border-violet-500 min-w-0 bg-white/80 dark:bg-gray-800/80 font-semibold"
+          className="min-w-0 flex-1 rounded-lg border border-violet-300 bg-white/80 px-1.5 py-0.5 text-[13px] font-semibold outline-none focus:border-violet-500 dark:border-violet-600 dark:bg-gray-800/80"
         />
       ) : (
         <span
           onClick={handleStartEdit}
-          className={`flex-1 text-[13px] min-w-0 truncate cursor-text hover:bg-black/[0.03] dark:hover:bg-white/[0.04] rounded px-1 -mx-1 ${
-            isCompleted ? "text-gray-400 dark:text-gray-500 font-normal" :
-            isCancelled ? "text-red-400/60 font-normal" :
-            isPaused ? "text-orange-600/70 dark:text-orange-400/70 font-semibold" :
-            "text-gray-700 dark:text-gray-200 font-semibold"
+          className={`-mx-1 min-w-0 flex-1 cursor-text truncate rounded px-1 text-[13px] hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${
+            isCompleted
+              ? "font-normal text-gray-400 dark:text-gray-500"
+              : isCancelled
+                ? "font-normal text-red-400/60"
+                : isPaused
+                  ? "font-semibold text-orange-600/70 dark:text-orange-400/70"
+                  : "font-semibold text-gray-700 dark:text-gray-200"
           }`}
         >
           {task.text}
@@ -461,41 +570,71 @@ function TaskRow({
         <button
           ref={statusTriggerRef}
           onClick={() => {
-            if (showStatusPicker) { setShowStatusPicker(false); return; }
+            if (showStatusPicker) {
+              setShowStatusPicker(false);
+              return;
+            }
             const rect = statusTriggerRef.current?.getBoundingClientRect();
             if (rect) setStatusPickerPos({ top: rect.bottom + 6, left: rect.left });
             setShowStatusPicker(true);
           }}
-          className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full transition-all cursor-pointer hover:opacity-80"
+          className="flex cursor-pointer items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold transition-all hover:opacity-80"
           style={{
-            background: isCompleted ? "#f5f3ff" : isCancelled ? "#fef2f2" : isPaused ? "#fff7ed" : isInProgress ? "#fefce8" : "rgba(0,0,0,0.05)",
-            color: isCompleted ? "#7c3aed" : isCancelled ? "#ef4444" : isPaused ? "#f97316" : isInProgress ? "#d97706" : "#9ca3af",
+            background: isCompleted
+              ? "#f5f3ff"
+              : isCancelled
+                ? "#fef2f2"
+                : isPaused
+                  ? "#fff7ed"
+                  : isInProgress
+                    ? "#fefce8"
+                    : "rgba(0,0,0,0.05)",
+            color: isCompleted
+              ? "#7c3aed"
+              : isCancelled
+                ? "#ef4444"
+                : isPaused
+                  ? "#f97316"
+                  : isInProgress
+                    ? "#d97706"
+                    : "#9ca3af",
           }}
         >
           {statusConfig.label}
         </button>
-        {showStatusPicker && statusPickerPos && createPortal(
-          <div
-            ref={statusPickerRef}
-            style={{ position: "fixed", top: statusPickerPos.top, left: statusPickerPos.left, zIndex: 9999 }}
-          >
-            <StatusPicker
-              current={task.status}
-              onSelect={handleStatusSelect}
-              onClose={() => setShowStatusPicker(false)}
-            />
-          </div>,
-          document.body
-        )}
+        {showStatusPicker &&
+          statusPickerPos &&
+          createPortal(
+            <div
+              ref={statusPickerRef}
+              style={{
+                position: "fixed",
+                top: statusPickerPos.top,
+                left: statusPickerPos.left,
+                zIndex: 9999,
+              }}
+            >
+              <StatusPicker
+                current={task.status}
+                onSelect={handleStatusSelect}
+                onClose={() => setShowStatusPicker(false)}
+              />
+            </div>,
+            document.body,
+          )}
       </div>
 
       <div className="relative" ref={durationRef}>
         <button
-          onClick={(e) => { e.stopPropagation(); setShowDurationDropdown(!showDurationDropdown); setShowCustomInput(false); }}
-          className={`text-[10px] tabular-nums font-bold flex-shrink-0 transition-colors rounded px-1.5 py-0.5 flex items-center gap-1 cursor-pointer ${
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowDurationDropdown(!showDurationDropdown);
+            setShowCustomInput(false);
+          }}
+          className={`flex flex-shrink-0 cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold tabular-nums transition-colors ${
             task.duration_minutes
-              ? "text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/20 hover:bg-violet-100 dark:hover:bg-violet-900/30"
-              : "text-gray-400 dark:text-gray-500 hover:bg-black/5 dark:hover:bg-white/5 md:opacity-0 md:group-hover:opacity-100"
+              ? "bg-violet-50 text-violet-600 hover:bg-violet-100 dark:bg-violet-950/20 dark:text-violet-400 dark:hover:bg-violet-900/30"
+              : "text-gray-400 hover:bg-black/5 md:opacity-0 md:group-hover:opacity-100 dark:text-gray-500 dark:hover:bg-white/5"
           }`}
           title="Set task duration"
         >
@@ -504,25 +643,34 @@ function TaskRow({
         </button>
 
         {showDurationDropdown && (
-          <div className="absolute right-0 top-full mt-1.5 z-50 glass-card-strong rounded-xl p-1.5 shadow-xl border border-black/5 dark:border-white/5 min-w-[110px] space-y-1">
+          <div className="glass-card-strong absolute top-full right-0 z-50 mt-1.5 min-w-[110px] space-y-1 rounded-xl border border-black/5 p-1.5 shadow-xl dark:border-white/5">
             {!showCustomInput ? (
               <>
                 {[15, 30, 45, 60, 90, 120].map((preset) => (
                   <button
                     key={preset}
-                    onClick={() => { onUpdate(task.id, { duration_minutes: preset }); setShowDurationDropdown(false); }}
-                    className="w-full text-left px-2 py-1 text-[10px] rounded-lg text-gray-700 dark:text-gray-200 hover:bg-black/5 dark:hover:bg-white/5 font-semibold cursor-pointer"
+                    onClick={() => {
+                      onUpdate(task.id, { duration_minutes: preset });
+                      setShowDurationDropdown(false);
+                    }}
+                    className="w-full cursor-pointer rounded-lg px-2 py-1 text-left text-[10px] font-semibold text-gray-700 hover:bg-black/5 dark:text-gray-200 dark:hover:bg-white/5"
                   >
                     {preset >= 60 ? `${preset / 60}h` : `${preset}m`}
                   </button>
                 ))}
-                <button onClick={() => setShowCustomInput(true)} className="w-full text-left px-2 py-1 text-[10px] rounded-lg text-gray-400 dark:text-gray-500 hover:bg-black/5 dark:hover:bg-white/5 font-semibold cursor-pointer">
+                <button
+                  onClick={() => setShowCustomInput(true)}
+                  className="w-full cursor-pointer rounded-lg px-2 py-1 text-left text-[10px] font-semibold text-gray-400 hover:bg-black/5 dark:text-gray-500 dark:hover:bg-white/5"
+                >
                   Custom...
                 </button>
                 {task.duration_minutes && (
                   <button
-                    onClick={() => { onUpdate(task.id, { duration_minutes: null }); setShowDurationDropdown(false); }}
-                    className="w-full text-left px-2 py-1 text-[10px] rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 font-semibold cursor-pointer"
+                    onClick={() => {
+                      onUpdate(task.id, { duration_minutes: null });
+                      setShowDurationDropdown(false);
+                    }}
+                    className="w-full cursor-pointer rounded-lg px-2 py-1 text-left text-[10px] font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20"
                   >
                     Remove
                   </button>
@@ -531,20 +679,38 @@ function TaskRow({
             ) : (
               <div className="flex flex-col gap-1 p-1">
                 <input
-                  type="number" min="5" max="480" step="5"
-                  value={customVal} placeholder="Minutes" autoFocus
+                  type="number"
+                  min="5"
+                  max="480"
+                  step="5"
+                  value={customVal}
+                  placeholder="Minutes"
+                  autoFocus
                   onChange={(e) => setCustomVal(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") { const val = parseInt(customVal); onUpdate(task.id, { duration_minutes: val > 0 ? val : null }); setShowDurationDropdown(false); }
+                    if (e.key === "Enter") {
+                      const val = parseInt(customVal);
+                      onUpdate(task.id, { duration_minutes: val > 0 ? val : null });
+                      setShowDurationDropdown(false);
+                    }
                     if (e.key === "Escape") setShowCustomInput(false);
                   }}
-                  className="w-full text-[10px] border border-black/10 dark:border-white/10 rounded px-1.5 py-0.5 bg-white/80 dark:bg-gray-800/80 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-violet-500 font-semibold"
+                  className="w-full rounded border border-black/10 bg-white/80 px-1.5 py-0.5 text-[10px] font-semibold text-gray-700 focus:ring-1 focus:ring-violet-500 focus:outline-none dark:border-white/10 dark:bg-gray-800/80 dark:text-gray-200"
                 />
-                <div className="flex justify-between gap-1 mt-1">
-                  <button onClick={() => setShowCustomInput(false)} className="text-[9px] text-gray-400 hover:text-gray-600 px-1 py-0.5 cursor-pointer font-semibold">Back</button>
+                <div className="mt-1 flex justify-between gap-1">
                   <button
-                    onClick={() => { const val = parseInt(customVal); onUpdate(task.id, { duration_minutes: val > 0 ? val : null }); setShowDurationDropdown(false); }}
-                    className="text-[9px] text-violet-600 dark:text-violet-400 hover:text-violet-700 px-1.5 py-0.5 font-bold cursor-pointer"
+                    onClick={() => setShowCustomInput(false)}
+                    className="cursor-pointer px-1 py-0.5 text-[9px] font-semibold text-gray-400 hover:text-gray-600"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={() => {
+                      const val = parseInt(customVal);
+                      onUpdate(task.id, { duration_minutes: val > 0 ? val : null });
+                      setShowDurationDropdown(false);
+                    }}
+                    className="cursor-pointer px-1.5 py-0.5 text-[9px] font-bold text-violet-600 hover:text-violet-700 dark:text-violet-400"
                   >
                     Save
                   </button>
@@ -556,46 +722,53 @@ function TaskRow({
       </div>
 
       {task.scheduled_time && (
-        <span className="text-[10px] text-violet-500 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/20 px-1.5 py-0.5 rounded flex-shrink-0 font-bold tabular-nums">
+        <span className="flex-shrink-0 rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold text-violet-500 tabular-nums dark:bg-violet-950/20 dark:text-violet-400">
           {formatTime(task.scheduled_time)}
         </span>
       )}
 
-      {onMoveTaskBetweenAreas && (() => {
-        const taskTags = getTagsForIdea?.(task.id) ?? [];
-        const nonSystemTags = taskTags.filter((t) => !t.is_system);
-        return (
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <button
-              ref={areaDotRef}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (showAreaPicker) { setShowAreaPicker(false); return; }
-                const rect = areaDotRef.current?.getBoundingClientRect();
-                if (rect) setAreaPickerPos({ top: rect.bottom + 4, left: rect.left });
-                setShowAreaPicker(true);
-              }}
-              className="w-2 h-2 rounded-full cursor-pointer hover:scale-150 transition-transform flex-shrink-0"
-              style={{ background: areaColors[area]?.dot }}
-              title="Change area"
-            />
-            {nonSystemTags.map((tag) => (
-              <span
-                key={tag.id}
-                className="text-[9px] font-bold px-1 py-0.5 rounded-full flex-shrink-0"
-                style={{ background: `${areaColors[tag.area]?.dot}15`, color: areaColors[tag.area]?.dot }}
-              >
-                {tag.name}
-              </span>
-            ))}
-          </div>
-        );
-      })()}
+      {onMoveTaskBetweenAreas &&
+        (() => {
+          const taskTags = getTagsForIdea?.(task.id) ?? [];
+          const nonSystemTags = taskTags.filter((t) => !t.is_system);
+          return (
+            <div className="flex flex-shrink-0 items-center gap-1">
+              <button
+                ref={areaDotRef}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (showAreaPicker) {
+                    setShowAreaPicker(false);
+                    return;
+                  }
+                  const rect = areaDotRef.current?.getBoundingClientRect();
+                  if (rect) setAreaPickerPos({ top: rect.bottom + 4, left: rect.left });
+                  setShowAreaPicker(true);
+                }}
+                className="h-2 w-2 flex-shrink-0 cursor-pointer rounded-full transition-transform hover:scale-150"
+                style={{ background: areaColors[area]?.dot }}
+                title="Change area"
+              />
+              {nonSystemTags.map((tag) => (
+                <span
+                  key={tag.id}
+                  className="flex-shrink-0 rounded-full px-1 py-0.5 text-[9px] font-bold"
+                  style={{
+                    background: `${areaColors[tag.area]?.dot}15`,
+                    color: areaColors[tag.area]?.dot,
+                  }}
+                >
+                  {tag.name}
+                </span>
+              ))}
+            </div>
+          );
+        })()}
 
-      <div className="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
+      <div className="flex flex-shrink-0 items-center gap-1 transition-opacity md:opacity-0 md:group-hover:opacity-100">
         <button
           onClick={() => onUpdate(task.id, { is_priority: !task.is_priority })}
-          className={`cursor-pointer ${task.is_priority ? "text-amber-400" : "text-gray-300 dark:text-gray-600 hover:text-gray-400"}`}
+          className={`cursor-pointer ${task.is_priority ? "text-amber-400" : "text-gray-300 hover:text-gray-400 dark:text-gray-600"}`}
         >
           <Star size={12} className={task.is_priority ? "fill-amber-400 text-amber-400" : ""} />
         </button>
@@ -604,121 +777,166 @@ function TaskRow({
           <button
             ref={menuTriggerRef}
             onClick={() => {
-              if (showMenu) { setShowMenu(false); return; }
+              if (showMenu) {
+                setShowMenu(false);
+                return;
+              }
               const rect = menuTriggerRef.current?.getBoundingClientRect();
               if (rect) setMenuPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
               setShowDateInput(false);
               setShowMenu(true);
             }}
-            className="text-gray-300 dark:text-gray-600 hover:text-gray-500 cursor-pointer md:opacity-50 md:hover:opacity-100"
+            className="cursor-pointer text-gray-300 hover:text-gray-500 md:opacity-50 md:hover:opacity-100 dark:text-gray-600"
           >
             <MoreHorizontal size={13} />
           </button>
-          {showMenu && menuPos && createPortal(
-            <div
-              ref={menuRef}
-              style={{ position: "fixed", top: menuPos.top, right: menuPos.right, zIndex: 9999 }}
-              className="glass-card-strong rounded-lg py-1 min-w-[160px] shadow-lg border border-black/5 dark:border-white/5"
-            >
-              {task.scheduled_date && (
-                <>
+          {showMenu &&
+            menuPos &&
+            createPortal(
+              <div
+                ref={menuRef}
+                style={{ position: "fixed", top: menuPos.top, right: menuPos.right, zIndex: 9999 }}
+                className="glass-card-strong min-w-[160px] rounded-lg border border-black/5 py-1 shadow-lg dark:border-white/5"
+              >
+                {task.scheduled_date && (
+                  <>
+                    <button
+                      onClick={() => {
+                        router.push(`/timeline?date=${task.scheduled_date}&highlight=${task.id}`);
+                        setShowMenu(false);
+                      }}
+                      className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-violet-600 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/20"
+                    >
+                      Reveal in Timeline
+                    </button>
+                    <div className="my-1 border-t border-black/5 dark:border-white/5" />
+                  </>
+                )}
+                <div className="my-1 border-t border-black/5 dark:border-white/5" />
+                {task.scheduled_date !== getToday() && (
                   <button
-                    onClick={() => { router.push(`/timeline?date=${task.scheduled_date}&highlight=${task.id}`); setShowMenu(false); }}
-                    className="flex w-full text-left px-3 py-1.5 text-[11px] text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/20 font-semibold cursor-pointer"
-                  >
-                    Reveal in Timeline
-                  </button>
-                  <div className="border-t border-black/5 dark:border-white/5 my-1" />
-                </>
-              )}
-              <div className="border-t border-black/5 dark:border-white/5 my-1" />
-              {task.scheduled_date !== getToday() && (
-                <button
-                  onClick={() => { void onReschedule(task.id, isReschedule ? { type: "retry_today" } : { type: "move", newDate: getToday() }); setShowMenu(false); }}
-                  className="flex w-full text-left px-3 py-1.5 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] font-semibold cursor-pointer"
-                >
-                  {dateActionLabel} to Today
-                </button>
-              )}
-              <button
-                onClick={() => setShowDateInput((v) => !v)}
-                className={`flex w-full text-left px-3 py-1.5 text-[11px] font-semibold cursor-pointer ${
-                  showDateInput
-                    ? "text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/20"
-                    : "text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
-                }`}
-              >
-                {dateActionLabel} Date…
-              </button>
-              {showDateInput && (
-                <div className="px-2.5 pb-1.5">
-                  <input
-                    ref={dateInputRef}
-                    type="date"
-                    autoFocus
-                    className="w-full text-xs border border-black/10 dark:border-white/10 rounded-lg px-2 py-1.5 bg-white/80 dark:bg-gray-800/80 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                    onChange={(e) => {
-                      if (e.target.value) { void onReschedule(task.id, isReschedule ? { type: "reschedule", newDate: e.target.value } : { type: "move", newDate: e.target.value }); setShowMenu(false); }
+                    onClick={() => {
+                      void onReschedule(
+                        task.id,
+                        isReschedule
+                          ? { type: "retry_today" }
+                          : { type: "move", newDate: getToday() },
+                      );
+                      setShowMenu(false);
                     }}
-                  />
-                </div>
-              )}
-              <button
-                onClick={() => { setShowDeleteConfirm(true); setShowMenu(false); }}
-                className="flex w-full text-left px-3 py-1.5 text-[11px] text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 font-bold cursor-pointer"
-              >
-                Delete
-              </button>
-            </div>,
-            document.body
-          )}
-
-          {showDeleteConfirm && createPortal(
-            <div
-              ref={deleteConfirmRef}
-              style={{ position: "fixed", top: menuPos ? menuPos.top : 0, right: menuPos ? menuPos.right : 0, zIndex: 10001 }}
-              className="glass-card-strong rounded-xl p-2 min-w-[180px] shadow-lg border border-red-200 dark:border-red-500/30"
-            >
-              <p className="text-[11px] font-medium text-red-700 dark:text-red-400 px-1">Delete this task?</p>
-              <div className="mt-2 flex justify-end gap-1.5">
+                    className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                  >
+                    {dateActionLabel} to Today
+                  </button>
+                )}
                 <button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="px-2 py-1 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] rounded-lg cursor-pointer"
+                  onClick={() => setShowDateInput((v) => !v)}
+                  className={`flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold ${
+                    showDateInput
+                      ? "bg-violet-50 text-violet-600 dark:bg-violet-950/20 dark:text-violet-400"
+                      : "text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                  }`}
                 >
-                  Cancel
+                  {dateActionLabel} Date…
                 </button>
+                {showDateInput && (
+                  <div className="px-2.5 pb-1.5">
+                    <input
+                      ref={dateInputRef}
+                      type="date"
+                      autoFocus
+                      className="w-full rounded-lg border border-black/10 bg-white/80 px-2 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-violet-500 focus:outline-none dark:border-white/10 dark:bg-gray-800/80 dark:text-gray-200"
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          void onReschedule(
+                            task.id,
+                            isReschedule
+                              ? { type: "reschedule", newDate: e.target.value }
+                              : { type: "move", newDate: e.target.value },
+                          );
+                          setShowMenu(false);
+                        }
+                      }}
+                    />
+                  </div>
+                )}
                 <button
-                  onClick={() => { onDelete(task.id); setShowDeleteConfirm(false); }}
-                  className="px-2 py-1 text-[11px] font-medium text-white bg-red-600 dark:bg-red-500 hover:bg-red-700 dark:hover:bg-red-400 rounded-lg cursor-pointer"
+                  onClick={() => {
+                    setShowDeleteConfirm(true);
+                    setShowMenu(false);
+                  }}
+                  className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20"
                 >
                   Delete
                 </button>
-              </div>
-            </div>,
-            document.body
-          )}
+              </div>,
+              document.body,
+            )}
+
+          {showDeleteConfirm &&
+            createPortal(
+              <div
+                ref={deleteConfirmRef}
+                style={{
+                  position: "fixed",
+                  top: menuPos ? menuPos.top : 0,
+                  right: menuPos ? menuPos.right : 0,
+                  zIndex: 10001,
+                }}
+                className="glass-card-strong min-w-[180px] rounded-xl border border-red-200 p-2 shadow-lg dark:border-red-500/30"
+              >
+                <p className="px-1 text-[11px] font-medium text-red-700 dark:text-red-400">
+                  Delete this task?
+                </p>
+                <div className="mt-2 flex justify-end gap-1.5">
+                  <button
+                    onClick={() => setShowDeleteConfirm(false)}
+                    className="cursor-pointer rounded-lg px-2 py-1 text-[11px] text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.06]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      onDelete(task.id);
+                      setShowDeleteConfirm(false);
+                    }}
+                    className="cursor-pointer rounded-lg bg-red-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-400"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>,
+              document.body,
+            )}
         </div>
       </div>
 
-      {showAreaPicker && areaPickerPos && createPortal(
-        <div
-          ref={areaPickerRef}
-          style={{ position: "fixed", top: areaPickerPos.top, left: areaPickerPos.left, zIndex: 10000 }}
-        >
-          <TagPicker
-            allTags={allTags ?? []}
-            selectedTags={taskTags}
-            onAdd={handleTagSelected}
-            onRemove={async (tagId) => {
-              if (onRemoveTag) await onRemoveTag(task.id, tagId);
-              setShowAreaPicker(false);
+      {showAreaPicker &&
+        areaPickerPos &&
+        createPortal(
+          <div
+            ref={areaPickerRef}
+            style={{
+              position: "fixed",
+              top: areaPickerPos.top,
+              left: areaPickerPos.left,
+              zIndex: 10000,
             }}
-            onCreateTag={onCreateTag ?? (async () => null)}
-            onClose={() => setShowAreaPicker(false)}
-          />
-        </div>,
-        document.body
-      )}
+          >
+            <TagPicker
+              allTags={allTags ?? []}
+              selectedTags={taskTags}
+              onAdd={handleTagSelected}
+              onRemove={async (tagId) => {
+                if (onRemoveTag) await onRemoveTag(task.id, tagId);
+                setShowAreaPicker(false);
+              }}
+              onCreateTag={onCreateTag ?? (async () => null)}
+              onClose={() => setShowAreaPicker(false)}
+            />
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

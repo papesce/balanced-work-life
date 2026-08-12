@@ -17,7 +17,7 @@ function buildScopedQuery(userId: string, scope: IdeasScope) {
   if (scope === "this_month") {
     const { start, end } = getWindowRange("month", getToday());
     query = query.or(
-      `and(scheduled_date.gte.${start},scheduled_date.lte.${end}),and(scheduled_date.is.null,status.not.in.(completed,cancelled,archived))`
+      `and(scheduled_date.gte.${start},scheduled_date.lte.${end}),and(scheduled_date.is.null,status.not.in.(completed,cancelled,archived))`,
     );
   }
   return query;
@@ -61,7 +61,9 @@ function getDepthMap(ideas: Idea[]): Map<string, number> {
 function computeCollapsedIds(ideas: Idea[], overrides: Map<string, OverrideState>): Set<string> {
   const depths = getDepthMap(ideas);
   const collapsed = new Set<string>();
-  const parents = new Set(ideas.filter((i) => ideas.some((c) => c.parent_id === i.id)).map((i) => i.id));
+  const parents = new Set(
+    ideas.filter((i) => ideas.some((c) => c.parent_id === i.id)).map((i) => i.id),
+  );
 
   for (const id of parents) {
     const depth = depths.get(id) ?? 0;
@@ -172,7 +174,7 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
     text: string,
     parentId: string | null = null,
     position: CreateIdeaPosition = "bottom",
-    initialUpdates: Partial<Idea> = {}
+    initialUpdates: Partial<Idea> = {},
   ): Promise<string> => {
     if (!user) return "";
     const siblings = ideas.filter((i) => i.parent_id === parentId);
@@ -181,9 +183,7 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
     const id = uuidv4();
     const sortOrder = position === "top" ? 0 : maxOrder + 1;
     const reorderedSiblings =
-      position === "top"
-        ? siblings.map((s) => ({ ...s, sort_order: s.sort_order + 1 }))
-        : [];
+      position === "top" ? siblings.map((s) => ({ ...s, sort_order: s.sort_order + 1 })) : [];
     const idea: Idea = {
       id,
       user_id: user.id,
@@ -211,9 +211,7 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
       ...initialUpdates,
     };
     setIdeas((prev) =>
-      prev
-        .map((i) => reorderedSiblings.find((s) => s.id === i.id) ?? i)
-        .concat(idea)
+      prev.map((i) => reorderedSiblings.find((s) => s.id === i.id) ?? i).concat(idea),
     );
     const { error } = await supabase.from("ideas").insert(idea);
     if (error) {
@@ -237,7 +235,7 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
     const updatedAt = new Date().toISOString();
     const previous = ideas.find((i) => i.id === id);
     setIdeas((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, ...updates, updated_at: updatedAt } : i))
+      prev.map((i) => (i.id === id ? { ...i, ...updates, updated_at: updatedAt } : i)),
     );
     const { error } = await supabase
       .from("ideas")
@@ -287,32 +285,36 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
       return next.sort((a, b) => a.sort_order - b.sort_order);
     });
     for (let i = 0; i < taskIds.length; i++) {
-      await supabase.from("ideas").update({ sort_order: i, updated_at: updatedAt }).eq("id", taskIds[i]);
+      await supabase
+        .from("ideas")
+        .update({ sort_order: i, updated_at: updatedAt })
+        .eq("id", taskIds[i]);
     }
   }, []);
 
-  const smartSortTasks = useCallback(async (tasksInGroup: Idea[]) => {
-    const computeScore = (t: Idea): number => {
-      const urgency = t.urgency ?? 3;
-      const impact = t.impact ?? 3;
-      const effort = t.effort ?? 3;
-      const priorityBoost = t.is_priority ? 2 : 1;
-      return priorityBoost * (urgency * impact) / Math.max(effort, 1);
-    };
+  const smartSortTasks = useCallback(
+    async (tasksInGroup: Idea[]) => {
+      const computeScore = (t: Idea): number => {
+        const urgency = t.urgency ?? 3;
+        const impact = t.impact ?? 3;
+        const effort = t.effort ?? 3;
+        const priorityBoost = t.is_priority ? 2 : 1;
+        return (priorityBoost * (urgency * impact)) / Math.max(effort, 1);
+      };
 
-    const sorted = [...tasksInGroup].sort((a, b) => {
-      const diff = computeScore(b) - computeScore(a);
-      return diff !== 0 ? diff : a.sort_order - b.sort_order;
-    });
+      const sorted = [...tasksInGroup].sort((a, b) => {
+        const diff = computeScore(b) - computeScore(a);
+        return diff !== 0 ? diff : a.sort_order - b.sort_order;
+      });
 
-    await reorderTasks(sorted.map((t) => t.id));
-  }, [reorderTasks]);
+      await reorderTasks(sorted.map((t) => t.id));
+    },
+    [reorderTasks],
+  );
 
   const moveIdea = async (id: string, newParentId: string | null, newSortOrder: number) => {
     const updatedAt = new Date().toISOString();
-    const siblings = ideas.filter(
-      (i) => i.parent_id === newParentId && i.id !== id
-    );
+    const siblings = ideas.filter((i) => i.parent_id === newParentId && i.id !== id);
     const reordered = siblings
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((s, idx) => ({
@@ -322,11 +324,12 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
 
     setIdeas((prev) =>
       prev.map((i) => {
-        if (i.id === id) return { ...i, parent_id: newParentId, sort_order: newSortOrder, updated_at: updatedAt };
+        if (i.id === id)
+          return { ...i, parent_id: newParentId, sort_order: newSortOrder, updated_at: updatedAt };
         const reorderedItem = reordered.find((r) => r.id === i.id);
         if (reorderedItem) return reorderedItem;
         return i;
-      })
+      }),
     );
 
     await supabase
@@ -352,7 +355,9 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
   const markUndone = async (id: string) => {
     const idea = ideas.find((i) => i.id === id);
     const fallbackStatus = idea?.scheduled_date
-      ? (idea?.scheduled_time ? "scheduled" : "planned")
+      ? idea?.scheduled_time
+        ? "scheduled"
+        : "planned"
       : "inbox";
     await updateIdea(id, { status: fallbackStatus, completed_at: null });
   };
@@ -424,7 +429,9 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
 
   const collapseAll = () => {
     overridesRef.current.clear();
-    const parents = new Set(ideas.filter((i) => ideas.some((c) => c.parent_id === i.id)).map((i) => i.id));
+    const parents = new Set(
+      ideas.filter((i) => ideas.some((c) => c.parent_id === i.id)).map((i) => i.id),
+    );
     for (const id of parents) {
       const depth = getDepthMap(ideas).get(id) ?? 0;
       if (depth < DEFAULT_EXPAND_DEPTH) {

@@ -20,7 +20,7 @@ function AuthGuard({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center">
         <div className="animate-pulse text-gray-400">Loading...</div>
       </div>
     );
@@ -28,7 +28,7 @@ function AuthGuard({ children }: { children: ReactNode }) {
 
   if (!user && pathname !== "/login") {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center">
         <div className="animate-pulse text-gray-400">Loading...</div>
       </div>
     );

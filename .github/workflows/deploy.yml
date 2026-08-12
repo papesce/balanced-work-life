@@ -57,7 +57,7 @@ jobs:
 
       - name: Build and push
         env:
-          DOCKER_BUILDKIT: '1'
+          DOCKER_BUILDKIT: "1"
         run: |
           docker build \
             --cache-from ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:latest \

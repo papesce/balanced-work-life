@@ -6,7 +6,11 @@ interface JumpToTodayButtonProps {
   label?: string;
 }
 
-export function JumpToTodayButton({ onClick, isToday = false, label = "Today" }: JumpToTodayButtonProps) {
+export function JumpToTodayButton({
+  onClick,
+  isToday = false,
+  label = "Today",
+}: JumpToTodayButtonProps) {
   return (
     <button
       type="button"

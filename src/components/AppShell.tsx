@@ -18,7 +18,14 @@ interface AppShellProps {
   onAdd?: (text: string, scheduledDate: string | null) => Promise<unknown>;
 }
 
-export function AppShell({ children, title, headerActions, headerStartActions, fullWidth, onAdd }: AppShellProps) {
+export function AppShell({
+  children,
+  title,
+  headerActions,
+  headerStartActions,
+  fullWidth,
+  onAdd,
+}: AppShellProps) {
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     const saved = localStorage.getItem(SIDEBAR_KEY);
@@ -53,19 +60,23 @@ export function AppShell({ children, title, headerActions, headerStartActions, f
     <div className="min-h-screen">
       <DesktopSidebar collapsed={collapsed} onToggle={handleToggle} />
 
-      <div className={`${collapsed ? "md:ml-[64px]" : "md:ml-[220px]"} flex flex-col min-h-screen transition-[margin-left] duration-200 ease-in-out`}>
-        <header className="sticky top-0 z-40 glass-card-strong border-b border-white/30 dark:border-white/5 px-4 md:px-5 py-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-none">
-          <div className="flex items-center gap-2 min-w-0">
-            <h1 className="text-[13px] font-semibold text-gray-500 dark:text-gray-400 tracking-tight truncate">{title}</h1>
+      <div
+        className={`${collapsed ? "md:ml-[64px]" : "md:ml-[220px]"} flex min-h-screen flex-col transition-[margin-left] duration-200 ease-in-out`}
+      >
+        <header className="glass-card-strong sticky top-0 z-40 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-none border-b border-white/30 px-4 py-2.5 md:px-5 dark:border-white/5">
+          <div className="flex min-w-0 items-center gap-2">
+            <h1 className="truncate text-[13px] font-semibold tracking-tight text-gray-500 dark:text-gray-400">
+              {title}
+            </h1>
             {headerStartActions && (
               <div className="flex flex-wrap items-center gap-1.5">{headerStartActions}</div>
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex shrink-0 items-center gap-2">
             {headerActions}
             {headerActions && (
               <>
-                <div className="w-px h-5 bg-black/[0.06] dark:bg-white/[0.08]" />
+                <div className="h-5 w-px bg-black/[0.06] dark:bg-white/[0.08]" />
                 <div className="w-1" />
               </>
             )}
@@ -74,9 +85,7 @@ export function AppShell({ children, title, headerActions, headerStartActions, f
         </header>
 
         <main className="flex-1 px-5 py-5 pb-24 md:pb-6">
-          <div className={fullWidth ? "w-full" : "max-w-2xl mx-auto"}>
-            {children}
-          </div>
+          <div className={fullWidth ? "w-full" : "mx-auto max-w-2xl"}>{children}</div>
         </main>
       </div>
 

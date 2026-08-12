@@ -3,7 +3,12 @@
 import { useBalanceData } from "@/hooks/useBalanceData";
 import { MiniRing } from "./MiniRing";
 import { LifeArea } from "@/lib/types";
-import { AREA_LABELS, AREA_ORDER, DEFAULT_TARGETS, LOCAL_STORAGE_TARGETS_KEY } from "@/lib/constants";
+import {
+  AREA_LABELS,
+  AREA_ORDER,
+  DEFAULT_TARGETS,
+  LOCAL_STORAGE_TARGETS_KEY,
+} from "@/lib/constants";
 import { areaColors } from "@/styles/tokens";
 
 function loadTargets(): Record<LifeArea, number> {
@@ -27,7 +32,12 @@ export function YearWheelView({ referenceDate }: YearWheelViewProps) {
 
   // Aggregate all monthly buckets into year totals
   const yearCounts: Record<LifeArea, number> = {
-    work: 0, health: 0, relationships: 0, growth: 0, finances: 0, life: 0,
+    work: 0,
+    health: 0,
+    relationships: 0,
+    growth: 0,
+    finances: 0,
+    life: 0,
   };
   for (const bucket of buckets) {
     for (const area of AREA_ORDER as LifeArea[]) {
@@ -38,15 +48,15 @@ export function YearWheelView({ referenceDate }: YearWheelViewProps) {
 
   if (loading) {
     return (
-      <div className="glass-card rounded-[20px] px-5 py-8 flex items-center justify-center">
-        <div className="animate-pulse text-gray-400 dark:text-gray-500 text-sm">Loading…</div>
+      <div className="glass-card flex items-center justify-center rounded-[20px] px-5 py-8">
+        <div className="animate-pulse text-sm text-gray-400 dark:text-gray-500">Loading…</div>
       </div>
     );
   }
 
   return (
-    <div className="glass-card rounded-[20px] px-5 py-6 space-y-6">
-      <h2 className="text-sm font-semibold text-center text-gray-700 dark:text-gray-200">
+    <div className="glass-card space-y-6 rounded-[20px] px-5 py-6">
+      <h2 className="text-center text-sm font-semibold text-gray-700 dark:text-gray-200">
         Wheel of Life — {year}
       </h2>
 
@@ -75,10 +85,10 @@ export function YearWheelView({ referenceDate }: YearWheelViewProps) {
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                   <div
-                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                    className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
                     style={{ background: areaColors[area]?.dot }}
                   />
-                  <span className="text-gray-600 dark:text-gray-300 font-medium">
+                  <span className="font-medium text-gray-600 dark:text-gray-300">
                     {AREA_LABELS[area]}
                   </span>
                 </div>
@@ -89,9 +99,7 @@ export function YearWheelView({ referenceDate }: YearWheelViewProps) {
                     <span
                       className={[
                         "font-medium",
-                        diff > 0
-                          ? "text-emerald-500"
-                          : "text-rose-400",
+                        diff > 0 ? "text-emerald-500" : "text-rose-400",
                       ].join(" ")}
                     >
                       {diff > 0 ? `+${diff}` : diff}%
@@ -100,9 +108,9 @@ export function YearWheelView({ referenceDate }: YearWheelViewProps) {
                 </div>
               </div>
               {/* Progress bar: actual fill, target marker */}
-              <div className="relative h-1.5 bg-black/[0.06] dark:bg-white/[0.08] rounded-full overflow-hidden">
+              <div className="relative h-1.5 overflow-hidden rounded-full bg-black/[0.06] dark:bg-white/[0.08]">
                 <div
-                  className="absolute left-0 top-0 h-full rounded-full transition-all"
+                  className="absolute top-0 left-0 h-full rounded-full transition-all"
                   style={{
                     width: `${barActual}%`,
                     background: areaColors[area]?.dot,
@@ -111,7 +119,7 @@ export function YearWheelView({ referenceDate }: YearWheelViewProps) {
                 />
                 {/* Target marker */}
                 <div
-                  className="absolute top-0 h-full w-0.5 bg-gray-400 dark:bg-gray-500 rounded-full"
+                  className="absolute top-0 h-full w-0.5 rounded-full bg-gray-400 dark:bg-gray-500"
                   style={{ left: `${barTarget}%` }}
                 />
               </div>

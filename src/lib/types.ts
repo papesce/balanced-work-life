@@ -1,6 +1,15 @@
 export type IdeaType = "idea" | "objective" | "project" | "initiative" | "task";
 export type LifeArea = "work" | "health" | "relationships" | "growth" | "finances" | "life";
-export type IdeaStatus = "inbox" | "planned" | "scheduled" | "in_progress" | "paused" | "completed" | "cancelled" | "archived" | "deferred";
+export type IdeaStatus =
+  | "inbox"
+  | "planned"
+  | "scheduled"
+  | "in_progress"
+  | "paused"
+  | "completed"
+  | "cancelled"
+  | "archived"
+  | "deferred";
 export type IdeaHorizon = "short" | "medium" | "long";
 
 export interface Tag {

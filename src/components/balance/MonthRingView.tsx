@@ -5,8 +5,18 @@ import { MiniRing } from "./MiniRing";
 import { getToday, toLocalDateString } from "@/lib/dateUtils";
 
 const MONTH_LABELS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 
 interface MonthRingViewProps {
@@ -23,22 +33,27 @@ export function MonthRingView({ referenceDate }: MonthRingViewProps) {
 
   if (loading) {
     return (
-      <div className="glass-card rounded-[20px] px-5 py-8 flex items-center justify-center">
-        <div className="animate-pulse text-gray-400 dark:text-gray-500 text-sm">Loading…</div>
+      <div className="glass-card flex items-center justify-center rounded-[20px] px-5 py-8">
+        <div className="animate-pulse text-sm text-gray-400 dark:text-gray-500">Loading…</div>
       </div>
     );
   }
 
   return (
     <div className="glass-card rounded-[20px] px-4 py-5">
-      <h2 className="text-sm font-semibold text-center text-gray-700 dark:text-gray-200 mb-5">
+      <h2 className="mb-5 text-center text-sm font-semibold text-gray-700 dark:text-gray-200">
         {currentYear}
       </h2>
       <div className="grid grid-cols-3 gap-4">
         {MONTH_LABELS.map((label, i) => {
           const bucket = buckets[i];
           const counts = bucket?.counts ?? {
-            work: 0, health: 0, relationships: 0, growth: 0, finances: 0, life: 0,
+            work: 0,
+            health: 0,
+            relationships: 0,
+            growth: 0,
+            finances: 0,
+            life: 0,
           };
           const isCurrent = i === currentMonthIndex;
           const monthStart = toLocalDateString(new Date(currentYear, i, 1));
@@ -48,9 +63,9 @@ export function MonthRingView({ referenceDate }: MonthRingViewProps) {
             <div
               key={label}
               className={[
-                "flex flex-col items-center gap-1.5 py-3 rounded-2xl transition-colors",
+                "flex flex-col items-center gap-1.5 rounded-2xl py-3 transition-colors",
                 isCurrent
-                  ? "bg-violet-500/10 dark:bg-violet-400/10 ring-1 ring-violet-400/30"
+                  ? "bg-violet-500/10 ring-1 ring-violet-400/30 dark:bg-violet-400/10"
                   : "bg-black/[0.02] dark:bg-white/[0.03]",
               ].join(" ")}
             >

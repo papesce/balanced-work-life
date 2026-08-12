@@ -38,7 +38,9 @@ export function useTags() {
     };
 
     void load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   const createTag = async (name: string, area: LifeArea): Promise<Tag | null> => {
@@ -99,7 +101,8 @@ export function useTags() {
     setTags((prev) => prev.filter((t) => t.id !== id));
     const { error } = await supabase.from("tags").delete().eq("id", id);
     if (error) {
-      if (previous) setTags((prev) => [...prev, previous].sort((a, b) => a.name.localeCompare(b.name)));
+      if (previous)
+        setTags((prev) => [...prev, previous].sort((a, b) => a.name.localeCompare(b.name)));
       console.error("Failed to delete tag", error);
       throw error;
     }

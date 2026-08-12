@@ -2,8 +2,25 @@
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, ChevronDown, GripVertical, Link2, ArrowUpDown, Calendar, Trash2 } from "lucide-react";
-import { IdeaNode as IdeaNodeType, Idea, IdeaLink, IdeaType, Tag, LinkType, IdeaStatus, LifeArea } from "@/lib/types";
+import {
+  ChevronRight,
+  ChevronDown,
+  GripVertical,
+  Link2,
+  ArrowUpDown,
+  Calendar,
+  Trash2,
+} from "lucide-react";
+import {
+  IdeaNode as IdeaNodeType,
+  Idea,
+  IdeaLink,
+  IdeaType,
+  Tag,
+  LinkType,
+  IdeaStatus,
+  LifeArea,
+} from "@/lib/types";
 import { TypePicker } from "./TypePicker";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { AREA_DOT_COLORS, STATUS_CONFIG } from "@/lib/constants";
@@ -23,7 +40,11 @@ interface IdeaNodeProps {
   setEditingId: (id: string | null) => void;
   selectedId: string | null;
   setSelectedId: (id: string | null) => void;
-  createIdea: (text: string, parentId?: string | null, position?: "top" | "bottom") => Promise<string>;
+  createIdea: (
+    text: string,
+    parentId?: string | null,
+    position?: "top" | "bottom",
+  ) => Promise<string>;
   updateIdea: (id: string, updates: Partial<Idea>) => Promise<void>;
   deleteIdea: (id: string) => Promise<void>;
   moveIdea: (id: string, newParentId: string | null, newSortOrder: number) => Promise<void>;
@@ -57,23 +78,32 @@ function formatScheduleDate(date: string, today: string): string {
 
 const TYPE_COLORS: Record<IdeaType, string> = {
   idea: "bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-700/30",
-  objective: "bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-700/30",
-  project: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700/30",
-  initiative: "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700/30",
+  objective:
+    "bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-700/30",
+  project:
+    "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700/30",
+  initiative:
+    "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700/30",
   task: "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700/30",
 };
 
-
 const STATUS_STYLES: Record<IdeaStatus, string> = {
   inbox: "border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 bg-transparent",
-  planned: "border-sky-200 dark:border-sky-700/30 bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-300",
-  scheduled: "border-blue-200 dark:border-blue-700/30 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300",
-  in_progress: "border-amber-200 dark:border-amber-700/30 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300",
-  paused: "border-orange-200 dark:border-orange-700/30 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300",
-  completed: "border-violet-200 dark:border-violet-700/30 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300",
-  cancelled: "border-red-200 dark:border-red-700/30 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300",
+  planned:
+    "border-sky-200 dark:border-sky-700/30 bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-300",
+  scheduled:
+    "border-blue-200 dark:border-blue-700/30 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300",
+  in_progress:
+    "border-amber-200 dark:border-amber-700/30 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300",
+  paused:
+    "border-orange-200 dark:border-orange-700/30 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300",
+  completed:
+    "border-violet-200 dark:border-violet-700/30 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300",
+  cancelled:
+    "border-red-200 dark:border-red-700/30 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300",
   archived: "border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 bg-transparent",
-  deferred: "border-amber-200 dark:border-amber-700/30 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300",
+  deferred:
+    "border-amber-200 dark:border-amber-700/30 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300",
 };
 
 const STATUS_LABELS: Record<IdeaStatus, string> = {
@@ -135,9 +165,7 @@ export function IdeaNode({
   const inputRef = useRef<HTMLInputElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
 
-  const linkCount = links.filter(
-    (l) => l.source_id === node.id || l.target_id === node.id
-  ).length;
+  const linkCount = links.filter((l) => l.source_id === node.id || l.target_id === node.id).length;
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -230,10 +258,18 @@ export function IdeaNode({
       if (isDescendant(node.id, draggedId)) return;
       moveIdea(draggedId, node.id, 0);
     } else if (dragOver === "top") {
-      if (node.parent_id === draggedId || (node.parent_id && isDescendant(node.parent_id, draggedId))) return;
+      if (
+        node.parent_id === draggedId ||
+        (node.parent_id && isDescendant(node.parent_id, draggedId))
+      )
+        return;
       moveIdea(draggedId, node.parent_id, node.sort_order);
     } else if (dragOver === "bottom") {
-      if (node.parent_id === draggedId || (node.parent_id && isDescendant(node.parent_id, draggedId))) return;
+      if (
+        node.parent_id === draggedId ||
+        (node.parent_id && isDescendant(node.parent_id, draggedId))
+      )
+        return;
       moveIdea(draggedId, node.parent_id, node.sort_order + 1);
     }
   };
@@ -268,7 +304,12 @@ export function IdeaNode({
         case "planned":
         case "scheduled":
         case "inbox":
-          await updateIdea(node.id, { status, completed_at: null, cancelled_at: null, paused_at: null });
+          await updateIdea(node.id, {
+            status,
+            completed_at: null,
+            cancelled_at: null,
+            paused_at: null,
+          });
           break;
         case "archived":
           await updateIdea(node.id, { status: "archived" });
@@ -300,19 +341,33 @@ export function IdeaNode({
     return n.children.some(matchesSearch);
   };
 
-  const isAnyMenuOpen = showTypePicker || showTagPicker || showStatusPicker || showLinkPanel || showMovePanel || showSchedulePicker;
+  const isAnyMenuOpen =
+    showTypePicker ||
+    showTagPicker ||
+    showStatusPicker ||
+    showLinkPanel ||
+    showMovePanel ||
+    showSchedulePicker;
 
   return (
     <div style={{ paddingLeft: depth > 0 ? 20 : 0 }}>
       <div
         ref={rowRef}
-        className={`group flex items-center gap-1 py-1 px-1 rounded-md ${
-          dragOver === "top" ? "border-t-2 border-indigo-400" :
-          dragOver === "bottom" ? "border-b-2 border-indigo-400" :
-          dragOver === "center" ? "bg-indigo-50 dark:bg-indigo-500/10" :
-          isSelected ? "bg-indigo-50/60 dark:bg-indigo-500/10" : ""
+        className={`group flex items-center gap-1 rounded-md px-1 py-1 ${
+          dragOver === "top"
+            ? "border-t-2 border-indigo-400"
+            : dragOver === "bottom"
+              ? "border-b-2 border-indigo-400"
+              : dragOver === "center"
+                ? "bg-indigo-50 dark:bg-indigo-500/10"
+                : isSelected
+                  ? "bg-indigo-50/60 dark:bg-indigo-500/10"
+                  : ""
         } ${isAnyMenuOpen ? "relative z-30" : ""}`}
-        onClick={(e) => { e.stopPropagation(); setSelectedId(isSelected ? null : node.id); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          setSelectedId(isSelected ? null : node.id);
+        }}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -323,7 +378,7 @@ export function IdeaNode({
             e.stopPropagation();
             if (hasChildren) toggleCollapse(node.id);
           }}
-          className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 flex-shrink-0"
+          className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-gray-400 hover:text-gray-600"
         >
           {hasChildren ? (
             node.collapsed ? (
@@ -338,7 +393,7 @@ export function IdeaNode({
         <span
           draggable
           onDragStart={handleDragStart}
-          className="cursor-grab text-gray-300 hover:text-gray-500 flex-shrink-0 select-none flex items-center"
+          className="flex flex-shrink-0 cursor-grab items-center text-gray-300 select-none hover:text-gray-500"
         >
           <GripVertical size={14} strokeWidth={1.5} />
         </span>
@@ -354,7 +409,7 @@ export function IdeaNode({
                 onMarkDone(node.id);
               }
             }}
-            className={`flex-shrink-0 flex items-center justify-center w-4 h-4 ${STATUS_CONFIG[node.status].textClass}`}
+            className={`flex h-4 w-4 flex-shrink-0 items-center justify-center ${STATUS_CONFIG[node.status].textClass}`}
           >
             {(() => {
               const Icon = STATUS_CONFIG[node.status].icon;
@@ -372,7 +427,7 @@ export function IdeaNode({
             onChange={(e) => setEditText(e.target.value)}
             onKeyDown={handleKeyDown}
             onBlur={handleConfirmEdit}
-            className="flex-1 text-sm px-2 py-0.5 border border-gray-300 rounded outline-none focus:border-indigo-500 min-w-0"
+            className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-0.5 text-sm outline-none focus:border-indigo-500"
             placeholder="Type an idea..."
           />
         ) : (
@@ -381,13 +436,18 @@ export function IdeaNode({
               e.stopPropagation();
               handleStartEdit();
             }}
-            className={`flex-1 text-sm px-2 py-0.5 rounded min-w-0 truncate ${
-              isAncestorOnly ? "text-gray-400 italic cursor-default" :
-              node.status === "completed" ? "text-violet-600/70 dark:text-violet-400/60 cursor-text hover:bg-gray-100 dark:hover:bg-white/[0.04]" :
-              node.status === "cancelled" ? "text-red-400/60 dark:text-red-400/50 cursor-text hover:bg-gray-100 dark:hover:bg-white/[0.04]" :
-              node.status === "paused" ? "text-orange-600/70 dark:text-orange-400/60 cursor-text hover:bg-gray-100 dark:hover:bg-white/[0.04]" :
-              node.status === "in_progress" ? "text-amber-700 dark:text-amber-300 cursor-text hover:bg-gray-100 dark:hover:bg-white/[0.04]" :
-              "text-gray-800 dark:text-gray-200 cursor-text hover:bg-gray-100 dark:hover:bg-white/[0.04]"
+            className={`min-w-0 flex-1 truncate rounded px-2 py-0.5 text-sm ${
+              isAncestorOnly
+                ? "cursor-default text-gray-400 italic"
+                : node.status === "completed"
+                  ? "cursor-text text-violet-600/70 hover:bg-gray-100 dark:text-violet-400/60 dark:hover:bg-white/[0.04]"
+                  : node.status === "cancelled"
+                    ? "cursor-text text-red-400/60 hover:bg-gray-100 dark:text-red-400/50 dark:hover:bg-white/[0.04]"
+                    : node.status === "paused"
+                      ? "cursor-text text-orange-600/70 hover:bg-gray-100 dark:text-orange-400/60 dark:hover:bg-white/[0.04]"
+                      : node.status === "in_progress"
+                        ? "cursor-text text-amber-700 hover:bg-gray-100 dark:text-amber-300 dark:hover:bg-white/[0.04]"
+                        : "cursor-text text-gray-800 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/[0.04]"
             }`}
           >
             {node.text || <span className="text-gray-400 italic">empty</span>}
@@ -399,7 +459,7 @@ export function IdeaNode({
           <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setShowTypePicker(!showTypePicker)}
-              className={`text-xs px-2 py-0.5 rounded-full border ${
+              className={`rounded-full border px-2 py-0.5 text-xs ${
                 node.type ? TYPE_COLORS[node.type] : "border-gray-200 text-gray-400"
               }`}
             >
@@ -420,24 +480,27 @@ export function IdeaNode({
 
         {/* Tag chips */}
         {showArea && (
-          <div className="relative flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="relative flex flex-shrink-0 items-center gap-1"
+            onClick={(e) => e.stopPropagation()}
+          >
             {nodeTags.map((tag) => (
               <span
                 key={tag.id}
-                className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium flex items-center gap-1 ${
-                  AREA_DOT_COLORS[tag.area]
-                    ? "border-current/20"
-                    : "border-gray-200 text-gray-400"
+                className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${
+                  AREA_DOT_COLORS[tag.area] ? "border-current/20" : "border-gray-200 text-gray-400"
                 }`}
                 style={{ opacity: 0.85 }}
               >
-                <span className={`w-1.5 h-1.5 rounded-full inline-block flex-shrink-0 ${AREA_DOT_COLORS[tag.area]}`} />
+                <span
+                  className={`inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full ${AREA_DOT_COLORS[tag.area]}`}
+                />
                 {tag.name}
               </span>
             ))}
             <button
               onClick={() => setShowTagPicker(!showTagPicker)}
-              className="text-[10px] px-1.5 py-0.5 rounded-full border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:border-gray-400 dark:hover:border-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+              className="rounded-full border border-gray-200 px-1.5 py-0.5 text-[10px] text-gray-400 hover:border-gray-400 hover:text-gray-600 dark:border-gray-700 dark:text-gray-500 dark:hover:border-gray-500 dark:hover:text-gray-300"
               title="Add tag"
             >
               {nodeTags.length === 0 ? "tag" : "+"}
@@ -446,8 +509,12 @@ export function IdeaNode({
               <TagPicker
                 allTags={allTags}
                 selectedTags={nodeTags}
-                onAdd={(tag) => { void onAddTag(node.id, tag); }}
-                onRemove={(tagId) => { void onRemoveTag(node.id, tagId); }}
+                onAdd={(tag) => {
+                  void onAddTag(node.id, tag);
+                }}
+                onRemove={(tagId) => {
+                  void onRemoveTag(node.id, tagId);
+                }}
                 onCreateTag={onCreateTag}
                 onClose={() => setShowTagPicker(false)}
               />
@@ -460,14 +527,14 @@ export function IdeaNode({
           <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setShowStatusPicker(!showStatusPicker)}
-              className={`text-xs px-2 py-0.5 rounded-full border cursor-pointer ${
+              className={`cursor-pointer rounded-full border px-2 py-0.5 text-xs ${
                 STATUS_STYLES[node.status]
               }`}
             >
               {STATUS_LABELS[node.status]}
             </button>
             {showStatusPicker && (
-              <div className="absolute right-0 top-full mt-1 z-50">
+              <div className="absolute top-full right-0 z-50 mt-1">
                 <StatusPicker
                   current={node.status}
                   onSelect={handleStatusSelect}
@@ -480,7 +547,7 @@ export function IdeaNode({
 
         {/* Link count badge */}
         {linkCount > 0 && (
-          <span className="text-xs text-indigo-500 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/20 px-1.5 py-0.5 rounded-full flex-shrink-0">
+          <span className="flex-shrink-0 rounded-full bg-indigo-50 px-1.5 py-0.5 text-xs text-indigo-500 dark:bg-indigo-500/20 dark:text-indigo-300">
             {linkCount}
           </span>
         )}
@@ -493,18 +560,19 @@ export function IdeaNode({
               router.push(`/timeline?date=${node.scheduled_date}&highlight=${node.id}`);
             }}
             title="Open in timeline"
-            className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 border cursor-pointer transition-colors hover:border-violet-400 dark:hover:border-violet-500 hover:text-violet-700 dark:hover:text-violet-300 ${
+            className={`flex-shrink-0 cursor-pointer rounded-full border px-1.5 py-0.5 text-xs transition-colors hover:border-violet-400 hover:text-violet-700 dark:hover:border-violet-500 dark:hover:text-violet-300 ${
               node.scheduled_date === todayString
-                ? "text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-500/20 border-violet-200 dark:border-violet-500/30"
-                : "text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700"
-            }`}>
+                ? "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/20 dark:text-violet-300"
+                : "border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-300"
+            }`}
+          >
             {formatScheduleDate(node.scheduled_date, todayString)}
           </button>
         )}
 
         {/* Actions (visible on hover) */}
         <div
-          className="relative flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+          className="relative flex flex-shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100"
           onClick={(e) => e.stopPropagation()}
         >
           <button
@@ -516,7 +584,7 @@ export function IdeaNode({
               setShowLinkPanel(!showLinkPanel);
             }}
             title="Link"
-            className="w-6 h-6 flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded"
+            className="flex h-6 w-6 items-center justify-center rounded text-gray-400 hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-500 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400"
           >
             <Link2 size={14} strokeWidth={1.5} />
           </button>
@@ -529,7 +597,7 @@ export function IdeaNode({
               setShowMovePanel(!showMovePanel);
             }}
             title="Move"
-            className="w-6 h-6 flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded"
+            className="flex h-6 w-6 items-center justify-center rounded text-gray-400 hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-500 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400"
           >
             <ArrowUpDown size={14} strokeWidth={1.5} />
           </button>
@@ -543,10 +611,10 @@ export function IdeaNode({
                 setShowSchedulePicker(!showSchedulePicker);
               }}
               title="Schedule"
-              className={`w-6 h-6 flex items-center justify-center rounded ${
+              className={`flex h-6 w-6 items-center justify-center rounded ${
                 node.scheduled_date
-                  ? "text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/20"
-                  : "text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10"
+                  ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300"
+                  : "text-gray-400 hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-500 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400"
               }`}
             >
               <Calendar size={14} strokeWidth={1.5} />
@@ -554,8 +622,14 @@ export function IdeaNode({
             {showSchedulePicker && (
               <SchedulePicker
                 currentDate={node.scheduled_date}
-                onSelect={(date) => { onSchedule(node.id, date); setShowSchedulePicker(false); }}
-                onClear={() => { onSchedule(node.id, null); setShowSchedulePicker(false); }}
+                onSelect={(date) => {
+                  onSchedule(node.id, date);
+                  setShowSchedulePicker(false);
+                }}
+                onClear={() => {
+                  onSchedule(node.id, null);
+                  setShowSchedulePicker(false);
+                }}
                 onClose={() => setShowSchedulePicker(false)}
               />
             )}
@@ -565,30 +639,34 @@ export function IdeaNode({
               onClick={handleRequestDelete}
               title="Delete"
               aria-expanded={showDeleteWarning}
-              className={`w-6 h-6 flex items-center justify-center rounded ${
+              className={`flex h-6 w-6 items-center justify-center rounded ${
                 showDeleteWarning
-                  ? "text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-500/20"
-                  : "text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10"
+                  ? "bg-red-50 text-red-600 dark:bg-red-500/20 dark:text-red-300"
+                  : "text-gray-400 hover:bg-red-50 hover:text-red-600 dark:text-gray-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
               }`}
             >
               <Trash2 size={14} strokeWidth={1.5} />
             </button>
             {showDeleteWarning && (
-              <div className="absolute right-0 top-7 z-20 w-52 rounded-xl border border-red-200 dark:border-red-500/30 glass-card-strong p-2">
-                <p className="text-xs font-medium text-red-700 dark:text-red-400">Delete this idea?</p>
+              <div className="glass-card-strong absolute top-7 right-0 z-20 w-52 rounded-xl border border-red-200 p-2 dark:border-red-500/30">
+                <p className="text-xs font-medium text-red-700 dark:text-red-400">
+                  Delete this idea?
+                </p>
                 {hasChildren && (
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Child ideas will be deleted too.</p>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Child ideas will be deleted too.
+                  </p>
                 )}
                 <div className="mt-2 flex justify-end gap-1.5">
                   <button
                     onClick={() => setShowDeleteWarning(false)}
-                    className="px-2 py-1 text-xs text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] rounded-lg"
+                    className="rounded-lg px-2 py-1 text-xs text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.06]"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleConfirmDelete}
-                    className="px-2 py-1 text-xs font-medium text-white bg-red-600 dark:bg-red-500 hover:bg-red-700 dark:hover:bg-red-400 rounded-lg"
+                    className="rounded-lg bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-400"
                   >
                     Delete
                   </button>
@@ -630,40 +708,42 @@ export function IdeaNode({
       {/* Children */}
       {hasChildren && !node.collapsed && (
         <div>
-          {node.children.filter((child) => matchesSearch(child)).map((child) => (
-            <IdeaNode
-              key={child.id}
-              node={child}
-              depth={depth + 1}
-              showType={showType}
-              showArea={showArea}
-              search={search}
-              editingId={editingId}
-              setEditingId={setEditingId}
-              selectedId={selectedId}
-              setSelectedId={setSelectedId}
-              createIdea={createIdea}
-              updateIdea={updateIdea}
-              deleteIdea={deleteIdea}
-              moveIdea={moveIdea}
-              toggleCollapse={toggleCollapse}
-              expandIdea={expandIdea}
-              allIdeas={allIdeas}
-              links={links}
-              onCreateLink={onCreateLink}
-              onDeleteLink={onDeleteLink}
-              onMarkDone={onMarkDone}
-              onMarkUndone={onMarkUndone}
-              onSchedule={onSchedule}
-              todayString={todayString}
-              isAncestorOnly={isAncestorOnly}
-              allTags={allTags}
-              getTagsForIdea={getTagsForIdea}
-              onAddTag={onAddTag}
-              onRemoveTag={onRemoveTag}
-              onCreateTag={onCreateTag}
-            />
-          ))}
+          {node.children
+            .filter((child) => matchesSearch(child))
+            .map((child) => (
+              <IdeaNode
+                key={child.id}
+                node={child}
+                depth={depth + 1}
+                showType={showType}
+                showArea={showArea}
+                search={search}
+                editingId={editingId}
+                setEditingId={setEditingId}
+                selectedId={selectedId}
+                setSelectedId={setSelectedId}
+                createIdea={createIdea}
+                updateIdea={updateIdea}
+                deleteIdea={deleteIdea}
+                moveIdea={moveIdea}
+                toggleCollapse={toggleCollapse}
+                expandIdea={expandIdea}
+                allIdeas={allIdeas}
+                links={links}
+                onCreateLink={onCreateLink}
+                onDeleteLink={onDeleteLink}
+                onMarkDone={onMarkDone}
+                onMarkUndone={onMarkUndone}
+                onSchedule={onSchedule}
+                todayString={todayString}
+                isAncestorOnly={isAncestorOnly}
+                allTags={allTags}
+                getTagsForIdea={getTagsForIdea}
+                onAddTag={onAddTag}
+                onRemoveTag={onRemoveTag}
+                onCreateTag={onCreateTag}
+              />
+            ))}
         </div>
       )}
     </div>

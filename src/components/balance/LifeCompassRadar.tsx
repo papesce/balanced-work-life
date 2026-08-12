@@ -43,7 +43,7 @@ export function LifeCompassRadar({ data }: LifeCompassRadarProps) {
 
   if (data.length === 0 || data.every((d) => d.actual === 0)) {
     return (
-      <div className="flex items-center justify-center h-full min-h-[220px] text-sm text-gray-400 dark:text-gray-500 italic">
+      <div className="flex h-full min-h-[220px] items-center justify-center text-sm text-gray-400 italic dark:text-gray-500">
         No tasks in this period
       </div>
     );
@@ -53,10 +53,7 @@ export function LifeCompassRadar({ data }: LifeCompassRadarProps) {
     <ResponsiveContainer width="100%" height={260}>
       <RadarChart data={chartData} margin={{ top: 8, right: 16, bottom: 8, left: 16 }}>
         <PolarGrid stroke={gridColor} />
-        <PolarAngleAxis
-          dataKey="area"
-          tick={{ fontSize: 11, fill: tickColor, fontWeight: 600 }}
-        />
+        <PolarAngleAxis dataKey="area" tick={{ fontSize: 11, fill: tickColor, fontWeight: 600 }} />
         <Radar
           name="Target"
           dataKey="Target"
@@ -82,11 +79,7 @@ export function LifeCompassRadar({ data }: LifeCompassRadarProps) {
           }}
           formatter={(value, name) => [`${value}%`, name]}
         />
-        <Legend
-          iconType="circle"
-          iconSize={8}
-          wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
-        />
+        <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
       </RadarChart>
     </ResponsiveContainer>
   );

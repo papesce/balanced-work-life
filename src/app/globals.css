@@ -120,7 +120,9 @@ body {
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   border: 1px solid rgba(139, 92, 246, 0.25);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 0 0 1.5px rgba(139, 92, 246, 0.2);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 0 0 1.5px rgba(139, 92, 246, 0.2);
 }
 
 /* Today card highlight (when not the selected anchor) */
@@ -129,7 +131,9 @@ body {
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06), inset 4px 0 0 0 rgba(16, 185, 129, 0.85);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.06),
+    inset 4px 0 0 0 rgba(16, 185, 129, 0.85);
 }
 
 /* No scrollbar utility */
@@ -349,7 +353,8 @@ body {
 
 /* Task highlight pulse for deep-link focus */
 @keyframes highlight-pulse {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.4);
     background-color: rgba(139, 92, 246, 0.06);
   }
@@ -366,7 +371,8 @@ body {
 
 /* Re-center flash for the Today button (keeps the element's own radius/background) */
 @keyframes today-recenter-flash {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.45);
   }
   50% {
@@ -428,13 +434,17 @@ body {
   .glass-card-anchor {
     background: rgba(30, 30, 48, 0.8);
     border: 1px solid rgba(139, 92, 246, 0.35);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1.5px rgba(139, 92, 246, 0.3);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.4),
+      0 0 0 1.5px rgba(139, 92, 246, 0.3);
   }
 
   .glass-card-today {
     background: rgba(30, 30, 48, 0.72);
     border: 1px solid rgba(255, 255, 255, 0.06);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 4px 0 0 0 rgba(16, 185, 129, 0.85);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.3),
+      inset 4px 0 0 0 rgba(16, 185, 129, 0.85);
   }
 
   .focus-button {

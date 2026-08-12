@@ -78,7 +78,7 @@ export function TagPicker({
         onClose();
       }
     },
-    [selectedIds, selectedTags, onAdd, onRemove, onClose, singleSelect]
+    [selectedIds, selectedTags, onAdd, onRemove, onClose, singleSelect],
   );
 
   const handleCreate = async () => {
@@ -93,25 +93,25 @@ export function TagPicker({
   };
 
   // Group tags by area, system tags first
-  const tagsByArea = AREA_ORDER.reduce<Record<LifeArea, Tag[]>>((acc, area) => {
-    const tags = allTags.filter((t) => t.area === area);
-    acc[area] = [
-      ...tags.filter((t) => t.is_system),
-      ...tags.filter((t) => !t.is_system),
-    ];
-    return acc;
-  }, {} as Record<LifeArea, Tag[]>);
+  const tagsByArea = AREA_ORDER.reduce<Record<LifeArea, Tag[]>>(
+    (acc, area) => {
+      const tags = allTags.filter((t) => t.area === area);
+      acc[area] = [...tags.filter((t) => t.is_system), ...tags.filter((t) => !t.is_system)];
+      return acc;
+    },
+    {} as Record<LifeArea, Tag[]>,
+  );
 
   const areasWithTags = AREA_ORDER.filter((a) => tagsByArea[a].length > 0);
 
   const content = (
     <div
       ref={ref}
-      className={`${fixedPosition ? "fixed z-[9999]" : "absolute left-0 top-full mt-1 z-50"} glass-card-strong rounded-xl shadow-lg min-w-[200px] max-w-[260px] py-2`}
+      className={`${fixedPosition ? "fixed z-[9999]" : "absolute top-full left-0 z-50 mt-1"} glass-card-strong max-w-[260px] min-w-[200px] rounded-xl py-2 shadow-lg`}
       style={fixedPosition ? { top: fixedPosition.top, left: fixedPosition.left } : undefined}
     >
       {areasWithTags.length === 0 && !creating && (
-        <p className="text-xs text-gray-400 dark:text-gray-500 px-3 py-1">No tags yet</p>
+        <p className="px-3 py-1 text-xs text-gray-400 dark:text-gray-500">No tags yet</p>
       )}
 
       {areasWithTags.map((area, areaIdx) => (
@@ -122,7 +122,7 @@ export function TagPicker({
               onClick={() => handleToggle(tag)}
               onMouseEnter={() => setHoveredTagId(tag.id)}
               onMouseLeave={() => setHoveredTagId(null)}
-              className="flex items-center gap-2 w-full text-left text-sm px-3 py-1.5 rounded-md mx-1 cursor-pointer transition-colors"
+              className="mx-1 flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm transition-colors"
               title={
                 selectedIds.has(tag.id) && selectedTags.length === 1
                   ? "A task must keep at least one area/tag"
@@ -133,20 +133,22 @@ export function TagPicker({
                 background: areaBg(area, hoveredTagId === tag.id ? 0.24 : 0.12),
               }}
             >
-              <span className={`flex-none w-3.5 h-3.5 flex items-center justify-center ${
-                singleSelect
-                  ? "rounded-full border-2 " + (
-                      selectedIds.has(tag.id)
-                        ? "border-current ring-2 ring-inset ring-current"
-                        : "border-gray-300 dark:border-gray-600"
-                    )
-                  : "rounded border " + (
-                      selectedIds.has(tag.id)
-                        ? "bg-current border-current"
-                        : "border-gray-300 dark:border-gray-600"
-                    )
-              }`}>
-                {!singleSelect && selectedIds.has(tag.id) && <Check size={9} className="text-white" strokeWidth={3} />}
+              <span
+                className={`flex h-3.5 w-3.5 flex-none items-center justify-center ${
+                  singleSelect
+                    ? "rounded-full border-2 " +
+                      (selectedIds.has(tag.id)
+                        ? "border-current ring-2 ring-current ring-inset"
+                        : "border-gray-300 dark:border-gray-600")
+                    : "rounded border " +
+                      (selectedIds.has(tag.id)
+                        ? "border-current bg-current"
+                        : "border-gray-300 dark:border-gray-600")
+                }`}
+              >
+                {!singleSelect && selectedIds.has(tag.id) && (
+                  <Check size={9} className="text-white" strokeWidth={3} />
+                )}
               </span>
               <span className="text-gray-700 dark:text-gray-200">{tag.name}</span>
             </button>
@@ -155,7 +157,7 @@ export function TagPicker({
       ))}
 
       {creating ? (
-        <div className="px-3 pt-2 pb-1 border-t border-black/5 dark:border-white/5 mt-1 space-y-1.5">
+        <div className="mt-1 space-y-1.5 border-t border-black/5 px-3 pt-2 pb-1 dark:border-white/5">
           <input
             ref={inputRef}
             value={newName}
@@ -165,17 +167,17 @@ export function TagPicker({
               if (e.key === "Escape") setCreating(false);
             }}
             placeholder="Tag name…"
-            className="w-full text-sm bg-transparent border border-gray-200 dark:border-gray-700 rounded-md px-2 py-1 outline-none focus:border-gray-400 dark:focus:border-gray-500"
+            className="w-full rounded-md border border-gray-200 bg-transparent px-2 py-1 text-sm outline-none focus:border-gray-400 dark:border-gray-700 dark:focus:border-gray-500"
           />
           <div className="flex flex-wrap gap-1">
             {AREA_ORDER.map((area) => (
               <button
                 key={area}
                 onClick={() => setNewArea(area)}
-                className={`text-[10px] px-1.5 py-0.5 rounded-full border cursor-pointer transition-colors ${
+                className={`cursor-pointer rounded-full border px-1.5 py-0.5 text-[10px] transition-colors ${
                   newArea === area
                     ? `${AREA_TEXT_COLORS[area]} border-current font-medium`
-                    : "text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-700 hover:text-gray-600 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"
+                    : "border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-600 dark:border-gray-700 dark:text-gray-500 dark:hover:border-gray-600 dark:hover:text-gray-300"
                 }`}
               >
                 {AREA_LABELS[area]}
@@ -185,13 +187,13 @@ export function TagPicker({
           <div className="flex gap-1.5 pt-0.5">
             <button
               onClick={() => void handleCreate()}
-              className="text-xs px-2 py-0.5 rounded bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium cursor-pointer hover:opacity-80 transition-opacity"
+              className="cursor-pointer rounded bg-gray-900 px-2 py-0.5 text-xs font-medium text-white transition-opacity hover:opacity-80 dark:bg-white dark:text-gray-900"
             >
               Add
             </button>
             <button
               onClick={() => setCreating(false)}
-              className="text-xs px-2 py-0.5 rounded text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+              className="rounded px-2 py-0.5 text-xs text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
             >
               Cancel
             </button>
@@ -200,7 +202,7 @@ export function TagPicker({
       ) : (
         <button
           onClick={() => setCreating(true)}
-          className="flex items-center gap-1.5 w-full text-left text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 px-3 py-1.5 border-t border-black/5 dark:border-white/5 mt-1 cursor-pointer transition-colors"
+          className="mt-1 flex w-full cursor-pointer items-center gap-1.5 border-t border-black/5 px-3 py-1.5 text-left text-xs text-gray-400 transition-colors hover:text-gray-600 dark:border-white/5 dark:text-gray-500 dark:hover:text-gray-300"
         >
           <Plus size={12} />
           New tag

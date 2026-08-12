@@ -10,9 +10,11 @@ export function formatDayLabel(dateStr: string, todayStr: string): string {
   if (dateStr === todayStr) return "Today";
   if (dateStr === offsetDate(todayStr, 1)) return "Tomorrow";
   if (dateStr === offsetDate(todayStr, -1)) return "Yesterday";
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", weekday: "short" }).format(
-    new Date(dateStr + "T12:00:00"),
-  );
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    weekday: "short",
+  }).format(new Date(dateStr + "T12:00:00"));
 }
 
 export function formatTime(raw: string): string {

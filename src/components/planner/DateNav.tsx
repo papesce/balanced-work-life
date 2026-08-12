@@ -11,10 +11,17 @@ interface DateNavProps {
   onChangeDate: (d: string) => void;
 }
 
-const segButton = "flex items-center justify-center h-full px-2.5 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition-colors cursor-pointer";
+const segButton =
+  "flex items-center justify-center h-full px-2.5 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition-colors cursor-pointer";
 const divider = "w-px h-4 bg-black/[0.06] dark:bg-white/[0.08]";
 
-export function DateNav({ activeDate, today, showDateInput, onShowDateInput, onChangeDate }: DateNavProps) {
+export function DateNav({
+  activeDate,
+  today,
+  showDateInput,
+  onShowDateInput,
+  onChangeDate,
+}: DateNavProps) {
   const label = formatDayLabel(activeDate, today);
   const isToday = activeDate === today;
 
@@ -24,13 +31,13 @@ export function DateNav({ activeDate, today, showDateInput, onShowDateInput, onC
         <button
           type="button"
           onClick={() => onChangeDate(today)}
-          className="toolbar-btn toolbar-btn--accent hidden md:inline-flex mr-1"
+          className="toolbar-btn toolbar-btn--accent mr-1 hidden md:inline-flex"
         >
           Today
         </button>
       )}
 
-      <div className="flex items-center h-8 rounded-lg bg-white/70 dark:bg-gray-900/60 border border-black/5 dark:border-white/5 shadow-sm overflow-hidden">
+      <div className="flex h-8 items-center overflow-hidden rounded-lg border border-black/5 bg-white/70 shadow-sm dark:border-white/5 dark:bg-gray-900/60">
         <button
           type="button"
           onClick={() => onChangeDate(offsetDate(activeDate, -1))}
@@ -53,7 +60,7 @@ export function DateNav({ activeDate, today, showDateInput, onShowDateInput, onC
               }
             }}
             onBlur={() => onShowDateInput(false)}
-            className="text-xs border-0 bg-transparent px-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-violet-500 h-full"
+            className="h-full border-0 bg-transparent px-2 text-xs text-gray-800 focus:ring-1 focus:ring-violet-500 focus:outline-none dark:text-gray-200"
           />
         ) : (
           <button
@@ -61,7 +68,7 @@ export function DateNav({ activeDate, today, showDateInput, onShowDateInput, onC
             onClick={() => onShowDateInput(true)}
             className={`${segButton} min-w-[96px] text-xs font-semibold`}
           >
-            <CalendarDays size={13} className="text-gray-400 dark:text-gray-500 mr-1" />
+            <CalendarDays size={13} className="mr-1 text-gray-400 dark:text-gray-500" />
             <span className="whitespace-nowrap">{label}</span>
           </button>
         )}

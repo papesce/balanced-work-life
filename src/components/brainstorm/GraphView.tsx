@@ -128,19 +128,19 @@ export function GraphView({ ideas, links, onNodeDoubleClick }: GraphViewProps) {
     (_: React.MouseEvent, node: Node) => {
       onNodeDoubleClick?.(node.id);
     },
-    [onNodeDoubleClick]
+    [onNodeDoubleClick],
   );
 
   if (initialNodes.length === 0) {
     return (
-      <div className="flex items-center justify-center h-[500px] text-gray-400 text-sm italic">
+      <div className="flex h-[500px] items-center justify-center text-sm text-gray-400 italic">
         No linked ideas to display. Create links between ideas to see the graph.
       </div>
     );
   }
 
   return (
-    <div className="h-[600px] w-full border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+    <div className="h-[600px] w-full overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -159,7 +159,7 @@ export function GraphView({ ideas, links, onNodeDoubleClick }: GraphViewProps) {
           nodeStrokeWidth={3}
           pannable
           zoomable
-          className="!bg-white/80 dark:!bg-gray-800/80 !border-gray-200 dark:!border-gray-700"
+          className="!border-gray-200 !bg-white/80 dark:!border-gray-700 dark:!bg-gray-800/80"
         />
       </ReactFlow>
     </div>
