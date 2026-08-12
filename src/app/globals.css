@@ -8,6 +8,11 @@
 :root {
   color-scheme: light dark;
   --ring-bg: rgba(0, 0, 0, 0.04);
+  --app-header-h: 56px;
+}
+
+html {
+  scroll-padding-top: var(--app-header-h);
 }
 
 @layer base {
