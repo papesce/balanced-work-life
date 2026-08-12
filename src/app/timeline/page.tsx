@@ -3,7 +3,7 @@
 import { useMemo, useRef, useEffect, useState, useCallback, Suspense, type RefObject } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Sparkles, Clock, CalendarRange, ChevronDown, ChevronUp, ChevronsUpDown } from "lucide-react";
+import { Sparkles, Clock, CalendarRange, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
@@ -217,7 +217,6 @@ function TimelineInner() {
   const windowMenuRef = useRef<HTMLDivElement>(null);
   const scrolledAnchorRef = useRef<string | null>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
-  const hasMountedRef = useRef(false);
   const [showDateInput, setShowDateInput] = useState(false);
   const [windowMenuOpen, setWindowMenuOpen] = useState(false);
   const [filter, setFilter] = useState<"all" | "deferred">(() => loadPrefs().filter);
@@ -348,19 +347,31 @@ function TimelineInner() {
     return () => document.removeEventListener("keydown", handler);
   }, [windowMenuOpen]);
 
+  const scrollToDate = useCallback((d: string, onDone?: () => void) => {
+    let attempts = 0;
+    const tryScroll = () => {
+      const el = document.getElementById(`day-${d}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        scrolledAnchorRef.current = d;
+        onDone?.();
+        return;
+      }
+      if (attempts < 30) {
+        attempts += 1;
+        requestAnimationFrame(tryScroll);
+      }
+    };
+    tryScroll();
+  }, []);
+
+  // Auto-scroll to the selected (anchor) day once data has loaded, and on every
+  // URL-driven anchor change (e.g. browser back/forward or ?date= deep links).
   useEffect(() => {
     if (loading) return;
     if (scrolledAnchorRef.current === anchor) return;
-    if (!hasMountedRef.current) {
-      hasMountedRef.current = true;
-      return;
-    }
-    const timer = setTimeout(() => {
-      document.getElementById(`day-${anchor}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-      scrolledAnchorRef.current = anchor;
-    }, 80);
-    return () => clearTimeout(timer);
-  }, [anchor, loading]);
+    scrollToDate(anchor);
+  }, [anchor, loading, scrollToDate]);
 
   useEffect(() => {
     if (!highlightId || loading) return;
@@ -417,24 +428,6 @@ function TimelineInner() {
     setTimeout(cleanup, 2500);
   }, []);
 
-  const scrollToDate = useCallback((d: string, onDone?: () => void) => {
-    let attempts = 0;
-    const tryScroll = () => {
-      const el = document.getElementById(`day-${d}`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        scrolledAnchorRef.current = d;
-        onDone?.();
-        return;
-      }
-      if (attempts < 30) {
-        attempts += 1;
-        requestAnimationFrame(tryScroll);
-      }
-    };
-    tryScroll();
-  }, []);
-
   const setAnchorParam = useCallback((d: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("date", d);
@@ -453,19 +446,15 @@ function TimelineInner() {
 
   // Track anchor visibility in viewport
   useEffect(() => {
-    const handleScroll = () => {
-      if (anchorRef.current) {
-        const rect = anchorRef.current.getBoundingClientRect();
-        const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
-        setAnchorVisible(isVisible);
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    handleScroll(); // Initial check
-
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [anchor, anchorRef]);
+    const el = anchorRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setAnchorVisible(entry.isIntersecting),
+      { threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [anchor, loading, anchorRef]);
 
   if (loading) {
     return (
@@ -669,10 +658,10 @@ function TimelineInner() {
       </div>
 
       {/* Floating button to navigate back to the selected date */}
-      {anchor !== today && (
+      {!anchorVisible && (
         <button
           onClick={() => {
-            anchorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+            scrollToDate(anchor);
           }}
           className="fixed bottom-6 right-6 z-50 bg-violet-600 hover:bg-violet-700 text-white p-3 rounded-full shadow-lg transition-all hover:scale-110 flex items-center justify-center"
           aria-label={`Jump to ${formatTimelineDate(anchor)}`}
