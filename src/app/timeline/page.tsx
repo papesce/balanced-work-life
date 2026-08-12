@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useEffect, useState, useCallback, Suspense, type RefObject } from "react";
+import { useMemo, useRef, useEffect, useLayoutEffect, useState, useCallback, Suspense, type RefObject, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Sparkles, Clock, CalendarRange, ChevronDown, ChevronsUpDown } from "lucide-react";
@@ -58,6 +58,26 @@ const FOCUS_FORWARD_DAYS = 31;
 type RenderUnit =
   | { kind: "day"; date: string }
   | { kind: "gap"; count: number };
+
+function AnchorReadyMarker({
+  date,
+  onReady,
+  enabled,
+  children,
+}: {
+  date: string;
+  onReady: (date: string, node: HTMLDivElement) => void;
+  enabled: boolean;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (enabled && ref.current) onReady(date, ref.current);
+  }, [date, enabled, onReady]);
+
+  return <div ref={ref}>{children}</div>;
+}
 
 const TIMELINE_PREFS_KEY = "timeline-prefs";
 
@@ -217,6 +237,7 @@ function TimelineInner() {
   const windowMenuRef = useRef<HTMLDivElement>(null);
   const scrolledAnchorRef = useRef<string | null>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
+  const [renderedAnchor, setRenderedAnchor] = useState<string | null>(null);
   const [showDateInput, setShowDateInput] = useState(false);
   const [windowMenuOpen, setWindowMenuOpen] = useState(false);
   const [filter, setFilter] = useState<"all" | "deferred">(() => loadPrefs().filter);
@@ -224,6 +245,7 @@ function TimelineInner() {
   const [futureRange, setFutureRange] = useState<FutureRangeId>(() => loadPrefs().futureRange);
   const [quickAddArea, setQuickAddArea] = useState<LifeArea | null>(null);
   const [anchorVisible, setAnchorVisible] = useState(true);
+  const [scrollRequest, setScrollRequest] = useState(0);
   const { undoAction, clearUndo, handleUndo } = useUndoAction();
 
   const today = getToday();
@@ -347,34 +369,23 @@ function TimelineInner() {
     return () => document.removeEventListener("keydown", handler);
   }, [windowMenuOpen]);
 
-  const scrollToDate = useCallback((d: string, onDone?: () => void) => {
-    let attempts = 0;
-    const tryScroll = () => {
-      const el = document.getElementById(`day-${d}`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        scrolledAnchorRef.current = d;
-        onDone?.();
-        return;
-      }
-      if (attempts < 30) {
-        attempts += 1;
-        requestAnimationFrame(tryScroll);
-      }
-    };
-    tryScroll();
-  }, []);
-
   // Auto-scroll to the selected (anchor) day once data has loaded, and on every
   // URL-driven anchor change (e.g. browser back/forward or ?date= deep links).
   useEffect(() => {
-    if (loading) return;
-    if (scrolledAnchorRef.current === anchor) return;
-    scrollToDate(anchor);
-  }, [anchor, loading, scrollToDate]);
+    if (loading || scrolledAnchorRef.current === anchor || renderedAnchor !== anchor || !anchorRef.current) return;
+    anchorRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    scrolledAnchorRef.current = anchor;
+  }, [anchor, loading, renderedAnchor]);
+
+  // Re-center the selected day when the floating button is activated.
+  useEffect(() => {
+    if (scrollRequest === 0 || loading || !anchorRef.current) return;
+    anchorRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    setScrollRequest(0);
+  }, [scrollRequest, loading]);
 
   useEffect(() => {
-    if (!highlightId || loading) return;
+    if (!highlightId || loading || renderedAnchor !== anchor) return;
     let attempts = 0;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const tryPulse = () => {
@@ -397,7 +408,7 @@ function TimelineInner() {
     };
     timer = setTimeout(tryPulse, 120);
     return () => { if (timer) clearTimeout(timer); };
-  }, [highlightId, anchor, loading, router, searchParams]);
+  }, [highlightId, anchor, loading, renderedAnchor, router, searchParams]);
 
   const handleQuickAdd = async (text: string, date: string, area: LifeArea | null) => {
     const id = await createIdea(text, null, "bottom", { type: "task", scheduled_date: date, status: "planned" });
@@ -419,30 +430,25 @@ function TimelineInner() {
     [reorderTasks],
   );
 
-  const pulseTask = useCallback((taskId: string, date: string) => {
-    const el = document.getElementById(`task-${taskId}-${date}`);
-    if (!el) return;
-    el.classList.add("highlight-pulse");
-    const cleanup = () => el.classList.remove("highlight-pulse");
-    el.addEventListener("animationend", cleanup, { once: true });
-    setTimeout(cleanup, 2500);
-  }, []);
-
-  const setAnchorParam = useCallback((d: string) => {
+  const setAnchorParam = useCallback((d: string, taskId?: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("date", d);
+    if (taskId) params.set("highlight", taskId);
     router.replace(`/timeline?${params.toString()}`, { scroll: false });
   }, [router, searchParams]);
 
   const handleAnchorChange = useCallback((d: string) => {
     setAnchorParam(d);
-    scrollToDate(d);
-  }, [setAnchorParam, scrollToDate]);
+  }, [setAnchorParam]);
 
   const handleGoToDate = useCallback((targetDate: string, taskId: string) => {
-    setAnchorParam(targetDate);
-    scrollToDate(targetDate, () => pulseTask(taskId, targetDate));
-  }, [setAnchorParam, scrollToDate, pulseTask]);
+    setAnchorParam(targetDate, taskId);
+  }, [setAnchorParam]);
+
+  const setAnchorReady = useCallback((date: string, node: HTMLDivElement) => {
+    anchorRef.current = node;
+    setRenderedAnchor(date);
+  }, []);
 
   // Track anchor visibility in viewport
   useEffect(() => {
@@ -564,15 +570,15 @@ function TimelineInner() {
             <motion.section
               key={date}
               id={`day-${date}`}
-              ref={isAnchorDate ? anchorRef : null}
               custom={index}
               variants={cardVariants}
               initial="hidden"
               animate="visible"
             >
-              <div id={isAnchorDate ? "anchor-card" : undefined} className={`rounded-[20px] transition-all ${
-                isAnchorDate ? "glass-card-anchor" : isTodayDate ? "glass-card-today" : "glass-card"
-              }`}>
+              <AnchorReadyMarker date={date} enabled={isAnchorDate} onReady={setAnchorReady}>
+                <div id={isAnchorDate ? "anchor-card" : undefined} className={`rounded-[20px] transition-all ${
+                  isAnchorDate ? "glass-card-anchor" : isTodayDate ? "glass-card-today" : "glass-card"
+                }`}>
                 <div className="flex items-center justify-between px-5 pt-4 pb-3">
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col">
@@ -650,7 +656,8 @@ function TimelineInner() {
                     />
                   </div>
                 ) : null}
-              </div>
+                </div>
+              </AnchorReadyMarker>
             </motion.section>
           );
         })
@@ -661,7 +668,7 @@ function TimelineInner() {
       {!anchorVisible && (
         <button
           onClick={() => {
-            scrollToDate(anchor);
+            setScrollRequest((request) => request + 1);
           }}
           className="fixed bottom-6 right-6 z-50 bg-violet-600 hover:bg-violet-700 text-white p-3 rounded-full shadow-lg transition-all hover:scale-110 flex items-center justify-center"
           aria-label={`Jump to ${formatTimelineDate(anchor)}`}

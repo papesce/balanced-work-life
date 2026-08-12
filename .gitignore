@@ -34,6 +34,9 @@ yarn-error.log*
 # local launcher state
 .balance/
 
+# local agent settings
+.claude/
+
 # env files (can opt-in for committing if needed)
 .env*
 
