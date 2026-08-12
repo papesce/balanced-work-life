@@ -243,14 +243,6 @@ function DailyPlannerInner() {
     if (targetTag) await taskTagsHook.addTagToTask(taskId, targetTag).catch(() => {});
   };
 
-  const handleAdd = async (text: string, scheduledDate: string | null) => {
-    await createIdea(text, null, "top", {
-      type: "task",
-      scheduled_date: scheduledDate ?? activeDate,
-      status: "planned",
-    });
-  };
-
   const handleCreateScheduledTask = async (text: string, time: string, area?: LifeArea) => {
     const id = await createIdea(text, null, "bottom", {
       type: "task",
@@ -321,7 +313,7 @@ function DailyPlannerInner() {
         },
       });
     },
-    [ideas, deleteIdea, restoreIdeas],
+    [ideas, deleteIdea, restoreIdeas, registerUndo],
   );
 
   if (loading) {
@@ -504,7 +496,6 @@ function DailyPlannerInner() {
               getTagsForIdea={taskTagsHook.getTagsForIdea}
               tags={tagsHook.tags}
               selectedArea={selectedArea}
-              onChangeTaskArea={handleMoveTaskBetweenAreas}
               onAddTag={async (ideaId, tag) => {
                 await taskTagsHook.addTagToTask(ideaId, tag);
               }}

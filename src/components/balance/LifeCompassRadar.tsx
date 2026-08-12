@@ -12,7 +12,6 @@ import {
 } from "recharts";
 import { RadarDataPoint } from "@/hooks/useBalanceData";
 import { AREA_LABELS } from "@/lib/constants";
-import { areaColors, areaDarkColors } from "@/styles/tokens";
 import { LifeArea } from "@/lib/types";
 
 interface LifeCompassRadarProps {

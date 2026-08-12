@@ -25,7 +25,7 @@ interface YearWheelViewProps {
 }
 
 export function YearWheelView({ referenceDate }: YearWheelViewProps) {
-  const { loading, radarData, buckets } = useBalanceData("year", referenceDate);
+  const { loading, buckets } = useBalanceData("year", referenceDate);
   const ref = new Date(referenceDate + "T00:00:00");
   const year = ref.getFullYear();
   const targets = loadTargets();

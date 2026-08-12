@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "./useAuth";
 import { LifeArea } from "@/lib/types";
 import { getWindowRange, getMonthCalendarGrid } from "@/lib/dateUtils";
@@ -21,7 +21,7 @@ export function useCalendarData(referenceDate: string): {
   const [loading, setLoading] = useState(true);
   const [dayData, setDayData] = useState<DayData[]>([]);
 
-  const ref = new Date(referenceDate + "T00:00:00");
+  const ref = useMemo(() => new Date(referenceDate + "T00:00:00"), [referenceDate]);
   const monthLabel = ref.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 
   useEffect(() => {
@@ -70,7 +70,7 @@ export function useCalendarData(referenceDate: string): {
     return () => {
       cancelled = true;
     };
-  }, [user, referenceDate]);
+  }, [user, referenceDate, ref]);
 
   return { loading, dayData, monthLabel };
 }

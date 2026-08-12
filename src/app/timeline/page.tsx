@@ -338,7 +338,7 @@ function TimelineInner() {
       future[r.id] = countFuture(afterDays);
     }
     return { past, future };
-  }, [tasks, anchor, today, effectiveFilter, lookbackDays, forwardDays]);
+  }, [tasks, anchor, today, effectiveFilter]);
 
   const rangeSpans = useMemo(() => {
     const formatSpan = (d: string) =>

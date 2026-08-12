@@ -40,7 +40,6 @@ interface DayslotTimelineProps {
   getTagsForIdea: (ideaId: string) => Tag[];
   tags: Tag[];
   selectedArea: LifeArea | null;
-  onChangeTaskArea?: (taskId: string, fromArea: LifeArea, toArea: LifeArea) => void;
   onAddTag?: (ideaId: string, tag: Tag) => Promise<void>;
   onRemoveTag?: (ideaId: string, tagId: string) => Promise<void>;
   onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
@@ -84,7 +83,6 @@ function SlotForm({
   onCreateTask,
   defaultArea,
   tags,
-  onAddTag,
   onCreateTag,
 }: {
   startMinute: number;
@@ -92,7 +90,6 @@ function SlotForm({
   onCreateTask: (text: string, time: string, area?: LifeArea) => Promise<void>;
   defaultArea: LifeArea | null;
   tags: Tag[];
-  onAddTag?: (ideaId: string, tag: Tag) => Promise<void>;
   onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
 }) {
   const [text, setText] = useState("");
@@ -218,7 +215,6 @@ export function DayslotTimeline({
   getTagsForIdea,
   tags,
   selectedArea,
-  onChangeTaskArea,
   onAddTag,
   onRemoveTag,
   onCreateTag,
@@ -276,12 +272,11 @@ export function DayslotTimeline({
           onCreateTask={onCreateTask}
           defaultArea={selectedArea}
           tags={tags}
-          onAddTag={onAddTag}
           onCreateTag={onCreateTag}
         />
       );
     },
-    [onCreateTask, selectedArea, tags, onAddTag, onCreateTag],
+    [onCreateTask, selectedArea, tags, onCreateTag],
   );
 
   const renderEventContent = useCallback(
@@ -309,7 +304,6 @@ export function DayslotTimeline({
           isCancelled={isCancelled}
           scrollElement={scrollEl}
           onUpdateTask={onUpdateTask}
-          onChangeTaskArea={onChangeTaskArea}
           onAddTag={onAddTag}
           onRemoveTag={onRemoveTag}
           onCreateTag={onCreateTag}
@@ -322,7 +316,6 @@ export function DayslotTimeline({
       tags,
       scrollEl,
       onUpdateTask,
-      onChangeTaskArea,
       onAddTag,
       onRemoveTag,
       onCreateTag,
@@ -366,7 +359,6 @@ function EventCard({
   isCancelled,
   scrollElement,
   onUpdateTask,
-  onChangeTaskArea,
   onAddTag,
   onRemoveTag,
   onCreateTag,
@@ -381,7 +373,6 @@ function EventCard({
   isCancelled: boolean;
   scrollElement: HTMLDivElement | null;
   onUpdateTask: (id: string, updates: Partial<Idea>) => void;
-  onChangeTaskArea?: (taskId: string, fromArea: LifeArea, toArea: LifeArea) => void;
   onAddTag?: (ideaId: string, tag: Tag) => Promise<void>;
   onRemoveTag?: (ideaId: string, tagId: string) => Promise<void>;
   onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;

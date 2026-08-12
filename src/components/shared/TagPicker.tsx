@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Plus, Check } from "lucide-react";
 import { Tag, LifeArea } from "@/lib/types";
@@ -65,7 +65,7 @@ export function TagPicker({
     if (creating) inputRef.current?.focus();
   }, [creating]);
 
-  const selectedIds = new Set(selectedTags.map((t) => t.id));
+  const selectedIds = useMemo(() => new Set(selectedTags.map((t) => t.id)), [selectedTags]);
 
   const handleToggle = useCallback(
     (tag: Tag) => {

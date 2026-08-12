@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 import { Download, LogOut, Upload, User as UserIcon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useIdeas } from "@/hooks/useIdeas";
@@ -103,7 +104,14 @@ export function UserMenu() {
       >
         <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-violet-100 dark:bg-violet-900/40">
           {avatarUrl ? (
-            <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+            <Image
+              src={avatarUrl}
+              alt=""
+              width={32}
+              height={32}
+              unoptimized
+              className="h-full w-full object-cover"
+            />
           ) : initials ? (
             <span className="text-[11px] font-bold text-violet-600 dark:text-violet-400">
               {initials}
