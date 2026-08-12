@@ -18,7 +18,9 @@
     "start:open": "./scripts/ctl.sh open prod --watch",
     "lint": "eslint",
     "format:check": "prettier --check .",
+    "precommit": "sh scripts/precommit-check.sh",
     "check": "pnpm format:check && pnpm lint && pnpm exec tsc --noEmit && pnpm build",
+    "prepare": "git config core.hooksPath .githooks",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "changeset publish"
