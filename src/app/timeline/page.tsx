@@ -217,6 +217,7 @@ function TimelineInner() {
   const windowMenuRef = useRef<HTMLDivElement>(null);
   const scrolledAnchorRef = useRef<string | null>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
+  const hasMountedRef = useRef(false);
   const [showDateInput, setShowDateInput] = useState(false);
   const [windowMenuOpen, setWindowMenuOpen] = useState(false);
   const [filter, setFilter] = useState<"all" | "deferred">(() => loadPrefs().filter);
@@ -350,6 +351,10 @@ function TimelineInner() {
   useEffect(() => {
     if (loading) return;
     if (scrolledAnchorRef.current === anchor) return;
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
     const timer = setTimeout(() => {
       document.getElementById(`day-${anchor}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
       scrolledAnchorRef.current = anchor;
