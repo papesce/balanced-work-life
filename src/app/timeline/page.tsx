@@ -10,7 +10,7 @@ import { useTaskTags } from "@/hooks/useTaskTags";
 import { AppShell } from "@/components/AppShell";
 import { MiniBalanceBar } from "@/components/MiniBalanceBar";
 import { Idea, LifeArea } from "@/lib/types";
-import { getToday, getTomorrow, getDatesRange, isPast, isPlanDate, addDays } from "@/lib/dateUtils";
+import { getToday, getTomorrow, getDatesRange, isPast, isPlanDate, addDays, addMonths, daysBetween } from "@/lib/dateUtils";
 import { computeReschedulePatch, getDayOccurrences, isActiveOccurrence, DayOccurrence, RescheduleAction } from "@/lib/tasks/rescheduleTask";
 import { useUndoAction } from "@/lib/tasks/undo";
 import { DayTaskList } from "@/components/timeline/DayTaskList";
@@ -29,28 +29,16 @@ const cardVariants = {
     }) as const,
 };
 
-const PAST_RANGES = [
-  { id: "3days", label: "3 days before", days: 3 },
-  { id: "week", label: "1 week before", days: 7 },
-  { id: "month", label: "1 month before", days: 31 },
-  { id: "quarter", label: "3 months before", days: 92 },
-  { id: "6months", label: "6 months before", days: 183 },
-  { id: "year", label: "1 year before", days: 366 },
+const TIMELINE_PRESETS = [
+  { id: "focus", label: "Focus", before: "3 days", after: "2 weeks", beforeDays: 3, afterDays: 14 },
+  { id: "planning", label: "Planning", before: "1 week", after: "1 month", beforeDays: 7, afterMonths: 1 },
+  { id: "review", label: "Review", before: "1 month", after: "3 months", beforeMonths: 1, afterMonths: 3 },
+  { id: "horizon", label: "Horizon", before: "3 months", after: "6 months", beforeMonths: 3, afterMonths: 6 },
 ] as const;
 
-const FUTURE_RANGES = [
-  { id: "3days", label: "3 days after", days: 3 },
-  { id: "week", label: "1 week after", days: 7 },
-  { id: "2weeks", label: "2 weeks after", days: 14 },
-  { id: "month", label: "1 month after", days: 31 },
-  { id: "quarter", label: "3 months after", days: 92 },
-] as const;
+type TimelinePresetId = (typeof TIMELINE_PRESETS)[number]["id"];
 
-type PastRangeId = (typeof PAST_RANGES)[number]["id"];
-type FutureRangeId = (typeof FUTURE_RANGES)[number]["id"];
-
-const MAX_LOOKBACK_DAYS = PAST_RANGES[PAST_RANGES.length - 1].days;
-const MAX_FORWARD_DAYS = FUTURE_RANGES[FUTURE_RANGES.length - 1].days;
+const DEFAULT_PRESET: TimelinePresetId = "focus";
 const MAX_SHOW_ALL_DAYS = 60;
 const FOCUS_BACK_DAYS = 7;
 const FOCUS_FORWARD_DAYS = 31;
@@ -83,139 +71,69 @@ const TIMELINE_PREFS_KEY = "timeline-prefs";
 
 interface TimelinePrefs {
   filter: "all" | "deferred";
-  pastRange: PastRangeId;
-  futureRange: FutureRangeId;
+  preset: TimelinePresetId;
 }
 
-const DEFAULT_PREFS: TimelinePrefs = { filter: "all", pastRange: "3days", futureRange: "2weeks" };
+const DEFAULT_PREFS: TimelinePrefs = { filter: "all", preset: DEFAULT_PRESET };
 
 function loadPrefs(): TimelinePrefs {
   if (typeof window === "undefined") return DEFAULT_PREFS;
   try {
     const stored = JSON.parse(localStorage.getItem(TIMELINE_PREFS_KEY) ?? "{}") as Partial<TimelinePrefs>;
-    const pastIds: string[] = PAST_RANGES.map((r) => r.id);
-    const futureIds: string[] = FUTURE_RANGES.map((r) => r.id);
+    const presetIds: string[] = TIMELINE_PRESETS.map((r) => r.id);
+    const legacyPreset = stored.preset as string | undefined;
+    const legacyPast = stored.pastRange as string | undefined;
+    const legacyFuture = stored.futureRange as string | undefined;
+    const migratedPreset = legacyPast === "3days" && legacyFuture === "2weeks" ? "focus"
+      : legacyPast === "week" && legacyFuture === "month" ? "planning"
+      : legacyPast === "month" && legacyFuture === "quarter" ? "review"
+      : legacyPast === "quarter" && legacyFuture === "6months" ? "horizon"
+      : undefined;
     return {
       filter: stored.filter === "deferred" ? "deferred" : "all",
-      pastRange: pastIds.includes(stored.pastRange as string) ? (stored.pastRange as PastRangeId) : DEFAULT_PREFS.pastRange,
-      futureRange: futureIds.includes(stored.futureRange as string) ? (stored.futureRange as FutureRangeId) : DEFAULT_PREFS.futureRange,
+      preset: presetIds.includes(legacyPreset ?? "") ? legacyPreset as TimelinePresetId : migratedPreset ?? DEFAULT_PRESET,
     };
   } catch {
     return DEFAULT_PREFS;
   }
 }
 
-function RangeColumn({
-  title,
-  options,
-  selectedId,
-  counts,
-  spans,
-  onSelect,
-}: {
-  title: string;
-  options: readonly { id: string; label: string; days: number }[];
-  selectedId: string;
+function RangeWindowDropdown({ preset, counts, spans, open, onToggle, onSelect, menuRef }: {
+  preset: TimelinePresetId;
   counts: Record<string, number>;
   spans: Record<string, string>;
-  onSelect: (id: string) => void;
+  open: boolean;
+  onToggle: () => void;
+  onSelect: (id: TimelinePresetId) => void;
+  menuRef: RefObject<HTMLDivElement | null>;
 }) {
+  const selected = TIMELINE_PRESETS.find((option) => option.id === preset) ?? TIMELINE_PRESETS[0];
   return (
-    <div>
-      <div className="px-2.5 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-        {title}
-      </div>
-      <div className="space-y-0.5">
-        {options.map((r) => (
+    <div ref={menuRef} className="relative">
+      <button type="button" onClick={onToggle} className={`toolbar-btn gap-1.5 px-2.5 ${open ? "toolbar-btn--accent" : "hover:text-gray-600 dark:hover:text-gray-300"}`}>
+        <CalendarRange size={13} />
+        <span>{selected.label}</span>
+        <ChevronDown size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && <div className="absolute right-0 top-full mt-1.5 z-50 glass-card-strong rounded-xl p-1.5 shadow-xl border border-black/5 dark:border-white/5 min-w-[250px]">
+        {TIMELINE_PRESETS.map((r) => (
           <button
             key={r.id}
             onClick={() => onSelect(r.id)}
             className={`w-full flex items-center justify-between gap-3 text-left px-2.5 py-1.5 text-[11px] rounded-lg font-semibold cursor-pointer ${
-              r.id === selectedId
+              r.id === preset
                 ? "text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/20"
                 : "text-gray-600 dark:text-gray-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
             }`}
           >
-            <span>{r.label}</span>
-            <span className="flex items-center gap-2 text-[10px] text-gray-400 font-medium tabular-nums">
-              <span>{spans[r.id]}</span>
-              <span>({counts[r.id] ?? 0})</span>
+            <span><span className="font-bold">{r.label}</span><span className="ml-1.5 text-gray-400 font-medium">{r.before} before · {r.after} after</span><span className="block text-[10px] text-gray-400 font-normal">{spans[r.id]}</span></span>
+            <span className="text-[10px] text-gray-400 font-medium tabular-nums whitespace-nowrap">
+              <span>{counts[r.id] ?? "0 before · 0 after"}</span>
             </span>
           </button>
         ))}
       </div>
-    </div>
-  );
-}
-
-function RangeWindowDropdown({
-  pastOptions,
-  futureOptions,
-  selectedPastId,
-  selectedFutureId,
-  pastCounts,
-  futureCounts,
-  pastSpans,
-  futureSpans,
-  open,
-  onToggle,
-  onSelectPast,
-  onSelectFuture,
-  menuRef,
-}: {
-  pastOptions: readonly { id: string; label: string; days: number }[];
-  futureOptions: readonly { id: string; label: string; days: number }[];
-  selectedPastId: string;
-  selectedFutureId: string;
-  pastCounts: Record<string, number>;
-  futureCounts: Record<string, number>;
-  pastSpans: Record<string, string>;
-  futureSpans: Record<string, string>;
-  open: boolean;
-  onToggle: () => void;
-  onSelectPast: (id: string) => void;
-  onSelectFuture: (id: string) => void;
-  menuRef: RefObject<HTMLDivElement | null>;
-}) {
-  const selectedPast = pastOptions.find((o) => o.id === selectedPastId) ?? pastOptions[0];
-  const selectedFuture = futureOptions.find((o) => o.id === selectedFutureId) ?? futureOptions[0];
-  return (
-    <div ref={menuRef} className="relative">
-      <button
-        type="button"
-        onClick={onToggle}
-        className={`toolbar-btn gap-1.5 px-2.5 ${
-          open
-            ? "toolbar-btn--accent"
-            : "hover:text-gray-600 dark:hover:text-gray-300"
-        }`}
-      >
-        <CalendarRange size={13} />
-        <span>{selectedPast.label} · {selectedFuture.label}</span>
-        <ChevronDown size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1.5 z-50 glass-card-strong rounded-xl p-1.5 shadow-xl border border-black/5 dark:border-white/5 min-w-[340px]">
-          <div className="grid grid-cols-2 gap-1.5">
-            <RangeColumn
-              title="Before"
-              options={pastOptions}
-              selectedId={selectedPastId}
-              counts={pastCounts}
-              spans={pastSpans}
-              onSelect={onSelectPast}
-            />
-            <RangeColumn
-              title="After"
-              options={futureOptions}
-              selectedId={selectedFutureId}
-              counts={futureCounts}
-              spans={futureSpans}
-              onSelect={onSelectFuture}
-            />
-          </div>
-        </div>
-      )}
+      </div>}
     </div>
   );
 }
@@ -241,8 +159,7 @@ function TimelineInner() {
   const [showDateInput, setShowDateInput] = useState(false);
   const [windowMenuOpen, setWindowMenuOpen] = useState(false);
   const [filter, setFilter] = useState<"all" | "deferred">(() => loadPrefs().filter);
-  const [pastRange, setPastRange] = useState<PastRangeId>(() => loadPrefs().pastRange);
-  const [futureRange, setFutureRange] = useState<FutureRangeId>(() => loadPrefs().futureRange);
+  const [preset, setPreset] = useState<TimelinePresetId>(() => loadPrefs().preset);
   const [quickAddArea, setQuickAddArea] = useState<LifeArea | null>(null);
   const [anchorVisible, setAnchorVisible] = useState(true);
   const [scrollRequest, setScrollRequest] = useState(0);
@@ -253,8 +170,13 @@ function TimelineInner() {
   const anchorParam = searchParams.get("date");
   const anchor = anchorParam && /^\d{4}-\d{2}-\d{2}$/.test(anchorParam) ? anchorParam : today;
   const highlightId = searchParams.get("highlight");
-  const lookbackDays = PAST_RANGES.find((r) => r.id === pastRange)?.days ?? 3;
-  const forwardDays = FUTURE_RANGES.find((r) => r.id === futureRange)?.days ?? 14;
+  const selectedPreset = TIMELINE_PRESETS.find((r) => r.id === preset) ?? TIMELINE_PRESETS[0];
+  const lookbackDays = selectedPreset.beforeMonths
+    ? daysBetween(addMonths(anchor, -selectedPreset.beforeMonths), anchor)
+    : selectedPreset.beforeDays ?? 3;
+  const forwardDays = selectedPreset.afterMonths
+    ? daysBetween(anchor, addMonths(anchor, selectedPreset.afterMonths))
+    : selectedPreset.afterDays ?? 14;
   const extendedRange = lookbackDays !== 3 || forwardDays !== 14;
   const dates = useMemo(
     () => getDatesRange(lookbackDays, forwardDays, anchor),
@@ -277,7 +199,9 @@ function TimelineInner() {
 
   const rangeCounts = useMemo(() => {
     const dateCounts: Record<string, number> = {};
-    const spanDates = getDatesRange(MAX_LOOKBACK_DAYS, MAX_FORWARD_DAYS, anchor);
+    const maxBeforeDays = Math.max(...TIMELINE_PRESETS.map((r) => r.beforeMonths ? daysBetween(addMonths(anchor, -r.beforeMonths), anchor) : r.beforeDays ?? 0));
+    const maxAfterDays = Math.max(...TIMELINE_PRESETS.map((r) => r.afterMonths ? daysBetween(anchor, addMonths(anchor, r.afterMonths)) : r.afterDays ?? 0));
+    const spanDates = getDatesRange(maxBeforeDays, maxAfterDays, anchor);
     for (const date of spanDates) {
       const occs = getDayOccurrences(tasks, date, today, true);
       dateCounts[date] = effectiveFilter === "deferred" && date <= today
@@ -288,23 +212,25 @@ function TimelineInner() {
     const countFuture = (days: number) => getDatesRange(0, days, anchor).reduce((n, d) => (d > anchor ? n + (dateCounts[d] ?? 0) : n), 0);
     const past: Record<string, number> = {};
     const future: Record<string, number> = {};
-    for (const r of PAST_RANGES) past[r.id] = countPast(r.days);
-    for (const r of FUTURE_RANGES) future[r.id] = countFuture(r.days);
+    for (const r of TIMELINE_PRESETS) {
+      const beforeDays = r.beforeMonths ? daysBetween(addMonths(anchor, -r.beforeMonths), anchor) : r.beforeDays ?? 0;
+      const afterDays = r.afterMonths ? daysBetween(anchor, addMonths(anchor, r.afterMonths)) : r.afterDays ?? 0;
+      past[r.id] = countPast(beforeDays);
+      future[r.id] = countFuture(afterDays);
+    }
     return { past, future };
-  }, [tasks, anchor, today, effectiveFilter]);
+  }, [tasks, anchor, today, effectiveFilter, lookbackDays, forwardDays]);
 
   const rangeSpans = useMemo(() => {
     const formatSpan = (d: string) =>
       new Date(d + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
-    const past: Record<string, string> = {};
-    const future: Record<string, string> = {};
-    for (const r of PAST_RANGES) {
-      past[r.id] = `${formatSpan(addDays(anchor, -r.days))} – ${formatSpan(addDays(anchor, -1))}`;
+    const spans: Record<string, string> = {};
+    for (const r of TIMELINE_PRESETS) {
+      const before = r.beforeMonths ? addMonths(anchor, -r.beforeMonths) : addDays(anchor, -(r.beforeDays ?? 0));
+      const after = r.afterMonths ? addMonths(anchor, r.afterMonths) : addDays(anchor, r.afterDays ?? 0);
+      spans[r.id] = `${formatSpan(before)} – ${formatSpan(after)}`;
     }
-    for (const r of FUTURE_RANGES) {
-      future[r.id] = `${formatSpan(addDays(anchor, 1))} – ${formatSpan(addDays(anchor, r.days))}`;
-    }
-    return { past, future };
+    return spans;
   }, [anchor]);
 
   const renderPlan = useMemo((): RenderUnit[] => {
@@ -346,9 +272,9 @@ function TimelineInner() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(TIMELINE_PREFS_KEY, JSON.stringify({ filter, pastRange, futureRange }));
+      localStorage.setItem(TIMELINE_PREFS_KEY, JSON.stringify({ filter, preset }));
     } catch {}
-  }, [filter, pastRange, futureRange]);
+  }, [filter, preset]);
 
   useEffect(() => {
     if (!windowMenuOpen) return;
@@ -516,18 +442,12 @@ function TimelineInner() {
         })}
       </div>
       <RangeWindowDropdown
-        pastOptions={PAST_RANGES}
-        futureOptions={FUTURE_RANGES}
-        selectedPastId={pastRange}
-        selectedFutureId={futureRange}
-        pastCounts={rangeCounts.past}
-        futureCounts={rangeCounts.future}
-        pastSpans={rangeSpans.past}
-        futureSpans={rangeSpans.future}
+        preset={preset}
+        counts={Object.fromEntries(TIMELINE_PRESETS.map((r) => [r.id, `${rangeCounts.past[r.id] ?? 0} before · ${rangeCounts.future[r.id] ?? 0} after`]))}
+        spans={rangeSpans}
         open={windowMenuOpen}
         onToggle={() => setWindowMenuOpen((v) => !v)}
-        onSelectPast={(id) => setPastRange(id as PastRangeId)}
-        onSelectFuture={(id) => setFutureRange(id as FutureRangeId)}
+        onSelect={(id) => { setPreset(id); setWindowMenuOpen(false); }}
         menuRef={windowMenuRef}
       />
     </>

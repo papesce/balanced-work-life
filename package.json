@@ -17,6 +17,8 @@
     "start": "next start",
     "start:open": "./scripts/ctl.sh open prod --watch",
     "lint": "eslint",
+    "format:check": "prettier --check .",
+    "check": "pnpm format:check && pnpm lint && pnpm exec tsc --noEmit && pnpm build",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "changeset publish"
@@ -49,6 +51,7 @@
     "eslint-config-next": "16.2.6",
     "next-pwa": "^5.6.0",
     "prettier-plugin-tailwindcss": "^0.8.1",
+    "prettier": "^2.8.8",
     "tailwindcss": "^4",
     "typescript": "^5"
   },

@@ -82,6 +82,22 @@ export function addDays(base: string, days: number): string {
   return toLocalDateString(d);
 }
 
+export function addMonths(base: string, months: number): string {
+  const d = new Date(base + "T00:00:00");
+  const day = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + months);
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(day, lastDay));
+  return toLocalDateString(d);
+}
+
+export function daysBetween(start: string, end: string): number {
+  const startTime = new Date(start + "T00:00:00").getTime();
+  const endTime = new Date(end + "T00:00:00").getTime();
+  return Math.round((endTime - startTime) / 86400000);
+}
+
 export type WindowType = "day" | "week" | "month" | "year";
 
 export interface DateRange {
