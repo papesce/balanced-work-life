@@ -8,6 +8,7 @@ import { Idea, IdeaNode } from "@/lib/types";
 import { getToday, getWindowRange } from "@/lib/dateUtils";
 
 const STORAGE_KEY = "brainstorm-tree-overrides";
+const IDEAS_CACHE_KEY = "ideas-cache-v1";
 const DEFAULT_EXPAND_DEPTH = 1;
 
 export type IdeasScope = "all" | "this_month";
@@ -40,6 +41,29 @@ function saveOverrides(overrides: Map<string, OverrideState>) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(overrides)));
   } catch {}
+}
+
+function getIdeasCacheKey(userId: string, scope: IdeasScope) {
+  return `${IDEAS_CACHE_KEY}:${userId}:${scope}`;
+}
+
+function loadCachedIdeas(userId: string, scope: IdeasScope): Idea[] | null {
+  try {
+    const raw = localStorage.getItem(getIdeasCacheKey(userId, scope));
+    if (!raw) return null;
+    const cached = JSON.parse(raw) as unknown;
+    return Array.isArray(cached) ? (cached as Idea[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveCachedIdeas(userId: string, scope: IdeasScope, ideas: Idea[]) {
+  try {
+    localStorage.setItem(getIdeasCacheKey(userId, scope), JSON.stringify(ideas));
+  } catch {
+    // A full or unavailable localStorage should not prevent the network load.
+  }
 }
 
 function getDepthMap(ideas: Idea[]): Map<string, number> {
@@ -145,7 +169,11 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
     const { data } = await buildScopedQuery(user.id, scope).order("sort_order", {
       ascending: true,
     });
-    if (data) setIdeas(data as Idea[]);
+    if (data) {
+      const freshIdeas = data as Idea[];
+      setIdeas(freshIdeas);
+      saveCachedIdeas(user.id, scope, freshIdeas);
+    }
     setLoading(false);
   }, [user, scope]);
 
@@ -154,12 +182,22 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
     let cancelled = false;
 
     const loadIdeas = async () => {
-      setLoading(true);
+      const cachedIdeas = loadCachedIdeas(user.id, scope);
+      if (cachedIdeas) {
+        setIdeas(cachedIdeas);
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
       const { data } = await buildScopedQuery(user.id, scope).order("sort_order", {
         ascending: true,
       });
       if (cancelled) return;
-      if (data) setIdeas(data as Idea[]);
+      if (data) {
+        const freshIdeas = data as Idea[];
+        setIdeas(freshIdeas);
+        saveCachedIdeas(user.id, scope, freshIdeas);
+      }
       setLoading(false);
     };
 

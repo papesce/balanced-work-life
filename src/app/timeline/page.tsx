@@ -58,6 +58,8 @@ const cardVariants = {
 interface TimelinePreset {
   id: string;
   label: string;
+  description: string;
+  group: string;
   before: string;
   after: string;
   beforeDays?: number;
@@ -67,10 +69,21 @@ interface TimelinePreset {
 }
 
 const TIMELINE_PRESETS: readonly TimelinePreset[] = [
-  { id: "focus", label: "Focus", before: "3 days", after: "2 weeks", beforeDays: 3, afterDays: 14 },
+  {
+    id: "focus",
+    label: "Focus",
+    description: "A narrow window around today",
+    group: "Short",
+    before: "3 days",
+    after: "2 weeks",
+    beforeDays: 3,
+    afterDays: 14,
+  },
   {
     id: "planning",
     label: "Planning",
+    description: "Near-term planning",
+    group: "Medium",
     before: "1 week",
     after: "1 month",
     beforeDays: 7,
@@ -79,6 +92,8 @@ const TIMELINE_PRESETS: readonly TimelinePreset[] = [
   {
     id: "review",
     label: "Review",
+    description: "Step back and review recent work",
+    group: "Long",
     before: "1 month",
     after: "3 months",
     beforeMonths: 1,
@@ -87,6 +102,8 @@ const TIMELINE_PRESETS: readonly TimelinePreset[] = [
   {
     id: "horizon",
     label: "Horizon",
+    description: "Long-range visibility",
+    group: "Extended",
     before: "3 months",
     after: "6 months",
     beforeMonths: 3,
@@ -183,6 +200,8 @@ function RangeWindowDropdown({
   menuRef: RefObject<HTMLDivElement | null>;
 }) {
   const selected = TIMELINE_PRESETS.find((option) => option.id === preset) ?? TIMELINE_PRESETS[0];
+  const [detailId, setDetailId] = useState<TimelinePresetId | null>(null);
+  const detail = TIMELINE_PRESETS.find((option) => option.id === detailId);
   return (
     <div ref={menuRef} className="relative">
       <button
@@ -191,33 +210,51 @@ function RangeWindowDropdown({
         className={`toolbar-btn gap-1.5 px-2.5 ${open ? "toolbar-btn--accent" : "hover:text-gray-600 dark:hover:text-gray-300"}`}
       >
         <CalendarRange size={13} />
-        <span>{selected.label}</span>
+        <span>
+          {selected.label}{" "}
+          <span className="text-[10px] opacity-60">
+            (−{selected.before} / +{selected.after})
+          </span>
+        </span>
         <ChevronDown size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
         <div className="glass-card-strong absolute top-full right-0 z-50 mt-1.5 min-w-[250px] rounded-xl border border-black/5 p-1.5 shadow-xl dark:border-white/5">
-          {TIMELINE_PRESETS.map((r) => (
-            <button
-              key={r.id}
-              onClick={() => onSelect(r.id)}
-              className={`flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-left text-[11px] font-semibold ${
-                r.id === preset
-                  ? "bg-violet-50 text-violet-600 dark:bg-violet-950/20 dark:text-violet-400"
-                  : "text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-              }`}
-            >
-              <span>
-                <span className="font-bold">{r.label}</span>
-                <span className="ml-1.5 font-medium text-gray-400">
-                  {r.before} before · {r.after} after
+          {TIMELINE_PRESETS.map((r, index) => (
+            <div key={r.id}>
+              {(index === 0 || r.group !== TIMELINE_PRESETS[index - 1].group) && (
+                <div className="px-2.5 pt-2 pb-1 text-[9px] font-bold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500">
+                  {r.group} window
+                </div>
+              )}
+              <button
+                onClick={() => onSelect(r.id)}
+                onMouseEnter={() => setDetailId(r.id as TimelinePresetId)}
+                onFocus={() => setDetailId(r.id as TimelinePresetId)}
+                className={`flex w-full cursor-pointer items-start justify-between gap-3 rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold transition-colors ${
+                  r.id === preset
+                    ? "bg-violet-50 text-violet-600 dark:bg-violet-950/20 dark:text-violet-400"
+                    : "text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                }`}
+              >
+                <span>
+                  <span className="font-bold">{r.label}</span>
+                  <span className="mt-0.5 block text-[10px] font-normal text-gray-400">
+                    {r.description}
+                  </span>
                 </span>
-                <span className="block text-[10px] font-normal text-gray-400">{spans[r.id]}</span>
-              </span>
-              <span className="text-[10px] font-medium whitespace-nowrap text-gray-400 tabular-nums">
-                <span>{counts[r.id] ?? "0 before · 0 after"}</span>
-              </span>
-            </button>
+                {r.id === preset && <span className="mt-0.5 text-violet-500">✓</span>}
+              </button>
+            </div>
           ))}
+          {detail && (
+            <div className="mt-1 border-t border-black/5 px-2.5 pt-2 pb-1 text-[10px] text-gray-500 dark:border-white/5 dark:text-gray-400">
+              <div className="font-semibold text-gray-600 dark:text-gray-300">
+                {detail.label} · {spans[detail.id]}
+              </div>
+              <div className="mt-0.5">{counts[detail.id] ?? "0 before · 0 after"}</div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -253,6 +290,7 @@ function TimelineInner() {
   const [renderedAnchor, setRenderedAnchor] = useState<string | null>(null);
   const [showDateInput, setShowDateInput] = useState(false);
   const [windowMenuOpen, setWindowMenuOpen] = useState(false);
+  const [rangeFlash, setRangeFlash] = useState(false);
   const [filter, setFilter] = useState<"all" | "deferred">(() => loadPrefs().filter);
   const [preset, setPreset] = useState<TimelinePresetId>(() => loadPrefs().preset);
   const [quickAddArea, setQuickAddArea] = useState<LifeArea | null>(null);
@@ -605,6 +643,8 @@ function TimelineInner() {
         onToggle={() => setWindowMenuOpen((v) => !v)}
         onSelect={(id) => {
           setPreset(id);
+          setRangeFlash(true);
+          window.setTimeout(() => setRangeFlash(false), 900);
           setWindowMenuOpen(false);
         }}
         menuRef={windowMenuRef}
@@ -618,7 +658,7 @@ function TimelineInner() {
       headerActions={headerActions}
       headerStartActions={headerStartActions}
     >
-      <div className="space-y-4 pb-24">
+      <div className={`space-y-4 pb-24 ${rangeFlash ? "timeline-range-updated" : ""}`}>
         <UndoBar undoAction={undoAction} onUndo={() => void handleUndo()} onDismiss={clearUndo} />
 
         {noDeferredActivity ? (

@@ -384,6 +384,21 @@ body {
   animation: today-recenter-flash 0.8s ease-in-out 2;
 }
 
+/* Briefly confirm that a new timeline range was applied. */
+@keyframes timeline-range-updated {
+  0%,
+  100% {
+    box-shadow: none;
+  }
+  35% {
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18);
+  }
+}
+
+.timeline-range-updated {
+  animation: timeline-range-updated 0.9s ease-out;
+}
+
 /* Dark mode overrides */
 @media (prefers-color-scheme: dark) {
   :root {
