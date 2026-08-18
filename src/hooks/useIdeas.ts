@@ -237,7 +237,7 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
       duration_minutes: null,
       is_priority: false,
       priority_order: null,
-      status: "draft",
+      status: "inbox",
       notes: null,
       completed_at: null,
       cancelled_at: null,
@@ -403,7 +403,7 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
       ? idea?.scheduled_time
         ? "scheduled"
         : "planned"
-      : "draft";
+      : "inbox";
     await updateIdea(id, { status: fallbackStatus, completed_at: null });
   };
 

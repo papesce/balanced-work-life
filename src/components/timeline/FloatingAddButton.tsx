@@ -15,7 +15,7 @@ interface FloatingAddButtonProps {
 
 export function FloatingAddButton({ open, onOpen, onClose, onAdd, today }: FloatingAddButtonProps) {
   const [text, setText] = useState("");
-  const [when, setWhen] = useState<"today" | "tomorrow" | "draft">("today");
+  const [when, setWhen] = useState<"today" | "tomorrow" | "inbox">("today");
   const inputRef = useRef<HTMLInputElement>(null);
   const [prevOpen, setPrevOpen] = useState(open);
 
@@ -73,11 +73,11 @@ export function FloatingAddButton({ open, onOpen, onClose, onAdd, today }: Float
                 />
 
                 <div className="flex gap-1.5">
-                  {(["today", "tomorrow", "draft"] as const).map((opt) => {
+                  {(["today", "tomorrow", "inbox"] as const).map((opt) => {
                     const labels = {
                       today: `Today · ${today.slice(8)}/${today.slice(5, 7)}`,
                       tomorrow: `Tomorrow · ${tomorrow.slice(8)}/${tomorrow.slice(5, 7)}`,
-                      draft: "No date",
+                      inbox: "No date",
                     };
                     return (
                       <button

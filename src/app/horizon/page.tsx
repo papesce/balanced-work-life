@@ -171,7 +171,7 @@ export default function HorizonPage() {
     return async (text: string): Promise<void> => {
       await createIdea(text, null, "bottom", {
         type: "task",
-        status: "draft",
+        status: "inbox",
         horizon,
       });
     };

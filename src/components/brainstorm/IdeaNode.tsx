@@ -91,6 +91,7 @@ const TYPE_COLORS: Record<IdeaType, string> = {
 };
 
 const STATUS_STYLES: Record<IdeaStatus, string> = {
+  inbox: "border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 bg-transparent",
   draft: "border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 bg-transparent",
   planned:
     "border-sky-200 dark:border-sky-700/30 bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-300",
@@ -110,6 +111,7 @@ const STATUS_STYLES: Record<IdeaStatus, string> = {
 };
 
 const STATUS_LABELS: Record<IdeaStatus, string> = {
+  inbox: "Draft",
   draft: "Draft",
   planned: "Planned",
   scheduled: "Scheduled",
@@ -328,6 +330,7 @@ export function IdeaNode({
         case "planned":
         case "scheduled":
         case "draft":
+        case "inbox":
           await updateIdea(node.id, {
             status,
             completed_at: null,

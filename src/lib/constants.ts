@@ -68,6 +68,13 @@ export const STATUS_CONFIG: Record<
     bg: "rgba(0,0,0,0.05)",
     icon: null,
   },
+  inbox: {
+    label: "Draft",
+    textClass: "text-gray-400",
+    hex: "#9ca3af",
+    bg: "rgba(0,0,0,0.05)",
+    icon: null,
+  },
   planned: {
     label: "Planned",
     textClass: "text-sky-500",
