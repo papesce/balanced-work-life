@@ -12,6 +12,8 @@ import {
   Trash2,
   MoreHorizontal,
   Pencil,
+  Telescope,
+  Check,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import {
@@ -19,6 +21,7 @@ import {
   Idea,
   IdeaLink,
   IdeaType,
+  IdeaHorizon,
   Tag,
   LinkType,
   IdeaStatus,
@@ -43,6 +46,32 @@ interface IdeaNodeProps {
   setEditingId: (id: string | null) => void;
   selectedId: string | null;
   setSelectedId: (id: string | null) => void;
+  composing: {
+    nodeId: string;
+    parentId: string | null;
+    position: "top" | "bottom";
+    composerDepth: number;
+  } | null;
+  setComposing: (
+    v: {
+      nodeId: string;
+      parentId: string | null;
+      position: "top" | "bottom";
+      composerDepth: number;
+    } | null,
+  ) => void;
+  insertion: {
+    nodeId: string;
+    position: "top" | "bottom";
+    targetDepth: number;
+  } | null;
+  setInsertion: (
+    v: {
+      nodeId: string;
+      position: "top" | "bottom";
+      targetDepth: number;
+    } | null,
+  ) => void;
   createIdea: (
     text: string,
     parentId?: string | null,
@@ -68,6 +97,22 @@ interface IdeaNodeProps {
   onAddTag: (ideaId: string, tag: Tag) => Promise<void>;
   onRemoveTag: (ideaId: string, tagId: string) => Promise<void>;
   onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
+}
+
+function getAncestorAtDepth(
+  nodeId: string,
+  currentDepth: number,
+  targetDepth: number,
+  allIdeas: Idea[],
+): string | null {
+  const ideaMap = new Map(allIdeas.map((i) => [i.id, i]));
+  let current = ideaMap.get(nodeId);
+  let depth = currentDepth;
+  while (current && depth > targetDepth) {
+    current = ideaMap.get(current.parent_id ?? "");
+    depth--;
+  }
+  return current?.parent_id ?? null;
 }
 
 function formatScheduleDate(date: string, today: string): string {
@@ -133,6 +178,10 @@ export function IdeaNode({
   setEditingId,
   selectedId,
   setSelectedId,
+  composing,
+  setComposing,
+  insertion,
+  setInsertion,
   createIdea,
   updateIdea,
   deleteIdea,
@@ -167,6 +216,7 @@ export function IdeaNode({
   const [dragOver, setDragOver] = useState<"top" | "center" | "bottom" | null>(null);
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const [showDeleteWarning, setShowDeleteWarning] = useState(false);
+  const [showHorizonPicker, setShowHorizonPicker] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
@@ -251,8 +301,12 @@ export function IdeaNode({
   };
 
   const handleCreateChild = async (text: string) => {
-    const childId = await createIdea(text, node.id, "top");
-    if (node.collapsed) toggleCollapse(node.id);
+    const parentId = composing?.parentId ?? node.id;
+    const position = composing?.position ?? "top";
+    const childId = await createIdea(text, parentId, position);
+    if (parentId === node.id && node.collapsed) toggleCollapse(node.id);
+    setComposing(null);
+    setInsertion(null);
     if (childId) setSelectedId(childId);
   };
 
@@ -369,6 +423,45 @@ export function IdeaNode({
     return n.children.some(matchesSearch);
   };
 
+  const EDGE_ZONE = 6;
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (search || isEditing || !rowRef.current) return;
+    const rect = rowRef.current.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const x = e.clientX;
+
+    if (y < EDGE_ZONE) {
+      const targetDepth = Math.min(Math.max(0, Math.floor((x - rect.left) / 20)), depth + 1);
+      if (
+        !insertion ||
+        insertion.nodeId !== node.id ||
+        insertion.position !== "top" ||
+        insertion.targetDepth !== targetDepth
+      ) {
+        setInsertion({ nodeId: node.id, position: "top", targetDepth });
+      }
+    } else if (y > rect.height - EDGE_ZONE) {
+      const targetDepth = Math.min(Math.max(0, Math.floor((x - rect.left) / 20)), depth + 1);
+      if (
+        !insertion ||
+        insertion.nodeId !== node.id ||
+        insertion.position !== "bottom" ||
+        insertion.targetDepth !== targetDepth
+      ) {
+        setInsertion({ nodeId: node.id, position: "bottom", targetDepth });
+      }
+    } else if (insertion?.nodeId === node.id) {
+      setInsertion(null);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (insertion?.nodeId === node.id) {
+      setInsertion(null);
+    }
+  };
+
   const isAnyMenuOpen =
     showMenu ||
     showTypePicker ||
@@ -376,7 +469,8 @@ export function IdeaNode({
     showStatusPicker ||
     showLinkPanel ||
     showMovePanel ||
-    showSchedulePicker;
+    showSchedulePicker ||
+    showHorizonPicker;
 
   return (
     <div style={{ paddingLeft: depth > 0 ? 20 : 0 }}>
@@ -395,8 +489,21 @@ export function IdeaNode({
         } ${isAnyMenuOpen ? "relative z-30" : ""}`}
         onClick={(e) => {
           e.stopPropagation();
+          if (insertion?.nodeId === node.id && !isEditing && !search) {
+            const parentId = getAncestorAtDepth(node.id, depth, insertion.targetDepth, allIdeas);
+            setComposing({
+              nodeId: node.id,
+              parentId,
+              position: insertion.position,
+              composerDepth: insertion.targetDepth + 1,
+            });
+            setInsertion(null);
+            return;
+          }
           setSelectedId(isSelected ? null : node.id);
         }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -675,6 +782,16 @@ export function IdeaNode({
                     Schedule
                   </button>
                 </div>
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    setShowHorizonPicker(true);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                >
+                  <Telescope size={12} strokeWidth={1.5} />
+                  Horizon
+                </button>
                 <div className="my-1 border-t border-black/5 dark:border-white/5" />
                 <button
                   onClick={handleRequestDelete}
@@ -687,6 +804,57 @@ export function IdeaNode({
               document.body,
             )}
         </div>
+
+        {/* Horizon picker flyout */}
+        {showHorizonPicker &&
+          menuPos &&
+          createPortal(
+            <div
+              ref={menuRef}
+              style={{
+                position: "fixed",
+                top: menuPos.top,
+                right: menuPos.right + 200,
+                zIndex: 9999,
+              }}
+              className="glass-card-strong min-w-[160px] rounded-xl py-1.5 shadow-lg"
+            >
+              <p className="px-3 py-1 text-[10px] font-medium tracking-wide text-gray-400 uppercase">
+                Move to horizon
+              </p>
+              {(["short", "medium", "long"] as IdeaHorizon[]).map((h) => (
+                <button
+                  key={h}
+                  onClick={() => {
+                    updateIdea(node.id, { horizon: h });
+                    setShowHorizonPicker(false);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                >
+                  <span className="w-3">
+                    {node.horizon === h && <Check size={12} strokeWidth={2} />}
+                  </span>
+                  {h === "short" ? "Short-term" : h === "medium" ? "Medium-term" : "Long-term"}
+                </button>
+              ))}
+              {node.horizon != null && (
+                <>
+                  <div className="my-1 border-t border-black/5 dark:border-white/5" />
+                  <button
+                    onClick={() => {
+                      updateIdea(node.id, { horizon: null });
+                      setShowHorizonPicker(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                  >
+                    <span className="w-3" />
+                    Remove from horizon
+                  </button>
+                </>
+              )}
+            </div>,
+            document.body,
+          )}
 
         {/* Sub-panels opened from menu */}
         {showLinkPanel && (
@@ -750,12 +918,12 @@ export function IdeaNode({
         )}
       </div>
 
-      {isSelected && !search && !node.collapsed && (
+      {composing?.nodeId === node.id && !search && !node.collapsed && editingId !== node.id && (
         <IdeaComposer
-          depth={depth + 1}
-          placeholder="Add child idea..."
+          depth={composing.composerDepth}
+          placeholder={composing.parentId === node.id ? "Add child idea..." : "Add idea..."}
           onCreate={handleCreateChild}
-          onDismiss={() => setSelectedId(null)}
+          onDismiss={() => setComposing(null)}
         />
       )}
 
@@ -776,6 +944,10 @@ export function IdeaNode({
                 setEditingId={setEditingId}
                 selectedId={selectedId}
                 setSelectedId={setSelectedId}
+                composing={composing}
+                setComposing={setComposing}
+                insertion={insertion}
+                setInsertion={setInsertion}
                 createIdea={createIdea}
                 updateIdea={updateIdea}
                 deleteIdea={deleteIdea}

@@ -37,6 +37,32 @@ interface IdeaTreeProps {
   setEditingId: (v: string | null) => void;
   selectedId: string | null;
   setSelectedId: (v: string | null) => void;
+  composing: {
+    nodeId: string;
+    parentId: string | null;
+    position: "top" | "bottom";
+    composerDepth: number;
+  } | null;
+  setComposing: (
+    v: {
+      nodeId: string;
+      parentId: string | null;
+      position: "top" | "bottom";
+      composerDepth: number;
+    } | null,
+  ) => void;
+  insertion: {
+    nodeId: string;
+    position: "top" | "bottom";
+    targetDepth: number;
+  } | null;
+  setInsertion: (
+    v: {
+      nodeId: string;
+      position: "top" | "bottom";
+      targetDepth: number;
+    } | null,
+  ) => void;
   showToday: boolean;
   hideClosed: boolean;
 }
@@ -95,6 +121,10 @@ export function IdeaTree({
   setEditingId,
   selectedId,
   setSelectedId,
+  composing,
+  setComposing,
+  insertion,
+  setInsertion,
   showToday,
   hideClosed,
 }: IdeaTreeProps) {
@@ -135,7 +165,14 @@ export function IdeaTree({
   }
 
   return (
-    <div className="space-y-3" onClick={() => setSelectedId(null)}>
+    <div
+      className="space-y-3"
+      onClick={() => {
+        setSelectedId(null);
+        setComposing(null);
+        setInsertion(null);
+      }}
+    >
       {filteredTree.length === 0 ? (
         <p className="py-4 text-sm text-gray-400 italic">
           {search
@@ -147,38 +184,59 @@ export function IdeaTree({
       ) : (
         <div className="space-y-0.5">
           {filteredTree.map((node) => (
-            <IdeaNode
-              key={node.id}
-              node={node}
-              depth={0}
-              showType={showType}
-              showArea={showArea}
-              search={search}
-              editingId={editingId}
-              setEditingId={setEditingId}
-              selectedId={selectedId}
-              setSelectedId={setSelectedId}
-              createIdea={createIdea}
-              updateIdea={updateIdea}
-              deleteIdea={deleteIdea}
-              moveIdea={moveIdea}
-              toggleCollapse={toggleCollapse}
-              expandIdea={expandIdea}
-              allIdeas={ideas}
-              links={links}
-              onCreateLink={onCreateLink}
-              onDeleteLink={onDeleteLink}
-              onMarkDone={onMarkDone}
-              onMarkUndone={onMarkUndone}
-              onSchedule={onSchedule}
-              todayString={todayString}
-              isAncestorOnly={false}
-              allTags={allTags}
-              getTagsForIdea={getTagsForIdea}
-              onAddTag={onAddTag}
-              onRemoveTag={onRemoveTag}
-              onCreateTag={onCreateTag}
-            />
+            <div key={node.id}>
+              {insertion?.nodeId === node.id && insertion.position === "top" && (
+                <div className="relative h-0">
+                  <div
+                    className="absolute top-0 h-[2px] rounded-full bg-indigo-400 dark:bg-indigo-500"
+                    style={{ left: insertion.targetDepth * 20, right: 0 }}
+                  />
+                </div>
+              )}
+              <IdeaNode
+                node={node}
+                depth={0}
+                showType={showType}
+                showArea={showArea}
+                search={search}
+                editingId={editingId}
+                setEditingId={setEditingId}
+                selectedId={selectedId}
+                setSelectedId={setSelectedId}
+                composing={composing}
+                setComposing={setComposing}
+                insertion={insertion}
+                setInsertion={setInsertion}
+                createIdea={createIdea}
+                updateIdea={updateIdea}
+                deleteIdea={deleteIdea}
+                moveIdea={moveIdea}
+                toggleCollapse={toggleCollapse}
+                expandIdea={expandIdea}
+                allIdeas={ideas}
+                links={links}
+                onCreateLink={onCreateLink}
+                onDeleteLink={onDeleteLink}
+                onMarkDone={onMarkDone}
+                onMarkUndone={onMarkUndone}
+                onSchedule={onSchedule}
+                todayString={todayString}
+                isAncestorOnly={false}
+                allTags={allTags}
+                getTagsForIdea={getTagsForIdea}
+                onAddTag={onAddTag}
+                onRemoveTag={onRemoveTag}
+                onCreateTag={onCreateTag}
+              />
+              {insertion?.nodeId === node.id && insertion.position === "bottom" && (
+                <div className="relative h-0">
+                  <div
+                    className="absolute top-0 h-[2px] rounded-full bg-indigo-400 dark:bg-indigo-500"
+                    style={{ left: insertion.targetDepth * 20, right: 0 }}
+                  />
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}

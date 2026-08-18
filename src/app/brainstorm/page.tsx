@@ -42,6 +42,17 @@ export default function BrainstormPage() {
   const [showArea, setShowArea] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [composing, setComposing] = useState<{
+    nodeId: string;
+    parentId: string | null;
+    position: "top" | "bottom";
+    composerDepth: number;
+  } | null>(null);
+  const [insertion, setInsertion] = useState<{
+    nodeId: string;
+    position: "top" | "bottom";
+    targetDepth: number;
+  } | null>(null);
   const [showToday, setShowToday] = useState(false);
   const [hideClosed, setHideClosed] = useState(false);
 
@@ -287,9 +298,10 @@ export default function BrainstormPage() {
     >
       {undoAction && (
         <motion.div
-          initial={{ opacity: 0, y: -4 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="glass-card mb-3 flex items-center justify-between gap-3 rounded-[16px] border-amber-200/40 px-4 py-2.5 dark:border-amber-700/30"
+          exit={{ opacity: 0, y: 8 }}
+          className="glass-card-strong fixed bottom-20 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-amber-200/40 px-4 py-2.5 shadow-lg dark:border-amber-700/30"
         >
           <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
             {undoAction.label}
@@ -340,6 +352,10 @@ export default function BrainstormPage() {
           setEditingId={setEditingId}
           selectedId={selectedId}
           setSelectedId={setSelectedId}
+          composing={composing}
+          setComposing={setComposing}
+          insertion={insertion}
+          setInsertion={setInsertion}
           showToday={showToday}
           hideClosed={hideClosed}
         />
