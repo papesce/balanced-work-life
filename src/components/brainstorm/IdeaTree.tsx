@@ -40,27 +40,15 @@ interface IdeaTreeProps {
   composing: {
     nodeId: string;
     parentId: string | null;
-    position: "top" | "bottom";
-    composerDepth: number;
+    position: "child" | "top" | "bottom";
+    depth: number;
   } | null;
   setComposing: (
     v: {
       nodeId: string;
       parentId: string | null;
-      position: "top" | "bottom";
-      composerDepth: number;
-    } | null,
-  ) => void;
-  insertion: {
-    nodeId: string;
-    position: "top" | "bottom";
-    targetDepth: number;
-  } | null;
-  setInsertion: (
-    v: {
-      nodeId: string;
-      position: "top" | "bottom";
-      targetDepth: number;
+      position: "child" | "top" | "bottom";
+      depth: number;
     } | null,
   ) => void;
   showToday: boolean;
@@ -123,8 +111,6 @@ export function IdeaTree({
   setSelectedId,
   composing,
   setComposing,
-  insertion,
-  setInsertion,
   showToday,
   hideClosed,
 }: IdeaTreeProps) {
@@ -170,7 +156,6 @@ export function IdeaTree({
       onClick={() => {
         setSelectedId(null);
         setComposing(null);
-        setInsertion(null);
       }}
     >
       {filteredTree.length === 0 ? (
@@ -184,59 +169,40 @@ export function IdeaTree({
       ) : (
         <div className="space-y-0.5">
           {filteredTree.map((node) => (
-            <div key={node.id}>
-              {insertion?.nodeId === node.id && insertion.position === "top" && (
-                <div className="relative h-0">
-                  <div
-                    className="absolute top-0 h-[2px] rounded-full bg-indigo-400 dark:bg-indigo-500"
-                    style={{ left: insertion.targetDepth * 20, right: 0 }}
-                  />
-                </div>
-              )}
-              <IdeaNode
-                node={node}
-                depth={0}
-                showType={showType}
-                showArea={showArea}
-                search={search}
-                editingId={editingId}
-                setEditingId={setEditingId}
-                selectedId={selectedId}
-                setSelectedId={setSelectedId}
-                composing={composing}
-                setComposing={setComposing}
-                insertion={insertion}
-                setInsertion={setInsertion}
-                createIdea={createIdea}
-                updateIdea={updateIdea}
-                deleteIdea={deleteIdea}
-                moveIdea={moveIdea}
-                toggleCollapse={toggleCollapse}
-                expandIdea={expandIdea}
-                allIdeas={ideas}
-                links={links}
-                onCreateLink={onCreateLink}
-                onDeleteLink={onDeleteLink}
-                onMarkDone={onMarkDone}
-                onMarkUndone={onMarkUndone}
-                onSchedule={onSchedule}
-                todayString={todayString}
-                isAncestorOnly={false}
-                allTags={allTags}
-                getTagsForIdea={getTagsForIdea}
-                onAddTag={onAddTag}
-                onRemoveTag={onRemoveTag}
-                onCreateTag={onCreateTag}
-              />
-              {insertion?.nodeId === node.id && insertion.position === "bottom" && (
-                <div className="relative h-0">
-                  <div
-                    className="absolute top-0 h-[2px] rounded-full bg-indigo-400 dark:bg-indigo-500"
-                    style={{ left: insertion.targetDepth * 20, right: 0 }}
-                  />
-                </div>
-              )}
-            </div>
+            <IdeaNode
+              key={node.id}
+              node={node}
+              depth={0}
+              showType={showType}
+              showArea={showArea}
+              search={search}
+              editingId={editingId}
+              setEditingId={setEditingId}
+              selectedId={selectedId}
+              setSelectedId={setSelectedId}
+              composing={composing}
+              setComposing={setComposing}
+              createIdea={createIdea}
+              updateIdea={updateIdea}
+              deleteIdea={deleteIdea}
+              moveIdea={moveIdea}
+              toggleCollapse={toggleCollapse}
+              expandIdea={expandIdea}
+              allIdeas={ideas}
+              links={links}
+              onCreateLink={onCreateLink}
+              onDeleteLink={onDeleteLink}
+              onMarkDone={onMarkDone}
+              onMarkUndone={onMarkUndone}
+              onSchedule={onSchedule}
+              todayString={todayString}
+              isAncestorOnly={false}
+              allTags={allTags}
+              getTagsForIdea={getTagsForIdea}
+              onAddTag={onAddTag}
+              onRemoveTag={onRemoveTag}
+              onCreateTag={onCreateTag}
+            />
           ))}
         </div>
       )}

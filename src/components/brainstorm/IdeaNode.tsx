@@ -14,6 +14,7 @@ import {
   Pencil,
   Telescope,
   Check,
+  Plus,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import {
@@ -49,27 +50,15 @@ interface IdeaNodeProps {
   composing: {
     nodeId: string;
     parentId: string | null;
-    position: "top" | "bottom";
-    composerDepth: number;
+    position: "child" | "top" | "bottom";
+    depth: number;
   } | null;
   setComposing: (
     v: {
       nodeId: string;
       parentId: string | null;
-      position: "top" | "bottom";
-      composerDepth: number;
-    } | null,
-  ) => void;
-  insertion: {
-    nodeId: string;
-    position: "top" | "bottom";
-    targetDepth: number;
-  } | null;
-  setInsertion: (
-    v: {
-      nodeId: string;
-      position: "top" | "bottom";
-      targetDepth: number;
+      position: "child" | "top" | "bottom";
+      depth: number;
     } | null,
   ) => void;
   createIdea: (
@@ -97,22 +86,6 @@ interface IdeaNodeProps {
   onAddTag: (ideaId: string, tag: Tag) => Promise<void>;
   onRemoveTag: (ideaId: string, tagId: string) => Promise<void>;
   onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
-}
-
-function getAncestorAtDepth(
-  nodeId: string,
-  currentDepth: number,
-  targetDepth: number,
-  allIdeas: Idea[],
-): string | null {
-  const ideaMap = new Map(allIdeas.map((i) => [i.id, i]));
-  let current = ideaMap.get(nodeId);
-  let depth = currentDepth;
-  while (current && depth > targetDepth) {
-    current = ideaMap.get(current.parent_id ?? "");
-    depth--;
-  }
-  return current?.parent_id ?? null;
 }
 
 function formatScheduleDate(date: string, today: string): string {
@@ -180,8 +153,6 @@ export function IdeaNode({
   setSelectedId,
   composing,
   setComposing,
-  insertion,
-  setInsertion,
   createIdea,
   updateIdea,
   deleteIdea,
@@ -302,11 +273,10 @@ export function IdeaNode({
 
   const handleCreateChild = async (text: string) => {
     const parentId = composing?.parentId ?? node.id;
-    const position = composing?.position ?? "top";
+    const position = composing?.position === "child" ? "top" : (composing?.position ?? "top");
     const childId = await createIdea(text, parentId, position);
     if (parentId === node.id && node.collapsed) toggleCollapse(node.id);
     setComposing(null);
-    setInsertion(null);
     if (childId) setSelectedId(childId);
   };
 
@@ -423,45 +393,6 @@ export function IdeaNode({
     return n.children.some(matchesSearch);
   };
 
-  const EDGE_ZONE = 6;
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (search || isEditing || !rowRef.current) return;
-    const rect = rowRef.current.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    const x = e.clientX;
-
-    if (y < EDGE_ZONE) {
-      const targetDepth = Math.min(Math.max(0, Math.floor((x - rect.left) / 20)), depth + 1);
-      if (
-        !insertion ||
-        insertion.nodeId !== node.id ||
-        insertion.position !== "top" ||
-        insertion.targetDepth !== targetDepth
-      ) {
-        setInsertion({ nodeId: node.id, position: "top", targetDepth });
-      }
-    } else if (y > rect.height - EDGE_ZONE) {
-      const targetDepth = Math.min(Math.max(0, Math.floor((x - rect.left) / 20)), depth + 1);
-      if (
-        !insertion ||
-        insertion.nodeId !== node.id ||
-        insertion.position !== "bottom" ||
-        insertion.targetDepth !== targetDepth
-      ) {
-        setInsertion({ nodeId: node.id, position: "bottom", targetDepth });
-      }
-    } else if (insertion?.nodeId === node.id) {
-      setInsertion(null);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    if (insertion?.nodeId === node.id) {
-      setInsertion(null);
-    }
-  };
-
   const isAnyMenuOpen =
     showMenu ||
     showTypePicker ||
@@ -473,7 +404,38 @@ export function IdeaNode({
     showHorizonPicker;
 
   return (
-    <div style={{ paddingLeft: depth > 0 ? 20 : 0 }}>
+    <div className="relative" style={{ paddingLeft: depth > 0 ? 20 : 0 }}>
+      {/* Separator bar - always in DOM, absolutely positioned to avoid layout shifts */}
+      {!search && !isEditing && (
+        <div
+          className="pointer-events-none absolute -top-2 right-0 left-0 z-10"
+          style={{ height: 16 }}
+        >
+          <div
+            className="pointer-events-auto absolute inset-x-0 top-1/2 -translate-y-1/2 cursor-pointer opacity-0 transition-opacity hover:opacity-100"
+            onClick={(e) => {
+              e.stopPropagation();
+              setComposing({
+                nodeId: node.id,
+                parentId: node.parent_id ?? null,
+                position: "top",
+                depth,
+              });
+            }}
+          >
+            <div className="flex items-center gap-1.5 rounded-md bg-indigo-50 px-1 dark:bg-indigo-500/10">
+              <div className="h-[2px] flex-1 rounded-full bg-indigo-300 dark:bg-indigo-500" />
+              <Plus
+                size={12}
+                className="flex-shrink-0 text-indigo-400 dark:text-indigo-400"
+                strokeWidth={2.5}
+              />
+              <div className="h-[2px] flex-1 rounded-full bg-indigo-300 dark:bg-indigo-500" />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div
         ref={rowRef}
         className={`group flex items-center gap-1 rounded-md px-1 py-1 ${
@@ -489,21 +451,8 @@ export function IdeaNode({
         } ${isAnyMenuOpen ? "relative z-30" : ""}`}
         onClick={(e) => {
           e.stopPropagation();
-          if (insertion?.nodeId === node.id && !isEditing && !search) {
-            const parentId = getAncestorAtDepth(node.id, depth, insertion.targetDepth, allIdeas);
-            setComposing({
-              nodeId: node.id,
-              parentId,
-              position: insertion.position,
-              composerDepth: insertion.targetDepth + 1,
-            });
-            setInsertion(null);
-            return;
-          }
           setSelectedId(isSelected ? null : node.id);
         }}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -524,6 +473,25 @@ export function IdeaNode({
             )
           ) : null}
         </button>
+
+        {/* Add child button - appears on hover */}
+        {!search && !isEditing && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setComposing({
+                nodeId: node.id,
+                parentId: node.id,
+                position: "child",
+                depth: depth + 1,
+              });
+            }}
+            title="Add child idea"
+            className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 hover:text-indigo-500 dark:text-gray-600 dark:hover:text-indigo-400"
+          >
+            <Plus size={14} strokeWidth={2} />
+          </button>
+        )}
 
         {/* Drag handle */}
         <span
@@ -920,8 +888,8 @@ export function IdeaNode({
 
       {composing?.nodeId === node.id && !search && !node.collapsed && editingId !== node.id && (
         <IdeaComposer
-          depth={composing.composerDepth}
-          placeholder={composing.parentId === node.id ? "Add child idea..." : "Add idea..."}
+          depth={composing.depth}
+          placeholder={composing.position === "child" ? "Add child idea..." : "Add idea..."}
           onCreate={handleCreateChild}
           onDismiss={() => setComposing(null)}
         />
@@ -946,8 +914,6 @@ export function IdeaNode({
                 setSelectedId={setSelectedId}
                 composing={composing}
                 setComposing={setComposing}
-                insertion={insertion}
-                setInsertion={setInsertion}
                 createIdea={createIdea}
                 updateIdea={updateIdea}
                 deleteIdea={deleteIdea}

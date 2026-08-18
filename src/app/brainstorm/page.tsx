@@ -45,13 +45,8 @@ export default function BrainstormPage() {
   const [composing, setComposing] = useState<{
     nodeId: string;
     parentId: string | null;
-    position: "top" | "bottom";
-    composerDepth: number;
-  } | null>(null);
-  const [insertion, setInsertion] = useState<{
-    nodeId: string;
-    position: "top" | "bottom";
-    targetDepth: number;
+    position: "child" | "top" | "bottom";
+    depth: number;
   } | null>(null);
   const [showToday, setShowToday] = useState(false);
   const [hideClosed, setHideClosed] = useState(false);
@@ -354,8 +349,6 @@ export default function BrainstormPage() {
           setSelectedId={setSelectedId}
           composing={composing}
           setComposing={setComposing}
-          insertion={insertion}
-          setInsertion={setInsertion}
           showToday={showToday}
           hideClosed={hideClosed}
         />
