@@ -143,7 +143,11 @@ export default function HorizonPage() {
       ideas.filter(
         (i) =>
           i.horizon != null &&
-          (i.status === "planned" || i.status === "in_progress" || i.status === "scheduled") &&
+          (i.status === "inbox" ||
+            i.status === "draft" ||
+            i.status === "planned" ||
+            i.status === "in_progress" ||
+            i.status === "scheduled") &&
           i.parent_id == null,
       ),
     [ideas],
