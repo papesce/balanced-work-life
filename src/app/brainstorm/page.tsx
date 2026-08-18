@@ -8,6 +8,7 @@ import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { AppShell } from "@/components/AppShell";
 import { IdeaTree } from "@/components/brainstorm/IdeaTree";
+import { BrainstormToolbar } from "@/components/brainstorm/BrainstormToolbar";
 import { GraphView } from "@/components/brainstorm/GraphView";
 import { Idea, LinkType } from "@/lib/types";
 import type { IdeasScope } from "@/hooks/useIdeas";
@@ -36,6 +37,14 @@ export default function BrainstormPage() {
   const [viewMode, setViewMode] = useState<"tree" | "graph">("tree");
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
 
+  const [search, setSearch] = useState("");
+  const [showType, setShowType] = useState(true);
+  const [showArea, setShowArea] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showToday, setShowToday] = useState(false);
+  const [hideClosed, setHideClosed] = useState(false);
+
   const hasLinks = linksHook.links.length > 0;
 
   const registerUndo = (undo: UndoAction) => {
@@ -44,6 +53,14 @@ export default function BrainstormPage() {
 
   const clearUndo = () => {
     setUndoAction(null);
+  };
+
+  const handleAddRoot = async () => {
+    const id = await createIdea("", null, "top");
+    if (id) {
+      setSelectedId(id);
+      setEditingId(id);
+    }
   };
 
   const createIdea = async (
@@ -199,6 +216,24 @@ export default function BrainstormPage() {
     );
   }
 
+  const headerStartActions = (
+    <BrainstormToolbar
+      search={search}
+      setSearch={setSearch}
+      showType={showType}
+      setShowType={setShowType}
+      showArea={showArea}
+      setShowArea={setShowArea}
+      showToday={showToday}
+      setShowToday={setShowToday}
+      hideClosed={hideClosed}
+      setHideClosed={setHideClosed}
+      onAddRoot={handleAddRoot}
+      expandAll={ideasHook.expandAll}
+      collapseAll={ideasHook.collapseAll}
+    />
+  );
+
   const headerActions = (
     <div className="flex items-center gap-2">
       <div className="flex gap-1">
@@ -244,7 +279,12 @@ export default function BrainstormPage() {
   );
 
   return (
-    <AppShell title="Brainstorm" headerActions={headerActions} fullWidth={viewMode === "graph"}>
+    <AppShell
+      title="Brainstorm"
+      headerActions={headerActions}
+      headerStartActions={headerStartActions}
+      fullWidth={viewMode === "graph"}
+    >
       {undoAction && (
         <motion.div
           initial={{ opacity: 0, y: -4 }}
@@ -295,6 +335,21 @@ export default function BrainstormPage() {
           onAddTag={taskTagsHook.addTagToTask}
           onRemoveTag={taskTagsHook.removeTagFromTask}
           onCreateTag={tagsHook.createTag}
+          search={search}
+          setSearch={setSearch}
+          showType={showType}
+          setShowType={setShowType}
+          showArea={showArea}
+          setShowArea={setShowArea}
+          editingId={editingId}
+          setEditingId={setEditingId}
+          selectedId={selectedId}
+          setSelectedId={setSelectedId}
+          showToday={showToday}
+          setShowToday={setShowToday}
+          hideClosed={hideClosed}
+          setHideClosed={setHideClosed}
+          handleAddRoot={handleAddRoot}
         />
       ) : (
         <GraphView

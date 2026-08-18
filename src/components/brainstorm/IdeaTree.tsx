@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { IdeaNode as IdeaNodeType, Idea, IdeaLink, Tag, LifeArea, LinkType } from "@/lib/types";
 import { IdeaNode } from "./IdeaNode";
 import { getToday } from "@/lib/dateUtils";
@@ -33,6 +32,21 @@ interface IdeaTreeProps {
   onAddTag: (ideaId: string, tag: Tag) => Promise<void>;
   onRemoveTag: (ideaId: string, tagId: string) => Promise<void>;
   onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
+  search: string;
+  setSearch: (v: string) => void;
+  showType: boolean;
+  setShowType: (v: boolean) => void;
+  showArea: boolean;
+  setShowArea: (v: boolean) => void;
+  editingId: string | null;
+  setEditingId: (v: string | null) => void;
+  selectedId: string | null;
+  setSelectedId: (v: string | null) => void;
+  showToday: boolean;
+  setShowToday: (v: boolean) => void;
+  hideClosed: boolean;
+  setHideClosed: (v: boolean) => void;
+  handleAddRoot: () => void;
 }
 
 function getAncestorIds(ideaId: string, ideas: Idea[]): Set<string> {
@@ -84,23 +98,23 @@ export function IdeaTree({
   onAddTag,
   onRemoveTag,
   onCreateTag,
+  search,
+  setSearch,
+  showType,
+  setShowType,
+  showArea,
+  setShowArea,
+  editingId,
+  setEditingId,
+  selectedId,
+  setSelectedId,
+  showToday,
+  setShowToday,
+  hideClosed,
+  setHideClosed,
+  handleAddRoot,
 }: IdeaTreeProps) {
-  const [search, setSearch] = useState("");
-  const [showType, setShowType] = useState(true);
-  const [showArea, setShowArea] = useState(true);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [showToday, setShowToday] = useState(false);
-  const [hideDone, setHideDone] = useState(false);
   const todayString = getToday();
-
-  const handleAddRoot = async () => {
-    const id = await createIdea("", null, "top");
-    if (id) {
-      setSelectedId(id);
-      setEditingId(id);
-    }
-  };
 
   const matchesSearch = (node: IdeaNodeType): boolean => {
     if (!search) return true;
@@ -119,7 +133,7 @@ export function IdeaTree({
       let passes = true;
       if (showToday && idea.scheduled_date !== todayString) passes = false;
       if (idea.status === "completed" && !hasActiveDescendant(idea.id, ideas)) passes = false;
-      if (hideDone && (idea.status === "cancelled" || idea.status === "archived")) passes = false;
+      if (hideClosed && (idea.status === "cancelled" || idea.status === "archived")) passes = false;
       if (passes) passingIds.add(idea.id);
     }
     const visibleIds = new Set(passingIds);
@@ -138,86 +152,6 @@ export function IdeaTree({
 
   return (
     <div className="space-y-3" onClick={() => setSelectedId(null)}>
-      {/* Row 1: Actions */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={handleAddRoot}
-          className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700"
-        >
-          + New idea
-        </button>
-        <button
-          onClick={expandAll}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-        >
-          Expand
-        </button>
-        <button
-          onClick={collapseAll}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-        >
-          Collapse
-        </button>
-        <input
-          type="text"
-          placeholder="Search..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="min-w-[120px] flex-1 rounded-lg border border-black/10 bg-white/60 px-3 py-1.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-indigo-500 dark:border-white/10 dark:bg-gray-800/60 dark:text-gray-200 dark:placeholder:text-gray-500 dark:focus:border-indigo-400"
-        />
-      </div>
-
-      {/* Row 2: Filters */}
-      <div className="flex items-center gap-3">
-        <div className="flex gap-1">
-          <button
-            onClick={() => setShowType(!showType)}
-            className={`rounded-full border px-2.5 py-1 text-xs ${
-              showType
-                ? "border-indigo-300 bg-white font-medium text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
-                : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
-            }`}
-          >
-            Type
-          </button>
-          <button
-            onClick={() => setShowArea(!showArea)}
-            className={`rounded-full border px-2.5 py-1 text-xs ${
-              showArea
-                ? "border-indigo-300 bg-white font-medium text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
-                : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
-            }`}
-          >
-            Area
-          </button>
-        </div>
-
-        <span className="text-gray-200">|</span>
-
-        <div className="flex gap-1">
-          <button
-            onClick={() => setShowToday(!showToday)}
-            className={`rounded-full border px-2.5 py-1 text-xs ${
-              showToday
-                ? "border-indigo-300 bg-white font-medium text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
-                : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
-            }`}
-          >
-            Today
-          </button>
-          <button
-            onClick={() => setHideDone(!hideDone)}
-            className={`rounded-full border px-2.5 py-1 text-xs ${
-              hideDone
-                ? "border-indigo-300 bg-white font-medium text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
-                : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
-            }`}
-          >
-            Hide done
-          </button>
-        </div>
-      </div>
-
       {filteredTree.length === 0 ? (
         <p className="py-4 text-sm text-gray-400 italic">
           {search
