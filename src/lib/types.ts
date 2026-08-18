@@ -56,6 +56,7 @@ export interface Idea {
   cancelled_at: string | null;
   paused_at: string | null;
   attempt_dates: string[];
+  status_history: { status: IdeaStatus; at: string }[] | null;
   horizon: IdeaHorizon | null;
   sort_order: number;
   created_at: string;

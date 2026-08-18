@@ -46,6 +46,21 @@ function getAncestorIds(ideaId: string, ideas: Idea[]): Set<string> {
   return ancestors;
 }
 
+function hasActiveDescendant(ideaId: string, ideas: Idea[]): boolean {
+  const children = ideas.filter((i) => i.parent_id === ideaId);
+  for (const child of children) {
+    if (
+      child.status !== "completed" &&
+      child.status !== "cancelled" &&
+      child.status !== "archived"
+    ) {
+      return true;
+    }
+    if (hasActiveDescendant(child.id, ideas)) return true;
+  }
+  return false;
+}
+
 export function IdeaTree({
   tree,
   ideas,
@@ -98,12 +113,13 @@ export function IdeaTree({
 
   let filteredTree = searchFiltered;
 
-  if (showToday || hideDone) {
+  {
     const passingIds = new Set<string>();
     for (const idea of ideas) {
       let passes = true;
       if (showToday && idea.scheduled_date !== todayString) passes = false;
-      if (hideDone && (idea.status === "completed" || idea.status === "cancelled")) passes = false;
+      if (idea.status === "completed" && !hasActiveDescendant(idea.id, ideas)) passes = false;
+      if (hideDone && (idea.status === "cancelled" || idea.status === "archived")) passes = false;
       if (passes) passingIds.add(idea.id);
     }
     const visibleIds = new Set(passingIds);

@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "./useAuth";
 import { Idea, IdeaNode } from "@/lib/types";
 import { getToday, getWindowRange } from "@/lib/dateUtils";
+import { appendStatusHistory } from "@/lib/statusHistory";
 
 const STORAGE_KEY = "brainstorm-tree-overrides";
 const IDEAS_CACHE_KEY = "ideas-cache-v1";
@@ -242,6 +243,7 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
       cancelled_at: null,
       paused_at: null,
       attempt_dates: [],
+      status_history: null,
       horizon: null,
       sort_order: sortOrder,
       created_at: now,
@@ -272,15 +274,20 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
   const updateIdea = async (id: string, updates: Partial<Idea>) => {
     const updatedAt = new Date().toISOString();
     const previous = ideas.find((i) => i.id === id);
+
+    const finalUpdates = { ...updates };
+    if (updates.status && previous && updates.status !== previous.status) {
+      finalUpdates.status_history = appendStatusHistory(previous, updates.status);
+    }
+
     setIdeas((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, ...updates, updated_at: updatedAt } : i)),
+      prev.map((i) => (i.id === id ? { ...i, ...finalUpdates, updated_at: updatedAt } : i)),
     );
     const { error } = await supabase
       .from("ideas")
-      .update({ ...updates, updated_at: updatedAt })
+      .update({ ...finalUpdates, updated_at: updatedAt })
       .eq("id", id);
     if (error) {
-      // Roll back the optimistic update so local state matches the DB.
       if (previous) {
         setIdeas((prev) => prev.map((i) => (i.id === id ? previous : i)));
       }
