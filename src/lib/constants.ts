@@ -61,8 +61,8 @@ export const STATUS_CONFIG: Record<
   IdeaStatus,
   { label: string; textClass: string; hex: string; bg: string; icon: React.ElementType | null }
 > = {
-  inbox: {
-    label: "Inbox",
+  draft: {
+    label: "Draft",
     textClass: "text-gray-400",
     hex: "#9ca3af",
     bg: "rgba(0,0,0,0.05)",

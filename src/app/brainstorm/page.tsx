@@ -323,8 +323,6 @@ export default function BrainstormPage() {
           moveIdea={moveIdea}
           toggleCollapse={ideasHook.toggleCollapse}
           expandIdea={ideasHook.expandIdea}
-          expandAll={ideasHook.expandAll}
-          collapseAll={ideasHook.collapseAll}
           onCreateLink={createLink}
           onDeleteLink={deleteLink}
           onMarkDone={markDone}
@@ -336,20 +334,14 @@ export default function BrainstormPage() {
           onRemoveTag={taskTagsHook.removeTagFromTask}
           onCreateTag={tagsHook.createTag}
           search={search}
-          setSearch={setSearch}
           showType={showType}
-          setShowType={setShowType}
           showArea={showArea}
-          setShowArea={setShowArea}
           editingId={editingId}
           setEditingId={setEditingId}
           selectedId={selectedId}
           setSelectedId={setSelectedId}
           showToday={showToday}
-          setShowToday={setShowToday}
           hideClosed={hideClosed}
-          setHideClosed={setHideClosed}
-          handleAddRoot={handleAddRoot}
         />
       ) : (
         <GraphView

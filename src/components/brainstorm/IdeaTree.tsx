@@ -20,8 +20,6 @@ interface IdeaTreeProps {
   moveIdea: (id: string, newParentId: string | null, newSortOrder: number) => Promise<void>;
   toggleCollapse: (id: string) => void;
   expandIdea: (id: string) => void;
-  expandAll: () => void;
-  collapseAll: () => void;
   onCreateLink: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
   onDeleteLink: (id: string) => Promise<void>;
   onMarkDone: (id: string) => Promise<void>;
@@ -33,20 +31,14 @@ interface IdeaTreeProps {
   onRemoveTag: (ideaId: string, tagId: string) => Promise<void>;
   onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
   search: string;
-  setSearch: (v: string) => void;
   showType: boolean;
-  setShowType: (v: boolean) => void;
   showArea: boolean;
-  setShowArea: (v: boolean) => void;
   editingId: string | null;
   setEditingId: (v: string | null) => void;
   selectedId: string | null;
   setSelectedId: (v: string | null) => void;
   showToday: boolean;
-  setShowToday: (v: boolean) => void;
   hideClosed: boolean;
-  setHideClosed: (v: boolean) => void;
-  handleAddRoot: () => void;
 }
 
 function getAncestorIds(ideaId: string, ideas: Idea[]): Set<string> {
@@ -86,8 +78,6 @@ export function IdeaTree({
   moveIdea,
   toggleCollapse,
   expandIdea,
-  expandAll,
-  collapseAll,
   onCreateLink,
   onDeleteLink,
   onMarkDone,
@@ -99,20 +89,14 @@ export function IdeaTree({
   onRemoveTag,
   onCreateTag,
   search,
-  setSearch,
   showType,
-  setShowType,
   showArea,
-  setShowArea,
   editingId,
   setEditingId,
   selectedId,
   setSelectedId,
   showToday,
-  setShowToday,
   hideClosed,
-  setHideClosed,
-  handleAddRoot,
 }: IdeaTreeProps) {
   const todayString = getToday();
 
