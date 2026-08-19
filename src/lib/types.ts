@@ -1,7 +1,6 @@
 export type IdeaType = "idea" | "objective" | "project" | "initiative" | "task";
 export type LifeArea = "work" | "health" | "relationships" | "growth" | "finances" | "life";
 export type IdeaStatus =
-  | "inbox"
   | "draft"
   | "planned"
   | "scheduled"

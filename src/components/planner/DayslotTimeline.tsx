@@ -455,7 +455,6 @@ function EventCard({
         case "planned":
         case "scheduled":
         case "draft":
-        case "inbox":
         case "deferred":
           onUpdateTask(idea.id, {
             status,

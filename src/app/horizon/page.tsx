@@ -143,8 +143,7 @@ export default function HorizonPage() {
       ideas.filter(
         (i) =>
           i.horizon != null &&
-          (i.status === "inbox" ||
-            i.status === "draft" ||
+          (i.status === "draft" ||
             i.status === "planned" ||
             i.status === "in_progress" ||
             i.status === "scheduled") &&
@@ -175,7 +174,7 @@ export default function HorizonPage() {
     return async (text: string): Promise<void> => {
       await createIdea(text, null, "bottom", {
         type: "task",
-        status: "inbox",
+        status: "draft",
         horizon,
       });
     };
