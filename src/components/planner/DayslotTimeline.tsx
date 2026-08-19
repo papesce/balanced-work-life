@@ -36,7 +36,7 @@ interface DayslotTimelineProps {
   activeDate: string;
   allTasks: Idea[];
   onUpdateTask: (id: string, updates: Partial<Idea>) => void;
-  onCreateTask: (text: string, time: string, area?: LifeArea) => Promise<void>;
+  onCreateTask: (text: string, time: string, area?: LifeArea, tag?: Tag) => Promise<void>;
   getTagsForIdea: (ideaId: string) => Tag[];
   tags: Tag[];
   selectedArea: LifeArea | null;
@@ -87,13 +87,14 @@ function SlotForm({
 }: {
   startMinute: number;
   close: () => void;
-  onCreateTask: (text: string, time: string, area?: LifeArea) => Promise<void>;
+  onCreateTask: (text: string, time: string, area?: LifeArea, tag?: Tag) => Promise<void>;
   defaultArea: LifeArea | null;
   tags: Tag[];
   onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
 }) {
   const [text, setText] = useState("");
   const [selectedArea, setSelectedArea] = useState<LifeArea | null>(defaultArea);
+  const [selectedTag, setSelectedTag] = useState<Tag | null>(null);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const areaBtnRef = useRef<HTMLButtonElement>(null);
   const [areaPickerPos, setAreaPickerPos] = useState<{ top: number; left: number } | null>(null);
@@ -112,7 +113,7 @@ function SlotForm({
     submittingRef.current = true;
     close();
     try {
-      await onCreateTask(text.trim(), timeStr, selectedArea ?? undefined);
+      await onCreateTask(text.trim(), timeStr, selectedArea ?? undefined, selectedTag ?? undefined);
     } catch (err) {
       console.error("Failed to create scheduled task", err);
     }
@@ -179,6 +180,7 @@ function SlotForm({
               selectedTags={areaSystemTag ? [areaSystemTag] : []}
               onAdd={(tag) => {
                 setSelectedArea(tag.area);
+                setSelectedTag(tag);
                 setShowAreaPicker(false);
               }}
               onRemove={() => {}}

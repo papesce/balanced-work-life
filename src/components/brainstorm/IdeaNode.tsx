@@ -531,7 +531,7 @@ export function IdeaNode({
             onChange={(e) => setEditText(e.target.value)}
             onKeyDown={handleKeyDown}
             onBlur={handleConfirmEdit}
-            className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-0.5 text-sm outline-none focus:border-indigo-500"
+            className="max-w-sm min-w-0 flex-1 rounded border border-gray-300 px-2 py-0.5 text-sm outline-none focus:border-indigo-500"
             placeholder="Type an idea..."
           />
         ) : (
@@ -540,7 +540,7 @@ export function IdeaNode({
               e.stopPropagation();
               handleStartEdit();
             }}
-            className={`min-w-0 flex-1 truncate rounded px-2 py-0.5 text-sm ${
+            className={`max-w-sm min-w-0 flex-1 truncate rounded px-2 py-0.5 text-sm ${
               isAncestorOnly
                 ? "cursor-default text-gray-400 italic"
                 : node.status === "completed"
@@ -560,7 +560,10 @@ export function IdeaNode({
 
         {/* Type pill */}
         {showType && (
-          <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="relative w-20 flex-shrink-0 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               onClick={() => setShowTypePicker(!showTypePicker)}
               className={`rounded-full border px-2 py-0.5 text-xs ${
@@ -585,7 +588,7 @@ export function IdeaNode({
         {/* Tag chips */}
         {showArea && (
           <div
-            className="relative flex flex-shrink-0 items-center gap-1"
+            className="relative flex min-w-28 flex-shrink-0 items-center gap-1"
             onClick={(e) => e.stopPropagation()}
           >
             {nodeTags.map((tag) => (
@@ -628,7 +631,10 @@ export function IdeaNode({
 
         {/* Status pill */}
         {!isAncestorOnly && (
-          <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="relative w-20 flex-shrink-0 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               onClick={() => setShowStatusPicker(!showStatusPicker)}
               className={`cursor-pointer rounded-full border px-2 py-0.5 text-xs ${
@@ -664,7 +670,7 @@ export function IdeaNode({
               router.push(`/timeline?date=${node.scheduled_date}&highlight=${node.id}`);
             }}
             title="Open in timeline"
-            className={`flex-shrink-0 cursor-pointer rounded-full border px-1.5 py-0.5 text-xs transition-colors hover:border-violet-400 hover:text-violet-700 dark:hover:border-violet-500 dark:hover:text-violet-300 ${
+            className={`flex w-20 flex-shrink-0 items-center justify-center truncate rounded-full border px-1.5 py-0.5 text-xs transition-colors hover:border-violet-400 hover:text-violet-700 dark:hover:border-violet-500 dark:hover:text-violet-300 ${
               node.scheduled_date === todayString
                 ? "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/20 dark:text-violet-300"
                 : "border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-300"

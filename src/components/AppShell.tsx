@@ -85,7 +85,7 @@ export function AppShell({
         </header>
 
         <main className="flex-1 px-5 py-5 pb-24 md:pb-6">
-          <div className={fullWidth ? "w-full" : "mx-auto max-w-2xl"}>{children}</div>
+          <div className={fullWidth ? "w-full" : "mx-auto max-w-4xl"}>{children}</div>
         </main>
       </div>
 
