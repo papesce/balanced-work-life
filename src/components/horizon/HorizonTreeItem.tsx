@@ -1,9 +1,19 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { ChevronRight, ChevronDown, Star } from "lucide-react";
-import { Idea, IdeaNode, IdeaStatus, Tag, IdeaLink, LinkType, LifeArea } from "@/lib/types";
+import { ChevronRight, ChevronDown, Star, Plus } from "lucide-react";
+import {
+  Idea,
+  IdeaNode,
+  IdeaStatus,
+  IdeaType,
+  Tag,
+  IdeaLink,
+  LinkType,
+  LifeArea,
+} from "@/lib/types";
 import { IdeaActionMenu } from "@/components/shared/IdeaActionMenu";
+import { IdeaComposer } from "@/components/brainstorm/IdeaComposer";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { TypePicker } from "@/components/brainstorm/TypePicker";
 import { TagPicker } from "@/components/shared/TagPicker";
@@ -86,6 +96,14 @@ interface HorizonTreeItemProps {
   onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
   onToggleCollapse: (id: string) => void;
   onExpandIdea: (id: string) => void;
+  createIdea: (
+    text: string,
+    parentId: string | null,
+    position: "top" | "bottom",
+    initialUpdates?: Partial<Idea>,
+  ) => Promise<string>;
+  composingNodeId: string | null;
+  setComposingNodeId: (id: string | null) => void;
 }
 
 function InlineEditInput({
@@ -144,6 +162,9 @@ export function HorizonTreeItem({
   onCreateTag,
   onToggleCollapse,
   onExpandIdea,
+  createIdea,
+  composingNodeId,
+  setComposingNodeId,
 }: HorizonTreeItemProps) {
   const hasChildren = node.children.length > 0;
   const isEditing = editingId === node.id;
@@ -151,6 +172,15 @@ export function HorizonTreeItem({
   const linkCount = links.filter((l) => l.source_id === node.id || l.target_id === node.id).length;
   const badge = node.type ? TYPE_BADGE[node.type] : null;
   const [showTypePicker, setShowTypePicker] = useState(false);
+  const [composingType, setComposingType] = useState<IdeaType>("task");
+  const isComposing = composingNodeId === node.id;
+
+  const handleCreateChild = async (text: string) => {
+    if (node.collapsed) onExpandIdea(node.id);
+    await createIdea(text, node.id, "bottom", { type: composingType, status: "draft" });
+    setComposingNodeId(null);
+    setComposingType("task");
+  };
 
   const handleStatusSelect = (status: IdeaStatus) => {
     const updates: Partial<Idea> = { status };
@@ -341,6 +371,20 @@ export function HorizonTreeItem({
           onMove={onMove}
           hiddenActions={["move"]}
         />
+
+        {/* Add child button */}
+        {!isEditing && !isComposing && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setComposingNodeId(node.id);
+            }}
+            title="Add child"
+            className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 hover:text-indigo-500 dark:text-gray-600 dark:hover:text-indigo-400"
+          >
+            <Plus size={14} strokeWidth={2} />
+          </button>
+        )}
       </div>
 
       {/* Children */}
@@ -372,8 +416,50 @@ export function HorizonTreeItem({
               onCreateTag={onCreateTag}
               onToggleCollapse={onToggleCollapse}
               onExpandIdea={onExpandIdea}
+              createIdea={createIdea}
+              composingNodeId={composingNodeId}
+              setComposingNodeId={setComposingNodeId}
             />
           ))}
+        </div>
+      )}
+
+      {/* Inline child composer */}
+      {isComposing && (
+        <div
+          className="flex items-center gap-1.5 bg-indigo-50/40 dark:bg-indigo-500/10"
+          style={{ paddingLeft: (depth + 1) * 20 + 12 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="relative flex-shrink-0">
+            <button
+              onClick={() => setShowTypePicker(!showTypePicker)}
+              className={`rounded-full px-1.5 py-0 text-[10px] font-semibold ${
+                TYPE_BADGE[composingType]?.className ?? ""
+              } cursor-pointer transition-opacity hover:opacity-80`}
+            >
+              {TYPE_BADGE[composingType]?.label ?? "Task"}
+            </button>
+            {showTypePicker && (
+              <TypePicker
+                current={composingType}
+                onSelect={(type) => {
+                  setComposingType(type ?? "task");
+                  setShowTypePicker(false);
+                }}
+                onClose={() => setShowTypePicker(false)}
+              />
+            )}
+          </div>
+          <IdeaComposer
+            depth={0}
+            placeholder="Add child..."
+            onCreate={handleCreateChild}
+            onDismiss={() => {
+              setComposingNodeId(null);
+              setComposingType("task");
+            }}
+          />
         </div>
       )}
     </div>

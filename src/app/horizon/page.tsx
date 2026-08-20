@@ -10,9 +10,8 @@ import { useIdeaInteractionState } from "@/hooks/useIdeaInteractionState";
 import { AppShell } from "@/components/AppShell";
 import { QuickAddInput } from "@/components/timeline/QuickAddInput";
 import { HorizonTreeItem } from "@/components/horizon/HorizonTreeItem";
+import { TypePicker } from "@/components/brainstorm/TypePicker";
 import { Idea, IdeaHorizon, IdeaNode, IdeaType } from "@/lib/types";
-
-const LAST_TYPE_KEY = "horizon-last-type";
 
 const HORIZONS: { key: IdeaHorizon; label: string }[] = [
   { key: "short", label: "Short term" },
@@ -93,6 +92,72 @@ function buildFilteredTree(ideas: Idea[], collapsedIds: Set<string>): IdeaNode[]
   return roots;
 }
 
+const TYPE_BADGE: Record<string, { label: string; className: string }> = {
+  idea: {
+    label: "Idea",
+    className: "bg-orange-100/80 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400",
+  },
+  objective: {
+    label: "Objective",
+    className: "bg-purple-100/80 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400",
+  },
+  project: {
+    label: "Project",
+    className: "bg-blue-100/80 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
+  },
+  initiative: {
+    label: "Initiative",
+    className: "bg-violet-100/80 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400",
+  },
+  task: {
+    label: "Task",
+    className: "bg-gray-100/80 text-gray-500 dark:bg-gray-800/40 dark:text-gray-400",
+  },
+};
+
+function RootAddInput({
+  horizon,
+  onAdd,
+}: {
+  horizon: IdeaHorizon;
+  onAdd: (text: string, type?: IdeaType) => Promise<void>;
+}) {
+  const [rootType, setRootType] = useState<IdeaType>("task");
+  const [showTypePicker, setShowTypePicker] = useState(false);
+  const badge = TYPE_BADGE[rootType];
+
+  return (
+    <div className="border-t border-black/[0.02] px-4 py-2 dark:border-white/[0.02]">
+      <div className="flex items-center gap-1.5">
+        <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => setShowTypePicker(!showTypePicker)}
+            className={`rounded-full px-1.5 py-0 text-[10px] font-semibold ${badge.className} cursor-pointer transition-opacity hover:opacity-80`}
+          >
+            {badge.label}
+          </button>
+          {showTypePicker && (
+            <TypePicker
+              current={rootType}
+              onSelect={(type) => {
+                setRootType(type ?? "task");
+                setShowTypePicker(false);
+              }}
+              onClose={() => setShowTypePicker(false)}
+            />
+          )}
+        </div>
+        <QuickAddInput
+          placeholder={`+ Add to ${horizon}...`}
+          onAdd={async (text) => {
+            await onAdd(text, rootType);
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function HorizonPage() {
   const ideasHook = useIdeas();
   const { ideas, loading, createIdea, updateIdea, deleteIdea, moveIdea, scheduleIdea } = ideasHook;
@@ -102,6 +167,7 @@ export default function HorizonPage() {
   const interaction = useIdeaInteractionState();
   const [activeTab, setActiveTab] = useState<IdeaHorizon>("short");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [composingNodeId, setComposingNodeId] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Map<string, HorizonOverrideState>>(() =>
     loadHorizonOverrides(),
   );
@@ -160,10 +226,9 @@ export default function HorizonPage() {
   }, [allTreeNodes]);
 
   const handleAdd = (horizon: IdeaHorizon) => {
-    return async (text: string): Promise<void> => {
-      const saved = localStorage.getItem(LAST_TYPE_KEY) as IdeaType | null;
+    return async (text: string, type?: IdeaType): Promise<void> => {
       await createIdea(text, null, "bottom", {
-        type: saved ?? "idea",
+        type: type ?? "task",
         status: "draft",
         horizon,
       });
@@ -222,18 +287,16 @@ export default function HorizonPage() {
                   onCreateTag={tagsHook.createTag}
                   onToggleCollapse={onToggleCollapse}
                   onExpandIdea={onExpandIdea}
+                  createIdea={createIdea}
+                  composingNodeId={composingNodeId}
+                  setComposingNodeId={setComposingNodeId}
                 />
               ))}
             </div>
           )}
         </div>
 
-        <div className="border-t border-black/[0.02] px-4 py-2 dark:border-white/[0.02]">
-          <QuickAddInput
-            placeholder={`+ Add to ${h.label.toLowerCase()}...`}
-            onAdd={handleAdd(h.key)}
-          />
-        </div>
+        <RootAddInput horizon={h.key} onAdd={handleAdd(h.key)} />
       </div>
     );
   };
