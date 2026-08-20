@@ -147,7 +147,7 @@ function SlotForm({
           }}
           className="cursor-pointer rounded-full border border-black/10 px-2 py-0.5 text-[10px] font-bold text-gray-600 hover:bg-black/5 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/5"
         >
-          Area: {selectedArea ? AREA_LABELS[selectedArea] : "Life"}
+          Area: {selectedTag ? selectedTag.name : selectedArea ? AREA_LABELS[selectedArea] : "Life"}
         </button>
         <div className="flex items-center gap-2">
           <button
