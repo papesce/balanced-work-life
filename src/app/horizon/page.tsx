@@ -7,7 +7,9 @@ import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useIdeaInteractionState } from "@/hooks/useIdeaInteractionState";
+import { useUndoAction } from "@/lib/tasks/undo";
 import { AppShell } from "@/components/AppShell";
+import { UndoBar } from "@/components/shared/UndoBar";
 import { QuickAddInput } from "@/components/timeline/QuickAddInput";
 import { HorizonTreeItem } from "@/components/horizon/HorizonTreeItem";
 import { TypePicker } from "@/components/brainstorm/TypePicker";
@@ -92,6 +94,16 @@ function buildFilteredTree(ideas: Idea[], collapsedIds: Set<string>): IdeaNode[]
   return roots;
 }
 
+function getDescendantIdeaIds(rootId: string, ideas: Idea[]): Set<string> {
+  const ids = new Set<string>();
+  const collect = (id: string) => {
+    ids.add(id);
+    ideas.filter((idea) => idea.parent_id === id).forEach((child) => collect(child.id));
+  };
+  collect(rootId);
+  return ids;
+}
+
 const TYPE_BADGE: Record<string, { label: string; className: string }> = {
   idea: {
     label: "Idea",
@@ -160,17 +172,67 @@ function RootAddInput({
 
 export default function HorizonPage() {
   const ideasHook = useIdeas();
-  const { ideas, loading, createIdea, updateIdea, deleteIdea, moveIdea, scheduleIdea } = ideasHook;
+  const { ideas, loading, moveIdea, scheduleIdea } = ideasHook;
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
   const linksHook = useIdeaLinks();
   const interaction = useIdeaInteractionState();
+  const { undoAction, registerUndo, clearUndo, handleUndo } = useUndoAction();
   const [activeTab, setActiveTab] = useState<IdeaHorizon>("short");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [composingNodeId, setComposingNodeId] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Map<string, HorizonOverrideState>>(() =>
     loadHorizonOverrides(),
   );
+
+  const updateIdea = async (id: string, updates: Partial<Idea>) => {
+    const previous = ideasHook.ideas.find((idea) => idea.id === id);
+    await ideasHook.updateIdea(id, updates);
+    if (!previous) return;
+    const restore: Partial<Idea> = {};
+    for (const key of Object.keys(updates) as Array<keyof Idea>) {
+      restore[key] = previous[key] as never;
+    }
+    registerUndo({
+      label: "Idea updated",
+      run: async () => {
+        await ideasHook.updateIdea(id, restore);
+      },
+    });
+  };
+
+  const deleteIdea = async (id: string) => {
+    const deletedIds = getDescendantIdeaIds(id, ideasHook.ideas);
+    const deletedIdeas = ideasHook.ideas.filter((idea) => deletedIds.has(idea.id));
+    const deletedLinks = linksHook.removeLinksForIdeaIds(deletedIds);
+    await ideasHook.deleteIdea(id);
+    if (deletedIdeas.length === 0) return;
+    registerUndo({
+      label: deletedIdeas.length > 1 ? "Ideas deleted" : "Idea deleted",
+      run: async () => {
+        await ideasHook.restoreIdeas(deletedIdeas);
+        await linksHook.restoreLinks(deletedLinks);
+      },
+    });
+  };
+
+  const createIdea = async (
+    text: string,
+    parentId: string | null,
+    position: "top" | "bottom",
+    initialUpdates?: Partial<Idea>,
+  ): Promise<string> => {
+    const id = await ideasHook.createIdea(text, parentId, position, initialUpdates);
+    if (id) {
+      registerUndo({
+        label: "Idea created",
+        run: async () => {
+          await ideasHook.deleteIdea(id);
+        },
+      });
+    }
+    return id;
+  };
 
   const collapsedIds = useMemo(() => {
     const parentIds = new Set(
@@ -303,6 +365,8 @@ export default function HorizonPage() {
 
   return (
     <AppShell title="Horizon">
+      <UndoBar undoAction={undoAction} onUndo={() => void handleUndo()} onDismiss={clearUndo} />
+
       {/* Mobile tab bar */}
       <div className="sticky top-[53px] z-10 mb-4 flex gap-1 rounded-xl bg-black/[0.03] p-1 md:hidden dark:bg-white/[0.04]">
         {HORIZONS.map((h) => (
