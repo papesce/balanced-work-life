@@ -2,12 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { EyeOff } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useIdeaInteractionState } from "@/hooks/useIdeaInteractionState";
 import { useUndoAction } from "@/lib/tasks/undo";
+import { filterTreeBySearch } from "@/lib/ideaTreeFilters";
 import { AppShell } from "@/components/AppShell";
 import { UndoBar } from "@/components/shared/UndoBar";
 import { QuickAddInput } from "@/components/timeline/QuickAddInput";
@@ -184,6 +186,8 @@ export default function HorizonPage() {
   const [overrides, setOverrides] = useState<Map<string, HorizonOverrideState>>(() =>
     loadHorizonOverrides(),
   );
+  const [search, setSearch] = useState("");
+  const [hideClosed, setHideClosed] = useState(false);
 
   const updateIdea = async (id: string, updates: Partial<Idea>) => {
     const previous = ideasHook.ideas.find((idea) => idea.id === id);
@@ -239,13 +243,24 @@ export default function HorizonPage() {
       ideas.filter((i) => ideas.some((c) => c.parent_id === i.id)).map((i) => i.id),
     );
     const collapsed = new Set<string>();
+    const hasSearch = search.trim().length > 0;
+
+    const nodeHasSearchMatch = (ideaId: string): boolean => {
+      const idea = ideas.find((i) => i.id === ideaId);
+      if (!idea) return false;
+      const q = search.toLowerCase();
+      if (idea.text.toLowerCase().includes(q)) return true;
+      return ideas.some((child) => child.parent_id === ideaId && nodeHasSearchMatch(child.id));
+    };
+
     for (const id of parentIds) {
       const override = overrides.get(id);
       if (override === "expanded") continue;
+      if (hasSearch && nodeHasSearchMatch(id)) continue;
       collapsed.add(id);
     }
     return collapsed;
-  }, [ideas, overrides]);
+  }, [ideas, overrides, search]);
 
   const onToggleCollapse = (id: string) => {
     setOverrides((prev) => {
@@ -287,6 +302,23 @@ export default function HorizonPage() {
     return grouped;
   }, [allTreeNodes]);
 
+  const originalTreeLengths = useMemo(() => {
+    const lengths: Record<IdeaHorizon, number> = { short: 0, medium: 0, long: 0 };
+    for (const key of Object.keys(treesByHorizon) as IdeaHorizon[]) {
+      lengths[key] = treesByHorizon[key].length;
+    }
+    return lengths;
+  }, [treesByHorizon]);
+
+  const filteredTreesByHorizon = useMemo(() => {
+    if (!search.trim()) return treesByHorizon;
+    const filtered: Record<IdeaHorizon, IdeaNode[]> = { short: [], medium: [], long: [] };
+    for (const key of Object.keys(treesByHorizon) as IdeaHorizon[]) {
+      filtered[key] = filterTreeBySearch(treesByHorizon[key], search);
+    }
+    return filtered;
+  }, [treesByHorizon, search]);
+
   const handleAdd = (horizon: IdeaHorizon) => {
     return async (text: string, type?: IdeaType): Promise<void> => {
       await createIdea(text, null, "bottom", {
@@ -306,7 +338,8 @@ export default function HorizonPage() {
   }
 
   const renderColumn = (h: { key: IdeaHorizon; label: string }) => {
-    const nodes = treesByHorizon[h.key];
+    const nodes = filteredTreesByHorizon[h.key];
+    const wasOriginallyEmpty = originalTreeLengths[h.key] === 0;
     return (
       <div className="glass-card flex min-w-0 flex-1 flex-col rounded-2xl">
         <div className="flex items-center justify-between border-b border-black/5 px-4 py-3 dark:border-white/5">
@@ -319,7 +352,7 @@ export default function HorizonPage() {
         <div className="max-h-[calc(100vh-220px)] min-h-[120px] flex-1 overflow-y-auto">
           {nodes.length === 0 ? (
             <p className="px-4 py-6 text-center text-xs text-gray-400 italic dark:text-gray-500">
-              No items yet
+              {wasOriginallyEmpty ? "No items yet" : "No matches"}
             </p>
           ) : (
             <div className="divide-y divide-black/[0.03] dark:divide-white/[0.03]">
@@ -363,8 +396,32 @@ export default function HorizonPage() {
     );
   };
 
+  const headerStartActions = (
+    <>
+      <input
+        type="text"
+        placeholder="Search\u2026"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="w-32 rounded-lg border border-black/10 bg-white/60 px-3 py-1.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-indigo-500 sm:w-44 md:w-56 dark:border-white/10 dark:bg-gray-800/60 dark:text-gray-200 dark:placeholder:text-gray-500 dark:focus:border-indigo-400"
+      />
+      <button
+        type="button"
+        onClick={() => setHideClosed((v) => !v)}
+        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+          hideClosed
+            ? "border-indigo-300 bg-white text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
+            : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
+        }`}
+      >
+        <EyeOff size={12} />
+        <span className="hidden sm:inline">Hide closed</span>
+      </button>
+    </>
+  );
+
   return (
-    <AppShell title="Horizon">
+    <AppShell title="Horizon" headerStartActions={headerStartActions}>
       <UndoBar undoAction={undoAction} onUndo={() => void handleUndo()} onDismiss={clearUndo} />
 
       {/* Mobile tab bar */}

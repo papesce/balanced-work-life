@@ -1,6 +1,7 @@
 "use client";
 
 import { IdeaNode as IdeaNodeType, Idea, IdeaLink, Tag, LifeArea, LinkType } from "@/lib/types";
+import { filterIdeaTree } from "@/lib/ideaTreeFilters";
 import { IdeaNode } from "./IdeaNode";
 import { getToday } from "@/lib/dateUtils";
 import type { IdeasScope } from "@/hooks/useIdeas";
@@ -116,31 +117,19 @@ export function IdeaTree({
 }: IdeaTreeProps) {
   const todayString = getToday();
 
-  const matchesSearch = (node: IdeaNodeType): boolean => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    if (node.text.toLowerCase().includes(q)) return true;
-    return node.children.some(matchesSearch);
-  };
+  let filteredTree = filterIdeaTree(tree, ideas, { search, hideClosed });
 
-  const searchFiltered = search ? tree.filter(matchesSearch) : tree;
-
-  let filteredTree = searchFiltered;
-
-  {
+  if (showToday) {
     const passingIds = new Set<string>();
     for (const idea of ideas) {
       let passes = true;
-      if (showToday && idea.scheduled_date !== todayString) passes = false;
+      if (idea.scheduled_date !== todayString) passes = false;
       if (idea.status === "completed" && !hasActiveDescendant(idea.id, ideas)) passes = false;
-      if (hideClosed && (idea.status === "cancelled" || idea.status === "archived")) passes = false;
       if (passes) passingIds.add(idea.id);
     }
     const visibleIds = new Set(passingIds);
-    if (showToday) {
-      for (const id of passingIds) {
-        for (const aid of getAncestorIds(id, ideas)) visibleIds.add(aid);
-      }
+    for (const id of passingIds) {
+      for (const aid of getAncestorIds(id, ideas)) visibleIds.add(aid);
     }
     const pruneNode = (node: IdeaNodeType): IdeaNodeType | null => {
       if (!visibleIds.has(node.id)) return null;
