@@ -9,7 +9,7 @@ import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useIdeaInteractionState } from "@/hooks/useIdeaInteractionState";
 import { AppShell } from "@/components/AppShell";
 import { QuickAddInput } from "@/components/timeline/QuickAddInput";
-import { HorizonIdeaCard } from "@/components/horizon/HorizonIdeaCard";
+import { HorizonTreeItem } from "@/components/horizon/HorizonTreeItem";
 import { Idea, IdeaHorizon, IdeaNode, IdeaType } from "@/lib/types";
 
 const LAST_TYPE_KEY = "horizon-last-type";
@@ -21,6 +21,25 @@ const HORIZONS: { key: IdeaHorizon; label: string }[] = [
 ];
 
 const ACTIVE_STATUSES = new Set(["draft", "planned", "in_progress", "scheduled"]);
+
+const HORIZON_STORAGE_KEY = "horizon-tree-overrides";
+type HorizonOverrideState = "expanded" | "collapsed";
+
+function loadHorizonOverrides(): Map<string, HorizonOverrideState> {
+  try {
+    const raw = localStorage.getItem(HORIZON_STORAGE_KEY);
+    if (!raw) return new Map();
+    return new Map(Object.entries(JSON.parse(raw)));
+  } catch {
+    return new Map();
+  }
+}
+
+function saveHorizonOverrides(overrides: Map<string, HorizonOverrideState>) {
+  try {
+    localStorage.setItem(HORIZON_STORAGE_KEY, JSON.stringify(Object.fromEntries(overrides)));
+  } catch {}
+}
 
 function buildFilteredTree(ideas: Idea[], collapsedIds: Set<string>): IdeaNode[] {
   const activeIdeas = ideas.filter((i) => ACTIVE_STATUSES.has(i.status));
@@ -76,47 +95,51 @@ function buildFilteredTree(ideas: Idea[], collapsedIds: Set<string>): IdeaNode[]
 
 export default function HorizonPage() {
   const ideasHook = useIdeas();
-  const {
-    ideas,
-    loading,
-    createIdea,
-    updateIdea,
-    deleteIdea,
-    moveIdea,
-    scheduleIdea,
-    toggleCollapse,
-    expandIdea,
-  } = ideasHook;
+  const { ideas, loading, createIdea, updateIdea, deleteIdea, moveIdea, scheduleIdea } = ideasHook;
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
   const linksHook = useIdeaLinks();
   const interaction = useIdeaInteractionState();
   const [activeTab, setActiveTab] = useState<IdeaHorizon>("short");
-  const [localCollapsed, setLocalCollapsed] = useState<Set<string>>(new Set());
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [overrides, setOverrides] = useState<Map<string, HorizonOverrideState>>(() =>
+    loadHorizonOverrides(),
+  );
+
+  const collapsedIds = useMemo(() => {
+    const parentIds = new Set(
+      ideas.filter((i) => ideas.some((c) => c.parent_id === i.id)).map((i) => i.id),
+    );
+    const collapsed = new Set<string>();
+    for (const id of parentIds) {
+      const override = overrides.get(id);
+      if (override === "expanded") continue;
+      collapsed.add(id);
+    }
+    return collapsed;
+  }, [ideas, overrides]);
 
   const onToggleCollapse = (id: string) => {
-    setLocalCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+    setOverrides((prev) => {
+      const next = new Map(prev);
+      const isCurrentlyCollapsed = prev.get(id) === "collapsed" || !prev.has(id);
+      next.set(id, isCurrentlyCollapsed ? "expanded" : "collapsed");
+      saveHorizonOverrides(next);
       return next;
     });
-    toggleCollapse(id);
   };
 
   const onExpandIdea = (id: string) => {
-    setLocalCollapsed((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
+    setOverrides((prev) => {
+      if (!prev.has(id) || prev.get(id) === "expanded") return prev;
+      const next = new Map(prev);
+      next.set(id, "expanded");
+      saveHorizonOverrides(next);
       return next;
     });
-    expandIdea(id);
   };
 
-  const allTreeNodes = useMemo(
-    () => buildFilteredTree(ideas, localCollapsed),
-    [ideas, localCollapsed],
-  );
+  const allTreeNodes = useMemo(() => buildFilteredTree(ideas, collapsedIds), [ideas, collapsedIds]);
 
   const treesByHorizon = useMemo(() => {
     const grouped: Record<IdeaHorizon, IdeaNode[]> = { short: [], medium: [], long: [] };
@@ -174,15 +197,15 @@ export default function HorizonPage() {
           ) : (
             <div className="divide-y divide-black/[0.03] dark:divide-white/[0.03]">
               {nodes.map((node) => (
-                <HorizonIdeaCard
+                <HorizonTreeItem
                   key={node.id}
                   node={node}
                   depth={0}
                   allIdeas={ideas}
                   allTags={tagsHook.tags}
                   links={linksHook.links}
-                  editingId={interaction.editingId}
-                  setEditingId={interaction.setEditingId}
+                  editingId={editingId}
+                  setEditingId={setEditingId}
                   showTagPickerFor={interaction.showTagPickerFor}
                   setShowTagPickerFor={interaction.setShowTagPickerFor}
                   showStatusPickerFor={interaction.showStatusPickerFor}

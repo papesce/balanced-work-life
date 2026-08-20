@@ -62,7 +62,7 @@ const TYPE_BADGE: Record<string, { label: string; className: string }> = {
   },
 };
 
-interface HorizonIdeaCardProps {
+interface HorizonTreeItemProps {
   node: IdeaNode;
   depth: number;
   allIdeas: Idea[];
@@ -120,7 +120,7 @@ function InlineEditInput({
   );
 }
 
-export function HorizonIdeaCard({
+export function HorizonTreeItem({
   node,
   depth,
   allIdeas,
@@ -144,7 +144,7 @@ export function HorizonIdeaCard({
   onCreateTag,
   onToggleCollapse,
   onExpandIdea,
-}: HorizonIdeaCardProps) {
+}: HorizonTreeItemProps) {
   const hasChildren = node.children.length > 0;
   const isEditing = editingId === node.id;
   const nodeTags = getTagsForIdea(node.id);
@@ -339,7 +339,7 @@ export function HorizonIdeaCard({
           onCreateLink={onCreateLink}
           onDeleteLink={onDeleteLink}
           onMove={onMove}
-          hiddenActions={["link", "move"]}
+          hiddenActions={["move"]}
         />
       </div>
 
@@ -347,7 +347,7 @@ export function HorizonIdeaCard({
       {hasChildren && !node.collapsed && (
         <div>
           {node.children.map((child) => (
-            <HorizonIdeaCard
+            <HorizonTreeItem
               key={child.id}
               node={child}
               depth={depth + 1}
