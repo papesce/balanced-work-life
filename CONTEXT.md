@@ -67,7 +67,7 @@ src/
     brainstorm/           12 components (IdeaTree, IdeaNode, GraphView, pickers/panels, etc.)
     planner/              AreaFilters, AreaTaskGroup, BacklogCard, DateNav, DayslotTimeline, dayslotAdapter, plannerUtils
     shared/               InboxPanel, JumpToTodayButton, TagPicker, UndoBar
-    timeline/             DayTaskList, FloatingAddButton, QuickAddInput, timelineUtils
+    timeline/             DayTaskList, QuickAddInput, timelineUtils
     triage/               TriageActions (reschedule/complete/cancel for deferred rows)
   hooks/
     useAuth.tsx           AuthContext (only global context)
