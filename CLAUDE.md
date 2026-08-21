@@ -24,16 +24,16 @@ Personal productivity PWA. Single user, auth required. All data lives in a singl
 
 ### Routes
 
-| Route            | Description                                                 |
-| ---------------- | ----------------------------------------------------------- |
-| `/`              | Daily Planner — area-grouped tasks for a selected date      |
-| `/timeline`      | Multi-day task cards with inline editing                    |
-| `/deferred`      | Overdue + deferred tasks with reschedule actions            |
-| `/horizon`       | Short/medium/long-term planning columns                     |
-| `/brainstorm`    | Hierarchical idea tree + graph view (xyflow)                |
-| `/balance`       | Life area balance ring visualizations (day/week/month/year) |
-| `/settings/tags` | Tag management                                              |
-| `/backup`        | Data export                                                 |
+| Route            | Description                                                                     |
+| ---------------- | ------------------------------------------------------------------------------- |
+| `/`              | Daily Planner — area-grouped tasks for a selected date, deferred-on-date triage |
+| `/timeline`      | Multi-day range view with deferred filter + triage                              |
+| `/horizon`       | Short/medium/long-term planning columns                                         |
+| `/brainstorm`    | Hierarchical idea tree + graph view (xyflow)                                    |
+| `/balance`       | Life area balance ring visualizations (day/week/month/year)                     |
+| `/settings/tags` | Tag management                                                                  |
+
+Backup/restore lives in the `UserMenu` component (`src/components/UserMenu.tsx`), not a route.
 
 ### Data flow
 
@@ -60,9 +60,9 @@ User action → Page component (holds hook instances)
 
 The `area` column was removed from `ideas` in favor of a `tags` / `task_tags` many-to-many system. System tags are auto-created per `LifeArea`. `getAreasForIdea(tags)` in `types.ts` bridges tags → areas. Both systems coexist during the transition.
 
-### Deferred tasks (`/deferred`)
+### Deferred tasks & triage
 
-When a task misses its scheduled date and is rescheduled, the old date is appended to `attempt_dates`. A task with `status: "deferred"` has no `scheduled_date`. `useDeferredTasks.ts` buckets overdue tasks by age; `src/lib/tasks/rescheduleTask.ts` computes the DB patch for retry/reschedule/defer actions.
+There is no dedicated `/deferred` route — triage is inline in the Daily Planner and Timeline. When a task misses its scheduled date and is rescheduled, the old date is appended to `attempt_dates`. A task with `status: "deferred"` has no `scheduled_date`. `src/lib/tasks/rescheduleTask.ts` computes DB patches for retry/reschedule/move/defer actions (`computeReschedulePatch`), derives per-day occurrences from `attempt_dates` (`getDayOccurrences`), and builds triage row metadata (`getTriageMeta`). The planner shows historical occurrences for the selected date via `TriageActions` (`src/components/triage/TriageActions.tsx`); the Timeline has a "Deferred" filter tab with its own reschedule handler.
 
 ### PowerSync (not active)
 

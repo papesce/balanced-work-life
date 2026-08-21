@@ -1,5 +1,5 @@
-const CACHE_NAME = "balanced-v2";
-const STATIC_ASSETS = ["/", "/timeline", "/brainstorm", "/backup", "/manifest.json"];
+const CACHE_NAME = "balanced-v3";
+const STATIC_ASSETS = ["/", "/timeline", "/brainstorm", "/manifest.json"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS)));
