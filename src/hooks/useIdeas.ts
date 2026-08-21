@@ -201,45 +201,48 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
       updated_at: now,
       ...initialUpdates,
     };
-    await db.execute(
-      `INSERT INTO ideas (id, user_id, parent_id, text, type, effort, impact, urgency,
-        scheduled_date, scheduled_time, duration_minutes, is_priority, priority_order,
-        status, notes, completed_at, cancelled_at, paused_at, attempt_dates, status_history,
-        horizon, sort_order, created_at, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [
-        idea.id,
-        idea.user_id,
-        idea.parent_id,
-        idea.text,
-        idea.type,
-        idea.effort,
-        idea.impact,
-        idea.urgency,
-        idea.scheduled_date,
-        idea.scheduled_time,
-        idea.duration_minutes,
-        idea.is_priority ? 1 : 0,
-        idea.priority_order,
-        idea.status,
-        idea.notes,
-        idea.completed_at,
-        idea.cancelled_at,
-        idea.paused_at,
-        JSON.stringify(idea.attempt_dates),
-        idea.status_history ? JSON.stringify(idea.status_history) : null,
-        idea.horizon,
-        idea.sort_order,
-        idea.created_at,
-        idea.updated_at,
-      ],
-    );
-    for (const sibling of reorderedSiblings) {
-      await db.execute(`UPDATE ideas SET sort_order = ? WHERE id = ?`, [
-        sibling.sort_order,
-        sibling.id,
-      ]);
-    }
+    await db.writeTransaction(async (tx) => {
+      await tx.execute(
+        `INSERT INTO ideas (id, user_id, parent_id, text, type, effort, impact, urgency,
+          scheduled_date, scheduled_time, duration_minutes, is_priority, priority_order,
+          status, notes, completed_at, cancelled_at, paused_at, attempt_dates, status_history,
+          horizon, sort_order, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [
+          idea.id,
+          idea.user_id,
+          idea.parent_id,
+          idea.text,
+          idea.type,
+          idea.effort,
+          idea.impact,
+          idea.urgency,
+          idea.scheduled_date,
+          idea.scheduled_time,
+          idea.duration_minutes,
+          idea.is_priority ? 1 : 0,
+          idea.priority_order,
+          idea.status,
+          idea.notes,
+          idea.completed_at,
+          idea.cancelled_at,
+          idea.paused_at,
+          JSON.stringify(idea.attempt_dates),
+          idea.status_history ? JSON.stringify(idea.status_history) : null,
+          idea.horizon,
+          idea.sort_order,
+          idea.created_at,
+          idea.updated_at,
+        ],
+      );
+      for (const sibling of reorderedSiblings) {
+        await tx.execute(`UPDATE ideas SET sort_order = ?, updated_at = ? WHERE id = ?`, [
+          sibling.sort_order,
+          now,
+          sibling.id,
+        ]);
+      }
+    });
     return id;
   };
 
@@ -275,61 +278,67 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
       ideas.filter((i) => i.parent_id === nodeId).forEach((child) => collect(child.id));
     };
     collect(id);
-    for (const ideaId of toDelete) {
-      await db.execute(`DELETE FROM ideas WHERE id = ?`, [ideaId]);
-    }
+    await db.writeTransaction(async (tx) => {
+      for (const ideaId of toDelete) {
+        await tx.execute(`DELETE FROM ideas WHERE id = ?`, [ideaId]);
+      }
+    });
   };
 
   const restoreIdeas = async (restoredIdeas: Idea[]) => {
     if (restoredIdeas.length === 0) return;
     const orderedIdeas = sortIdeasForInsert(restoredIdeas);
-    for (const idea of orderedIdeas) {
-      await db.execute(
-        `INSERT OR REPLACE INTO ideas (id, user_id, parent_id, text, type, effort, impact, urgency,
-          scheduled_date, scheduled_time, duration_minutes, is_priority, priority_order,
-          status, notes, completed_at, cancelled_at, paused_at, attempt_dates, status_history,
-          horizon, sort_order, created_at, updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [
-          idea.id,
-          idea.user_id,
-          idea.parent_id,
-          idea.text,
-          idea.type,
-          idea.effort,
-          idea.impact,
-          idea.urgency,
-          idea.scheduled_date,
-          idea.scheduled_time,
-          idea.duration_minutes,
-          idea.is_priority ? 1 : 0,
-          idea.priority_order,
-          idea.status,
-          idea.notes,
-          idea.completed_at,
-          idea.cancelled_at,
-          idea.paused_at,
-          JSON.stringify(idea.attempt_dates),
-          idea.status_history ? JSON.stringify(idea.status_history) : null,
-          idea.horizon,
-          idea.sort_order,
-          idea.created_at,
-          idea.updated_at,
-        ],
-      );
-    }
+    await db.writeTransaction(async (tx) => {
+      for (const idea of orderedIdeas) {
+        await tx.execute(
+          `INSERT OR REPLACE INTO ideas (id, user_id, parent_id, text, type, effort, impact, urgency,
+            scheduled_date, scheduled_time, duration_minutes, is_priority, priority_order,
+            status, notes, completed_at, cancelled_at, paused_at, attempt_dates, status_history,
+            horizon, sort_order, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          [
+            idea.id,
+            idea.user_id,
+            idea.parent_id,
+            idea.text,
+            idea.type,
+            idea.effort,
+            idea.impact,
+            idea.urgency,
+            idea.scheduled_date,
+            idea.scheduled_time,
+            idea.duration_minutes,
+            idea.is_priority ? 1 : 0,
+            idea.priority_order,
+            idea.status,
+            idea.notes,
+            idea.completed_at,
+            idea.cancelled_at,
+            idea.paused_at,
+            JSON.stringify(idea.attempt_dates),
+            idea.status_history ? JSON.stringify(idea.status_history) : null,
+            idea.horizon,
+            idea.sort_order,
+            idea.created_at,
+            idea.updated_at,
+          ],
+        );
+      }
+    });
   };
 
   const reorderTasks = useCallback(
     async (taskIds: string[]) => {
       const updatedAt = new Date().toISOString();
-      for (let i = 0; i < taskIds.length; i++) {
-        await db.execute(`UPDATE ideas SET sort_order = ?, updated_at = ? WHERE id = ?`, [
-          i,
-          updatedAt,
-          taskIds[i],
-        ]);
-      }
+      await db.writeTransaction(async (tx) => {
+        for (let i = 0; i < taskIds.length; i++) {
+          await tx.execute(`UPDATE ideas SET sort_order = ?, updated_at = ? WHERE id = ?`, [
+            i,
+            updatedAt,
+            taskIds[i],
+          ]);
+        }
+      });
     },
     [db],
   );
@@ -357,6 +366,7 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
   const moveIdea = async (id: string, newParentId: string | null, newSortOrder: number) => {
     const updatedAt = new Date().toISOString();
     const siblings = ideas.filter((i) => i.parent_id === newParentId && i.id !== id);
+    const previousOrders = new Map(ideas.map((i) => [i.id, i.sort_order]));
     const reordered = siblings
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((s, idx) => ({
@@ -364,19 +374,21 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
         sort_order: idx >= newSortOrder ? idx + 1 : idx,
       }));
 
-    await db.execute(
-      `UPDATE ideas SET parent_id = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
-      [newParentId, newSortOrder, updatedAt, id],
-    );
+    await db.writeTransaction(async (tx) => {
+      await tx.execute(
+        `UPDATE ideas SET parent_id = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
+        [newParentId, newSortOrder, updatedAt, id],
+      );
 
-    for (const sibling of reordered) {
-      if (sibling.sort_order !== ideas.find((i) => i.id === sibling.id)?.sort_order) {
-        await db.execute(`UPDATE ideas SET sort_order = ? WHERE id = ?`, [
+      for (const sibling of reordered) {
+        if (sibling.sort_order === previousOrders.get(sibling.id)) continue;
+        await tx.execute(`UPDATE ideas SET sort_order = ?, updated_at = ? WHERE id = ?`, [
           sibling.sort_order,
+          updatedAt,
           sibling.id,
         ]);
       }
-    }
+    });
   };
 
   const markDone = async (id: string) => {
