@@ -5,8 +5,8 @@ import { Navigation } from "@/components/Navigation";
 import { QuickAddButton } from "@/components/QuickAddButton";
 import { DesktopSidebar } from "@/components/DesktopSidebar";
 import { UserMenu } from "@/components/UserMenu";
+import { STORAGE_KEYS, readRawString, writeRawString } from "@/lib/storage";
 
-const SIDEBAR_KEY = "sidebar-collapsed";
 const COLLAPSE_BELOW = 1024;
 
 interface AppShellProps {
@@ -28,15 +28,14 @@ export function AppShell({
 }: AppShellProps) {
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
-    const saved = localStorage.getItem(SIDEBAR_KEY);
+    const saved = readRawString(STORAGE_KEYS.sidebarCollapsed);
     if (saved !== null) return saved === "true";
     return window.innerWidth < COLLAPSE_BELOW;
   });
 
-  const [userOverride, setUserOverride] = useState<boolean | null>(() => {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem(SIDEBAR_KEY) !== null ? true : null;
-  });
+  const [userOverride, setUserOverride] = useState<boolean | null>(() =>
+    readRawString(STORAGE_KEYS.sidebarCollapsed) !== null ? true : null,
+  );
 
   useEffect(() => {
     const handleResize = () => {
@@ -50,7 +49,7 @@ export function AppShell({
   const handleToggle = useCallback(() => {
     setCollapsed((prev) => {
       const next = !prev;
-      localStorage.setItem(SIDEBAR_KEY, String(next));
+      writeRawString(STORAGE_KEYS.sidebarCollapsed, String(next));
       return next;
     });
     setUserOverride(true);

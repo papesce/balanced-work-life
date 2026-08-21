@@ -135,8 +135,6 @@ export const DEFAULT_TARGETS: Record<LifeArea, number> = {
   life: 10,
 };
 
-export const LOCAL_STORAGE_TARGETS_KEY = "daily-planner-area-targets";
-
 export const SCHEDULE_HOURS = [
   "07:00",
   "08:00",

@@ -286,7 +286,6 @@ export function HorizonTreeItem({
               current={node.type}
               onSelect={(type) => {
                 onUpdate(node.id, { type });
-                if (type) localStorage.setItem("horizon-last-type", type);
                 setShowTypePicker(false);
               }}
               onClose={() => setShowTypePicker(false)}

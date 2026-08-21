@@ -5,8 +5,9 @@ import { usePowerSync } from "@powersync/react";
 import { useAuth } from "./useAuth";
 import { LifeArea } from "@/lib/types";
 import { WindowType, getWindowRange, getWindowBuckets, getWindowLabel } from "@/lib/dateUtils";
-import { AREA_ORDER, DEFAULT_TARGETS, LOCAL_STORAGE_TARGETS_KEY } from "@/lib/constants";
+import { AREA_ORDER } from "@/lib/constants";
 import { emptyAreaCounts, fetchTasksWithTags, getEffectiveAreasForIdea } from "@/lib/taskTags";
+import { loadAreaTargets } from "@/lib/storage";
 
 export interface RadarDataPoint {
   area: LifeArea;
@@ -24,14 +25,6 @@ export interface BalanceData {
   radarData: RadarDataPoint[];
   buckets: BucketData[];
   windowLabel: string;
-}
-
-function loadTargets(): Record<LifeArea, number> {
-  try {
-    const stored = localStorage.getItem(LOCAL_STORAGE_TARGETS_KEY);
-    if (stored) return JSON.parse(stored) as Record<LifeArea, number>;
-  } catch {}
-  return DEFAULT_TARGETS;
 }
 
 export function useBalanceData(windowType: WindowType, referenceDate: string): BalanceData {
@@ -54,7 +47,7 @@ export function useBalanceData(windowType: WindowType, referenceDate: string): B
 
       const { tasks, tagsByIdea } = await fetchTasksWithTags(db, user.id, { start, end });
 
-      const targets = loadTargets();
+      const targets = loadAreaTargets();
 
       // Aggregate radar counts
       const totalCounts = emptyAreaCounts();
@@ -68,7 +61,7 @@ export function useBalanceData(windowType: WindowType, referenceDate: string): B
       const radar: RadarDataPoint[] = AREA_ORDER.map((area) => ({
         area,
         actual: total > 0 ? Math.round((totalCounts[area] / total) * 100) : 0,
-        target: targets[area] ?? DEFAULT_TARGETS[area],
+        target: targets[area],
       }));
 
       // Aggregate per-bucket counts

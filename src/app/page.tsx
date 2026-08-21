@@ -15,13 +15,7 @@ import { AreaFilters } from "@/components/planner/AreaFilters";
 import { DayslotTimeline } from "@/components/planner/DayslotTimeline";
 import { AreaTaskGroup } from "@/components/planner/AreaTaskGroup";
 import { UndoBar } from "@/components/shared/UndoBar";
-import {
-  AREA_DOT_COLORS,
-  AREA_ORDER,
-  AREA_LABELS,
-  DEFAULT_TARGETS,
-  LOCAL_STORAGE_TARGETS_KEY,
-} from "@/lib/constants";
+import { AREA_DOT_COLORS, AREA_ORDER, AREA_LABELS } from "@/lib/constants";
 import {
   computeReschedulePatch,
   computeCompletePatch,
@@ -34,6 +28,7 @@ import {
 import { useUndoAction } from "@/lib/tasks/undo";
 import { TriageActions } from "@/components/triage/TriageActions";
 import { formatDayLabel } from "@/components/planner/plannerUtils";
+import { STORAGE_KEYS, loadAreaTargets, readRawString, writeRawString } from "@/lib/storage";
 
 export default function DailyPlannerPage() {
   return (
@@ -92,23 +87,13 @@ function DailyPlannerInner() {
 
   const [selectedArea, setSelectedArea] = useState<LifeArea | null>(null);
   const [activeMobileTab, setActiveMobileTab] = useState<"tasks" | "schedule" | "balance">("tasks");
-  const [targets] = useState<Record<LifeArea, number>>(() => {
-    try {
-      if (typeof window !== "undefined") {
-        const stored = localStorage.getItem(LOCAL_STORAGE_TARGETS_KEY);
-        if (stored) return JSON.parse(stored) as Record<LifeArea, number>;
-      }
-    } catch {}
-    return DEFAULT_TARGETS;
-  });
+  const [targets] = useState<Record<LifeArea, number>>(() => loadAreaTargets());
   const [showDateInput, setShowDateInput] = useState(false);
   const [rightColWidth, setRightColWidth] = useState<number>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("planner-right-col-width");
-      if (saved) {
-        const n = parseInt(saved, 10);
-        if (!isNaN(n) && n >= 320 && n <= 600) return n;
-      }
+    const saved = readRawString(STORAGE_KEYS.plannerRightColWidth);
+    if (saved) {
+      const n = parseInt(saved, 10);
+      if (!isNaN(n) && n >= 320 && n <= 600) return n;
     }
     return 360;
   });
@@ -134,7 +119,7 @@ function DailyPlannerInner() {
       document.removeEventListener("mouseup", onMouseUp);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
-      localStorage.setItem("planner-right-col-width", String(rightColWidthRef.current));
+      writeRawString(STORAGE_KEYS.plannerRightColWidth, String(rightColWidthRef.current));
     };
 
     document.addEventListener("mousemove", onMouseMove);

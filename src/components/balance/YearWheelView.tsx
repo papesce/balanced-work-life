@@ -3,22 +3,9 @@
 import { useBalanceData } from "@/hooks/useBalanceData";
 import { MiniRing } from "./MiniRing";
 import { LifeArea } from "@/lib/types";
-import {
-  AREA_LABELS,
-  AREA_ORDER,
-  DEFAULT_TARGETS,
-  LOCAL_STORAGE_TARGETS_KEY,
-} from "@/lib/constants";
+import { AREA_LABELS, AREA_ORDER } from "@/lib/constants";
 import { areaColors } from "@/styles/tokens";
-
-function loadTargets(): Record<LifeArea, number> {
-  if (typeof window === "undefined") return DEFAULT_TARGETS;
-  try {
-    const stored = localStorage.getItem(LOCAL_STORAGE_TARGETS_KEY);
-    if (stored) return JSON.parse(stored) as Record<LifeArea, number>;
-  } catch {}
-  return DEFAULT_TARGETS;
-}
+import { loadAreaTargets } from "@/lib/storage";
 
 interface YearWheelViewProps {
   referenceDate: string;
@@ -28,7 +15,7 @@ export function YearWheelView({ referenceDate }: YearWheelViewProps) {
   const { loading, buckets } = useBalanceData("year", referenceDate);
   const ref = new Date(referenceDate + "T00:00:00");
   const year = ref.getFullYear();
-  const targets = loadTargets();
+  const targets = loadAreaTargets();
 
   // Aggregate all monthly buckets into year totals
   const yearCounts: Record<LifeArea, number> = {
@@ -75,7 +62,7 @@ export function YearWheelView({ referenceDate }: YearWheelViewProps) {
       <div className="space-y-2">
         {(AREA_ORDER as LifeArea[]).map((area) => {
           const actual = yearTotal > 0 ? Math.round((yearCounts[area] / yearTotal) * 100) : 0;
-          const target = targets[area] ?? DEFAULT_TARGETS[area];
+          const target = targets[area];
           const diff = actual - target;
           const barActual = Math.min(actual, 100);
           const barTarget = Math.min(target, 100);

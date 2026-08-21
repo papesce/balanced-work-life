@@ -113,7 +113,7 @@ User action
 - **No Zustand/Redux.** Entirely React `useState`/`useCallback` + one global Context.
 - `AuthContext` (via `useAuth.tsx`) is the only React context; everything else is instantiated per-page and prop-drilled.
 - Optimistic updates in all write hooks; local state reverts on Supabase error.
-- LocalStorage keys: `brainstorm-tree-overrides`, `daily-planner-area-targets`, `planner-right-col-width`, `timeline-prefs`.
+- LocalStorage keys (typed registry + helpers in `src/lib/storage.ts`): `brainstorm-tree-overrides`, `horizon-tree-overrides`, `daily-planner-area-targets` (read-only), `sidebar-collapsed`, `planner-right-col-width`, `timeline-prefs`.
 - Undo system: `src/lib/tasks/undo.ts` `useUndoAction` registers reverse actions (e.g. task delete, cancel) and renders an `UndoBar`.
 
 ### Routing

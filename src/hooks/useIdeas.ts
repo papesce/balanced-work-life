@@ -7,29 +7,18 @@ import { useAuth } from "./useAuth";
 import { Idea, IdeaNode } from "@/lib/types";
 import { getToday, getWindowRange } from "@/lib/dateUtils";
 import { appendStatusHistory } from "@/lib/statusHistory";
+import {
+  STORAGE_KEYS,
+  TreeOverrideState,
+  readTreeOverrides,
+  writeTreeOverrides,
+} from "@/lib/storage";
 
-const STORAGE_KEY = "brainstorm-tree-overrides";
 const DEFAULT_EXPAND_DEPTH = 1;
 
 export type IdeasScope = "all" | "this_month";
 export type CreateIdeaPosition = "top" | "bottom";
-type OverrideState = "expanded" | "collapsed";
-
-function loadOverrides(): Map<string, OverrideState> {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return new Map();
-    return new Map(Object.entries(JSON.parse(raw)));
-  } catch {
-    return new Map();
-  }
-}
-
-function saveOverrides(overrides: Map<string, OverrideState>) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(overrides)));
-  } catch {}
-}
+type OverrideState = TreeOverrideState;
 
 function getDepthMap(ideas: Idea[]): Map<string, number> {
   const depths = new Map<string, number>();
@@ -151,7 +140,7 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
   const overridesRef = useRef<Map<string, OverrideState>>(new Map());
 
   useEffect(() => {
-    overridesRef.current = loadOverrides();
+    overridesRef.current = readTreeOverrides(STORAGE_KEYS.brainstormTreeOverrides);
   }, []);
 
   const userId = user?.id ?? "";
@@ -441,7 +430,7 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
         next.add(id);
         overridesRef.current.set(id, "collapsed");
       }
-      saveOverrides(overridesRef.current);
+      writeTreeOverrides(STORAGE_KEYS.brainstormTreeOverrides, overridesRef.current);
       return next;
     });
   };
@@ -452,7 +441,7 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
       const next = new Set(prev);
       next.delete(id);
       overridesRef.current.set(id, "expanded");
-      saveOverrides(overridesRef.current);
+      writeTreeOverrides(STORAGE_KEYS.brainstormTreeOverrides, overridesRef.current);
       return next;
     });
   };
@@ -466,7 +455,7 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
         overridesRef.current.set(p.id, "expanded");
       }
     }
-    saveOverrides(overridesRef.current);
+    writeTreeOverrides(STORAGE_KEYS.brainstormTreeOverrides, overridesRef.current);
     setCollapsedIds(new Set());
   };
 
@@ -481,7 +470,7 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
         overridesRef.current.set(id, "collapsed");
       }
     }
-    saveOverrides(overridesRef.current);
+    writeTreeOverrides(STORAGE_KEYS.brainstormTreeOverrides, overridesRef.current);
     setCollapsedIds(parents);
   };
 

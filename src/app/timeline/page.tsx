@@ -38,6 +38,7 @@ import {
   DayOccurrence,
   RescheduleAction,
 } from "@/lib/tasks/rescheduleTask";
+import { STORAGE_KEYS, readJson, writeJson } from "@/lib/storage";
 import { useUndoAction } from "@/lib/tasks/undo";
 import { DayTaskList } from "@/components/timeline/DayTaskList";
 import { QuickAddInput } from "@/components/timeline/QuickAddInput";
@@ -140,8 +141,6 @@ function AnchorReadyMarker({
   return <div ref={ref}>{children}</div>;
 }
 
-const TIMELINE_PREFS_KEY = "timeline-prefs";
-
 interface TimelinePrefs {
   filter: "all" | "deferred";
   preset: TimelinePresetId;
@@ -149,37 +148,28 @@ interface TimelinePrefs {
   futureRange?: string;
 }
 
-const DEFAULT_PREFS: TimelinePrefs = { filter: "all", preset: DEFAULT_PRESET };
-
 function loadPrefs(): TimelinePrefs {
-  if (typeof window === "undefined") return DEFAULT_PREFS;
-  try {
-    const stored = JSON.parse(
-      localStorage.getItem(TIMELINE_PREFS_KEY) ?? "{}",
-    ) as Partial<TimelinePrefs>;
-    const presetIds: string[] = TIMELINE_PRESETS.map((r) => r.id);
-    const legacyPreset = stored.preset as string | undefined;
-    const legacyPast = stored.pastRange as string | undefined;
-    const legacyFuture = stored.futureRange as string | undefined;
-    const migratedPreset =
-      legacyPast === "3days" && legacyFuture === "2weeks"
-        ? "focus"
-        : legacyPast === "week" && legacyFuture === "month"
-          ? "planning"
-          : legacyPast === "month" && legacyFuture === "quarter"
-            ? "review"
-            : legacyPast === "quarter" && legacyFuture === "6months"
-              ? "horizon"
-              : undefined;
-    return {
-      filter: stored.filter === "deferred" ? "deferred" : "all",
-      preset: presetIds.includes(legacyPreset ?? "")
-        ? (legacyPreset as TimelinePresetId)
-        : (migratedPreset ?? DEFAULT_PRESET),
-    };
-  } catch {
-    return DEFAULT_PREFS;
-  }
+  const stored = readJson<Partial<TimelinePrefs>>(STORAGE_KEYS.timelinePrefs) ?? {};
+  const presetIds: string[] = TIMELINE_PRESETS.map((r) => r.id);
+  const legacyPreset = stored.preset as string | undefined;
+  const legacyPast = stored.pastRange as string | undefined;
+  const legacyFuture = stored.futureRange as string | undefined;
+  const migratedPreset =
+    legacyPast === "3days" && legacyFuture === "2weeks"
+      ? "focus"
+      : legacyPast === "week" && legacyFuture === "month"
+        ? "planning"
+        : legacyPast === "month" && legacyFuture === "quarter"
+          ? "review"
+          : legacyPast === "quarter" && legacyFuture === "6months"
+            ? "horizon"
+            : undefined;
+  return {
+    filter: stored.filter === "deferred" ? "deferred" : "all",
+    preset: presetIds.includes(legacyPreset ?? "")
+      ? (legacyPreset as TimelinePresetId)
+      : (migratedPreset ?? DEFAULT_PRESET),
+  };
 }
 
 function RangeWindowDropdown({
@@ -434,9 +424,7 @@ function TimelineInner() {
   };
 
   useEffect(() => {
-    try {
-      localStorage.setItem(TIMELINE_PREFS_KEY, JSON.stringify({ filter, preset }));
-    } catch {}
+    writeJson(STORAGE_KEYS.timelinePrefs, { filter, preset });
   }, [filter, preset]);
 
   useEffect(() => {

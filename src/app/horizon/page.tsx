@@ -16,6 +16,12 @@ import { QuickAddInput } from "@/components/timeline/QuickAddInput";
 import { HorizonTreeItem } from "@/components/horizon/HorizonTreeItem";
 import { TypePicker } from "@/components/brainstorm/TypePicker";
 import { Idea, IdeaHorizon, IdeaNode, IdeaType } from "@/lib/types";
+import {
+  STORAGE_KEYS,
+  TreeOverrideState,
+  readTreeOverrides,
+  writeTreeOverrides,
+} from "@/lib/storage";
 
 const HORIZONS: { key: IdeaHorizon; label: string }[] = [
   { key: "short", label: "Short term" },
@@ -24,25 +30,6 @@ const HORIZONS: { key: IdeaHorizon; label: string }[] = [
 ];
 
 const ACTIVE_STATUSES = new Set(["draft", "planned", "in_progress", "scheduled"]);
-
-const HORIZON_STORAGE_KEY = "horizon-tree-overrides";
-type HorizonOverrideState = "expanded" | "collapsed";
-
-function loadHorizonOverrides(): Map<string, HorizonOverrideState> {
-  try {
-    const raw = localStorage.getItem(HORIZON_STORAGE_KEY);
-    if (!raw) return new Map();
-    return new Map(Object.entries(JSON.parse(raw)));
-  } catch {
-    return new Map();
-  }
-}
-
-function saveHorizonOverrides(overrides: Map<string, HorizonOverrideState>) {
-  try {
-    localStorage.setItem(HORIZON_STORAGE_KEY, JSON.stringify(Object.fromEntries(overrides)));
-  } catch {}
-}
 
 function buildFilteredTree(ideas: Idea[], collapsedIds: Set<string>): IdeaNode[] {
   const activeIdeas = ideas.filter((i) => ACTIVE_STATUSES.has(i.status));
@@ -183,8 +170,8 @@ export default function HorizonPage() {
   const [activeTab, setActiveTab] = useState<IdeaHorizon>("short");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [composingNodeId, setComposingNodeId] = useState<string | null>(null);
-  const [overrides, setOverrides] = useState<Map<string, HorizonOverrideState>>(() =>
-    loadHorizonOverrides(),
+  const [overrides, setOverrides] = useState<Map<string, TreeOverrideState>>(() =>
+    readTreeOverrides(STORAGE_KEYS.horizonTreeOverrides),
   );
   const [search, setSearch] = useState("");
   const [hideClosed, setHideClosed] = useState(false);
@@ -267,7 +254,7 @@ export default function HorizonPage() {
       const next = new Map(prev);
       const isCurrentlyCollapsed = prev.get(id) === "collapsed" || !prev.has(id);
       next.set(id, isCurrentlyCollapsed ? "expanded" : "collapsed");
-      saveHorizonOverrides(next);
+      writeTreeOverrides(STORAGE_KEYS.horizonTreeOverrides, next);
       return next;
     });
   };
@@ -277,7 +264,7 @@ export default function HorizonPage() {
       if (!prev.has(id) || prev.get(id) === "expanded") return prev;
       const next = new Map(prev);
       next.set(id, "expanded");
-      saveHorizonOverrides(next);
+      writeTreeOverrides(STORAGE_KEYS.horizonTreeOverrides, next);
       return next;
     });
   };
