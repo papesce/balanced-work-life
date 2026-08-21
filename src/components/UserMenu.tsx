@@ -8,6 +8,7 @@ import { usePowerSync } from "@powersync/react";
 import { useAuth } from "@/hooks/useAuth";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
+import { useTaskTags } from "@/hooks/useTaskTags";
 import { buildBackupData, downloadBackup, parseBackupFile } from "@/lib/backup";
 
 export function UserMenu() {
@@ -15,6 +16,7 @@ export function UserMenu() {
   const db = usePowerSync();
   const { restoreIdeas } = useIdeas();
   const { restoreLinks } = useIdeaLinks();
+  const { restoreTags, restoreTaskTags } = useTaskTags();
 
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<"export" | "import" | null>(null);
@@ -47,7 +49,7 @@ export function UserMenu() {
       downloadBackup(data);
       setStatus({
         type: "success",
-        text: `Exported ${data.ideas.length} ideas and ${data.ideaLinks.length} links.`,
+        text: `Exported ${data.ideas.length} ideas, ${data.ideaLinks.length} links and ${data.tags.length} tags.`,
       });
     } catch (err) {
       setStatus({
@@ -67,9 +69,11 @@ export function UserMenu() {
       const data = await parseBackupFile(file);
       await restoreIdeas(data.ideas);
       await restoreLinks(data.ideaLinks);
+      await restoreTags(data.tags);
+      await restoreTaskTags(data.taskTags);
       setStatus({
         type: "success",
-        text: `Imported ${data.ideas.length} ideas and ${data.ideaLinks.length} links.`,
+        text: `Imported ${data.ideas.length} ideas, ${data.ideaLinks.length} links and ${data.tags.length} tags.`,
       });
     } catch (err) {
       setStatus({

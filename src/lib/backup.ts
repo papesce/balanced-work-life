@@ -2,13 +2,19 @@
 
 import { User } from "@supabase/supabase-js";
 import type { AbstractPowerSyncDatabase } from "@powersync/web";
-import { Idea, IdeaLink } from "@/lib/types";
+import { Idea, IdeaLink, Tag, TaskTag } from "@/lib/types";
+
+export interface BackupTaskTag extends TaskTag {
+  id: string;
+}
 
 export interface BackupData {
   version: number;
   exportedAt: string;
   ideas: Idea[];
   ideaLinks: IdeaLink[];
+  tags: Tag[];
+  taskTags: BackupTaskTag[];
 }
 
 export function isValidBackup(data: unknown): data is BackupData {
@@ -17,13 +23,31 @@ export function isValidBackup(data: unknown): data is BackupData {
   return Array.isArray(obj.ideas) && Array.isArray(obj.ideaLinks);
 }
 
+/** Accepts v1 backups (no tags/taskTags) by defaulting the new fields to empty arrays. */
+export function normalizeBackup(data: BackupData): BackupData {
+  return {
+    ...data,
+    version: data.version ?? 1,
+    tags: Array.isArray(data.tags) ? data.tags : [],
+    taskTags: Array.isArray(data.taskTags) ? data.taskTags : [],
+  };
+}
+
 export async function buildBackupData(
   user: User,
   db: AbstractPowerSyncDatabase,
 ): Promise<BackupData> {
-  const [rawIdeas, rawLinks] = await Promise.all([
+  const [rawIdeas, rawLinks, rawTags, rawTaskTags] = await Promise.all([
     db.getAll<Record<string, unknown>>("SELECT * FROM ideas WHERE user_id = ?", [user.id]),
     db.getAll<IdeaLink>("SELECT * FROM idea_links WHERE user_id = ?", [user.id]),
+    db.getAll<Record<string, unknown>>("SELECT * FROM tags WHERE user_id = ?", [user.id]),
+    db.getAll<BackupTaskTag>(
+      `SELECT tt.id, tt.idea_id, tt.tag_id
+       FROM task_tags tt
+       JOIN tags t ON t.id = tt.tag_id
+       WHERE t.user_id = ?`,
+      [user.id],
+    ),
   ]);
 
   // Deserialize JSON text columns stored by PowerSync
@@ -41,11 +65,18 @@ export async function buildBackupData(
       }) as unknown as Idea,
   );
 
+  const tags: Tag[] = rawTags.map((row: Record<string, unknown>) => ({
+    ...(row as unknown as Tag),
+    is_system: Boolean(row.is_system),
+  }));
+
   return {
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     ideas,
     ideaLinks: rawLinks,
+    tags,
+    taskTags: rawTaskTags,
   };
 }
 
@@ -67,5 +98,5 @@ export async function parseBackupFile(file: File): Promise<BackupData> {
     throw new Error("Invalid backup file. Expected JSON with 'ideas' and 'ideaLinks' arrays.");
   }
 
-  return data;
+  return normalizeBackup(data);
 }

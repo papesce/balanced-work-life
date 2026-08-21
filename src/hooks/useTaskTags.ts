@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { usePowerSync, useQuery } from "@powersync/react";
 import { useAuth } from "./useAuth";
 import { Tag } from "@/lib/types";
+import type { BackupTaskTag } from "@/lib/backup";
 
 interface TaskTagJoinRow {
   idea_id: string;
@@ -71,6 +72,27 @@ export function useTaskTags() {
     await db.execute(`DELETE FROM task_tags WHERE idea_id = ? AND tag_id = ?`, [ideaId, tagId]);
   };
 
+  const restoreTags = async (restoredTags: Tag[]) => {
+    if (restoredTags.length === 0) return;
+    for (const tag of restoredTags) {
+      await db.execute(
+        `INSERT OR REPLACE INTO tags (id, user_id, name, area, is_system, created_at) VALUES (?,?,?,?,?,?)`,
+        [tag.id, tag.user_id, tag.name, tag.area, tag.is_system ? 1 : 0, tag.created_at],
+      );
+    }
+  };
+
+  const restoreTaskTags = async (restoredTaskTags: BackupTaskTag[]) => {
+    if (restoredTaskTags.length === 0) return;
+    for (const taskTag of restoredTaskTags) {
+      await db.execute(`INSERT OR REPLACE INTO task_tags (id, idea_id, tag_id) VALUES (?,?,?)`, [
+        taskTag.id ?? `${taskTag.idea_id}:${taskTag.tag_id}`,
+        taskTag.idea_id,
+        taskTag.tag_id,
+      ]);
+    }
+  };
+
   const refetch = useCallback(async () => {
     // useQuery is live — no manual refetch needed; kept for API compatibility
   }, []);
@@ -81,6 +103,8 @@ export function useTaskTags() {
     getTagsForIdea,
     addTagToTask,
     removeTagFromTask,
+    restoreTags,
+    restoreTaskTags,
     refetch,
   };
 }
