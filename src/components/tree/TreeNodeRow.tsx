@@ -174,8 +174,12 @@ export function TreeNodeRow<T extends TreeItem>({
 
   const setRowRef = (el: HTMLDivElement | null) => {
     droppable.setNodeRef(el);
-    draggable.setNodeRef(el);
     rowContentRef.current = el;
+  };
+
+  const setDragHandleRef = (el: HTMLSpanElement | null) => {
+    draggable.setNodeRef(el);
+    draggable.setActivatorNodeRef(el);
   };
 
   const composer = isComposingHere ? (
@@ -324,10 +328,9 @@ export function TreeNodeRow<T extends TreeItem>({
             {/* Drag handle */}
             {Boolean(controller.onMove) && (
               <span
-                // dnd-kit's API requires passing these during render; they are a
-                // callback ref and stable handlers, not render-time ref reads.
-                /* eslint-disable-next-line react-hooks/refs */
-                ref={draggable.setActivatorNodeRef}
+                // Measure from the grip so the compact drag overlay tracks the
+                // pointer instead of inheriting the full row's dimensions.
+                ref={setDragHandleRef}
                 /* eslint-disable-next-line react-hooks/refs */
                 {...draggable.attributes}
                 /* eslint-disable-next-line react-hooks/refs */

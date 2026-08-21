@@ -13,6 +13,7 @@ import {
   type DragEndEvent,
   type DragMoveEvent,
   type DragStartEvent,
+  type Modifier,
 } from "@dnd-kit/core";
 import { GripVertical } from "lucide-react";
 import type { ReactNode } from "react";
@@ -21,6 +22,18 @@ import { TreeDndStateProvider, type TreeDndState } from "./context";
 import type { DropTarget, DropZone, TreeItem } from "./types";
 
 const ROW_PREFIX = "row:";
+
+/** Keep the compact drag preview centered on the pointer. Uses the draggable
+ * node's initial rect (stable throughout drag) to compute a fixed offset. */
+const snapCenterToCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
+  if (!draggingNodeRect || !activatorEvent) return transform;
+  const { clientX, clientY } = activatorEvent as PointerEvent;
+  return {
+    ...transform,
+    x: transform.x + clientX - draggingNodeRect.left - draggingNodeRect.width / 2,
+    y: transform.y + clientY - draggingNodeRect.top - draggingNodeRect.height / 2,
+  };
+};
 
 function rowIdToItemId(rowId: string): string | null {
   return rowId.startsWith(ROW_PREFIX) ? rowId.slice(ROW_PREFIX.length) : null;
@@ -204,7 +217,10 @@ export function TreeDnd<T extends TreeItem>({
     >
       <TreeDndStateProvider value={dndState}>
         {children}
-        <DragOverlay>
+        <DragOverlay
+          modifiers={[snapCenterToCursor]}
+          style={{ width: "max-content", height: "max-content" }}
+        >
           {activeItem ? (
             <div className="flex items-center gap-1 rounded-md border border-indigo-300 bg-white px-2 py-1 text-sm text-gray-800 shadow-lg dark:border-indigo-500/40 dark:bg-gray-800 dark:text-gray-100">
               <GripVertical size={14} className="flex-shrink-0 text-gray-400" />
