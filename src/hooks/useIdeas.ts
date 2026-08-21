@@ -18,7 +18,12 @@ import {
 const DEFAULT_EXPAND_DEPTH = 1;
 
 export type IdeasScope = "all" | "this_month";
-export type CreateIdeaPosition = "top" | "bottom";
+/**
+ * Where a newly created idea lands among its siblings:
+ * - "top"/"bottom": absolute start/end of the sibling list
+ * - { beforeId } / { afterId }: directly before/after the anchor sibling
+ */
+export type CreateIdeaPosition = "top" | "bottom" | { beforeId: string } | { afterId: string };
 type OverrideState = TreeOverrideState;
 
 function getDepthMap(ideas: Idea[]): Map<string, number> {
@@ -152,9 +157,28 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
     const maxOrder = siblings.length > 0 ? Math.max(...siblings.map((s) => s.sort_order)) : -1;
     const now = new Date().toISOString();
     const id = uuidv4();
-    const sortOrder = position === "top" ? 0 : maxOrder + 1;
+
+    let sortOrder: number;
+    if (position === "top") {
+      sortOrder = 0;
+    } else if (position === "bottom") {
+      sortOrder = maxOrder + 1;
+    } else {
+      // Anchored insert; fall back to append when the anchor isn't a sibling
+      // (e.g. stale UI state after the anchor was deleted or moved).
+      const anchorId = "beforeId" in position ? position.beforeId : position.afterId;
+      const anchor = siblings.find((s) => s.id === anchorId);
+      sortOrder = anchor ? anchor.sort_order + ("afterId" in position ? 1 : 0) : maxOrder + 1;
+    }
+
     const reorderedSiblings =
-      position === "top" ? siblings.map((s) => ({ ...s, sort_order: s.sort_order + 1 })) : [];
+      position === "top"
+        ? siblings.map((s) => ({ ...s, sort_order: s.sort_order + 1 }))
+        : typeof position === "object"
+          ? siblings
+              .filter((s) => s.sort_order >= sortOrder)
+              .map((s) => ({ ...s, sort_order: s.sort_order + 1 }))
+          : [];
     const idea: Idea = {
       id,
       user_id: user.id,

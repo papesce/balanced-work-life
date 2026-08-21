@@ -31,7 +31,7 @@ function rowIdToItemId(rowId: string): string | null {
  * original native-HTML5 implementation:
  * - center  -> first child of the target
  * - top     -> sibling above the target
- * - bottom  -> sibling below the target
+ * - bottom  -> sibling below the target (supports depth snapping via overDepth/targetDepth)
  * Returns null when the move is a no-op or would create a cycle.
  */
 export function resolveDropTarget<T extends TreeItem>(
@@ -39,6 +39,8 @@ export function resolveDropTarget<T extends TreeItem>(
   draggedId: string,
   overId: string,
   zone: DropZone,
+  overDepth?: number,
+  targetDepth?: number,
 ): DropTarget | null {
   if (draggedId === overId) return null;
   const dragged = byId.get(draggedId);
@@ -48,6 +50,26 @@ export function resolveDropTarget<T extends TreeItem>(
   if (zone === "center") {
     if (isDescendantOf(byId, over.id, dragged.id)) return null;
     return { parent_id: over.id, sort_order: 0 };
+  }
+
+  // Depth-snapped bottom drop: walk up to the ancestor at targetDepth.
+  if (
+    zone === "bottom" &&
+    overDepth !== undefined &&
+    targetDepth !== undefined &&
+    targetDepth < overDepth
+  ) {
+    let insertAfter: T | undefined = over;
+    let steps = overDepth - targetDepth;
+    while (steps-- > 0 && insertAfter?.parent_id) {
+      insertAfter = byId.get(insertAfter.parent_id);
+    }
+    if (!insertAfter) return null;
+    if (insertAfter.id === draggedId) return null;
+    if (insertAfter.parent_id === draggedId) return null;
+    if (insertAfter.parent_id && isDescendantOf(byId, insertAfter.parent_id, draggedId))
+      return null;
+    return { parent_id: insertAfter.parent_id, sort_order: insertAfter.sort_order + 1 };
   }
 
   if (over.parent_id === dragged.id) return null;
@@ -64,6 +86,7 @@ interface TreeDndProps<T extends TreeItem> {
   onMove: (id: string, newParentId: string | null, newSortOrder: number) => void | Promise<void>;
   getLabel: (item: T) => string;
   children: ReactNode;
+  indentSize?: number;
 }
 
 /**
@@ -76,11 +99,17 @@ export function TreeDnd<T extends TreeItem>({
   onMove,
   getLabel,
   children,
+  indentSize = 20,
 }: TreeDndProps<T>) {
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
-  const [over, setOver] = useState<{ itemId: string | null; zone: DropZone | null }>({
+  const [over, setOver] = useState<{
+    itemId: string | null;
+    zone: DropZone | null;
+    targetDepth: number | null;
+  }>({
     itemId: null,
     zone: null,
+    targetDepth: null,
   });
 
   const sensors = useSensors(
@@ -99,7 +128,9 @@ export function TreeDnd<T extends TreeItem>({
     const rect = event.over?.rect;
     if (!itemId || !rect || itemId === activeItemId) {
       setOver((prev) =>
-        prev.itemId === null && prev.zone === null ? prev : { itemId: null, zone: null },
+        prev.itemId === null && prev.zone === null && prev.targetDepth === null
+          ? prev
+          : { itemId: null, zone: null, targetDepth: null },
       );
       return;
     }
@@ -112,19 +143,39 @@ export function TreeDnd<T extends TreeItem>({
       if (pointerY - rect.top < third) zone = "top";
       else if (pointerY - rect.top > third * 2) zone = "bottom";
     }
-    setOver((prev) => (prev.itemId === itemId && prev.zone === zone ? prev : { itemId, zone }));
+
+    let targetDepth: number | null = null;
+    if (zone === "bottom") {
+      const overDepth: number = event.over?.data.current?.depth ?? 0;
+      const depthAdjust = Math.floor(event.delta.x / indentSize);
+      targetDepth = Math.max(0, Math.min(overDepth, overDepth + depthAdjust));
+    }
+
+    setOver((prev) =>
+      prev.itemId === itemId && prev.zone === zone && prev.targetDepth === targetDepth
+        ? prev
+        : { itemId, zone, targetDepth },
+    );
   };
 
   const reset = () => {
     setActiveItemId(null);
-    setOver({ itemId: null, zone: null });
+    setOver({ itemId: null, zone: null, targetDepth: null });
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const draggedId = String(event.active.id);
     const overId = event.over?.id ? rowIdToItemId(String(event.over.id)) : null;
     if (overId && over.itemId) {
-      const target = resolveDropTarget(byId, draggedId, overId, over.zone ?? "center");
+      const overDepth: number = event.over?.data.current?.depth ?? 0;
+      const target = resolveDropTarget(
+        byId,
+        draggedId,
+        overId,
+        over.zone ?? "center",
+        overDepth,
+        over.targetDepth ?? undefined,
+      );
       if (target) void onMove(draggedId, target.parent_id, target.sort_order);
     }
     reset();
@@ -136,6 +187,7 @@ export function TreeDnd<T extends TreeItem>({
     activeItemId,
     overItemId: over.itemId,
     zone: over.zone,
+    targetDepth: over.targetDepth,
   };
 
   const activeItem = activeItemId ? byId.get(activeItemId) : undefined;

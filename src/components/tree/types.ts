@@ -1,4 +1,7 @@
 import type { ReactNode } from "react";
+import type { CreateIdeaPosition } from "../../hooks/useIdeas";
+
+export type { CreateIdeaPosition };
 
 /**
  * Minimal structural contract for items rendered by the generic tree.
@@ -27,6 +30,8 @@ export interface DropTarget {
 
 /**
  * Pending inline-composer placement, anchored to a node.
+ * - "top"/"bottom": new sibling directly above/below the anchor node
+ * - "child": first child of the anchor node
  * `meta` is opaque caller data (e.g. horizon's chosen item type) that is
  * forwarded to `onCreate`.
  */
@@ -55,7 +60,7 @@ export interface TreeController<T extends TreeItem> {
   onCreate?: (
     text: string,
     parentId: string | null,
-    position: "top" | "bottom",
+    position: CreateIdeaPosition,
     meta?: unknown,
   ) => Promise<string | void> | string | void;
   /** Rename the node's primary label; enables inline editing when provided. */
@@ -98,7 +103,7 @@ export interface TreeOptions<T extends TreeItem> {
   rowClassName?: string;
   /** Pixels of indentation per depth level. */
   indentSize?: number;
-  /** Hides the "+" add-child button and the insert-above separator bar. */
+  /** Hides the "+" add-child button and the hover insertion bands. */
   disableInsert?: boolean;
   editBehavior?: TreeEditBehavior;
 }

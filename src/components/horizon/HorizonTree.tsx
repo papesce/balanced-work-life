@@ -13,7 +13,12 @@ import {
   Tag,
 } from "@/lib/types";
 import { STATUS_LABELS, STATUS_STYLES } from "@/lib/constants";
-import { TreeView, type ComposingState, type TreeNode } from "@/components/tree";
+import {
+  TreeView,
+  type ComposingState,
+  type CreateIdeaPosition,
+  type TreeNode,
+} from "@/components/tree";
 import { IdeaActionMenu } from "@/components/shared/IdeaActionMenu";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { TypePicker } from "@/components/brainstorm/TypePicker";
@@ -265,7 +270,7 @@ export interface HorizonTreeProps {
   createIdea: (
     text: string,
     parentId: string | null,
-    position: "top" | "bottom",
+    position: CreateIdeaPosition,
     initialUpdates?: Partial<Idea>,
   ) => Promise<string>;
   onToggleCollapse: (id: string) => void;

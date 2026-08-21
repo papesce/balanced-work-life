@@ -7,6 +7,7 @@ export interface TreeDndState {
   activeItemId: string | null;
   overItemId: string | null;
   zone: DropZone | null;
+  targetDepth: number | null;
 }
 
 interface TreeContextValue<T extends TreeItem> {
@@ -22,6 +23,7 @@ const TreeDndStateContext = createContext<TreeDndState>({
   activeItemId: null,
   overItemId: null,
   zone: null,
+  targetDepth: null,
 });
 
 export const TreeProvider = TreeContext.Provider;

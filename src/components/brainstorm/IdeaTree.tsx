@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { IdeaNode as IdeaNodeType, Idea, IdeaLink, Tag, LifeArea, LinkType } from "@/lib/types";
 import { filterIdeaTree } from "@/lib/ideaTreeFilters";
 import { pruneTreeToIds } from "@/components/tree/filterTree";
-import { TreeView } from "@/components/tree";
+import { TreeView, type ComposingState, type CreateIdeaPosition } from "@/components/tree";
 import { getToday } from "@/lib/dateUtils";
 import type { IdeasScope } from "@/hooks/useIdeas";
 import { IdeaActionMenu } from "@/components/shared/IdeaActionMenu";
@@ -25,7 +25,7 @@ interface IdeaTreeProps {
   createIdea: (
     text: string,
     parentId?: string | null,
-    position?: "top" | "bottom",
+    position?: CreateIdeaPosition,
   ) => Promise<string>;
   updateIdea: (id: string, updates: Partial<Idea>) => Promise<void>;
   deleteIdea: (id: string) => Promise<void>;
@@ -49,20 +49,8 @@ interface IdeaTreeProps {
   setEditingId: (v: string | null) => void;
   selectedId: string | null;
   setSelectedId: (v: string | null) => void;
-  composing: {
-    nodeId: string;
-    parentId: string | null;
-    position: "child" | "top" | "bottom";
-    depth: number;
-  } | null;
-  setComposing: (
-    v: {
-      nodeId: string;
-      parentId: string | null;
-      position: "child" | "top" | "bottom";
-      depth: number;
-    } | null,
-  ) => void;
+  composing: ComposingState | null;
+  setComposing: (v: ComposingState | null) => void;
   showToday: boolean;
   hideClosed: boolean;
 }

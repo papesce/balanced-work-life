@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { useIdeas } from "@/hooks/useIdeas";
+import { useIdeas, type CreateIdeaPosition } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
@@ -72,7 +72,7 @@ export default function BrainstormPage() {
   const createIdea = async (
     text: string,
     parentId?: string | null,
-    position?: "top" | "bottom",
+    position?: CreateIdeaPosition,
   ): Promise<string> => {
     const id = await ideasHook.createIdea(text, parentId, position);
     if (id) {

@@ -68,7 +68,12 @@ export function TreeView<T extends TreeItem>({
   };
 
   return (
-    <TreeDnd items={items} onMove={onMove} getLabel={options.getLabel}>
+    <TreeDnd
+      items={items}
+      onMove={onMove}
+      getLabel={options.getLabel}
+      indentSize={options.indentSize}
+    >
       <TreeProvider value={{ controller, ui, options }}>
         <div
           className={className}
@@ -80,9 +85,14 @@ export function TreeView<T extends TreeItem>({
           {nodes.length === 0 ? (
             (emptyMessage ?? null)
           ) : (
-            <div className={rowsClassName}>
-              {nodes.map((node) => (
-                <TreeNodeRow key={node.id} node={node} depth={0} />
+            <div className={rowsClassName} role="tree">
+              {nodes.map((node, index) => (
+                <TreeNodeRow
+                  key={node.id}
+                  node={node}
+                  depth={0}
+                  isLastSibling={index === nodes.length - 1}
+                />
               ))}
             </div>
           )}
