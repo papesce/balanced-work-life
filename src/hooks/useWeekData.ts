@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePowerSync } from "@powersync/react";
 import { useAuth } from "./useAuth";
 import { LifeArea } from "@/lib/types";
 import { getWeeksInMonth } from "@/lib/dateUtils";
@@ -18,6 +19,7 @@ export function useWeekData(referenceDate: string): {
   weeks: WeekBucket[];
 } {
   const { user } = useAuth();
+  const db = usePowerSync();
   const [loading, setLoading] = useState(true);
   const [weeks, setWeeks] = useState<WeekBucket[]>([]);
 
@@ -32,10 +34,9 @@ export function useWeekData(referenceDate: string): {
       const rangeStart = weekDefs[0].start;
       const rangeEnd = weekDefs[weekDefs.length - 1].end;
 
-      const { tasks, tagsByIdea } = await fetchTasksWithTags(user.id, {
+      const { tasks, tagsByIdea } = await fetchTasksWithTags(db, user.id, {
         start: rangeStart,
         end: rangeEnd,
-        select: "id, scheduled_date",
       });
 
       const result: WeekBucket[] = weekDefs.map((w) => {
@@ -60,7 +61,7 @@ export function useWeekData(referenceDate: string): {
     return () => {
       cancelled = true;
     };
-  }, [user, referenceDate]);
+  }, [user, db, referenceDate]);
 
   return { loading, weeks };
 }

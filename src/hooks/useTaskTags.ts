@@ -1,92 +1,79 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useCallback } from "react";
+import { usePowerSync, useQuery } from "@powersync/react";
 import { useAuth } from "./useAuth";
 import { Tag } from "@/lib/types";
-import { fetchTagsByIdea } from "@/lib/taskTags";
+
+interface TaskTagJoinRow {
+  idea_id: string;
+  tag_id: string;
+  id: string;
+  user_id: string;
+  name: string;
+  area: string;
+  is_system: number;
+  created_at: string;
+}
+
+function buildTagsByIdeaFromRows(rows: TaskTagJoinRow[]): Map<string, Tag[]> {
+  const map = new Map<string, Tag[]>();
+  for (const row of rows) {
+    const tag: Tag = {
+      id: row.tag_id,
+      user_id: row.user_id,
+      name: row.name,
+      area: row.area as Tag["area"],
+      is_system: Boolean(row.is_system),
+      created_at: row.created_at,
+    };
+    const existing = map.get(row.idea_id) ?? [];
+    map.set(row.idea_id, [...existing, tag]);
+  }
+  return map;
+}
 
 export function useTaskTags() {
   const { user } = useAuth();
-  // Map from idea_id → Tag[]
-  const [tagsByIdea, setTagsByIdea] = useState<Map<string, Tag[]>>(new Map());
-  const [loading, setLoading] = useState(true);
+  const db = usePowerSync();
 
-  const fetchTaskTags = useCallback(async () => {
-    if (!user) return;
-    setTagsByIdea(await fetchTagsByIdea(user.id));
-    setLoading(false);
-  }, [user]);
+  const userId = user?.id ?? "";
+  const { data: rawRows, isLoading: loading } = useQuery<TaskTagJoinRow>(
+    userId
+      ? `SELECT tt.idea_id, tt.tag_id,
+               t.id, t.user_id, t.name, t.area, t.is_system, t.created_at
+         FROM task_tags tt
+         JOIN tags t ON t.id = tt.tag_id
+         WHERE t.user_id = ?`
+      : "SELECT tt.idea_id FROM task_tags tt WHERE 0",
+    userId ? [userId] : [],
+  );
 
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-
-    const load = async () => {
-      const map = await fetchTagsByIdea(user.id);
-      if (cancelled) return;
-      setTagsByIdea(map);
-      setLoading(false);
-    };
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
+  const tagsByIdea: Map<string, Tag[]> = buildTagsByIdeaFromRows(rawRows as TaskTagJoinRow[]);
 
   const getTagsForIdea = useCallback(
     (ideaId: string): Tag[] => {
       return tagsByIdea.get(ideaId) ?? [];
     },
-    [tagsByIdea],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rawRows],
   );
 
   const addTagToTask = async (ideaId: string, tag: Tag) => {
-    setTagsByIdea((prev) => {
-      const next = new Map(prev);
-      const current = next.get(ideaId) ?? [];
-      if (current.some((t) => t.id === tag.id)) return prev;
-      next.set(ideaId, [...current, tag]);
-      return next;
-    });
-    const { error } = await supabase.from("task_tags").insert({ idea_id: ideaId, tag_id: tag.id });
-    if (error) {
-      setTagsByIdea((prev) => {
-        const next = new Map(prev);
-        const current = next.get(ideaId) ?? [];
-        next.set(
-          ideaId,
-          current.filter((t) => t.id !== tag.id),
-        );
-        return next;
-      });
-      console.error("Failed to add tag to task", error);
-      throw error;
-    }
+    await db.execute(`INSERT OR IGNORE INTO task_tags (id, idea_id, tag_id) VALUES (?,?,?)`, [
+      `${ideaId}:${tag.id}`,
+      ideaId,
+      tag.id,
+    ]);
   };
 
   const removeTagFromTask = async (ideaId: string, tagId: string) => {
-    const previous = tagsByIdea.get(ideaId);
-    setTagsByIdea((prev) => {
-      const next = new Map(prev);
-      next.set(
-        ideaId,
-        (next.get(ideaId) ?? []).filter((t) => t.id !== tagId),
-      );
-      return next;
-    });
-    const { error } = await supabase
-      .from("task_tags")
-      .delete()
-      .eq("idea_id", ideaId)
-      .eq("tag_id", tagId);
-    if (error) {
-      if (previous) setTagsByIdea((prev) => new Map(prev).set(ideaId, previous));
-      console.error("Failed to remove tag from task", error);
-      throw error;
-    }
+    await db.execute(`DELETE FROM task_tags WHERE idea_id = ? AND tag_id = ?`, [ideaId, tagId]);
   };
+
+  const refetch = useCallback(async () => {
+    // useQuery is live — no manual refetch needed; kept for API compatibility
+  }, []);
 
   return {
     tagsByIdea,
@@ -94,6 +81,6 @@ export function useTaskTags() {
     getTagsForIdea,
     addTagToTask,
     removeTagFromTask,
-    refetch: fetchTaskTags,
+    refetch,
   };
 }

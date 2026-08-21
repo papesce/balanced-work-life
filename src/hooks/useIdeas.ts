@@ -2,31 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { supabase } from "@/lib/supabase";
+import { usePowerSync, useQuery } from "@powersync/react";
 import { useAuth } from "./useAuth";
 import { Idea, IdeaNode } from "@/lib/types";
 import { getToday, getWindowRange } from "@/lib/dateUtils";
 import { appendStatusHistory } from "@/lib/statusHistory";
 
 const STORAGE_KEY = "brainstorm-tree-overrides";
-const IDEAS_CACHE_KEY = "ideas-cache-v1";
 const DEFAULT_EXPAND_DEPTH = 1;
 
 export type IdeasScope = "all" | "this_month";
-
-function buildScopedQuery(userId: string, scope: IdeasScope) {
-  let query = supabase.from("ideas").select("*").eq("user_id", userId);
-  if (scope === "this_month") {
-    const { start, end } = getWindowRange("month", getToday());
-    query = query.or(
-      `and(scheduled_date.gte.${start},scheduled_date.lte.${end}),and(scheduled_date.is.null,status.not.in.(completed,cancelled,archived))`,
-    );
-  }
-  return query;
-}
-
-type OverrideState = "expanded" | "collapsed";
 export type CreateIdeaPosition = "top" | "bottom";
+type OverrideState = "expanded" | "collapsed";
 
 function loadOverrides(): Map<string, OverrideState> {
   try {
@@ -42,29 +29,6 @@ function saveOverrides(overrides: Map<string, OverrideState>) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(overrides)));
   } catch {}
-}
-
-function getIdeasCacheKey(userId: string, scope: IdeasScope) {
-  return `${IDEAS_CACHE_KEY}:${userId}:${scope}`;
-}
-
-function loadCachedIdeas(userId: string, scope: IdeasScope): Idea[] | null {
-  try {
-    const raw = localStorage.getItem(getIdeasCacheKey(userId, scope));
-    if (!raw) return null;
-    const cached = JSON.parse(raw) as unknown;
-    return Array.isArray(cached) ? (cached as Idea[]) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveCachedIdeas(userId: string, scope: IdeasScope, ideas: Idea[]) {
-  try {
-    localStorage.setItem(getIdeasCacheKey(userId, scope), JSON.stringify(ideas));
-  } catch {
-    // A full or unavailable localStorage should not prevent the network load.
-  }
 }
 
 function getDepthMap(ideas: Idea[]): Map<string, number> {
@@ -147,67 +111,65 @@ function sortIdeasForInsert(ideas: Idea[]): Idea[] {
   return [...ideas].sort((a, b) => depthOf(a) - depthOf(b));
 }
 
+/** PowerSync stores JSON columns as text — deserialize them back to the expected JS types. */
+function deserializeIdea(row: Record<string, unknown>): Idea {
+  return {
+    ...row,
+    is_priority: Boolean(row.is_priority),
+    attempt_dates: row.attempt_dates ? (JSON.parse(row.attempt_dates as string) as string[]) : [],
+    status_history: row.status_history
+      ? (JSON.parse(row.status_history as string) as { status: Idea["status"]; at: string }[])
+      : null,
+  } as unknown as Idea;
+}
+
+function buildScopedQuery(userId: string, scope: IdeasScope): { sql: string; params: string[] } {
+  if (scope === "this_month") {
+    const { start, end } = getWindowRange("month", getToday());
+    return {
+      sql: `SELECT * FROM ideas WHERE user_id = ?
+            AND (
+              (scheduled_date >= ? AND scheduled_date <= ?)
+              OR (scheduled_date IS NULL AND status NOT IN ('completed','cancelled','archived'))
+            )
+            ORDER BY sort_order ASC`,
+      params: [userId, start, end],
+    };
+  }
+  return {
+    sql: `SELECT * FROM ideas WHERE user_id = ? ORDER BY sort_order ASC`,
+    params: [userId],
+  };
+}
+
 export function useIdeas(options: { scope?: IdeasScope } = {}) {
   const { scope = "all" } = options;
   const { user } = useAuth();
-  const [ideas, setIdeas] = useState<Idea[]>([]);
+  const db = usePowerSync();
+
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const overridesRef = useRef<Map<string, OverrideState>>(new Map());
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     overridesRef.current = loadOverrides();
   }, []);
 
+  const userId = user?.id ?? "";
+  const { sql, params } = buildScopedQuery(userId, scope);
+
+  const { data: rawRows, isLoading: loading } = useQuery<Record<string, unknown>>(
+    userId ? sql : "SELECT * FROM ideas WHERE 0",
+    userId ? params : [],
+  );
+
+  const ideas: Idea[] = rawRows.map(deserializeIdea);
+
   useEffect(() => {
     if (ideas.length > 0) {
       setCollapsedIds(computeCollapsedIds(ideas, overridesRef.current));
     }
-  }, [ideas]);
-
-  const fetchIdeas = useCallback(async () => {
-    if (!user) return;
-    const { data } = await buildScopedQuery(user.id, scope).order("sort_order", {
-      ascending: true,
-    });
-    if (data) {
-      const freshIdeas = data as Idea[];
-      setIdeas(freshIdeas);
-      saveCachedIdeas(user.id, scope, freshIdeas);
-    }
-    setLoading(false);
-  }, [user, scope]);
-
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-
-    const loadIdeas = async () => {
-      const cachedIdeas = loadCachedIdeas(user.id, scope);
-      if (cachedIdeas) {
-        setIdeas(cachedIdeas);
-        setLoading(false);
-      } else {
-        setLoading(true);
-      }
-      const { data } = await buildScopedQuery(user.id, scope).order("sort_order", {
-        ascending: true,
-      });
-      if (cancelled) return;
-      if (data) {
-        const freshIdeas = data as Idea[];
-        setIdeas(freshIdeas);
-        saveCachedIdeas(user.id, scope, freshIdeas);
-      }
-      setLoading(false);
-    };
-
-    void loadIdeas();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user, scope]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawRows]);
 
   const createIdea = async (
     text: string,
@@ -250,23 +212,44 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
       updated_at: now,
       ...initialUpdates,
     };
-    setIdeas((prev) =>
-      prev.map((i) => reorderedSiblings.find((s) => s.id === i.id) ?? i).concat(idea),
+    await db.execute(
+      `INSERT INTO ideas (id, user_id, parent_id, text, type, effort, impact, urgency,
+        scheduled_date, scheduled_time, duration_minutes, is_priority, priority_order,
+        status, notes, completed_at, cancelled_at, paused_at, attempt_dates, status_history,
+        horizon, sort_order, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [
+        idea.id,
+        idea.user_id,
+        idea.parent_id,
+        idea.text,
+        idea.type,
+        idea.effort,
+        idea.impact,
+        idea.urgency,
+        idea.scheduled_date,
+        idea.scheduled_time,
+        idea.duration_minutes,
+        idea.is_priority ? 1 : 0,
+        idea.priority_order,
+        idea.status,
+        idea.notes,
+        idea.completed_at,
+        idea.cancelled_at,
+        idea.paused_at,
+        JSON.stringify(idea.attempt_dates),
+        idea.status_history ? JSON.stringify(idea.status_history) : null,
+        idea.horizon,
+        idea.sort_order,
+        idea.created_at,
+        idea.updated_at,
+      ],
     );
-    const { error } = await supabase.from("ideas").insert(idea);
-    if (error) {
-      setIdeas((prev) => prev.filter((i) => i.id !== id));
-      console.error("Failed to create idea", error);
-      throw error;
-    }
     for (const sibling of reorderedSiblings) {
-      const { error: siblingError } = await supabase
-        .from("ideas")
-        .update({ sort_order: sibling.sort_order })
-        .eq("id", sibling.id);
-      if (siblingError) {
-        console.error("Failed to reorder sibling ideas", siblingError);
-      }
+      await db.execute(`UPDATE ideas SET sort_order = ? WHERE id = ?`, [
+        sibling.sort_order,
+        sibling.id,
+      ]);
     }
     return id;
   };
@@ -280,20 +263,20 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
       finalUpdates.status_history = appendStatusHistory(previous, updates.status);
     }
 
-    setIdeas((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, ...finalUpdates, updated_at: updatedAt } : i)),
-    );
-    const { error } = await supabase
-      .from("ideas")
-      .update({ ...finalUpdates, updated_at: updatedAt })
-      .eq("id", id);
-    if (error) {
-      if (previous) {
-        setIdeas((prev) => prev.map((i) => (i.id === id ? previous : i)));
-      }
-      console.error("Failed to update idea", id, updates, error);
-      throw error;
-    }
+    const fields = Object.keys(finalUpdates);
+    if (fields.length === 0) return;
+
+    const setClauses = [...fields, "updated_at"].map((f) => `${f} = ?`).join(", ");
+    const values = fields.map((f) => {
+      const v = finalUpdates[f as keyof Idea];
+      if (f === "attempt_dates") return JSON.stringify(v ?? []);
+      if (f === "status_history") return v ? JSON.stringify(v) : null;
+      if (f === "is_priority") return v ? 1 : 0;
+      return v ?? null;
+    });
+    values.push(updatedAt);
+
+    await db.execute(`UPDATE ideas SET ${setClauses} WHERE id = ?`, [...values, id]);
   };
 
   const deleteIdea = async (id: string) => {
@@ -303,39 +286,64 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
       ideas.filter((i) => i.parent_id === nodeId).forEach((child) => collect(child.id));
     };
     collect(id);
-    setIdeas((prev) => prev.filter((i) => !toDelete.has(i.id)));
-    await supabase.from("ideas").delete().eq("id", id);
+    for (const ideaId of toDelete) {
+      await db.execute(`DELETE FROM ideas WHERE id = ?`, [ideaId]);
+    }
   };
 
   const restoreIdeas = async (restoredIdeas: Idea[]) => {
     if (restoredIdeas.length === 0) return;
     const orderedIdeas = sortIdeasForInsert(restoredIdeas);
-    setIdeas((prev) => {
-      const restoredIds = new Set(orderedIdeas.map((idea) => idea.id));
-      return [...prev.filter((idea) => !restoredIds.has(idea.id)), ...orderedIdeas];
-    });
-    await supabase.from("ideas").upsert(orderedIdeas);
+    for (const idea of orderedIdeas) {
+      await db.execute(
+        `INSERT OR REPLACE INTO ideas (id, user_id, parent_id, text, type, effort, impact, urgency,
+          scheduled_date, scheduled_time, duration_minutes, is_priority, priority_order,
+          status, notes, completed_at, cancelled_at, paused_at, attempt_dates, status_history,
+          horizon, sort_order, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [
+          idea.id,
+          idea.user_id,
+          idea.parent_id,
+          idea.text,
+          idea.type,
+          idea.effort,
+          idea.impact,
+          idea.urgency,
+          idea.scheduled_date,
+          idea.scheduled_time,
+          idea.duration_minutes,
+          idea.is_priority ? 1 : 0,
+          idea.priority_order,
+          idea.status,
+          idea.notes,
+          idea.completed_at,
+          idea.cancelled_at,
+          idea.paused_at,
+          JSON.stringify(idea.attempt_dates),
+          idea.status_history ? JSON.stringify(idea.status_history) : null,
+          idea.horizon,
+          idea.sort_order,
+          idea.created_at,
+          idea.updated_at,
+        ],
+      );
+    }
   };
 
-  const reorderTasks = useCallback(async (taskIds: string[]) => {
-    const updatedAt = new Date().toISOString();
-    setIdeas((prev) => {
-      const next = [...prev];
+  const reorderTasks = useCallback(
+    async (taskIds: string[]) => {
+      const updatedAt = new Date().toISOString();
       for (let i = 0; i < taskIds.length; i++) {
-        const idx = next.findIndex((t) => t.id === taskIds[i]);
-        if (idx !== -1) {
-          next[idx] = { ...next[idx], sort_order: i, updated_at: updatedAt };
-        }
+        await db.execute(`UPDATE ideas SET sort_order = ?, updated_at = ? WHERE id = ?`, [
+          i,
+          updatedAt,
+          taskIds[i],
+        ]);
       }
-      return next.sort((a, b) => a.sort_order - b.sort_order);
-    });
-    for (let i = 0; i < taskIds.length; i++) {
-      await supabase
-        .from("ideas")
-        .update({ sort_order: i, updated_at: updatedAt })
-        .eq("id", taskIds[i]);
-    }
-  }, []);
+    },
+    [db],
+  );
 
   const smartSortTasks = useCallback(
     async (tasksInGroup: Idea[]) => {
@@ -367,27 +375,17 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
         sort_order: idx >= newSortOrder ? idx + 1 : idx,
       }));
 
-    setIdeas((prev) =>
-      prev.map((i) => {
-        if (i.id === id)
-          return { ...i, parent_id: newParentId, sort_order: newSortOrder, updated_at: updatedAt };
-        const reorderedItem = reordered.find((r) => r.id === i.id);
-        if (reorderedItem) return reorderedItem;
-        return i;
-      }),
+    await db.execute(
+      `UPDATE ideas SET parent_id = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
+      [newParentId, newSortOrder, updatedAt, id],
     );
-
-    await supabase
-      .from("ideas")
-      .update({ parent_id: newParentId, sort_order: newSortOrder, updated_at: updatedAt })
-      .eq("id", id);
 
     for (const sibling of reordered) {
       if (sibling.sort_order !== ideas.find((i) => i.id === sibling.id)?.sort_order) {
-        await supabase
-          .from("ideas")
-          .update({ sort_order: sibling.sort_order })
-          .eq("id", sibling.id);
+        await db.execute(`UPDATE ideas SET sort_order = ? WHERE id = ?`, [
+          sibling.sort_order,
+          sibling.id,
+        ]);
       }
     }
   };
@@ -510,6 +508,5 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
     expandIdea,
     expandAll,
     collapseAll,
-    refetch: fetchIdeas,
   };
 }

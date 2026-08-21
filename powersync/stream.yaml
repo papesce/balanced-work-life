@@ -1,0 +1,8 @@
+bucket_definitions:
+  user_data:
+    parameters: SELECT request.user_id() as user_id
+    data:
+      - SELECT * FROM ideas WHERE user_id = bucket.user_id
+      - SELECT * FROM tags WHERE user_id = bucket.user_id
+      - SELECT * FROM idea_links WHERE user_id = bucket.user_id
+      - SELECT id, idea_id, tag_id FROM task_tags WHERE user_id = bucket.user_id

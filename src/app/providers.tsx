@@ -1,8 +1,30 @@
 "use client";
 
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { PowerSyncContext } from "@powersync/react";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { getPowerSync, SupabaseConnector } from "@/lib/powersync";
+import type { PowerSyncDatabase } from "@powersync/web";
+
+function PowerSyncProvider({ children }: { children: ReactNode }) {
+  const { session } = useAuth();
+  const dbRef = useRef<PowerSyncDatabase | null>(null);
+
+  useEffect(() => {
+    const db = getPowerSync();
+    dbRef.current = db;
+
+    if (session) {
+      void db.connect(new SupabaseConnector());
+    } else {
+      void db.disconnect();
+    }
+  }, [session]);
+
+  const db = getPowerSync();
+  return <PowerSyncContext.Provider value={db}>{children}</PowerSyncContext.Provider>;
+}
 
 function AuthGuard({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -46,7 +68,9 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <AuthProvider>
-      <AuthGuard>{children}</AuthGuard>
+      <PowerSyncProvider>
+        <AuthGuard>{children}</AuthGuard>
+      </PowerSyncProvider>
     </AuthProvider>
   );
 }

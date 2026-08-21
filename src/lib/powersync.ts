@@ -1,4 +1,12 @@
-import { WASQLitePowerSyncDatabaseOpenFactory, column, Schema, Table } from "@powersync/web";
+"use client";
+
+import {
+  column,
+  Schema,
+  Table,
+  PowerSyncDatabase,
+  AbstractPowerSyncDatabase,
+} from "@powersync/web";
 import { supabase } from "./supabase";
 
 export const IdeasTable = new Table(
@@ -7,9 +15,9 @@ export const IdeasTable = new Table(
     parent_id: column.text,
     text: column.text,
     type: column.text,
-    effort: column.text,
-    impact: column.text,
-    urgency: column.text,
+    effort: column.real,
+    impact: column.real,
+    urgency: column.real,
     scheduled_date: column.text,
     scheduled_time: column.text,
     duration_minutes: column.integer,
@@ -21,8 +29,9 @@ export const IdeasTable = new Table(
     cancelled_at: column.text,
     paused_at: column.text,
     attempt_dates: column.text,
+    status_history: column.text,
     horizon: column.text,
-    sort_order: column.text,
+    sort_order: column.real,
     created_at: column.text,
     updated_at: column.text,
   },
@@ -55,6 +64,7 @@ export const TaskTagsTable = new Table(
   {
     idea_id: column.text,
     tag_id: column.text,
+    user_id: column.text,
   },
   { indexes: {} },
 );
@@ -65,10 +75,6 @@ export const AppSchema = new Schema({
   tags: TagsTable,
   task_tags: TaskTagsTable,
 });
-
-let powerSyncInstance: Awaited<
-  ReturnType<WASQLitePowerSyncDatabaseOpenFactory["getInstance"]>
-> | null = null;
 
 export class SupabaseConnector {
   async fetchCredentials() {
@@ -82,41 +88,53 @@ export class SupabaseConnector {
     };
   }
 
-  async uploadData(database: { getCrudBatch: (limit: number) => Promise<unknown> }) {
+  async uploadData(database: AbstractPowerSyncDatabase): Promise<void> {
     const batch = await database.getCrudBatch(100);
     if (!batch) return;
 
-    const ops = (
-      batch as {
-        crud: Array<{ op: string; table: string; id: string; opData?: Record<string, unknown> }>;
+    for (const op of batch.crud) {
+      if (op.table === "task_tags") {
+        const { idea_id, tag_id } = op.opData ?? {};
+        switch (op.op) {
+          case "PUT":
+            await supabase
+              .from("task_tags")
+              .upsert({ idea_id, tag_id }, { onConflict: "idea_id,tag_id" });
+            break;
+          case "DELETE":
+            await supabase.from("task_tags").delete().eq("idea_id", idea_id).eq("tag_id", tag_id);
+            break;
+        }
+        continue;
       }
-    ).crud;
-    for (const op of ops) {
-      const { op: operation, table, id, opData } = op;
-      switch (operation) {
+
+      switch (op.op) {
         case "PUT":
-          await supabase.from(table).upsert({ id, ...opData });
+          await supabase.from(op.table).upsert({ id: op.id, ...op.opData });
           break;
         case "PATCH":
-          await supabase.from(table).update(opData!).eq("id", id);
+          await supabase.from(op.table).update(op.opData!).eq("id", op.id);
           break;
         case "DELETE":
-          await supabase.from(table).delete().eq("id", id);
+          await supabase.from(op.table).delete().eq("id", op.id);
           break;
       }
     }
-    await (batch as { complete: () => Promise<void> }).complete();
+    await batch.complete();
   }
 }
 
-export async function getPowerSync() {
+let powerSyncInstance: PowerSyncDatabase | null = null;
+
+export function getPowerSync(): PowerSyncDatabase {
   if (powerSyncInstance) return powerSyncInstance;
 
-  const factory = new WASQLitePowerSyncDatabaseOpenFactory({
-    dbFilename: "balanced-work-life.db",
+  powerSyncInstance = new PowerSyncDatabase({
     schema: AppSchema,
+    database: {
+      dbFilename: "balanced-work-life.db",
+    },
   });
 
-  powerSyncInstance = await factory.getInstance();
   return powerSyncInstance;
 }

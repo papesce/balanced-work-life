@@ -213,6 +213,20 @@ export function HorizonTreeItem({
           <span className="w-5 flex-shrink-0" />
         )}
 
+        {/* Add child button - appears on hover */}
+        {!isEditing && !isComposing && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setComposingNodeId(node.id);
+            }}
+            title="Add child"
+            className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 hover:text-indigo-500 dark:text-gray-600 dark:hover:text-indigo-400"
+          >
+            <Plus size={14} strokeWidth={2} />
+          </button>
+        )}
+
         {/* Priority star */}
         <button
           onClick={() => onUpdate(node.id, { is_priority: !node.is_priority })}
@@ -371,20 +385,6 @@ export function HorizonTreeItem({
           onMove={onMove}
           hiddenActions={["move"]}
         />
-
-        {/* Add child button */}
-        {!isEditing && !isComposing && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setComposingNodeId(node.id);
-            }}
-            title="Add child"
-            className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 hover:text-indigo-500 dark:text-gray-600 dark:hover:text-indigo-400"
-          >
-            <Plus size={14} strokeWidth={2} />
-          </button>
-        )}
       </div>
 
       {/* Children */}

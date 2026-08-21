@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { Download, LogOut, Upload, User as UserIcon } from "lucide-react";
+import { usePowerSync } from "@powersync/react";
 import { useAuth } from "@/hooks/useAuth";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
@@ -11,6 +12,7 @@ import { buildBackupData, downloadBackup, parseBackupFile } from "@/lib/backup";
 
 export function UserMenu() {
   const { user, signOut } = useAuth();
+  const db = usePowerSync();
   const { restoreIdeas } = useIdeas();
   const { restoreLinks } = useIdeaLinks();
 
@@ -41,7 +43,7 @@ export function UserMenu() {
     setBusy("export");
     setStatus(null);
     try {
-      const data = await buildBackupData(user);
+      const data = await buildBackupData(user, db);
       downloadBackup(data);
       setStatus({
         type: "success",

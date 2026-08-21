@@ -1,7 +1,7 @@
 "use client";
 
 import { User } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabase";
+import type { AbstractPowerSyncDatabase } from "@powersync/web";
 import { Idea, IdeaLink } from "@/lib/types";
 
 export interface BackupData {
@@ -17,20 +17,35 @@ export function isValidBackup(data: unknown): data is BackupData {
   return Array.isArray(obj.ideas) && Array.isArray(obj.ideaLinks);
 }
 
-export async function buildBackupData(user: User): Promise<BackupData> {
-  const [ideasRes, linksRes] = await Promise.all([
-    supabase.from("ideas").select("*").eq("user_id", user.id),
-    supabase.from("idea_links").select("*").eq("user_id", user.id),
+export async function buildBackupData(
+  user: User,
+  db: AbstractPowerSyncDatabase,
+): Promise<BackupData> {
+  const [rawIdeas, rawLinks] = await Promise.all([
+    db.getAll<Record<string, unknown>>("SELECT * FROM ideas WHERE user_id = ?", [user.id]),
+    db.getAll<IdeaLink>("SELECT * FROM idea_links WHERE user_id = ?", [user.id]),
   ]);
 
-  if (ideasRes.error) throw ideasRes.error;
-  if (linksRes.error) throw linksRes.error;
+  // Deserialize JSON text columns stored by PowerSync
+  const ideas: Idea[] = rawIdeas.map(
+    (row: Record<string, unknown>) =>
+      ({
+        ...row,
+        is_priority: Boolean(row.is_priority),
+        attempt_dates: row.attempt_dates
+          ? (JSON.parse(row.attempt_dates as string) as string[])
+          : [],
+        status_history: row.status_history
+          ? (JSON.parse(row.status_history as string) as Idea["status_history"])
+          : null,
+      }) as unknown as Idea,
+  );
 
   return {
     version: 1,
     exportedAt: new Date().toISOString(),
-    ideas: ideasRes.data as Idea[],
-    ideaLinks: linksRes.data as IdeaLink[],
+    ideas,
+    ideaLinks: rawLinks,
   };
 }
 

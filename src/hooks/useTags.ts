@@ -1,47 +1,31 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { supabase } from "@/lib/supabase";
+import { usePowerSync, useQuery } from "@powersync/react";
 import { useAuth } from "./useAuth";
 import { Tag, LifeArea } from "@/lib/types";
 
+function deserializeTag(row: Record<string, unknown>): Tag {
+  return {
+    ...row,
+    is_system: Boolean(row.is_system),
+  } as unknown as Tag;
+}
+
 export function useTags() {
   const { user } = useAuth();
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [loading, setLoading] = useState(true);
+  const db = usePowerSync();
 
-  const fetchTags = useCallback(async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from("tags")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("name", { ascending: true });
-    if (data) setTags(data as Tag[]);
-    setLoading(false);
-  }, [user]);
+  const userId = user?.id ?? "";
+  const { data: rawRows, isLoading: loading } = useQuery<Record<string, unknown>>(
+    userId
+      ? "SELECT * FROM tags WHERE user_id = ? ORDER BY name ASC"
+      : "SELECT * FROM tags WHERE 0",
+    userId ? [userId] : [],
+  );
 
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-
-    const load = async () => {
-      const { data } = await supabase
-        .from("tags")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("name", { ascending: true });
-      if (cancelled) return;
-      if (data) setTags(data as Tag[]);
-      setLoading(false);
-    };
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
+  const tags: Tag[] = rawRows.map(deserializeTag);
 
   const createTag = async (name: string, area: LifeArea): Promise<Tag | null> => {
     if (!user) return null;
@@ -54,13 +38,10 @@ export function useTags() {
       is_system: false,
       created_at: now,
     };
-    setTags((prev) => [...prev, tag].sort((a, b) => a.name.localeCompare(b.name)));
-    const { error } = await supabase.from("tags").insert(tag);
-    if (error) {
-      setTags((prev) => prev.filter((t) => t.id !== tag.id));
-      console.error("Failed to create tag", error);
-      throw error;
-    }
+    await db.execute(
+      `INSERT INTO tags (id, user_id, name, area, is_system, created_at) VALUES (?,?,?,?,?,?)`,
+      [tag.id, tag.user_id, tag.name, tag.area, tag.is_system ? 1 : 0, tag.created_at],
+    );
     return tag;
   };
 
@@ -77,36 +58,20 @@ export function useTags() {
       is_system: true,
       created_at: now,
     };
-    setTags((prev) => [...prev, tag].sort((a, b) => a.name.localeCompare(b.name)));
-    const { error } = await supabase.from("tags").insert(tag);
-    if (error) {
-      setTags((prev) => prev.filter((t) => t.id !== tag.id));
-      const { data } = await supabase
-        .from("tags")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("is_system", true)
-        .eq("area", area)
-        .limit(1)
-        .maybeSingle();
-      if (data) return data as Tag;
-      console.error("Failed to create system tag", error);
-      return null;
-    }
+    await db.execute(
+      `INSERT INTO tags (id, user_id, name, area, is_system, created_at) VALUES (?,?,?,?,?,?)`,
+      [tag.id, tag.user_id, tag.name, tag.area, 1, tag.created_at],
+    );
     return tag;
   };
 
   const deleteTag = async (id: string) => {
-    const previous = tags.find((t) => t.id === id);
-    setTags((prev) => prev.filter((t) => t.id !== id));
-    const { error } = await supabase.from("tags").delete().eq("id", id);
-    if (error) {
-      if (previous)
-        setTags((prev) => [...prev, previous].sort((a, b) => a.name.localeCompare(b.name)));
-      console.error("Failed to delete tag", error);
-      throw error;
-    }
+    await db.execute(`DELETE FROM tags WHERE id = ?`, [id]);
   };
 
-  return { tags, loading, createTag, getOrCreateSystemTag, deleteTag, refetch: fetchTags };
+  const refetch = useCallback(async () => {
+    // useQuery is live — no manual refetch needed; kept for API compatibility
+  }, []);
+
+  return { tags, loading, createTag, getOrCreateSystemTag, deleteTag, refetch };
 }

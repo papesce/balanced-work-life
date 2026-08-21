@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePowerSync } from "@powersync/react";
 import { useAuth } from "./useAuth";
 import { LifeArea } from "@/lib/types";
 import { WindowType, getWindowRange, getWindowBuckets, getWindowLabel } from "@/lib/dateUtils";
@@ -35,6 +36,7 @@ function loadTargets(): Record<LifeArea, number> {
 
 export function useBalanceData(windowType: WindowType, referenceDate: string): BalanceData {
   const { user } = useAuth();
+  const db = usePowerSync();
   const [loading, setLoading] = useState(true);
   const [radarData, setRadarData] = useState<RadarDataPoint[]>([]);
   const [buckets, setBuckets] = useState<BucketData[]>([]);
@@ -50,7 +52,7 @@ export function useBalanceData(windowType: WindowType, referenceDate: string): B
 
       const { start, end } = getWindowRange(windowType, referenceDate);
 
-      const { tasks, tagsByIdea } = await fetchTasksWithTags(user.id, { start, end });
+      const { tasks, tagsByIdea } = await fetchTasksWithTags(db, user.id, { start, end });
 
       const targets = loadTargets();
 
@@ -95,7 +97,7 @@ export function useBalanceData(windowType: WindowType, referenceDate: string): B
     return () => {
       cancelled = true;
     };
-  }, [user, windowType, referenceDate]);
+  }, [user, db, windowType, referenceDate]);
 
   return { loading, radarData, buckets, windowLabel };
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { usePowerSync } from "@powersync/react";
 import { useAuth } from "./useAuth";
 import { LifeArea } from "@/lib/types";
 import { getWindowRange, getMonthCalendarGrid } from "@/lib/dateUtils";
@@ -18,6 +19,7 @@ export function useCalendarData(referenceDate: string): {
   monthLabel: string;
 } {
   const { user } = useAuth();
+  const db = usePowerSync();
   const [loading, setLoading] = useState(true);
   const [dayData, setDayData] = useState<DayData[]>([]);
 
@@ -33,7 +35,7 @@ export function useCalendarData(referenceDate: string): {
 
       const { start, end } = getWindowRange("month", referenceDate);
 
-      const { tasks, tagsByIdea } = await fetchTasksWithTags(user.id, { start, end });
+      const { tasks, tagsByIdea } = await fetchTasksWithTags(db, user.id, { start, end });
 
       const dayMap = new Map<string, Record<LifeArea, number>>();
       for (const task of tasks) {
@@ -70,7 +72,7 @@ export function useCalendarData(referenceDate: string): {
     return () => {
       cancelled = true;
     };
-  }, [user, referenceDate, ref]);
+  }, [user, db, referenceDate, ref]);
 
   return { loading, dayData, monthLabel };
 }
