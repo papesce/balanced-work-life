@@ -17,7 +17,7 @@ export function UndoBar({
     <motion.div
       initial={{ opacity: 0, y: -4 }}
       animate={{ opacity: 1, y: 0 }}
-      className="glass-card mb-3 flex items-center justify-between gap-3 rounded-[16px] border-amber-200/40 px-4 py-2.5 dark:border-amber-700/30"
+      className="glass-card fixed bottom-20 left-1/2 z-50 flex -translate-x-1/2 items-center justify-between gap-3 rounded-[16px] border-amber-200/40 px-4 py-2.5 shadow-lg dark:border-amber-700/30"
     >
       <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
         {undoAction.label}

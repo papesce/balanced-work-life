@@ -8,8 +8,10 @@ import {
   MeasuringStrategy,
   PointerSensor,
   closestCenter,
+  pointerWithin,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragMoveEvent,
   type DragStartEvent,
@@ -22,6 +24,14 @@ import { TreeDndStateProvider, type TreeDndState } from "./context";
 import type { DropTarget, DropZone, TreeItem } from "./types";
 
 const ROW_PREFIX = "row:";
+
+// Tree drop zones are based on the pointer's third of a row. Prefer its exact
+// position over the dragged preview's rectangle, then fall back to the nearest
+// row for keyboard dragging and brief gaps between rows.
+const treeCollisionDetection: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args);
+  return pointerCollisions.length > 0 ? pointerCollisions : closestCenter(args);
+};
 
 /** Keep the compact drag preview centered on the pointer. Uses the draggable
  * node's initial rect (stable throughout drag) to compute a fixed offset. */
@@ -208,7 +218,7 @@ export function TreeDnd<T extends TreeItem>({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={treeCollisionDetection}
       measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
       onDragStart={handleDragStart}
       onDragMove={handleDragMove}
