@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import { usePowerSync, useQuery } from "@powersync/react";
 import { useAuth } from "./useAuth";
 import { Idea, IdeaNode } from "@/lib/types";
+import { buildTree as buildTreeGeneric } from "@/components/tree/buildTree";
 import { getToday, getWindowRange } from "@/lib/dateUtils";
 import { appendStatusHistory } from "@/lib/statusHistory";
 import {
@@ -54,35 +55,15 @@ function computeCollapsedIds(ideas: Idea[], overrides: Map<string, OverrideState
   return collapsed;
 }
 
+function compareIdeasForTree(a: Idea, b: Idea): number {
+  const aDone = a.completed_at ? 1 : 0;
+  const bDone = b.completed_at ? 1 : 0;
+  if (aDone !== bDone) return aDone - bDone;
+  return a.sort_order - b.sort_order;
+}
+
 function buildTree(ideas: Idea[], collapsedIds: Set<string>): IdeaNode[] {
-  const map = new Map<string, IdeaNode>();
-  const roots: IdeaNode[] = [];
-
-  for (const idea of ideas) {
-    map.set(idea.id, { ...idea, children: [], collapsed: collapsedIds.has(idea.id) });
-  }
-
-  for (const idea of ideas) {
-    const node = map.get(idea.id)!;
-    if (idea.parent_id && map.has(idea.parent_id)) {
-      map.get(idea.parent_id)!.children.push(node);
-    } else {
-      roots.push(node);
-    }
-  }
-
-  const sortNodes = (nodes: IdeaNode[]) => {
-    nodes.sort((a, b) => {
-      const aDone = a.completed_at ? 1 : 0;
-      const bDone = b.completed_at ? 1 : 0;
-      if (aDone !== bDone) return aDone - bDone;
-      return a.sort_order - b.sort_order;
-    });
-    for (const node of nodes) sortNodes(node.children);
-  };
-  sortNodes(roots);
-
-  return roots;
+  return buildTreeGeneric(ideas, collapsedIds, compareIdeasForTree);
 }
 
 function sortIdeasForInsert(ideas: Idea[]): Idea[] {

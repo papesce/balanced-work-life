@@ -1,10 +1,21 @@
 "use client";
 
+import { useMemo } from "react";
 import { IdeaNode as IdeaNodeType, Idea, IdeaLink, Tag, LifeArea, LinkType } from "@/lib/types";
 import { filterIdeaTree } from "@/lib/ideaTreeFilters";
-import { IdeaNode } from "./IdeaNode";
+import { pruneTreeToIds } from "@/components/tree/filterTree";
+import { TreeView } from "@/components/tree";
 import { getToday } from "@/lib/dateUtils";
 import type { IdeasScope } from "@/hooks/useIdeas";
+import { IdeaActionMenu } from "@/components/shared/IdeaActionMenu";
+import {
+  LinkCountBadge,
+  ScheduleChip,
+  StatusIconSlot,
+  StatusPillSlot,
+  TagChipsSlot,
+  TypePillSlot,
+} from "./ideaNodeSlots";
 
 interface IdeaTreeProps {
   tree: IdeaNodeType[];
@@ -117,84 +128,120 @@ export function IdeaTree({
 }: IdeaTreeProps) {
   const todayString = getToday();
 
-  let filteredTree = filterIdeaTree(tree, ideas, { search, hideClosed });
+  const filteredTree = useMemo(() => {
+    let filtered = filterIdeaTree(tree, ideas, { search, hideClosed });
 
-  if (showToday) {
-    const passingIds = new Set<string>();
-    for (const idea of ideas) {
-      let passes = true;
-      if (idea.scheduled_date !== todayString) passes = false;
-      if (idea.status === "completed" && !hasActiveDescendant(idea.id, ideas)) passes = false;
-      if (passes) passingIds.add(idea.id);
+    if (showToday) {
+      const passingIds = new Set<string>();
+      for (const idea of ideas) {
+        let passes = true;
+        if (idea.scheduled_date !== todayString) passes = false;
+        if (idea.status === "completed" && !hasActiveDescendant(idea.id, ideas)) passes = false;
+        if (passes) passingIds.add(idea.id);
+      }
+      const visibleIds = new Set(passingIds);
+      for (const id of passingIds) {
+        for (const aid of getAncestorIds(id, ideas)) visibleIds.add(aid);
+      }
+      filtered = pruneTreeToIds(filtered, visibleIds);
     }
-    const visibleIds = new Set(passingIds);
-    for (const id of passingIds) {
-      for (const aid of getAncestorIds(id, ideas)) visibleIds.add(aid);
+
+    return filtered;
+  }, [tree, ideas, search, hideClosed, showToday, todayString]);
+
+  const labelClassName = (node: IdeaNodeType): string => {
+    switch (node.status) {
+      case "completed":
+        return "text-violet-600/70 dark:text-violet-400/60";
+      case "cancelled":
+        return "text-red-400/60 dark:text-red-400/50";
+      case "paused":
+        return "text-orange-600/70 dark:text-orange-400/60";
+      case "in_progress":
+        return "text-amber-700 dark:text-amber-300";
+      default:
+        return "text-gray-800 dark:text-gray-200";
     }
-    const pruneNode = (node: IdeaNodeType): IdeaNodeType | null => {
-      if (!visibleIds.has(node.id)) return null;
-      const children = node.children.map(pruneNode).filter(Boolean) as IdeaNodeType[];
-      return { ...node, children };
-    };
-    filteredTree = filteredTree.map(pruneNode).filter(Boolean) as IdeaNodeType[];
-  }
+  };
 
   return (
-    <div
-      className="space-y-3"
-      onClick={() => {
-        setSelectedId(null);
-        setComposing(null);
-      }}
-    >
-      {filteredTree.length === 0 ? (
-        <p className="py-4 text-sm text-gray-400 italic">
-          {search
-            ? "No matching ideas"
-            : scope === "this_month"
-              ? 'No ideas this month. Click "+ New idea" to add one, or switch to All to see everything.'
-              : 'No ideas yet. Click "+ New idea" to start.'}
-        </p>
-      ) : (
-        <div className="space-y-0.5">
-          {filteredTree.map((node) => (
-            <IdeaNode
-              key={node.id}
-              node={node}
-              depth={0}
-              showType={showType}
-              showArea={showArea}
-              search={search}
-              editingId={editingId}
-              setEditingId={setEditingId}
-              selectedId={selectedId}
-              setSelectedId={setSelectedId}
-              composing={composing}
-              setComposing={setComposing}
-              createIdea={createIdea}
-              updateIdea={updateIdea}
-              deleteIdea={deleteIdea}
-              moveIdea={moveIdea}
-              toggleCollapse={toggleCollapse}
-              expandIdea={expandIdea}
+    <div className="space-y-3">
+      <TreeView
+        nodes={filteredTree}
+        items={ideas}
+        className="space-y-0.5"
+        onMove={moveIdea}
+        onCreate={createIdea}
+        onRename={(id, text) => updateIdea(id, { text })}
+        onDelete={deleteIdea}
+        onToggleCollapse={toggleCollapse}
+        onExpand={expandIdea}
+        selectedId={selectedId}
+        setSelectedId={setSelectedId}
+        editingId={editingId}
+        setEditingId={setEditingId}
+        composing={composing}
+        setComposing={setComposing}
+        getLabel={(idea) => idea.text}
+        emptyLabel="empty"
+        editPlaceholder="Type an idea..."
+        editBehavior={{
+          deleteEmptyOnConfirm: true,
+          deleteEmptyOnCancel: true,
+          createChildOnTab: true,
+        }}
+        disableInsert={Boolean(search.trim())}
+        labelClassName={labelClassName}
+        renderLeading={(node) => (
+          <StatusIconSlot node={node} onMarkDone={onMarkDone} onMarkUndone={onMarkUndone} />
+        )}
+        renderTrailing={(node) => (
+          <>
+            {showType && <TypePillSlot node={node} onUpdate={updateIdea} />}
+            {showArea && (
+              <TagChipsSlot
+                node={node}
+                allTags={allTags}
+                getTagsForIdea={getTagsForIdea}
+                onAddTag={onAddTag}
+                onRemoveTag={onRemoveTag}
+                onCreateTag={onCreateTag}
+              />
+            )}
+            <StatusPillSlot node={node} onUpdate={updateIdea} />
+            <LinkCountBadge nodeId={node.id} links={links} />
+            <ScheduleChip node={node} todayString={todayString} />
+            <IdeaActionMenu
+              idea={node}
               allIdeas={ideas}
               links={links}
+              hasChildren={node.children.length > 0}
+              onEdit={() => {
+                setSelectedId(node.id);
+                setEditingId(node.id);
+              }}
+              onUpdate={updateIdea}
+              onDelete={deleteIdea}
+              onSchedule={onSchedule}
               onCreateLink={onCreateLink}
               onDeleteLink={onDeleteLink}
-              onMarkDone={onMarkDone}
-              onMarkUndone={onMarkUndone}
-              onSchedule={onSchedule}
-              todayString={todayString}
-              isAncestorOnly={false}
-              allTags={allTags}
-              getTagsForIdea={getTagsForIdea}
-              onAddTag={onAddTag}
-              onRemoveTag={onRemoveTag}
-              onCreateTag={onCreateTag}
+              onMove={moveIdea}
+              onMoved={(id) => {
+                if (id) expandIdea(id);
+              }}
             />
-          ))}
-        </div>
-      )}
+          </>
+        )}
+        emptyMessage={
+          <p className="py-4 text-sm text-gray-400 italic">
+            {search
+              ? "No matching ideas"
+              : scope === "this_month"
+                ? 'No ideas this month. Click "+ New idea" to add one, or switch to All to see everything.'
+                : 'No ideas yet. Click "+ New idea" to start.'}
+          </p>
+        }
+      />
     </div>
   );
 }

@@ -1,15 +1,24 @@
 "use client";
 
 import { KeyboardEvent, useState } from "react";
+import type { ReactNode } from "react";
 
-interface IdeaComposerProps {
+interface TreeComposerProps {
   depth?: number;
   placeholder: string;
-  onCreate: (text: string) => Promise<void>;
+  /** Optional content rendered before the "+" (e.g. a type picker pill). */
+  leading?: ReactNode;
+  onCreate: (text: string) => Promise<void> | void;
   onDismiss?: () => void;
 }
 
-export function IdeaComposer({ depth = 0, placeholder, onCreate, onDismiss }: IdeaComposerProps) {
+export function TreeComposer({
+  depth = 0,
+  placeholder,
+  leading,
+  onCreate,
+  onDismiss,
+}: TreeComposerProps) {
   const [text, setText] = useState("");
 
   const submit = async () => {
@@ -37,6 +46,7 @@ export function IdeaComposer({ depth = 0, placeholder, onCreate, onDismiss }: Id
     <div style={{ paddingLeft: depth > 0 ? 20 * depth : 0 }} onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center gap-1 rounded-md bg-indigo-50/40 px-1 py-1 dark:bg-indigo-500/10">
         <span className="h-5 w-5 flex-shrink-0" />
+        {leading}
         <span className="w-[14px] flex-shrink-0 text-sm text-gray-300 select-none dark:text-gray-500">
           +
         </span>

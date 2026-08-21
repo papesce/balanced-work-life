@@ -7,13 +7,13 @@ import { useIdeas } from "@/hooks/useIdeas";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
-import { useIdeaInteractionState } from "@/hooks/useIdeaInteractionState";
 import { useUndoAction } from "@/lib/tasks/undo";
 import { filterTreeBySearch } from "@/lib/ideaTreeFilters";
+import { buildTree as buildTreeGeneric } from "@/components/tree/buildTree";
 import { AppShell } from "@/components/AppShell";
 import { UndoBar } from "@/components/shared/UndoBar";
 import { QuickAddInput } from "@/components/timeline/QuickAddInput";
-import { HorizonTreeItem } from "@/components/horizon/HorizonTreeItem";
+import { HorizonTree } from "@/components/horizon/HorizonTree";
 import { TypePicker } from "@/components/brainstorm/TypePicker";
 import { Idea, IdeaHorizon, IdeaNode, IdeaType } from "@/lib/types";
 import {
@@ -53,34 +53,14 @@ function buildFilteredTree(ideas: Idea[], collapsedIds: Set<string>): IdeaNode[]
     return false;
   });
 
-  const map = new Map<string, IdeaNode>();
-  const roots: IdeaNode[] = [];
+  return buildTreeGeneric(included, collapsedIds, compareIdeasForTree);
+}
 
-  for (const idea of included) {
-    map.set(idea.id, { ...idea, children: [], collapsed: collapsedIds.has(idea.id) });
-  }
-
-  for (const idea of included) {
-    const node = map.get(idea.id)!;
-    if (idea.parent_id && map.has(idea.parent_id)) {
-      map.get(idea.parent_id)!.children.push(node);
-    } else {
-      roots.push(node);
-    }
-  }
-
-  const sortNodes = (nodes: IdeaNode[]) => {
-    nodes.sort((a, b) => {
-      const aDone = a.completed_at ? 1 : 0;
-      const bDone = b.completed_at ? 1 : 0;
-      if (aDone !== bDone) return aDone - bDone;
-      return a.sort_order - b.sort_order;
-    });
-    for (const node of nodes) sortNodes(node.children);
-  };
-  sortNodes(roots);
-
-  return roots;
+function compareIdeasForTree(a: Idea, b: Idea): number {
+  const aDone = a.completed_at ? 1 : 0;
+  const bDone = b.completed_at ? 1 : 0;
+  if (aDone !== bDone) return aDone - bDone;
+  return a.sort_order - b.sort_order;
 }
 
 function getDescendantIdeaIds(rootId: string, ideas: Idea[]): Set<string> {
@@ -165,11 +145,8 @@ export default function HorizonPage() {
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
   const linksHook = useIdeaLinks();
-  const interaction = useIdeaInteractionState();
   const { undoAction, registerUndo, clearUndo, handleUndo } = useUndoAction();
   const [activeTab, setActiveTab] = useState<IdeaHorizon>("short");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [composingNodeId, setComposingNodeId] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Map<string, TreeOverrideState>>(() =>
     readTreeOverrides(STORAGE_KEYS.horizonTreeOverrides),
   );
@@ -337,45 +314,30 @@ export default function HorizonPage() {
         </div>
 
         <div className="max-h-[calc(100vh-220px)] min-h-[120px] flex-1 overflow-y-auto">
-          {nodes.length === 0 ? (
-            <p className="px-4 py-6 text-center text-xs text-gray-400 italic dark:text-gray-500">
-              {wasOriginallyEmpty ? "No items yet" : "No matches"}
-            </p>
-          ) : (
-            <div className="divide-y divide-black/[0.03] dark:divide-white/[0.03]">
-              {nodes.map((node) => (
-                <HorizonTreeItem
-                  key={node.id}
-                  node={node}
-                  depth={0}
-                  allIdeas={ideas}
-                  allTags={tagsHook.tags}
-                  links={linksHook.links}
-                  editingId={editingId}
-                  setEditingId={setEditingId}
-                  showTagPickerFor={interaction.showTagPickerFor}
-                  setShowTagPickerFor={interaction.setShowTagPickerFor}
-                  showStatusPickerFor={interaction.showStatusPickerFor}
-                  setShowStatusPickerFor={interaction.setShowStatusPickerFor}
-                  getTagsForIdea={taskTagsHook.getTagsForIdea}
-                  onUpdate={updateIdea}
-                  onDelete={deleteIdea}
-                  onSchedule={scheduleIdea}
-                  onMove={moveIdea}
-                  onCreateLink={linksHook.createLink}
-                  onDeleteLink={linksHook.deleteLink}
-                  onAddTag={taskTagsHook.addTagToTask}
-                  onRemoveTag={taskTagsHook.removeTagFromTask}
-                  onCreateTag={tagsHook.createTag}
-                  onToggleCollapse={onToggleCollapse}
-                  onExpandIdea={onExpandIdea}
-                  createIdea={createIdea}
-                  composingNodeId={composingNodeId}
-                  setComposingNodeId={setComposingNodeId}
-                />
-              ))}
-            </div>
-          )}
+          <HorizonTree
+            nodes={nodes}
+            ideas={ideas}
+            allTags={tagsHook.tags}
+            links={linksHook.links}
+            getTagsForIdea={taskTagsHook.getTagsForIdea}
+            onUpdate={updateIdea}
+            onDelete={deleteIdea}
+            onSchedule={scheduleIdea}
+            onMove={moveIdea}
+            onCreateLink={linksHook.createLink}
+            onDeleteLink={linksHook.deleteLink}
+            onAddTag={taskTagsHook.addTagToTask}
+            onRemoveTag={taskTagsHook.removeTagFromTask}
+            onCreateTag={tagsHook.createTag}
+            createIdea={createIdea}
+            onToggleCollapse={onToggleCollapse}
+            onExpand={onExpandIdea}
+            emptyMessage={
+              <p className="px-4 py-6 text-center text-xs text-gray-400 italic dark:text-gray-500">
+                {wasOriginallyEmpty ? "No items yet" : "No matches"}
+              </p>
+            }
+          />
         </div>
 
         <RootAddInput horizon={h.key} onAdd={handleAdd(h.key)} />

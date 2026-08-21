@@ -26,6 +26,8 @@
     "release": "changeset publish"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/utilities": "^3.2.2",
     "@papesce/dayslot": "^0.6.2",
     "@powersync/react": "^1.10.0",
     "@powersync/web": "^1.38.1",

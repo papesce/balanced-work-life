@@ -126,6 +126,38 @@ export const STATUS_CONFIG: Record<
   },
 };
 
+/** Pill styles for status chips in tree rows (shared by brainstorm + horizon). */
+export const STATUS_STYLES: Record<IdeaStatus, string> = {
+  draft: "border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 bg-transparent",
+  planned:
+    "border-sky-200 dark:border-sky-700/30 bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-300",
+  scheduled:
+    "border-blue-200 dark:border-blue-700/30 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300",
+  in_progress:
+    "border-amber-200 dark:border-amber-700/30 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300",
+  paused:
+    "border-orange-200 dark:border-orange-700/30 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300",
+  completed:
+    "border-violet-200 dark:border-violet-700/30 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300",
+  cancelled:
+    "border-red-200 dark:border-red-700/30 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300",
+  archived: "border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 bg-transparent",
+  deferred:
+    "border-amber-200 dark:border-amber-700/30 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300",
+};
+
+export const STATUS_LABELS: Record<IdeaStatus, string> = {
+  draft: "Draft",
+  planned: "Planned",
+  scheduled: "Scheduled",
+  in_progress: "Active",
+  paused: "Paused",
+  completed: "Done",
+  cancelled: "Cancelled",
+  archived: "Archived",
+  deferred: "Deferred",
+};
+
 export const DEFAULT_TARGETS: Record<LifeArea, number> = {
   work: 35,
   health: 15,
