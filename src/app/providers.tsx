@@ -61,9 +61,19 @@ function AuthGuard({ children }: { children: ReactNode }) {
 
 export function Providers({ children }: { children: ReactNode }) {
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
+    if (!("serviceWorker" in navigator)) return;
+
+    if (process.env.NODE_ENV === "production") {
       navigator.serviceWorker.register("/sw.js");
+      return;
     }
+
+    // Dev: unregister leftover SWs + clear caches so they don't
+    // serve stale pages while the dev server is down.
+    navigator.serviceWorker
+      .getRegistrations()
+      .then((regs) => Promise.all(regs.map((reg) => reg.unregister())));
+    caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key))));
   }, []);
 
   return (
