@@ -382,19 +382,19 @@ export default function BrainstormPage() {
           </div>
         </motion.div>
       )}
+      {effectiveFocusId && focusedIdea && (
+        <div className="mb-3">
+          <BrainstormBreadcrumb
+            chain={breadcrumbChain}
+            focused={focusedIdea}
+            onSelect={handleFocus}
+          />
+        </div>
+      )}
       {viewMode === "tree" ? (
         <>
           <div className="flex items-start gap-4">
             <div className="min-w-0 flex-1">
-              {effectiveFocusId && focusedIdea && (
-                <div className="mb-3">
-                  <BrainstormBreadcrumb
-                    chain={breadcrumbChain}
-                    focused={focusedIdea}
-                    onSelect={handleFocus}
-                  />
-                </div>
-              )}
               <IdeaTree
                 tree={ideasHook.tree}
                 ideas={ideasHook.ideas}
@@ -463,6 +463,7 @@ export default function BrainstormPage() {
               hideClosed={hideClosed}
               hideCompleted={hideCompleted}
               hideDeferred={hideDeferred}
+              focusedId={effectiveFocusId}
               selectedId={selectedId}
               onSelect={(id) => {
                 if (id === selectedId) {
@@ -487,7 +488,9 @@ export default function BrainstormPage() {
         <GraphView
           ideas={ideasHook.ideas}
           links={linksHook.links}
-          onNodeDoubleClick={() => {
+          focusedId={effectiveFocusId}
+          onNodeDoubleClick={(ideaId) => {
+            handleFocus(ideaId);
             setViewMode("tree");
           }}
         />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useEffect } from "react";
 import {
   ReactFlow,
   Controls,
@@ -14,11 +14,13 @@ import {
 import "@xyflow/react/dist/style.css";
 import dagre from "dagre";
 import { Idea, IdeaLink } from "@/lib/types";
+import { getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
 import { GraphIdeaNode, type GraphIdeaNodeData } from "./GraphIdeaNode";
 
 interface GraphViewProps {
   ideas: Idea[];
   links: IdeaLink[];
+  focusedId?: string | null;
   onNodeDoubleClick?: (ideaId: string) => void;
 }
 
@@ -58,10 +60,16 @@ function getLayoutedElements(nodes: Node[], edges: Edge[]) {
   return { nodes: layoutedNodes, edges };
 }
 
-export function GraphView({ ideas, links, onNodeDoubleClick }: GraphViewProps) {
+export function GraphView({ ideas, links, focusedId, onNodeDoubleClick }: GraphViewProps) {
   const { initialNodes, initialEdges } = useMemo(() => {
+    let scopedLinks = links;
+    if (focusedId) {
+      const focusIds = getFocusedSubtreeIds(focusedId, ideas);
+      scopedLinks = links.filter((l) => focusIds.has(l.source_id) && focusIds.has(l.target_id));
+    }
+
     const connectedIds = new Set<string>();
-    links.forEach((l) => {
+    scopedLinks.forEach((l) => {
       connectedIds.add(l.source_id);
       connectedIds.add(l.target_id);
     });
@@ -91,7 +99,7 @@ export function GraphView({ ideas, links, onNodeDoubleClick }: GraphViewProps) {
     const edges: Edge[] = [];
 
     // Add typed links as solid edges
-    links.forEach((link) => {
+    scopedLinks.forEach((link) => {
       edges.push({
         id: `link-${link.id}`,
         source: link.source_id,
@@ -119,10 +127,16 @@ export function GraphView({ ideas, links, onNodeDoubleClick }: GraphViewProps) {
 
     const layouted = getLayoutedElements(nodes, edges);
     return { initialNodes: layouted.nodes, initialEdges: layouted.edges };
-  }, [ideas, links]);
+  }, [ideas, links, focusedId]);
 
-  const [nodes, , onNodesChange] = useNodesState(initialNodes);
-  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // Re-sync graph when the underlying data (ideas/links/focus) changes.
+  useEffect(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+  }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   const handleNodeDoubleClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
@@ -134,7 +148,9 @@ export function GraphView({ ideas, links, onNodeDoubleClick }: GraphViewProps) {
   if (initialNodes.length === 0) {
     return (
       <div className="flex h-[500px] items-center justify-center text-sm text-gray-400 italic">
-        No linked ideas to display. Create links between ideas to see the graph.
+        {focusedId
+          ? "No linked ideas in this focus. Create links between focused ideas to see the graph."
+          : "No linked ideas to display. Create links between ideas to see the graph."}
       </div>
     );
   }

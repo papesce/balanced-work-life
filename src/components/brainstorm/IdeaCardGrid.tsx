@@ -5,6 +5,7 @@ import { AlignLeft } from "lucide-react";
 import { Idea, IdeaNode, IdeaType } from "@/lib/types";
 import { STATUS_LABELS, STATUS_STYLES } from "@/lib/constants";
 import { filterIdeaTree } from "@/lib/ideaTreeFilters";
+import { getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
 import { TYPE_COLORS } from "./ideaNodeSlots";
 
 function collectIds(nodes: IdeaNode[], acc: Set<string> = new Set<string>()): Set<string> {
@@ -30,6 +31,7 @@ export function IdeaCardGrid({
   hideClosed,
   hideCompleted,
   hideDeferred,
+  focusedId,
   selectedId,
   onSelect,
 }: {
@@ -39,6 +41,7 @@ export function IdeaCardGrid({
   hideClosed: boolean;
   hideCompleted: boolean;
   hideDeferred: boolean;
+  focusedId: string | null;
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
@@ -49,14 +52,22 @@ export function IdeaCardGrid({
       hideCompleted,
       hideDeferred,
     });
-    const visibleIds = collectIds(filteredTree);
+    let visibleIds = collectIds(filteredTree);
+    if (focusedId) {
+      const focusIds = getFocusedSubtreeIds(focusedId, ideas);
+      visibleIds = new Set([...visibleIds].filter((id) => focusIds.has(id)));
+    }
     return ideas.filter((idea) => visibleIds.has(idea.id));
-  }, [tree, ideas, search, hideClosed, hideCompleted, hideDeferred]);
+  }, [tree, ideas, search, hideClosed, hideCompleted, hideDeferred, focusedId]);
 
   if (visibleIdeas.length === 0) {
     return (
       <p className="py-4 text-sm text-gray-400 italic">
-        {search ? "No matching ideas" : 'No ideas yet. Click "+ New idea" to start.'}
+        {focusedId
+          ? "No ideas in this focus"
+          : search
+            ? "No matching ideas"
+            : 'No ideas yet. Click "+ New idea" to start.'}
       </p>
     );
   }
