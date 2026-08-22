@@ -142,9 +142,19 @@ export function IdeaActionMenu({
     if (onMoved) onMoved(parentIdToExpand);
   };
 
+  const anyPanelOpen =
+    showMenu ||
+    showLinkPanel ||
+    showMovePanel ||
+    showSchedulePicker ||
+    showDeleteWarning ||
+    showHorizonPicker;
+
   return (
     <div
-      className="relative flex flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+      className={`relative flex flex-shrink-0 transition-opacity ${
+        anyPanelOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+      }`}
       onClick={(e) => e.stopPropagation()}
     >
       <button

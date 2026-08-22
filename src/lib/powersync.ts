@@ -14,6 +14,7 @@ export const IdeasTable = new Table(
     user_id: column.text,
     parent_id: column.text,
     text: column.text,
+    description: column.text,
     type: column.text,
     effort: column.real,
     impact: column.real,

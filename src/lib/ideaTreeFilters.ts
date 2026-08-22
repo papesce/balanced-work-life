@@ -23,40 +23,60 @@ export function filterTreeHideClosed(nodes: IdeaNode[]): IdeaNode[] {
 export function filterIdeaTree(
   tree: IdeaNode[],
   ideas: Idea[],
-  options: { search?: string; hideClosed?: boolean } = {},
+  options: {
+    search?: string;
+    hideClosed?: boolean;
+    hideCompleted?: boolean;
+    hideDeferred?: boolean;
+  } = {},
 ): IdeaNode[] {
-  const { search = "", hideClosed = false } = options;
+  const { search = "", hideClosed = false, hideCompleted = false, hideDeferred = false } = options;
 
-  if (!search.trim() && !hideClosed) return tree;
+  if (!search.trim() && !hideClosed && !hideCompleted && !hideDeferred) return tree;
 
-  const passingIds = new Set<string>();
-  for (const idea of ideas) {
-    let passes = true;
-    if (hideClosed && (idea.status === "cancelled" || idea.status === "archived")) passes = false;
-    if (passes) passingIds.add(idea.id);
-  }
+  const hasHideFilters = hideClosed || hideCompleted || hideDeferred;
 
-  if (search.trim()) {
-    const q = search.toLowerCase();
-    const matchesSearch = (idea: Idea): boolean => {
-      if (idea.text.toLowerCase().includes(q)) return true;
-      return ideas.some((child) => child.parent_id === idea.id && matchesSearch(child));
-    };
+  const hidePassedIds = new Set<string>();
+  if (hasHideFilters) {
     for (const idea of ideas) {
-      if (matchesSearch(idea)) passingIds.add(idea.id);
+      let passes = true;
+      if (hideClosed && (idea.status === "cancelled" || idea.status === "archived")) passes = false;
+      if (hideCompleted && idea.status === "completed") passes = false;
+      if (hideDeferred && idea.status === "deferred") passes = false;
+      if (passes) hidePassedIds.add(idea.id);
     }
-
-    const ancestorIds = new Set<string>();
-    const ideaMap = new Map(ideas.map((i) => [i.id, i]));
-    for (const id of passingIds) {
-      let cur = ideaMap.get(id);
-      while (cur?.parent_id) {
-        ancestorIds.add(cur.parent_id);
-        cur = ideaMap.get(cur.parent_id);
-      }
-    }
-    for (const id of ancestorIds) passingIds.add(id);
   }
 
-  return pruneTreeToIds(tree, passingIds);
+  if (!search.trim()) {
+    return pruneTreeToIds(tree, hidePassedIds);
+  }
+
+  const q = search.toLowerCase();
+  const matchesSearch = (idea: Idea): boolean => {
+    if (idea.text.toLowerCase().includes(q)) return true;
+    if (idea.description?.toLowerCase().includes(q)) return true;
+    if (idea.notes?.toLowerCase().includes(q)) return true;
+    return ideas.some((child) => child.parent_id === idea.id && matchesSearch(child));
+  };
+
+  const matchedIds = new Set<string>();
+  for (const idea of ideas) {
+    if (matchesSearch(idea)) matchedIds.add(idea.id);
+  }
+
+  const visibleSearchIds = new Set(matchedIds);
+  const ideaMap = new Map(ideas.map((i) => [i.id, i]));
+  for (const id of matchedIds) {
+    let cur = ideaMap.get(id);
+    while (cur?.parent_id) {
+      visibleSearchIds.add(cur.parent_id);
+      cur = ideaMap.get(cur.parent_id);
+    }
+  }
+
+  const finalIds = new Set<string>();
+  for (const id of visibleSearchIds) {
+    if (!hasHideFilters || hidePassedIds.has(id)) finalIds.add(id);
+  }
+  return pruneTreeToIds(tree, finalIds);
 }

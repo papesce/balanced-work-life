@@ -11,6 +11,7 @@ import { IdeaTree } from "@/components/brainstorm/IdeaTree";
 import { BrainstormToolbar } from "@/components/brainstorm/BrainstormToolbar";
 import { GraphView } from "@/components/brainstorm/GraphView";
 import { Idea, LinkType } from "@/lib/types";
+import { STORAGE_KEYS, readRawString, writeRawString } from "@/lib/storage";
 import type { IdeasScope } from "@/hooks/useIdeas";
 
 type UndoAction = {
@@ -30,14 +31,26 @@ function getDescendantIdeaIds(rootId: string, ideas: Idea[]): Set<string> {
 
 export default function BrainstormPage() {
   const [timeScope, setTimeScope] = useState<IdeasScope>("this_month");
-  const ideasHook = useIdeas({ scope: timeScope });
+  const [search, setSearch] = useState("");
+  const ideasHook = useIdeas({ scope: timeScope, searchQuery: search });
   const linksHook = useIdeaLinks();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
   const [viewMode, setViewMode] = useState<"tree" | "graph">("tree");
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
 
-  const [search, setSearch] = useState("");
+  type EditMode = "view" | "edit" | "insert";
+  const [editMode, setEditMode] = useState<EditMode>(() => {
+    const saved = readRawString(STORAGE_KEYS.brainstormEditMode);
+    return saved === "edit" || saved === "insert" ? saved : "view";
+  });
+  const changeEditMode = (mode: EditMode) => {
+    setEditMode(mode);
+    writeRawString(STORAGE_KEYS.brainstormEditMode, mode);
+    if (mode !== "edit") setEditingId(null);
+    if (mode === "view") setComposing(null);
+  };
+
   const [showType, setShowType] = useState(true);
   const [showArea, setShowArea] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -50,6 +63,8 @@ export default function BrainstormPage() {
   } | null>(null);
   const [showToday, setShowToday] = useState(false);
   const [hideClosed, setHideClosed] = useState(false);
+  const [hideCompleted, setHideCompleted] = useState(false);
+  const [hideDeferred, setHideDeferred] = useState(false);
 
   const hasLinks = linksHook.links.length > 0;
 
@@ -226,6 +241,8 @@ export default function BrainstormPage() {
     <BrainstormToolbar
       search={search}
       setSearch={setSearch}
+      editMode={editMode}
+      setEditMode={changeEditMode}
       showType={showType}
       setShowType={setShowType}
       showArea={showArea}
@@ -234,6 +251,10 @@ export default function BrainstormPage() {
       setShowToday={setShowToday}
       hideClosed={hideClosed}
       setHideClosed={setHideClosed}
+      hideCompleted={hideCompleted}
+      setHideCompleted={setHideCompleted}
+      hideDeferred={hideDeferred}
+      setHideDeferred={setHideDeferred}
       onAddRoot={handleAddRoot}
       expandAll={ideasHook.expandAll}
       collapseAll={ideasHook.collapseAll}
@@ -343,6 +364,7 @@ export default function BrainstormPage() {
           search={search}
           showType={showType}
           showArea={showArea}
+          editMode={editMode}
           editingId={editingId}
           setEditingId={setEditingId}
           selectedId={selectedId}
@@ -351,6 +373,8 @@ export default function BrainstormPage() {
           setComposing={setComposing}
           showToday={showToday}
           hideClosed={hideClosed}
+          hideCompleted={hideCompleted}
+          hideDeferred={hideDeferred}
         />
       ) : (
         <GraphView

@@ -31,6 +31,14 @@ export function TreeNodeRow<T extends TreeItem>({
   const [insertZone, setInsertZone] = useState<InsertZone | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const rowContentRef = useRef<HTMLDivElement | null>(null);
+  const detailRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (isSelected && options.renderDetail) {
+      detailRef.current?.scrollIntoView({ block: "nearest" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSelected]);
 
   // Sync the draft text whenever editing starts (render-time adjustment pattern).
   if (isEditing !== wasEditing) {
@@ -48,6 +56,8 @@ export function TreeNodeRow<T extends TreeItem>({
   const hasChildren = node.children.length > 0;
   const canCreate = Boolean(controller.onCreate) && !options.disableInsert;
   const canRename = Boolean(controller.onRename);
+  const inlineEditEnabled = options.inlineEditEnabled ?? true;
+  const clickToInsert = Boolean(options.clickToInsert) && canCreate;
   const behavior = options.editBehavior ?? {};
 
   const droppable = useDroppable({ id: `row:${node.id}`, data: { itemId: node.id, depth } });
@@ -97,8 +107,11 @@ export function TreeNodeRow<T extends TreeItem>({
   };
 
   const isComposingHere = ui.composing?.nodeId === node.id;
+  // Hover insertion bands are an insert-mode affordance; edit mode keeps the
+  // explicit "+" button but never shows hover-triggered slots.
   const showInsertBand =
     canCreate &&
+    clickToInsert &&
     !isEditing &&
     !isDragging &&
     !dnd.activeItemId &&
@@ -114,7 +127,7 @@ export function TreeNodeRow<T extends TreeItem>({
    */
   const handleInsertHover = (e: React.MouseEvent) => {
     const el = rowContentRef.current;
-    if (!el || !canCreate || isEditing || dnd.activeItemId) return;
+    if (!el || !canCreate || !clickToInsert || isEditing || dnd.activeItemId) return;
     const rect = el.getBoundingClientRect();
     const y = e.clientY - rect.top;
     if (y < -4 || y > rect.height + 4) {
@@ -156,7 +169,7 @@ export function TreeNodeRow<T extends TreeItem>({
         position: "bottom",
         depth,
       });
-    } else if (e.key === "F2" && canRename) {
+    } else if (e.key === "F2" && canRename && inlineEditEnabled) {
       e.preventDefault();
       startEdit();
     }
@@ -260,7 +273,17 @@ export function TreeNodeRow<T extends TreeItem>({
             onMouseMove={handleInsertHover}
             onClick={(e) => {
               e.stopPropagation();
-              ui.setSelectedId(isSelected ? null : node.id);
+              if (clickToInsert && !isEditing) {
+                ui.setSelectedId(node.id);
+                ui.setComposing({
+                  nodeId: node.id,
+                  parentId: node.parent_id ?? null,
+                  position: "bottom",
+                  depth,
+                });
+              } else {
+                ui.setSelectedId(isSelected ? null : node.id);
+              }
             }}
             onKeyDown={handleRowKeyDown}
           >
@@ -360,10 +383,18 @@ export function TreeNodeRow<T extends TreeItem>({
               <span
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (canRename) {
+                  if (clickToInsert && !isEditing) {
+                    ui.setSelectedId(node.id);
+                    ui.setComposing({
+                      nodeId: node.id,
+                      parentId: node.parent_id ?? null,
+                      position: "bottom",
+                      depth,
+                    });
+                  } else if (isSelected && canRename && inlineEditEnabled) {
                     startEdit();
                   } else {
-                    ui.setSelectedId(isSelected ? null : node.id);
+                    ui.setSelectedId(node.id);
                   }
                 }}
                 className={`max-w-sm min-w-0 flex-1 cursor-text truncate rounded px-2 py-0.5 text-sm hover:bg-gray-100 dark:hover:bg-white/[0.04] ${
@@ -376,6 +407,16 @@ export function TreeNodeRow<T extends TreeItem>({
 
             {options.renderTrailing?.(node)}
           </div>
+
+          {options.renderDetail && isSelected && (
+            <div
+              ref={detailRef}
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              {options.renderDetail(node)}
+            </div>
+          )}
 
           {composer && ui.composing!.position !== "top" && composer}
         </div>

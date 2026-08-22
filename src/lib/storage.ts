@@ -3,6 +3,7 @@ import { LifeArea } from "@/lib/types";
 
 const APP_STORAGE_KEYS = [
   "brainstorm-tree-overrides",
+  "brainstorm-edit-mode",
   "horizon-tree-overrides",
   "daily-planner-area-targets",
   "sidebar-collapsed",
@@ -14,6 +15,7 @@ export type AppStorageKey = (typeof APP_STORAGE_KEYS)[number];
 
 export const STORAGE_KEYS = {
   brainstormTreeOverrides: "brainstorm-tree-overrides",
+  brainstormEditMode: "brainstorm-edit-mode",
   horizonTreeOverrides: "horizon-tree-overrides",
   dailyPlannerAreaTargets: "daily-planner-area-targets",
   sidebarCollapsed: "sidebar-collapsed",

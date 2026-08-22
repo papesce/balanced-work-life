@@ -42,17 +42,33 @@ function getDepthMap(ideas: Idea[]): Map<string, number> {
   return depths;
 }
 
-function computeCollapsedIds(ideas: Idea[], overrides: Map<string, OverrideState>): Set<string> {
+function computeCollapsedIds(
+  ideas: Idea[],
+  overrides: Map<string, OverrideState>,
+  search = "",
+): Set<string> {
   const depths = getDepthMap(ideas);
   const collapsed = new Set<string>();
   const parents = new Set(
     ideas.filter((i) => ideas.some((c) => c.parent_id === i.id)).map((i) => i.id),
   );
+  const hasSearch = search.trim().length > 0;
+
+  const nodeHasSearchMatch = (ideaId: string): boolean => {
+    const idea = ideas.find((i) => i.id === ideaId);
+    if (!idea) return false;
+    const q = search.toLowerCase();
+    if (idea.text.toLowerCase().includes(q)) return true;
+    if (idea.description?.toLowerCase().includes(q)) return true;
+    if (idea.notes?.toLowerCase().includes(q)) return true;
+    return ideas.some((child) => child.parent_id === ideaId && nodeHasSearchMatch(child.id));
+  };
 
   for (const id of parents) {
     const depth = depths.get(id) ?? 0;
     const override = overrides.get(id);
     if (override === "expanded") continue;
+    if (hasSearch && nodeHasSearchMatch(id)) continue;
     if (override === "collapsed" || depth >= DEFAULT_EXPAND_DEPTH) {
       collapsed.add(id);
     }
@@ -117,8 +133,8 @@ function buildScopedQuery(userId: string, scope: IdeasScope): { sql: string; par
   };
 }
 
-export function useIdeas(options: { scope?: IdeasScope } = {}) {
-  const { scope = "all" } = options;
+export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } = {}) {
+  const { scope = "all", searchQuery = "" } = options;
   const { user } = useAuth();
   const db = usePowerSync();
 
@@ -130,7 +146,9 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
   }, []);
 
   const userId = user?.id ?? "";
-  const { sql, params } = buildScopedQuery(userId, scope);
+  const hasSearch = searchQuery.trim().length > 0;
+  // While searching, look at every idea regardless of the active time scope.
+  const { sql, params } = buildScopedQuery(userId, hasSearch ? "all" : scope);
 
   const { data: rawRows, isLoading: loading } = useQuery<Record<string, unknown>>(
     userId ? sql : "SELECT * FROM ideas WHERE 0",
@@ -140,11 +158,10 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
   const ideas: Idea[] = rawRows.map(deserializeIdea);
 
   useEffect(() => {
-    if (ideas.length > 0) {
-      setCollapsedIds(computeCollapsedIds(ideas, overridesRef.current));
-    }
+    if (ideas.length === 0) return;
+    setCollapsedIds(computeCollapsedIds(ideas, overridesRef.current, searchQuery));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawRows]);
+  }, [rawRows, searchQuery]);
 
   const createIdea = async (
     text: string,
@@ -184,6 +201,7 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
       user_id: user.id,
       parent_id: parentId,
       text,
+      description: null,
       type: null,
       effort: null,
       impact: null,
@@ -208,16 +226,17 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
     };
     await db.writeTransaction(async (tx) => {
       await tx.execute(
-        `INSERT INTO ideas (id, user_id, parent_id, text, type, effort, impact, urgency,
+        `INSERT INTO ideas (id, user_id, parent_id, text, description, type, effort, impact, urgency,
           scheduled_date, scheduled_time, duration_minutes, is_priority, priority_order,
           status, notes, completed_at, cancelled_at, paused_at, attempt_dates, status_history,
           horizon, sort_order, created_at, updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
           idea.id,
           idea.user_id,
           idea.parent_id,
           idea.text,
+          idea.description,
           idea.type,
           idea.effort,
           idea.impact,
@@ -296,16 +315,17 @@ export function useIdeas(options: { scope?: IdeasScope } = {}) {
     await db.writeTransaction(async (tx) => {
       for (const idea of orderedIdeas) {
         await tx.execute(
-          `INSERT OR REPLACE INTO ideas (id, user_id, parent_id, text, type, effort, impact, urgency,
+          `INSERT OR REPLACE INTO ideas (id, user_id, parent_id, text, description, type, effort, impact, urgency,
             scheduled_date, scheduled_time, duration_minutes, is_priority, priority_order,
             status, notes, completed_at, cancelled_at, paused_at, attempt_dates, status_history,
             horizon, sort_order, created_at, updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
           [
             idea.id,
             idea.user_id,
             idea.parent_id,
             idea.text,
+            idea.description,
             idea.type,
             idea.effort,
             idea.impact,

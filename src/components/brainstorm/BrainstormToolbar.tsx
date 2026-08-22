@@ -2,11 +2,24 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp, MoreHorizontal, Plus, SlidersHorizontal } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  ListPlus,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  SlidersHorizontal,
+} from "lucide-react";
+
+export type BrainstormEditMode = "view" | "edit" | "insert";
 
 export interface BrainstormToolbarProps {
   search: string;
   setSearch: (v: string) => void;
+  editMode: BrainstormEditMode;
+  setEditMode: (v: BrainstormEditMode) => void;
   showType: boolean;
   setShowType: (v: boolean) => void;
   showArea: boolean;
@@ -15,6 +28,10 @@ export interface BrainstormToolbarProps {
   setShowToday: (v: boolean) => void;
   hideClosed: boolean;
   setHideClosed: (v: boolean) => void;
+  hideCompleted: boolean;
+  setHideCompleted: (v: boolean) => void;
+  hideDeferred: boolean;
+  setHideDeferred: (v: boolean) => void;
   onAddRoot: () => void;
   expandAll: () => void;
   collapseAll: () => void;
@@ -31,6 +48,8 @@ function pillClass(active: boolean) {
 export function BrainstormToolbar({
   search,
   setSearch,
+  editMode,
+  setEditMode,
   showType,
   setShowType,
   showArea,
@@ -39,6 +58,10 @@ export function BrainstormToolbar({
   setShowToday,
   hideClosed,
   setHideClosed,
+  hideCompleted,
+  setHideCompleted,
+  hideDeferred,
+  setHideDeferred,
   onAddRoot,
   expandAll,
   collapseAll,
@@ -83,7 +106,12 @@ export function BrainstormToolbar({
   }, [overflowOpen]);
 
   const activeFilterCount =
-    (showToday ? 1 : 0) + (hideClosed ? 1 : 0) + (!showType ? 1 : 0) + (!showArea ? 1 : 0);
+    (showToday ? 1 : 0) +
+    (hideClosed ? 1 : 0) +
+    (hideCompleted ? 1 : 0) +
+    (hideDeferred ? 1 : 0) +
+    (!showType ? 1 : 0) +
+    (!showArea ? 1 : 0);
 
   return (
     <>
@@ -103,6 +131,42 @@ export function BrainstormToolbar({
         onChange={(e) => setSearch(e.target.value)}
         className="w-32 rounded-lg border border-black/10 bg-white/60 px-3 py-1.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-indigo-500 sm:w-44 md:w-56 dark:border-white/10 dark:bg-gray-800/60 dark:text-gray-200 dark:placeholder:text-gray-500 dark:focus:border-indigo-400"
       />
+
+      <div role="radiogroup" aria-label="Editing mode" className="flex gap-1">
+        <button
+          type="button"
+          role="radio"
+          aria-checked={editMode === "view"}
+          onClick={() => setEditMode("view")}
+          title="Read-only: click a row to view its details"
+          className={`toolbar-btn ${editMode === "view" ? "toolbar-btn--accent" : ""}`}
+        >
+          <Eye size={14} />
+          <span className="hidden lg:inline">View</span>
+        </button>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={editMode === "edit"}
+          onClick={() => setEditMode("edit")}
+          title="Edit: click twice to rename, edit details inline"
+          className={`toolbar-btn ${editMode === "edit" ? "toolbar-btn--accent" : ""}`}
+        >
+          <Pencil size={14} />
+          <span className="hidden lg:inline">Edit</span>
+        </button>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={editMode === "insert"}
+          onClick={() => setEditMode("insert")}
+          title="Insert: hover a row to place a new idea above or below it"
+          className={`toolbar-btn ${editMode === "insert" ? "toolbar-btn--accent" : ""}`}
+        >
+          <ListPlus size={14} />
+          <span className="hidden lg:inline">Insert</span>
+        </button>
+      </div>
 
       <div ref={filtersRef} className="relative">
         <button
@@ -167,6 +231,24 @@ export function BrainstormToolbar({
               >
                 <span>Hide closed</span>
                 <span className={pillClass(hideClosed)}>On</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => setHideCompleted(!hideCompleted)}
+                className={`flex w-full cursor-pointer items-center justify-between rounded-lg px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-black/[0.03] dark:text-gray-200 dark:hover:bg-white/[0.04]`}
+              >
+                <span>Hide completed</span>
+                <span className={pillClass(hideCompleted)}>On</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => setHideDeferred(!hideDeferred)}
+                className={`flex w-full cursor-pointer items-center justify-between rounded-lg px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-black/[0.03] dark:text-gray-200 dark:hover:bg-white/[0.04]`}
+              >
+                <span>Hide deferred</span>
+                <span className={pillClass(hideDeferred)}>On</span>
               </button>
             </motion.div>
           )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { FileText } from "lucide-react";
 import { IdeaNode as IdeaNodeType, Idea, IdeaLink, Tag, LifeArea, LinkType } from "@/lib/types";
 import { filterIdeaTree } from "@/lib/ideaTreeFilters";
 import { pruneTreeToIds } from "@/components/tree/filterTree";
@@ -8,6 +9,7 @@ import { TreeView, type ComposingState, type CreateIdeaPosition } from "@/compon
 import { getToday } from "@/lib/dateUtils";
 import type { IdeasScope } from "@/hooks/useIdeas";
 import { IdeaActionMenu } from "@/components/shared/IdeaActionMenu";
+import { IdeaDetailStrip } from "./IdeaDetailStrip";
 import {
   LinkCountBadge,
   ScheduleChip,
@@ -45,6 +47,7 @@ interface IdeaTreeProps {
   search: string;
   showType: boolean;
   showArea: boolean;
+  editMode: "view" | "edit" | "insert";
   editingId: string | null;
   setEditingId: (v: string | null) => void;
   selectedId: string | null;
@@ -53,6 +56,8 @@ interface IdeaTreeProps {
   setComposing: (v: ComposingState | null) => void;
   showToday: boolean;
   hideClosed: boolean;
+  hideCompleted: boolean;
+  hideDeferred: boolean;
 }
 
 function getAncestorIds(ideaId: string, ideas: Idea[]): Set<string> {
@@ -105,6 +110,7 @@ export function IdeaTree({
   search,
   showType,
   showArea,
+  editMode,
   editingId,
   setEditingId,
   selectedId,
@@ -113,11 +119,13 @@ export function IdeaTree({
   setComposing,
   showToday,
   hideClosed,
+  hideCompleted,
+  hideDeferred,
 }: IdeaTreeProps) {
   const todayString = getToday();
 
   const filteredTree = useMemo(() => {
-    let filtered = filterIdeaTree(tree, ideas, { search, hideClosed });
+    let filtered = filterIdeaTree(tree, ideas, { search, hideClosed, hideCompleted, hideDeferred });
 
     if (showToday) {
       const passingIds = new Set<string>();
@@ -135,7 +143,7 @@ export function IdeaTree({
     }
 
     return filtered;
-  }, [tree, ideas, search, hideClosed, showToday, todayString]);
+  }, [tree, ideas, search, hideClosed, hideCompleted, hideDeferred, showToday, todayString]);
 
   const labelClassName = (node: IdeaNodeType): string => {
     switch (node.status) {
@@ -178,13 +186,22 @@ export function IdeaTree({
           deleteEmptyOnCancel: true,
           createChildOnTab: true,
         }}
-        disableInsert={Boolean(search.trim())}
+        disableInsert={Boolean(search.trim()) || editMode === "view"}
         labelClassName={labelClassName}
         renderLeading={(node) => (
           <StatusIconSlot node={node} onMarkDone={onMarkDone} onMarkUndone={onMarkUndone} />
         )}
         renderTrailing={(node) => (
           <>
+            {(node.description?.trim() || node.notes?.trim()) && (
+              <span
+                title="Has description or notes"
+                aria-label="Has description or notes"
+                className="flex flex-shrink-0 items-center text-gray-300 dark:text-gray-600"
+              >
+                <FileText size={11} strokeWidth={2} />
+              </span>
+            )}
             {showType && <TypePillSlot node={node} onUpdate={updateIdea} />}
             {showArea && (
               <TagChipsSlot
@@ -204,6 +221,7 @@ export function IdeaTree({
               allIdeas={ideas}
               links={links}
               hasChildren={node.children.length > 0}
+              hiddenActions={editMode === "edit" ? [] : ["edit"]}
               onEdit={() => {
                 setSelectedId(node.id);
                 setEditingId(node.id);
@@ -219,6 +237,16 @@ export function IdeaTree({
               }}
             />
           </>
+        )}
+        inlineEditEnabled={editMode === "edit"}
+        clickToInsert={editMode === "insert"}
+        renderDetail={(node) => (
+          <IdeaDetailStrip
+            description={node.description}
+            notes={node.notes}
+            editable={editMode === "edit"}
+            onSave={(updates) => updateIdea(node.id, updates)}
+          />
         )}
         emptyMessage={
           <p className="py-4 text-sm text-gray-400 italic">

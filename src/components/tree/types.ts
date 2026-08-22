@@ -92,6 +92,8 @@ export interface TreeOptions<T extends TreeItem> {
   renderLeading?: (node: TreeNode<T>) => ReactNode;
   /** Rendered after the label (pills, chips, menus...). */
   renderTrailing?: (node: TreeNode<T>) => ReactNode;
+  /** Rendered below a row while it is selected (e.g. a read-only detail strip). */
+  renderDetail?: (node: TreeNode<T>) => ReactNode;
   /** Optional content at the start of the inline composer row. */
   composerLeading?: (
     node: TreeNode<T>,
@@ -105,5 +107,9 @@ export interface TreeOptions<T extends TreeItem> {
   indentSize?: number;
   /** Hides the "+" add-child button and the hover insertion bands. */
   disableInsert?: boolean;
+  /** When false, clicking a selected row's label selects instead of entering edit mode. Defaults to true. */
+  inlineEditEnabled?: boolean;
+  /** Clicking a row opens the composer below it (insert-focused mode) instead of selecting. */
+  clickToInsert?: boolean;
   editBehavior?: TreeEditBehavior;
 }
