@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import {
   Link2,
   ArrowUpDown,
@@ -54,9 +54,27 @@ export function IdeaActionMenu({
   const [showMovePanel, setShowMovePanel] = useState(false);
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const [showDeleteWarning, setShowDeleteWarning] = useState(false);
+  const [deletePos, setDeletePos] = useState<{ top: number; right: number } | null>(null);
   const [showHorizonPicker, setShowHorizonPicker] = useState(false);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const deleteConfirmRef = useRef<HTMLDivElement>(null);
+
+  const descendantCount = useMemo(() => {
+    if (!hasChildren) return 0;
+    let count = 0;
+    const stack = [idea.id];
+    while (stack.length) {
+      const current = stack.pop();
+      for (const candidate of allIdeas) {
+        if (candidate.parent_id === current) {
+          count += 1;
+          stack.push(candidate.id);
+        }
+      }
+    }
+    return count;
+  }, [hasChildren, idea.id, allIdeas]);
 
   const hidden = hiddenActions ?? [];
 
@@ -77,6 +95,24 @@ export function IdeaActionMenu({
     return () => document.removeEventListener("mousedown", handler);
   }, [showMenu]);
 
+  useEffect(() => {
+    if (!showDeleteWarning) return;
+    const handler = (e: MouseEvent) => {
+      if (deleteConfirmRef.current && !deleteConfirmRef.current.contains(e.target as Node)) {
+        setShowDeleteWarning(false);
+      }
+    };
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowDeleteWarning(false);
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("keydown", keyHandler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("keydown", keyHandler);
+    };
+  }, [showDeleteWarning]);
+
   const closeAll = () => {
     setShowMenu(false);
     setShowLinkPanel(false);
@@ -88,6 +124,8 @@ export function IdeaActionMenu({
 
   const handleRequestDelete = () => {
     closeAll();
+    const rect = menuTriggerRef.current?.getBoundingClientRect();
+    if (rect) setDeletePos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
     setShowDeleteWarning(true);
   };
 
@@ -305,30 +343,48 @@ export function IdeaActionMenu({
           />
         </div>
       )}
-      {showDeleteWarning && (
-        <div className="glass-card-strong absolute top-7 right-0 z-20 w-52 rounded-xl border border-red-200 p-2 dark:border-red-500/30">
-          <p className="text-xs font-medium text-red-700 dark:text-red-400">Delete this idea?</p>
-          {hasChildren && (
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Child ideas will be deleted too.
+      {showDeleteWarning &&
+        createPortal(
+          <div
+            ref={deleteConfirmRef}
+            role="alertdialog"
+            aria-label="Confirm delete"
+            style={{
+              position: "fixed",
+              top: deletePos ? deletePos.top : 0,
+              right: deletePos ? deletePos.right : 0,
+              zIndex: 10000,
+            }}
+            className="glass-card-strong w-64 rounded-xl border border-red-200 p-3 shadow-lg dark:border-red-500/30"
+          >
+            <p className="text-xs font-medium text-red-700 dark:text-red-400">
+              Delete &ldquo;{idea.text || "empty"}&rdquo;?
             </p>
-          )}
-          <div className="mt-2 flex justify-end gap-1.5">
-            <button
-              onClick={() => setShowDeleteWarning(false)}
-              className="rounded-lg px-2 py-1 text-xs text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.06]"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleConfirmDelete}
-              className="rounded-lg bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-400"
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      )}
+            {descendantCount > 0 && (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {descendantCount === 1
+                  ? "1 child idea will be deleted too."
+                  : `${descendantCount} child ideas will be deleted too.`}
+              </p>
+            )}
+            <div className="mt-2 flex justify-end gap-1.5">
+              <button
+                autoFocus
+                onClick={() => setShowDeleteWarning(false)}
+                className="rounded-lg px-2 py-1 text-xs text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.06]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="rounded-lg bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-400"
+              >
+                Delete
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
