@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useIdeas, type CreateIdeaPosition } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
@@ -9,11 +9,13 @@ import { useTaskTags } from "@/hooks/useTaskTags";
 import { AppShell } from "@/components/AppShell";
 import { IdeaTree } from "@/components/brainstorm/IdeaTree";
 import { BrainstormToolbar } from "@/components/brainstorm/BrainstormToolbar";
+import { BrainstormBreadcrumb } from "@/components/brainstorm/BrainstormBreadcrumb";
 import { GraphView } from "@/components/brainstorm/GraphView";
 import { IdeaCardGrid } from "@/components/brainstorm/IdeaCardGrid";
 import { IdeaInspector } from "@/components/brainstorm/IdeaInspector";
 import { Idea, LinkType } from "@/lib/types";
 import { STORAGE_KEYS, readRawString, writeRawString } from "@/lib/storage";
+import { getAncestorChain } from "@/lib/ideaTreeFocus";
 import type { IdeasScope } from "@/hooks/useIdeas";
 
 type UndoAction = {
@@ -68,6 +70,35 @@ export default function BrainstormPage() {
   const [hideCompleted, setHideCompleted] = useState(false);
   const [hideDeferred, setHideDeferred] = useState(false);
 
+  const [focusedId, setFocusedId] = useState<string | null>(() => {
+    const saved = readRawString(STORAGE_KEYS.brainstormFocusId);
+    return saved ? saved : null;
+  });
+
+  useEffect(() => {
+    writeRawString(STORAGE_KEYS.brainstormFocusId, focusedId ?? "");
+  }, [focusedId]);
+
+  // Search spans every idea: focus is suspended while a search is active.
+  // Focus also self-heals when the focused idea no longer exists (deleted).
+  const searchActive = search.trim().length > 0;
+  const focusValid = focusedId !== null && ideasHook.ideas.some((i) => i.id === focusedId);
+  const effectiveFocusId = searchActive || !focusValid ? null : focusedId;
+
+  const focusedIdea = useMemo(
+    () => ideasHook.ideas.find((idea) => idea.id === effectiveFocusId) ?? null,
+    [ideasHook.ideas, effectiveFocusId],
+  );
+  const breadcrumbChain = useMemo(
+    () => (effectiveFocusId ? getAncestorChain(effectiveFocusId, ideasHook.ideas) : []),
+    [effectiveFocusId, ideasHook.ideas],
+  );
+
+  const handleFocus = (id: string | null) => {
+    setFocusedId(id);
+    if (id) ideasHook.expandIdea(id);
+  };
+
   const hasLinks = linksHook.links.length > 0;
   const selectedIdea = useMemo(
     () => ideasHook.ideas.find((idea) => idea.id === selectedId) ?? null,
@@ -83,7 +114,7 @@ export default function BrainstormPage() {
   };
 
   const handleAddRoot = async () => {
-    const id = await createIdea("", null, "top");
+    const id = await createIdea("", effectiveFocusId, "top");
     if (id) {
       setSelectedId(id);
       setEditingId(id);
@@ -355,6 +386,15 @@ export default function BrainstormPage() {
         <>
           <div className="flex items-start gap-4">
             <div className="min-w-0 flex-1">
+              {effectiveFocusId && focusedIdea && (
+                <div className="mb-3">
+                  <BrainstormBreadcrumb
+                    chain={breadcrumbChain}
+                    focused={focusedIdea}
+                    onSelect={handleFocus}
+                  />
+                </div>
+              )}
               <IdeaTree
                 tree={ideasHook.tree}
                 ideas={ideasHook.ideas}
@@ -390,6 +430,8 @@ export default function BrainstormPage() {
                 hideClosed={hideClosed}
                 hideCompleted={hideCompleted}
                 hideDeferred={hideDeferred}
+                focusedId={effectiveFocusId}
+                onFocus={handleFocus}
               />
             </div>
             {selectedIdea && (

@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
-import { FileText } from "lucide-react";
+import { FileText, Focus as FocusIcon } from "lucide-react";
 import { IdeaNode as IdeaNodeType, Idea, IdeaLink, Tag, LifeArea, LinkType } from "@/lib/types";
 import { filterIdeaTree } from "@/lib/ideaTreeFilters";
+import { getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
 import { pruneTreeToIds } from "@/components/tree/filterTree";
 import { TreeView, type ComposingState, type CreateIdeaPosition } from "@/components/tree";
 import { getToday } from "@/lib/dateUtils";
@@ -57,6 +58,8 @@ interface IdeaTreeProps {
   hideClosed: boolean;
   hideCompleted: boolean;
   hideDeferred: boolean;
+  focusedId: string | null;
+  onFocus: (id: string | null) => void;
 }
 
 function getAncestorIds(ideaId: string, ideas: Idea[]): Set<string> {
@@ -83,6 +86,14 @@ function hasActiveDescendant(ideaId: string, ideas: Idea[]): boolean {
     if (hasActiveDescendant(child.id, ideas)) return true;
   }
   return false;
+}
+
+function collectTreeIds(nodes: IdeaNodeType[], acc: Set<string> = new Set<string>()): Set<string> {
+  for (const node of nodes) {
+    acc.add(node.id);
+    collectTreeIds(node.children, acc);
+  }
+  return acc;
 }
 
 export function IdeaTree({
@@ -120,6 +131,8 @@ export function IdeaTree({
   hideClosed,
   hideCompleted,
   hideDeferred,
+  focusedId,
+  onFocus,
 }: IdeaTreeProps) {
   const todayString = getToday();
 
@@ -141,8 +154,28 @@ export function IdeaTree({
       filtered = pruneTreeToIds(filtered, visibleIds);
     }
 
+    if (focusedId) {
+      const focusIds = getFocusedSubtreeIds(focusedId, ideas);
+      const treeIds = collectTreeIds(filtered);
+      const visibleFocusIds = new Set<string>();
+      for (const id of focusIds) {
+        if (treeIds.has(id)) visibleFocusIds.add(id);
+      }
+      filtered = pruneTreeToIds(filtered, visibleFocusIds);
+    }
+
     return filtered;
-  }, [tree, ideas, search, hideClosed, hideCompleted, hideDeferred, showToday, todayString]);
+  }, [
+    tree,
+    ideas,
+    search,
+    hideClosed,
+    hideCompleted,
+    hideDeferred,
+    showToday,
+    focusedId,
+    todayString,
+  ]);
 
   const labelClassName = (node: IdeaNodeType): string => {
     switch (node.status) {
@@ -224,6 +257,20 @@ export function IdeaTree({
             <StatusPillSlot node={node} onUpdate={updateIdea} />
             <LinkCountBadge nodeId={node.id} links={links} />
             <ScheduleChip node={node} todayString={todayString} />
+            {focusedId !== node.id && (
+              <button
+                type="button"
+                title="Focus on this idea and its subtree"
+                aria-label="Focus on this idea and its subtree"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onFocus(node.id);
+                }}
+                className="flex flex-shrink-0 items-center text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 hover:text-indigo-500 dark:text-gray-600 dark:hover:text-indigo-400"
+              >
+                <FocusIcon size={12} strokeWidth={2} />
+              </button>
+            )}
             <IdeaActionMenu
               idea={node}
               allIdeas={ideas}
