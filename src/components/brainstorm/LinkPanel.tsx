@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, ArrowLeft, X } from "lucide-react";
-import { Idea, IdeaLink, LinkType } from "@/lib/types";
+import { Idea, IdeaLink, LinkType, Tag } from "@/lib/types";
 import { IdeaSearchPicker } from "./IdeaSearchPicker";
 
 const LINK_TYPES: { value: LinkType; label: string }[] = [
@@ -17,6 +17,7 @@ interface LinkPanelProps {
   ideaId: string;
   ideas: Idea[];
   links: IdeaLink[];
+  getTagsForIdea?: (ideaId: string) => Tag[];
   onCreateLink: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
   onDeleteLink: (id: string) => Promise<void>;
   onClose: () => void;
@@ -26,6 +27,7 @@ export function LinkPanel({
   ideaId,
   ideas,
   links,
+  getTagsForIdea,
   onCreateLink,
   onDeleteLink,
   onClose,
@@ -81,6 +83,7 @@ export function LinkPanel({
       <IdeaSearchPicker
         ideas={ideas}
         excludeIds={linkedIds}
+        getTagsForIdea={getTagsForIdea}
         renderActions={(idea, clearSearch) => (
           <button
             onClick={async () => {

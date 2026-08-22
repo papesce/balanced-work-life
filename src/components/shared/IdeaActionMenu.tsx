@@ -12,7 +12,7 @@ import {
   Check,
 } from "lucide-react";
 import { createPortal } from "react-dom";
-import { Idea, IdeaLink, IdeaHorizon, LinkType } from "@/lib/types";
+import { Idea, IdeaLink, IdeaHorizon, LinkType, Tag } from "@/lib/types";
 import { LinkPanel } from "@/components/brainstorm/LinkPanel";
 import { MoveIdeaPanel } from "@/components/brainstorm/MoveIdeaPanel";
 import { SchedulePicker } from "@/components/brainstorm/SchedulePicker";
@@ -22,6 +22,7 @@ interface IdeaActionMenuProps {
   allIdeas: Idea[];
   links: IdeaLink[];
   hasChildren: boolean;
+  getTagsForIdea?: (ideaId: string) => Tag[];
   onEdit: () => void;
   onUpdate: (id: string, updates: Partial<Idea>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
@@ -38,6 +39,7 @@ export function IdeaActionMenu({
   allIdeas,
   links,
   hasChildren,
+  getTagsForIdea,
   onEdit,
   onUpdate,
   onDelete,
@@ -323,6 +325,7 @@ export function IdeaActionMenu({
           ideaId={idea.id}
           ideas={allIdeas}
           links={links}
+          getTagsForIdea={getTagsForIdea}
           onCreateLink={onCreateLink}
           onDeleteLink={onDeleteLink}
           onClose={() => setShowLinkPanel(false)}
@@ -332,6 +335,7 @@ export function IdeaActionMenu({
         <MoveIdeaPanel
           idea={idea}
           ideas={allIdeas}
+          getTagsForIdea={getTagsForIdea}
           onMove={handleMove}
           onMoved={handleMoved}
           onClose={() => setShowMovePanel(false)}

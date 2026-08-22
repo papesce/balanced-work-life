@@ -351,6 +351,7 @@ export function HorizonTree({
             allIdeas={ideas}
             links={links}
             hasChildren={node.children.length > 0}
+            getTagsForIdea={getTagsForIdea}
             onEdit={() => setEditingId(node.id)}
             onUpdate={onUpdate}
             onDelete={onDelete}

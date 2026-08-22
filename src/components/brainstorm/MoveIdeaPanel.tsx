@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Idea } from "@/lib/types";
+import { Idea, Tag } from "@/lib/types";
 import { IdeaSearchPicker } from "./IdeaSearchPicker";
 
 interface MoveIdeaPanelProps {
   idea: Idea;
   ideas: Idea[];
+  getTagsForIdea?: (ideaId: string) => Tag[];
   onMove: (newParentId: string | null, newSortOrder: number) => Promise<void>;
   onMoved: (parentIdToExpand: string | null) => void;
   onClose: () => void;
@@ -24,7 +25,14 @@ function getDescendantIds(ideaId: string, ideas: Idea[]) {
   return descendants;
 }
 
-export function MoveIdeaPanel({ idea, ideas, onMove, onMoved, onClose }: MoveIdeaPanelProps) {
+export function MoveIdeaPanel({
+  idea,
+  ideas,
+  getTagsForIdea,
+  onMove,
+  onMoved,
+  onClose,
+}: MoveIdeaPanelProps) {
   const ref = useRef<HTMLDivElement>(null);
   const excludedIds = getDescendantIds(idea.id, ideas);
   excludedIds.add(idea.id);
@@ -60,6 +68,7 @@ export function MoveIdeaPanel({ idea, ideas, onMove, onMoved, onClose }: MoveIde
       <IdeaSearchPicker
         ideas={ideas}
         excludeIds={excludedIds}
+        getTagsForIdea={getTagsForIdea}
         emptyLabel="No valid ideas"
         renderActions={(target) => (
           <>

@@ -1,19 +1,35 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Idea } from "@/lib/types";
+import { Idea, IdeaType, Tag } from "@/lib/types";
+import { AREA_DOT_COLORS, STATUS_LABELS, STATUS_STYLES } from "@/lib/constants";
+import { TYPE_COLORS } from "./ideaNodeSlots";
 
 interface IdeaSearchPickerProps {
   ideas: Idea[];
   excludeIds?: Set<string>;
   placeholder?: string;
   emptyLabel?: string;
+  getTagsForIdea?: (ideaId: string) => Tag[];
   renderActions: (idea: Idea, clearSearch: () => void) => ReactNode;
 }
 
-function getParentLabel(idea: Idea, ideasById: Map<string, Idea>) {
-  if (!idea.parent_id) return "Root";
-  return ideasById.get(idea.parent_id)?.text || "Unknown parent";
+function getTypeLabel(type: IdeaType) {
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
+function getPathLabel(idea: Idea, ideasById: Map<string, Idea>) {
+  const segments: string[] = [];
+  const visited = new Set<string>([idea.id]);
+  let current: Idea | undefined = idea;
+  while (current?.parent_id && !visited.has(current.parent_id)) {
+    visited.add(current.parent_id);
+    const parent = ideasById.get(current.parent_id);
+    if (!parent) break;
+    segments.unshift(parent.text || "empty");
+    current = parent;
+  }
+  return segments.length > 0 ? segments.join(" › ") : "Root";
 }
 
 export function IdeaSearchPicker({
@@ -21,6 +37,7 @@ export function IdeaSearchPicker({
   excludeIds = new Set(),
   placeholder = "Search ideas...",
   emptyLabel = "No matching ideas",
+  getTagsForIdea,
   renderActions,
 }: IdeaSearchPickerProps) {
   const [search, setSearch] = useState("");
@@ -45,24 +62,56 @@ export function IdeaSearchPicker({
 
       {searchResults.length > 0 && (
         <div className="mb-2 max-h-[190px] overflow-y-auto rounded-lg border border-black/10 dark:border-white/10">
-          {searchResults.map((idea) => (
-            <div
-              key={idea.id}
-              className="flex items-center gap-2 px-2 py-1.5 hover:bg-black/[0.02] dark:hover:bg-white/[0.04]"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm text-gray-800 dark:text-gray-200">
-                  {idea.text || "empty"}
+          {searchResults.map((idea) => {
+            const tags = getTagsForIdea?.(idea.id) ?? [];
+            return (
+              <div
+                key={idea.id}
+                className="flex items-center gap-2 px-2 py-1.5 hover:bg-black/[0.02] dark:hover:bg-white/[0.04]"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <span className="truncate text-sm text-gray-800 dark:text-gray-200">
+                      {idea.text || "empty"}
+                    </span>
+                    {idea.type && (
+                      <span
+                        className={`flex-shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium ${TYPE_COLORS[idea.type]}`}
+                      >
+                        {getTypeLabel(idea.type)}
+                      </span>
+                    )}
+                    <span
+                      className={`flex-shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium ${STATUS_STYLES[idea.status]}`}
+                    >
+                      {STATUS_LABELS[idea.status]}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 truncate text-xs text-gray-400 dark:text-gray-500">
+                    {tags.length > 0 && (
+                      <span className="flex flex-shrink-0 items-center gap-1">
+                        {tags.map((tag) => (
+                          <span
+                            key={tag.id}
+                            className="flex items-center gap-1 rounded-full border border-current/20 px-1 py-px text-[10px]"
+                          >
+                            <span
+                              className={`inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full ${AREA_DOT_COLORS[tag.area]}`}
+                            />
+                            {tag.name}
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                    <span className="truncate">{getPathLabel(idea, ideasById)}</span>
+                  </div>
                 </div>
-                <div className="truncate text-xs text-gray-400 dark:text-gray-500">
-                  {getParentLabel(idea, ideasById)}
+                <div className="flex flex-shrink-0 gap-1">
+                  {renderActions(idea, () => setSearch(""))}
                 </div>
               </div>
-              <div className="flex flex-shrink-0 gap-1">
-                {renderActions(idea, () => setSearch(""))}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
