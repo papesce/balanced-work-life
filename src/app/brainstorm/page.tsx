@@ -465,6 +465,7 @@ export default function BrainstormPage() {
               hideDeferred={hideDeferred}
               focusedId={effectiveFocusId}
               selectedId={selectedId}
+              onUpdate={updateIdea}
               onSelect={(id) => {
                 if (id === selectedId) {
                   setSelectedId(null);
