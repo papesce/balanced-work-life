@@ -16,7 +16,7 @@ import { TypePicker } from "./TypePicker";
 import { StatusPicker } from "./StatusPicker";
 import { TagPicker } from "@/components/shared/TagPicker";
 
-const TYPE_COLORS: Record<IdeaType, string> = {
+export const TYPE_COLORS: Record<IdeaType, string> = {
   idea: "bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-700/30",
   objective:
     "bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-700/30",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useIdeas, type CreateIdeaPosition } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
@@ -10,6 +10,8 @@ import { AppShell } from "@/components/AppShell";
 import { IdeaTree } from "@/components/brainstorm/IdeaTree";
 import { BrainstormToolbar } from "@/components/brainstorm/BrainstormToolbar";
 import { GraphView } from "@/components/brainstorm/GraphView";
+import { IdeaCardGrid } from "@/components/brainstorm/IdeaCardGrid";
+import { IdeaInspector } from "@/components/brainstorm/IdeaInspector";
 import { Idea, LinkType } from "@/lib/types";
 import { STORAGE_KEYS, readRawString, writeRawString } from "@/lib/storage";
 import type { IdeasScope } from "@/hooks/useIdeas";
@@ -36,7 +38,7 @@ export default function BrainstormPage() {
   const linksHook = useIdeaLinks();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
-  const [viewMode, setViewMode] = useState<"tree" | "graph">("tree");
+  const [viewMode, setViewMode] = useState<"tree" | "graph" | "cards">("tree");
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
 
   type EditMode = "view" | "edit" | "insert";
@@ -67,6 +69,10 @@ export default function BrainstormPage() {
   const [hideDeferred, setHideDeferred] = useState(false);
 
   const hasLinks = linksHook.links.length > 0;
+  const selectedIdea = useMemo(
+    () => ideasHook.ideas.find((idea) => idea.id === selectedId) ?? null,
+    [ideasHook.ideas, selectedId],
+  );
 
   const registerUndo = (undo: UndoAction) => {
     setUndoAction(undo);
@@ -288,6 +294,12 @@ export default function BrainstormPage() {
           Tree
         </button>
         <button
+          onClick={() => setViewMode("cards")}
+          className={`toolbar-btn ${viewMode === "cards" ? "toolbar-btn--accent" : ""}`}
+        >
+          Cards
+        </button>
+        <button
           onClick={() => setViewMode("graph")}
           disabled={!hasLinks}
           className={`toolbar-btn ${
@@ -310,7 +322,7 @@ export default function BrainstormPage() {
       title="Brainstorm"
       headerActions={headerActions}
       headerStartActions={headerStartActions}
-      fullWidth={viewMode === "graph"}
+      fullWidth={viewMode !== "tree"}
     >
       {undoAction && (
         <motion.div
@@ -340,42 +352,95 @@ export default function BrainstormPage() {
         </motion.div>
       )}
       {viewMode === "tree" ? (
-        <IdeaTree
-          tree={ideasHook.tree}
-          ideas={ideasHook.ideas}
-          links={linksHook.links}
-          scope={timeScope}
-          createIdea={createIdea}
-          updateIdea={updateIdea}
-          deleteIdea={deleteIdea}
-          moveIdea={moveIdea}
-          toggleCollapse={ideasHook.toggleCollapse}
-          expandIdea={ideasHook.expandIdea}
-          onCreateLink={createLink}
-          onDeleteLink={deleteLink}
-          onMarkDone={markDone}
-          onMarkUndone={markUndone}
-          onSchedule={scheduleIdea}
-          allTags={tagsHook.tags}
-          getTagsForIdea={taskTagsHook.getTagsForIdea}
-          onAddTag={taskTagsHook.addTagToTask}
-          onRemoveTag={taskTagsHook.removeTagFromTask}
-          onCreateTag={tagsHook.createTag}
-          search={search}
-          showType={showType}
-          showArea={showArea}
-          editMode={editMode}
-          editingId={editingId}
-          setEditingId={setEditingId}
-          selectedId={selectedId}
-          setSelectedId={setSelectedId}
-          composing={composing}
-          setComposing={setComposing}
-          showToday={showToday}
-          hideClosed={hideClosed}
-          hideCompleted={hideCompleted}
-          hideDeferred={hideDeferred}
-        />
+        <>
+          <div className="flex items-start gap-4">
+            <div className="min-w-0 flex-1">
+              <IdeaTree
+                tree={ideasHook.tree}
+                ideas={ideasHook.ideas}
+                links={linksHook.links}
+                scope={timeScope}
+                createIdea={createIdea}
+                updateIdea={updateIdea}
+                deleteIdea={deleteIdea}
+                moveIdea={moveIdea}
+                toggleCollapse={ideasHook.toggleCollapse}
+                expandIdea={ideasHook.expandIdea}
+                onCreateLink={createLink}
+                onDeleteLink={deleteLink}
+                onMarkDone={markDone}
+                onMarkUndone={markUndone}
+                onSchedule={scheduleIdea}
+                allTags={tagsHook.tags}
+                getTagsForIdea={taskTagsHook.getTagsForIdea}
+                onAddTag={taskTagsHook.addTagToTask}
+                onRemoveTag={taskTagsHook.removeTagFromTask}
+                onCreateTag={tagsHook.createTag}
+                search={search}
+                showType={showType}
+                showArea={showArea}
+                editMode={editMode}
+                editingId={editingId}
+                setEditingId={setEditingId}
+                selectedId={selectedId}
+                setSelectedId={setSelectedId}
+                composing={composing}
+                setComposing={setComposing}
+                showToday={showToday}
+                hideClosed={hideClosed}
+                hideCompleted={hideCompleted}
+                hideDeferred={hideDeferred}
+              />
+            </div>
+            {selectedIdea && (
+              <IdeaInspector
+                idea={selectedIdea}
+                onUpdate={updateIdea}
+                onClose={() => setSelectedId(null)}
+                className="sticky top-16 hidden w-72 shrink-0 lg:block"
+              />
+            )}
+          </div>
+          {selectedIdea && (
+            <div className="mt-4 lg:hidden">
+              <IdeaInspector
+                idea={selectedIdea}
+                onUpdate={updateIdea}
+                onClose={() => setSelectedId(null)}
+              />
+            </div>
+          )}
+        </>
+      ) : viewMode === "cards" ? (
+        <div className="flex items-start gap-4">
+          <div className="min-w-0 flex-1">
+            <IdeaCardGrid
+              tree={ideasHook.tree}
+              ideas={ideasHook.ideas}
+              search={search}
+              hideClosed={hideClosed}
+              hideCompleted={hideCompleted}
+              hideDeferred={hideDeferred}
+              selectedId={selectedId}
+              onSelect={(id) => {
+                if (id === selectedId) {
+                  setSelectedId(null);
+                } else {
+                  setSelectedId(id);
+                  ideasHook.expandIdea(id);
+                }
+              }}
+            />
+          </div>
+          {selectedIdea && (
+            <IdeaInspector
+              idea={selectedIdea}
+              onUpdate={updateIdea}
+              onClose={() => setSelectedId(null)}
+              className="sticky top-16 hidden w-72 shrink-0 lg:block"
+            />
+          )}
+        </div>
       ) : (
         <GraphView
           ideas={ideasHook.ideas}

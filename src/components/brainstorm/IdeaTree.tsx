@@ -9,7 +9,6 @@ import { TreeView, type ComposingState, type CreateIdeaPosition } from "@/compon
 import { getToday } from "@/lib/dateUtils";
 import type { IdeasScope } from "@/hooks/useIdeas";
 import { IdeaActionMenu } from "@/components/shared/IdeaActionMenu";
-import { IdeaDetailStrip } from "./IdeaDetailStrip";
 import {
   LinkCountBadge,
   ScheduleChip,
@@ -194,13 +193,22 @@ export function IdeaTree({
         renderTrailing={(node) => (
           <>
             {(node.description?.trim() || node.notes?.trim()) && (
-              <span
+              <button
+                type="button"
                 title="Has description or notes"
-                aria-label="Has description or notes"
-                className="flex flex-shrink-0 items-center text-gray-300 dark:text-gray-600"
+                aria-label="Show description or notes"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedId(node.id);
+                }}
+                className={`flex flex-shrink-0 items-center ${
+                  selectedId === node.id
+                    ? "text-indigo-400 dark:text-indigo-400"
+                    : "text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400"
+                }`}
               >
                 <FileText size={11} strokeWidth={2} />
-              </span>
+              </button>
             )}
             {showType && <TypePillSlot node={node} onUpdate={updateIdea} />}
             {showArea && (
@@ -240,14 +248,6 @@ export function IdeaTree({
         )}
         inlineEditEnabled={editMode === "edit"}
         clickToInsert={editMode === "insert"}
-        renderDetail={(node) => (
-          <IdeaDetailStrip
-            description={node.description}
-            notes={node.notes}
-            editable={editMode === "edit"}
-            onSave={(updates) => updateIdea(node.id, updates)}
-          />
-        )}
         emptyMessage={
           <p className="py-4 text-sm text-gray-400 italic">
             {search
