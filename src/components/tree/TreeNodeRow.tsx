@@ -21,7 +21,7 @@ export function TreeNodeRow<T extends TreeItem>({
   const { controller, ui, options } = useTree<T>();
   const dnd = useTreeDndState();
   const indentSize = options.indentSize ?? 20;
-  const insertBandLeadingOffset = 3 * 20;
+  const insertBandLeadingOffset = 3 * indentSize;
 
   const label = options.getLabel(node);
   const isEditing = ui.editingId === node.id;
@@ -198,6 +198,7 @@ export function TreeNodeRow<T extends TreeItem>({
   const composer = isComposingHere ? (
     <TreeComposer
       depth={ui.composing!.depth}
+      indentSize={indentSize}
       placeholder={
         options.composerPlaceholder?.(ui.composing!) ??
         (ui.composing!.position === "child" ? "Add child..." : "Add item...")
@@ -212,10 +213,7 @@ export function TreeNodeRow<T extends TreeItem>({
 
   return (
     <>
-      <div
-        style={{ paddingLeft: depth > 0 ? indentSize : 0 }}
-        onMouseLeave={() => setInsertZone(null)}
-      >
+      <div style={{ paddingLeft: depth * indentSize }} onMouseLeave={() => setInsertZone(null)}>
         {/* Inner positioning context: contains only this row (+composers), so
             absolutely-positioned bands anchor to the row, not the subtree. */}
         <div className="relative">
@@ -328,8 +326,8 @@ export function TreeNodeRow<T extends TreeItem>({
               ) : null}
             </button>
 
-            {/* Add child button - appears on hover */}
-            {canCreate && !isEditing && (
+            {/* Add child button - insert mode only, appears on hover */}
+            {canCreate && clickToInsert && !isEditing && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();

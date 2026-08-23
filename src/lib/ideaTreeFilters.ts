@@ -20,6 +20,23 @@ export function filterTreeHideClosed(nodes: IdeaNode[]): IdeaNode[] {
   return dropSubtrees(nodes, (node) => node.status === "cancelled" || node.status === "archived");
 }
 
+export function filterTreeByFocus(nodes: IdeaNode[], ideas: Idea[]): IdeaNode[] {
+  const ideaMap = new Map(ideas.map((i) => [i.id, i]));
+  // Collect all ideas that are in_focus plus their ancestors so tree structure is preserved
+  const focusedIds = new Set<string>();
+  for (const idea of ideas) {
+    if (idea.in_focus) {
+      let cur: Idea | undefined = idea;
+      while (cur) {
+        focusedIds.add(cur.id);
+        cur = cur.parent_id ? ideaMap.get(cur.parent_id) : undefined;
+      }
+    }
+  }
+  if (focusedIds.size === 0) return [];
+  return pruneTreeToIds(nodes, focusedIds);
+}
+
 export function filterIdeaTree(
   tree: IdeaNode[],
   ideas: Idea[],

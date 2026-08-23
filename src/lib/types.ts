@@ -59,6 +59,8 @@ export interface Idea {
   attempt_dates: string[];
   status_history: { status: IdeaStatus; at: string }[] | null;
   horizon: IdeaHorizon | null;
+  in_focus: boolean;
+  in_focus_until: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;

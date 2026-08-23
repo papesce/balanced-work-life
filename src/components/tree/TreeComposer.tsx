@@ -5,6 +5,8 @@ import type { ReactNode } from "react";
 
 interface TreeComposerProps {
   depth?: number;
+  /** Pixels of indentation per depth level (matches the tree rows). */
+  indentSize?: number;
   placeholder: string;
   /** Optional content rendered before the "+" (e.g. a type picker pill). */
   leading?: ReactNode;
@@ -14,6 +16,7 @@ interface TreeComposerProps {
 
 export function TreeComposer({
   depth = 0,
+  indentSize = 20,
   placeholder,
   leading,
   onCreate,
@@ -43,7 +46,7 @@ export function TreeComposer({
   };
 
   return (
-    <div style={{ paddingLeft: depth > 0 ? 20 * depth : 0 }} onClick={(e) => e.stopPropagation()}>
+    <div style={{ paddingLeft: depth * indentSize }} onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center gap-1 rounded-md bg-indigo-50/40 px-1 py-1 dark:bg-indigo-500/10">
         <span className="h-5 w-5 flex-shrink-0" />
         {leading}

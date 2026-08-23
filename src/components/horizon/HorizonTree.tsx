@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Star } from "lucide-react";
+import { Star, Target } from "lucide-react";
 import {
   Idea,
   IdeaLink,
@@ -276,6 +276,7 @@ export interface HorizonTreeProps {
   onToggleCollapse: (id: string) => void;
   onExpand: (id: string) => void;
   emptyMessage?: React.ReactNode;
+  onToggleInFocus?: (id: string, until?: string | null) => Promise<void>;
 }
 
 export function HorizonTree({
@@ -297,6 +298,7 @@ export function HorizonTree({
   onToggleCollapse,
   onExpand,
   emptyMessage,
+  onToggleInFocus,
 }: HorizonTreeProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -331,6 +333,14 @@ export function HorizonTree({
       renderLeading={(node) => <PriorityStarSlot node={node} onUpdate={onUpdate} />}
       renderTrailing={(node) => (
         <>
+          {node.in_focus && (
+            <span
+              title="In Focus"
+              className="flex flex-shrink-0 items-center text-amber-500 dark:text-amber-400"
+            >
+              <Target size={13} strokeWidth={1.75} />
+            </span>
+          )}
           <TypeBadgeSlot node={node} onUpdate={onUpdate} />
           <HorizonTagsSlot
             node={node}
@@ -360,6 +370,7 @@ export function HorizonTree({
             onDeleteLink={onDeleteLink}
             onMove={onMove}
             hiddenActions={["move"]}
+            onToggleInFocus={onToggleInFocus}
           />
         </>
       )}

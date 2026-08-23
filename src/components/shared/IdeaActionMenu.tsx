@@ -10,6 +10,7 @@ import {
   Pencil,
   Telescope,
   Check,
+  Target,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { Idea, IdeaLink, IdeaHorizon, LinkType, Tag } from "@/lib/types";
@@ -32,6 +33,7 @@ interface IdeaActionMenuProps {
   onMove: (id: string, newParentId: string | null, newSortOrder: number) => Promise<void>;
   onMoved?: (parentIdToExpand: string | null) => void;
   hiddenActions?: Array<"edit" | "link" | "move" | "schedule" | "horizon" | "delete">;
+  onToggleInFocus?: (id: string, until?: string | null) => Promise<void>;
 }
 
 export function IdeaActionMenu({
@@ -49,6 +51,7 @@ export function IdeaActionMenu({
   onMove,
   onMoved,
   hiddenActions,
+  onToggleInFocus,
 }: IdeaActionMenuProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
@@ -252,6 +255,21 @@ export function IdeaActionMenu({
                 Horizon
               </button>
             )}
+            <button
+              onClick={() => {
+                setShowMenu(false);
+                if (onToggleInFocus) void onToggleInFocus(idea.id);
+                else
+                  void onUpdate(idea.id, {
+                    in_focus: !idea.in_focus,
+                    in_focus_until: idea.in_focus ? null : idea.in_focus_until,
+                  });
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+            >
+              <Target size={12} strokeWidth={1.5} />
+              {idea.in_focus ? "Remove from Focus" : "Mark In Focus"}
+            </button>
             {!hidden.includes("delete") && (
               <>
                 <div className="my-1 border-t border-black/5 dark:border-white/5" />

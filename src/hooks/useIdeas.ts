@@ -107,6 +107,7 @@ function deserializeIdea(row: Record<string, unknown>): Idea {
   return {
     ...row,
     is_priority: Boolean(row.is_priority),
+    in_focus: Boolean(row.in_focus),
     attempt_dates: row.attempt_dates ? (JSON.parse(row.attempt_dates as string) as string[]) : [],
     status_history: row.status_history
       ? (JSON.parse(row.status_history as string) as { status: Idea["status"]; at: string }[])
@@ -219,6 +220,8 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
       attempt_dates: [],
       status_history: null,
       horizon: null,
+      in_focus: false,
+      in_focus_until: null,
       sort_order: sortOrder,
       created_at: now,
       updated_at: now,
@@ -229,8 +232,8 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
         `INSERT INTO ideas (id, user_id, parent_id, text, description, type, effort, impact, urgency,
           scheduled_date, scheduled_time, duration_minutes, is_priority, priority_order,
           status, notes, completed_at, cancelled_at, paused_at, attempt_dates, status_history,
-          horizon, sort_order, created_at, updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          horizon, in_focus, in_focus_until, sort_order, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
           idea.id,
           idea.user_id,
@@ -254,6 +257,8 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
           JSON.stringify(idea.attempt_dates),
           idea.status_history ? JSON.stringify(idea.status_history) : null,
           idea.horizon,
+          idea.in_focus ? 1 : 0,
+          idea.in_focus_until,
           idea.sort_order,
           idea.created_at,
           idea.updated_at,
@@ -287,7 +292,7 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
       const v = finalUpdates[f as keyof Idea];
       if (f === "attempt_dates") return JSON.stringify(v ?? []);
       if (f === "status_history") return v ? JSON.stringify(v) : null;
-      if (f === "is_priority") return v ? 1 : 0;
+      if (f === "is_priority" || f === "in_focus") return v ? 1 : 0;
       return v ?? null;
     });
     values.push(updatedAt);
@@ -318,8 +323,8 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
           `INSERT OR REPLACE INTO ideas (id, user_id, parent_id, text, description, type, effort, impact, urgency,
             scheduled_date, scheduled_time, duration_minutes, is_priority, priority_order,
             status, notes, completed_at, cancelled_at, paused_at, attempt_dates, status_history,
-            horizon, sort_order, created_at, updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            horizon, in_focus, in_focus_until, sort_order, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
           [
             idea.id,
             idea.user_id,
@@ -343,12 +348,24 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
             JSON.stringify(idea.attempt_dates),
             idea.status_history ? JSON.stringify(idea.status_history) : null,
             idea.horizon,
+            idea.in_focus ? 1 : 0,
+            idea.in_focus_until,
             idea.sort_order,
             idea.created_at,
             idea.updated_at,
           ],
         );
       }
+    });
+  };
+
+  const toggleInFocus = async (id: string, until?: string | null) => {
+    const idea = ideas.find((i) => i.id === id);
+    if (!idea) return;
+    const nextFocus = !idea.in_focus;
+    await updateIdea(id, {
+      in_focus: nextFocus,
+      in_focus_until: until !== undefined ? until : nextFocus ? idea.in_focus_until : null,
     });
   };
 
@@ -529,6 +546,7 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
     markPaused,
     markCancelled,
     scheduleIdea,
+    toggleInFocus,
     restoreIdeas,
     toggleCollapse,
     expandIdea,
