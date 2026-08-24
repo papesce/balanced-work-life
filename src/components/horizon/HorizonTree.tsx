@@ -25,6 +25,8 @@ import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { TypePicker } from "@/components/brainstorm/TypePicker";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";
+import { NotesIndicator } from "@/components/shared/NotesIndicator";
+import { useNotes } from "@/contexts/NotesContext";
 
 function PriorityStarSlot({
   node,
@@ -322,6 +324,7 @@ export function HorizonTree({
   const [composing, setComposing] = useState<ComposingState | null>(null);
   const [revealTarget, setRevealTarget] = useState<Idea | null>(null);
   const [revealPos, setRevealPos] = useState<{ top: number; right: number } | null>(null);
+  const { openNotes } = useNotes();
 
   const laneIds = new Set(laneConfigs.map((l) => l.id));
 
@@ -350,6 +353,7 @@ export function HorizonTree({
     renderLeading: (node: IdeaNodeType) => <PriorityStarSlot node={node} onUpdate={onUpdate} />,
     renderTrailing: (node: IdeaNodeType) => (
       <>
+        <NotesIndicator hasNotes={!!node.notes?.trim()} onClick={() => openNotes(node.id)} />
         {node.in_focus && (
           <span
             title="In Focus"

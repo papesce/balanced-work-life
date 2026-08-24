@@ -10,6 +10,8 @@ import { AREA_DOT_COLORS, STATUS_CONFIG } from "@/lib/constants";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { RescheduleAction, DayOccurrence } from "@/lib/tasks/rescheduleTask";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";
+import { NotesIndicator } from "@/components/shared/NotesIndicator";
+import { useNotes } from "@/contexts/NotesContext";
 import { Eye } from "lucide-react";
 
 interface DayTaskListProps {
@@ -284,6 +286,7 @@ function TimelineTaskRow({
   );
   const tagTriggerRef = useRef<HTMLButtonElement>(null);
   const [tagPickerPos, setTagPickerPos] = useState<{ top: number; left: number } | null>(null);
+  const { openNotes } = useNotes();
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -555,6 +558,7 @@ function TimelineTaskRow({
           )}
       </div>
 
+      <NotesIndicator hasNotes={!!task.notes?.trim()} onClick={() => openNotes(task.id)} />
       <button
         onClick={() => onUpdate(task.id, { is_priority: !task.is_priority })}
         className={`flex-shrink-0 transition-colors ${task.is_priority ? "text-amber-400" : "text-gray-200 hover:text-gray-400 dark:text-gray-600"}`}

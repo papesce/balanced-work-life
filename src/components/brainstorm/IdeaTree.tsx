@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FileText, Focus as FocusIcon } from "lucide-react";
+import { Focus as FocusIcon } from "lucide-react";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";
+import { NotesIndicator } from "@/components/shared/NotesIndicator";
+import { useNotes } from "@/contexts/NotesContext";
 import { IdeaNode as IdeaNodeType, Idea, IdeaLink, Tag, LifeArea, LinkType } from "@/lib/types";
 import { filterIdeaTree } from "@/lib/ideaTreeFilters";
 import { getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
@@ -138,6 +140,7 @@ export function IdeaTree({
   const todayString = getToday();
   const [revealTarget, setRevealTarget] = useState<Idea | null>(null);
   const [revealPos, setRevealPos] = useState<{ top: number; right: number } | null>(null);
+  const { openNotes } = useNotes();
 
   const filteredTree = useMemo(() => {
     let filtered = filterIdeaTree(tree, ideas, { search, hideClosed, hideCompleted, hideDeferred });
@@ -233,24 +236,11 @@ export function IdeaTree({
         )}
         renderTrailing={(node) => (
           <>
-            {node.notes?.trim() && (
-              <button
-                type="button"
-                title="Has notes"
-                aria-label="Show notes"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedId(node.id);
-                }}
-                className={`flex flex-shrink-0 items-center ${
-                  selectedId === node.id
-                    ? "text-indigo-400 dark:text-indigo-400"
-                    : "text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400"
-                }`}
-              >
-                <FileText size={11} strokeWidth={2} />
-              </button>
-            )}
+            <NotesIndicator
+              hasNotes={!!node.notes?.trim()}
+              onClick={() => openNotes(node.id)}
+              size={11}
+            />
             {showType && <TypePillSlot node={node} onUpdate={updateIdea} />}
             {showArea && (
               <TagChipsSlot

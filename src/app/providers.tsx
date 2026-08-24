@@ -6,6 +6,7 @@ import { PowerSyncContext } from "@powersync/react";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { getPowerSync, SupabaseConnector } from "@/lib/powersync";
 import { LaneConfigsProvider } from "@/contexts/LaneConfigsContext";
+import { NotesProvider } from "@/contexts/NotesContext";
 import type { PowerSyncDatabase } from "@powersync/web";
 
 function PowerSyncProvider({ children }: { children: ReactNode }) {
@@ -57,7 +58,11 @@ function AuthGuard({ children }: { children: ReactNode }) {
     );
   }
 
-  return <LaneConfigsProvider>{children}</LaneConfigsProvider>;
+  return (
+    <LaneConfigsProvider>
+      <NotesProvider>{children}</NotesProvider>
+    </LaneConfigsProvider>
+  );
 }
 
 export function Providers({ children }: { children: ReactNode }) {

@@ -12,7 +12,6 @@ import { BrainstormToolbar } from "@/components/brainstorm/BrainstormToolbar";
 import { BrainstormBreadcrumb } from "@/components/brainstorm/BrainstormBreadcrumb";
 import { GraphView } from "@/components/brainstorm/GraphView";
 import { IdeaCardGrid } from "@/components/brainstorm/IdeaCardGrid";
-import { IdeaInspector } from "@/components/brainstorm/IdeaInspector";
 import { Idea, LinkType } from "@/lib/types";
 import { STORAGE_KEYS, readRawString, writeRawString } from "@/lib/storage";
 import { getAncestorChain } from "@/lib/ideaTreeFocus";
@@ -104,10 +103,6 @@ export default function BrainstormPage() {
   };
 
   const hasLinks = linksHook.links.length > 0;
-  const selectedIdea = useMemo(
-    () => ideasHook.ideas.find((idea) => idea.id === selectedId) ?? null,
-    [ideasHook.ideas, selectedId],
-  );
 
   const registerUndo = (undo: UndoAction) => {
     setUndoAction(undo);
@@ -425,99 +420,64 @@ export default function BrainstormPage() {
         </div>
       )}
       {viewMode === "tree" ? (
-        <>
-          <div className="flex items-start gap-4">
-            <div className="min-w-0 flex-1">
-              <IdeaTree
-                tree={ideasHook.tree}
-                ideas={ideasHook.ideas}
-                links={linksHook.links}
-                scope={timeScope}
-                createIdea={createIdea}
-                updateIdea={updateIdea}
-                deleteIdea={deleteIdea}
-                moveIdea={moveIdea}
-                toggleCollapse={ideasHook.toggleCollapse}
-                expandIdea={ideasHook.expandIdea}
-                onCreateLink={createLink}
-                onDeleteLink={deleteLink}
-                onMarkDone={markDone}
-                onMarkUndone={markUndone}
-                onSchedule={scheduleIdea}
-                allTags={tagsHook.tags}
-                getTagsForIdea={taskTagsHook.getTagsForIdea}
-                onAddTag={taskTagsHook.addTagToTask}
-                onRemoveTag={taskTagsHook.removeTagFromTask}
-                onCreateTag={tagsHook.createTag}
-                search={search}
-                showType={showType}
-                showArea={showArea}
-                editMode={editMode}
-                editingId={editingId}
-                setEditingId={setEditingId}
-                selectedId={selectedId}
-                setSelectedId={setSelectedId}
-                composing={composing}
-                setComposing={setComposing}
-                showToday={showToday}
-                hideClosed={hideClosed}
-                hideCompleted={hideCompleted}
-                hideDeferred={hideDeferred}
-                focusedId={effectiveFocusId}
-                onFocus={handleFocus}
-              />
-            </div>
-            {selectedIdea && (
-              <IdeaInspector
-                idea={selectedIdea}
-                onUpdate={updateIdea}
-                onClose={() => setSelectedId(null)}
-                className="sticky top-16 hidden w-72 shrink-0 lg:block"
-              />
-            )}
-          </div>
-          {selectedIdea && (
-            <div className="mt-4 lg:hidden">
-              <IdeaInspector
-                idea={selectedIdea}
-                onUpdate={updateIdea}
-                onClose={() => setSelectedId(null)}
-              />
-            </div>
-          )}
-        </>
+        <IdeaTree
+          tree={ideasHook.tree}
+          ideas={ideasHook.ideas}
+          links={linksHook.links}
+          scope={timeScope}
+          createIdea={createIdea}
+          updateIdea={updateIdea}
+          deleteIdea={deleteIdea}
+          moveIdea={moveIdea}
+          toggleCollapse={ideasHook.toggleCollapse}
+          expandIdea={ideasHook.expandIdea}
+          onCreateLink={createLink}
+          onDeleteLink={deleteLink}
+          onMarkDone={markDone}
+          onMarkUndone={markUndone}
+          onSchedule={scheduleIdea}
+          allTags={tagsHook.tags}
+          getTagsForIdea={taskTagsHook.getTagsForIdea}
+          onAddTag={taskTagsHook.addTagToTask}
+          onRemoveTag={taskTagsHook.removeTagFromTask}
+          onCreateTag={tagsHook.createTag}
+          search={search}
+          showType={showType}
+          showArea={showArea}
+          editMode={editMode}
+          editingId={editingId}
+          setEditingId={setEditingId}
+          selectedId={selectedId}
+          setSelectedId={setSelectedId}
+          composing={composing}
+          setComposing={setComposing}
+          showToday={showToday}
+          hideClosed={hideClosed}
+          hideCompleted={hideCompleted}
+          hideDeferred={hideDeferred}
+          focusedId={effectiveFocusId}
+          onFocus={handleFocus}
+        />
       ) : viewMode === "cards" ? (
-        <div className="flex items-start gap-4">
-          <div className="min-w-0 flex-1">
-            <IdeaCardGrid
-              tree={ideasHook.tree}
-              ideas={ideasHook.ideas}
-              search={search}
-              hideClosed={hideClosed}
-              hideCompleted={hideCompleted}
-              hideDeferred={hideDeferred}
-              focusedId={effectiveFocusId}
-              selectedId={selectedId}
-              onUpdate={updateIdea}
-              onSelect={(id) => {
-                if (id === selectedId) {
-                  setSelectedId(null);
-                } else {
-                  setSelectedId(id);
-                  ideasHook.expandIdea(id);
-                }
-              }}
-            />
-          </div>
-          {selectedIdea && (
-            <IdeaInspector
-              idea={selectedIdea}
-              onUpdate={updateIdea}
-              onClose={() => setSelectedId(null)}
-              className="sticky top-16 hidden w-72 shrink-0 lg:block"
-            />
-          )}
-        </div>
+        <IdeaCardGrid
+          tree={ideasHook.tree}
+          ideas={ideasHook.ideas}
+          search={search}
+          hideClosed={hideClosed}
+          hideCompleted={hideCompleted}
+          hideDeferred={hideDeferred}
+          focusedId={effectiveFocusId}
+          selectedId={selectedId}
+          onUpdate={updateIdea}
+          onSelect={(id) => {
+            if (id === selectedId) {
+              setSelectedId(null);
+            } else {
+              setSelectedId(id);
+              ideasHook.expandIdea(id);
+            }
+          }}
+        />
       ) : (
         <GraphView
           ideas={ideasHook.ideas}

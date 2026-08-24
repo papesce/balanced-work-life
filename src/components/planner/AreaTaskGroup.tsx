@@ -13,6 +13,8 @@ import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { RescheduleAction } from "@/lib/tasks/rescheduleTask";
 import { getToday } from "@/lib/dateUtils";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";
+import { NotesIndicator } from "@/components/shared/NotesIndicator";
+import { useNotes } from "@/contexts/NotesContext";
 import { Eye } from "lucide-react";
 
 interface AreaTaskGroupProps {
@@ -362,6 +364,7 @@ function TaskRow({
   const dateActionLabel = isReschedule ? "Reschedule" : "Move";
   const [revealPos, setRevealPos] = useState<{ top: number; right: number } | null>(null);
   const [showReveal, setShowReveal] = useState(false);
+  const { openNotes } = useNotes();
 
   useEffect(() => {
     if (!showDateInput || !dateInputRef.current) return;
@@ -772,6 +775,7 @@ function TaskRow({
           );
         })()}
 
+      <NotesIndicator hasNotes={!!task.notes?.trim()} onClick={() => openNotes(task.id)} />
       <div className="flex flex-shrink-0 items-center gap-1 transition-opacity md:opacity-0 md:group-hover:opacity-100">
         <button
           onClick={() => onUpdate(task.id, { is_priority: !task.is_priority })}
