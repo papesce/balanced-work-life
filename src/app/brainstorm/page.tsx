@@ -11,7 +11,6 @@ import { IdeaTree } from "@/components/brainstorm/IdeaTree";
 import { BrainstormToolbar } from "@/components/brainstorm/BrainstormToolbar";
 import { BrainstormBreadcrumb } from "@/components/brainstorm/BrainstormBreadcrumb";
 import { GraphView } from "@/components/brainstorm/GraphView";
-import { IdeaCardGrid } from "@/components/brainstorm/IdeaCardGrid";
 import { Idea, LinkType } from "@/lib/types";
 import { STORAGE_KEYS, readRawString, writeRawString } from "@/lib/storage";
 import { getAncestorChain } from "@/lib/ideaTreeFocus";
@@ -43,7 +42,10 @@ export default function BrainstormPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const highlightId = searchParams.get("highlight");
-  const [viewMode, setViewMode] = useState<"tree" | "graph" | "cards">("tree");
+  const [viewMode, setViewMode] = useState<"tree" | "graph">("tree");
+  const [cardMode, setCardMode] = useState(
+    () => readRawString(STORAGE_KEYS.brainstormCardMode) === "true",
+  );
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
 
   type EditMode = "view" | "edit" | "insert";
@@ -81,6 +83,21 @@ export default function BrainstormPage() {
   useEffect(() => {
     writeRawString(STORAGE_KEYS.brainstormFocusId, focusedId ?? "");
   }, [focusedId]);
+
+  useEffect(() => {
+    writeRawString(STORAGE_KEYS.brainstormCardMode, String(cardMode));
+  }, [cardMode]);
+
+  useEffect(() => {
+    if (cardMode && editMode !== "view") {
+      /* eslint-disable react-hooks/set-state-in-effect -- sync editMode to cardMode */
+      setEditMode("view");
+      writeRawString(STORAGE_KEYS.brainstormEditMode, "view");
+      setEditingId(null);
+      setComposing(null);
+      /* eslint-enable react-hooks/set-state-in-effect */
+    }
+  }, [cardMode, editMode]);
 
   // Search spans every idea: focus is suspended while a search is active.
   // Focus also self-heals when the focused idea no longer exists (deleted).
@@ -308,6 +325,7 @@ export default function BrainstormPage() {
       setSearch={setSearch}
       editMode={editMode}
       setEditMode={changeEditMode}
+      cardMode={cardMode}
       showType={showType}
       setShowType={setShowType}
       showArea={showArea}
@@ -345,18 +363,25 @@ export default function BrainstormPage() {
         </button>
       </div>
       <span className="text-gray-200">|</span>
+      {viewMode === "tree" && (
+        <>
+          <button
+            onClick={() => setCardMode((v: boolean) => !v)}
+            className={`toolbar-btn ${cardMode ? "toolbar-btn--accent" : ""}`}
+            title={cardMode ? "Show rows" : "Show cards"}
+            aria-pressed={cardMode}
+          >
+            {cardMode ? "Rows" : "Cards"}
+          </button>
+          <span className="text-gray-200">|</span>
+        </>
+      )}
       <div className="flex gap-1">
         <button
           onClick={() => setViewMode("tree")}
           className={`toolbar-btn ${viewMode === "tree" ? "toolbar-btn--accent" : ""}`}
         >
           Tree
-        </button>
-        <button
-          onClick={() => setViewMode("cards")}
-          className={`toolbar-btn ${viewMode === "cards" ? "toolbar-btn--accent" : ""}`}
-        >
-          Cards
         </button>
         <button
           onClick={() => setViewMode("graph")}
@@ -457,26 +482,7 @@ export default function BrainstormPage() {
           hideDeferred={hideDeferred}
           focusedId={effectiveFocusId}
           onFocus={handleFocus}
-        />
-      ) : viewMode === "cards" ? (
-        <IdeaCardGrid
-          tree={ideasHook.tree}
-          ideas={ideasHook.ideas}
-          search={search}
-          hideClosed={hideClosed}
-          hideCompleted={hideCompleted}
-          hideDeferred={hideDeferred}
-          focusedId={effectiveFocusId}
-          selectedId={selectedId}
-          onUpdate={updateIdea}
-          onSelect={(id) => {
-            if (id === selectedId) {
-              setSelectedId(null);
-            } else {
-              setSelectedId(id);
-              ideasHook.expandIdea(id);
-            }
-          }}
+          cardMode={cardMode}
         />
       ) : (
         <GraphView

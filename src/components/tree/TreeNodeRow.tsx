@@ -175,15 +175,28 @@ export function TreeNodeRow<T extends TreeItem>({
     }
   };
 
-  const rowClasses = [
-    "group relative flex items-center gap-1 rounded-md px-1 py-1",
-    options.rowClassName ?? "",
-    dropZone === "center" ? "bg-indigo-50 dark:bg-indigo-500/10" : "",
-    !dropZone && isSelected ? "bg-indigo-50/60 dark:bg-indigo-500/10" : "",
-    isDragging ? "opacity-40" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const isCardMode = Boolean(options.cardMode);
+  const notesText = (node as unknown as { notes?: string | null }).notes?.trim() ?? "";
+
+  const rowClasses = isCardMode
+    ? [
+        "group relative flex items-start gap-1 rounded-xl border bg-white/80 px-2 py-2 shadow-sm dark:border-white/10 dark:bg-gray-800/60",
+        options.rowClassName ?? "",
+        dropZone === "center" ? "bg-indigo-50 dark:bg-indigo-500/10" : "",
+        !dropZone && isSelected ? "ring-2 ring-indigo-400 dark:ring-indigo-500" : "border-black/5",
+        isDragging ? "opacity-40" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : [
+        "group relative flex items-center gap-1 rounded-md px-1 py-1",
+        options.rowClassName ?? "",
+        dropZone === "center" ? "bg-indigo-50 dark:bg-indigo-500/10" : "",
+        !dropZone && isSelected ? "bg-indigo-50/60 dark:bg-indigo-500/10" : "",
+        isDragging ? "opacity-40" : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
 
   const setRowRef = (el: HTMLDivElement | null) => {
     droppable.setNodeRef(el);
@@ -378,6 +391,42 @@ export function TreeNodeRow<T extends TreeItem>({
                 className="max-w-sm min-w-0 flex-1 rounded border border-gray-300 px-2 py-0.5 text-sm outline-none focus:border-indigo-500"
                 placeholder={options.editPlaceholder ?? "Type an item..."}
               />
+            ) : isCardMode ? (
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (clickToInsert && !isEditing) {
+                      ui.setSelectedId(node.id);
+                      ui.setComposing({
+                        nodeId: node.id,
+                        parentId: node.parent_id ?? null,
+                        position: "bottom",
+                        depth,
+                      });
+                    } else if (isSelected && canRename && inlineEditEnabled) {
+                      startEdit();
+                    } else {
+                      ui.setSelectedId(node.id);
+                    }
+                  }}
+                  className={`cursor-text rounded px-1 py-0.5 text-sm leading-snug font-medium hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${
+                    options.labelClassName?.(node) ?? ""
+                  }`}
+                >
+                  {label || (
+                    <span className="text-gray-400 italic">{options.emptyLabel ?? ""}</span>
+                  )}
+                </span>
+                {notesText && (
+                  <span className="line-clamp-2 px-1 text-xs leading-relaxed whitespace-pre-wrap text-gray-500 italic dark:text-gray-400">
+                    {notesText}
+                  </span>
+                )}
+                <div className="flex flex-wrap items-center gap-1 px-1">
+                  {options.renderTrailing?.(node)}
+                </div>
+              </div>
             ) : (
               <span
                 onClick={(e) => {
@@ -404,7 +453,7 @@ export function TreeNodeRow<T extends TreeItem>({
               </span>
             )}
 
-            {options.renderTrailing?.(node)}
+            {!isCardMode && options.renderTrailing?.(node)}
           </div>
 
           {options.renderDetail && isSelected && (

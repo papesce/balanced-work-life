@@ -35,6 +35,7 @@ export interface BrainstormToolbarProps {
   onAddRoot: () => void;
   expandAll: () => void;
   collapseAll: () => void;
+  cardMode?: boolean;
 }
 
 function pillClass(active: boolean) {
@@ -65,6 +66,7 @@ export function BrainstormToolbar({
   onAddRoot,
   expandAll,
   collapseAll,
+  cardMode,
 }: BrainstormToolbarProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
@@ -144,28 +146,32 @@ export function BrainstormToolbar({
           <Eye size={14} />
           <span className="hidden lg:inline">View</span>
         </button>
-        <button
-          type="button"
-          role="radio"
-          aria-checked={editMode === "edit"}
-          onClick={() => setEditMode("edit")}
-          title="Edit: click twice to rename, edit details inline"
-          className={`toolbar-btn ${editMode === "edit" ? "toolbar-btn--accent" : ""}`}
-        >
-          <Pencil size={14} />
-          <span className="hidden lg:inline">Edit</span>
-        </button>
-        <button
-          type="button"
-          role="radio"
-          aria-checked={editMode === "insert"}
-          onClick={() => setEditMode("insert")}
-          title="Insert: hover a row to place a new idea above or below it"
-          className={`toolbar-btn ${editMode === "insert" ? "toolbar-btn--accent" : ""}`}
-        >
-          <ListPlus size={14} />
-          <span className="hidden lg:inline">Insert</span>
-        </button>
+        {!cardMode && (
+          <>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={editMode === "edit"}
+              onClick={() => setEditMode("edit")}
+              title="Edit: click twice to rename, edit details inline"
+              className={`toolbar-btn ${editMode === "edit" ? "toolbar-btn--accent" : ""}`}
+            >
+              <Pencil size={14} />
+              <span className="hidden lg:inline">Edit</span>
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={editMode === "insert"}
+              onClick={() => setEditMode("insert")}
+              title="Insert: hover a row to place a new idea above or below it"
+              className={`toolbar-btn ${editMode === "insert" ? "toolbar-btn--accent" : ""}`}
+            >
+              <ListPlus size={14} />
+              <span className="hidden lg:inline">Insert</span>
+            </button>
+          </>
+        )}
       </div>
 
       <div ref={filtersRef} className="relative">

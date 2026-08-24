@@ -105,6 +105,8 @@ export interface TreeOptions<T extends TreeItem> {
   rowClassName?: string;
   /** Pixels of indentation per depth level. */
   indentSize?: number;
+  /** Renders each row as a card instead of a compact label row. */
+  cardMode?: boolean;
   /** Hides the "+" add-child button and the hover insertion bands. */
   disableInsert?: boolean;
   /** When false, clicking a selected row's label selects instead of entering edit mode. Defaults to true. */

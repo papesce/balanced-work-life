@@ -63,6 +63,7 @@ interface IdeaTreeProps {
   hideDeferred: boolean;
   focusedId: string | null;
   onFocus: (id: string | null) => void;
+  cardMode?: boolean;
 }
 
 function getAncestorIds(ideaId: string, ideas: Idea[]): Set<string> {
@@ -136,6 +137,7 @@ export function IdeaTree({
   hideDeferred,
   focusedId,
   onFocus,
+  cardMode,
 }: IdeaTreeProps) {
   const todayString = getToday();
   const [revealTarget, setRevealTarget] = useState<Idea | null>(null);
@@ -230,6 +232,7 @@ export function IdeaTree({
           createChildOnTab: true,
         }}
         disableInsert={Boolean(search.trim()) || editMode === "view"}
+        cardMode={cardMode}
         labelClassName={labelClassName}
         renderLeading={(node) => (
           <StatusIconSlot node={node} onMarkDone={onMarkDone} onMarkUndone={onMarkUndone} />
