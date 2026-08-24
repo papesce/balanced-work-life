@@ -33,6 +33,8 @@ export const IdeasTable = new Table(
     status_history: column.text,
     horizon: column.text,
     focus_lane: column.text,
+    in_focus: column.integer,
+    in_focus_until: column.text,
     sort_order: column.real,
     created_at: column.text,
     updated_at: column.text,
