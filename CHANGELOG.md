@@ -1,5 +1,31 @@
 # balanced-work-life
 
+## 0.4.0
+
+### Minor Changes
+
+- Add tree card mode to brainstorm and horizon, remove generic cards view, and ship focus/notes/lanes supporting changes
+
+  - Add a shared card-mode toggle (persisted via `brainstorm-card-mode`) that renders each tree row as a card with notes preview in brainstorm (`Tree` view) and horizon (all three horizons); includes `cardMode` in generic tree options
+  - Remove the generic flat `IdeaCardGrid` cards view from brainstorm; keep tree (with Rows/Cards switch) and graph
+  - Hide Edit/Insert mode buttons when card mode is active in brainstorm and force view mode
+  - Add horizon lane configurability (per-horizon lanes, drag-to-lane, lane config dialog), in-focus flag with horizon/tree filtering and Tree indent fixes
+  - Generalize notes to a shared drawer with `NotesIndicator` across all views, hide description field and keep notes only
+  - Add common Reveal in context menu, PowerSync `IdeasTable` in_focus/lanes migrations, and related tree/detail UI polish
+
+### Patch Changes
+
+- a28cb3c: Bump pinned nanoid to 3.3.18 (high-severity Dependabot alert)
+
+  Updates the `nanoid` override in `pnpm-workspace.yaml` from 3.3.17 to 3.3.18,
+  which patches the advisory where custom generators could loop indefinitely when
+  size is zero.
+
+- e65e5cf: Fix undo bar placement and tree drop-zone accuracy
+
+  - Pin the undo bar as a fixed toast centered above the bottom navigation instead of rendering it inline
+  - Prefer pointer position for tree drag-and-drop collision detection so drop zones match the cursor's third of a row, falling back to closest-center for keyboard drags
+
 ## 0.3.0
 
 ### Minor Changes
