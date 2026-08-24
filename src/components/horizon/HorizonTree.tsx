@@ -292,6 +292,7 @@ export interface HorizonTreeProps {
   onExpand: (id: string) => void;
   emptyMessage?: React.ReactNode;
   onToggleInFocus?: (id: string, until?: string | null) => Promise<void>;
+  cardMode?: boolean;
 }
 
 export function HorizonTree({
@@ -318,6 +319,7 @@ export function HorizonTree({
   onExpand,
   emptyMessage,
   onToggleInFocus,
+  cardMode,
 }: HorizonTreeProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -345,6 +347,7 @@ export function HorizonTree({
     getLabel: (idea: Idea) => idea.text,
     emptyLabel: "Untitled",
     rowClassName: "px-3 py-2 gap-1.5",
+    cardMode,
     onContextMenu: (node, e) => {
       e.preventDefault();
       setRevealTarget(node as Idea);

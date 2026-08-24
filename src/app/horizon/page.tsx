@@ -25,6 +25,8 @@ import { Settings2 } from "lucide-react";
 import {
   STORAGE_KEYS,
   TreeOverrideState,
+  readRawString,
+  writeRawString,
   readTreeOverrides,
   writeTreeOverrides,
 } from "@/lib/storage";
@@ -138,12 +140,19 @@ export default function HorizonPage() {
   const [search, setSearch] = useState("");
   const [hideClosed, setHideClosed] = useState(true);
   const [focusOnly, setFocusOnly] = useState(false);
+  const [cardMode, setCardMode] = useState(
+    () => readRawString(STORAGE_KEYS.brainstormCardMode) === "true",
+  );
   const laneConfigsHook = useLaneConfigsContext();
   const [laneDialogHorizon, setLaneDialogHorizon] = useState<IdeaHorizon | null>(null);
   const searchParams = useSearchParams();
   const router = useRouter();
   const highlightId = searchParams.get("highlight");
   const horizonParam = searchParams.get("horizon") as IdeaHorizon | null;
+
+  useEffect(() => {
+    writeRawString(STORAGE_KEYS.brainstormCardMode, String(cardMode));
+  }, [cardMode]);
 
   const updateIdea = async (id: string, updates: Partial<Idea>) => {
     const previous = ideasHook.ideas.find((idea) => idea.id === id);
@@ -382,6 +391,7 @@ export default function HorizonPage() {
             horizon={h.key}
             laneConfigs={laneConfigsHook.getLanesForHorizon(h.key)}
             unassignedLabel={laneConfigsHook.getUnassignedLabel(h.key)}
+            cardMode={cardMode}
             isLoading={laneConfigsHook.isLoading}
             allTags={tagsHook.tags}
             links={linksHook.links}
@@ -444,6 +454,15 @@ export default function HorizonPage() {
       >
         <Target size={12} />
         <span className="hidden sm:inline">Focus only</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => setCardMode((v) => !v)}
+        className={`toolbar-btn ${cardMode ? "toolbar-btn--accent" : ""}`}
+        title={cardMode ? "Show rows" : "Show cards"}
+        aria-pressed={cardMode}
+      >
+        {cardMode ? "Rows" : "Cards"}
       </button>
     </>
   );
