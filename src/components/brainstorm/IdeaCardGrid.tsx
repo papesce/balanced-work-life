@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlignLeft, Check, Pencil, StickyNote, X } from "lucide-react";
+import { Check, Pencil, StickyNote, X } from "lucide-react";
 import { Idea, IdeaNode, IdeaType } from "@/lib/types";
 import { STATUS_LABELS, STATUS_STYLES } from "@/lib/constants";
 import { filterIdeaTree } from "@/lib/ideaTreeFilters";
@@ -39,28 +39,21 @@ function IdeaCard({
   onUpdate: (id: string, updates: Partial<Idea>) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
-  const [descDraft, setDescDraft] = useDraft(idea.description ?? "");
   const [notesDraft, setNotesDraft] = useDraft(idea.notes ?? "");
 
   const startEditing = () => {
-    setDescDraft(idea.description ?? "");
     setNotesDraft(idea.notes ?? "");
     setEditing(true);
   };
 
   const cancelEditing = () => {
-    setDescDraft(idea.description ?? "");
     setNotesDraft(idea.notes ?? "");
     setEditing(false);
   };
 
   const confirmEditing = async () => {
     const updates: Partial<Idea> = {};
-    const descTrimmed = descDraft.trim();
     const notesTrimmed = notesDraft.trim();
-    if (descTrimmed !== (idea.description ?? "").trim()) {
-      updates.description = descTrimmed ? descTrimmed : null;
-    }
     if (notesTrimmed !== (idea.notes ?? "").trim()) {
       updates.notes = notesTrimmed ? notesTrimmed : null;
     }
@@ -68,7 +61,7 @@ function IdeaCard({
     setEditing(false);
   };
 
-  const hasDetails = Boolean(idea.description?.trim() || idea.notes?.trim());
+  const hasDetails = Boolean(idea.notes?.trim());
 
   return (
     <div
@@ -126,14 +119,6 @@ function IdeaCard({
         <div onClick={(e) => e.stopPropagation()}>
           <div className="mt-2 space-y-2">
             <DetailField
-              icon={AlignLeft}
-              value={idea.description}
-              placeholder="Add a short description…"
-              commitOnBlur={false}
-              onChange={setDescDraft}
-              onSave={(next) => setDescDraft(next ?? "")}
-            />
-            <DetailField
               icon={StickyNote}
               value={idea.notes}
               placeholder="Add notes…"
@@ -170,11 +155,6 @@ function IdeaCard({
         </div>
       ) : (
         <>
-          {idea.description?.trim() && (
-            <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-gray-600 dark:text-gray-300">
-              {idea.description}
-            </p>
-          )}
           {idea.notes?.trim() && (
             <p className="mt-1 line-clamp-2 text-xs leading-relaxed whitespace-pre-wrap text-gray-500 italic dark:text-gray-400">
               {idea.notes}
@@ -199,11 +179,11 @@ function IdeaCard({
               )}
               {hasDetails && (
                 <span
-                  aria-label="Has description or notes"
-                  title="Has description or notes"
+                  aria-label="Has notes"
+                  title="Has notes"
                   className="flex items-center text-gray-300 dark:text-gray-600"
                 >
-                  <AlignLeft size={11} strokeWidth={2} />
+                  <StickyNote size={11} strokeWidth={2} />
                 </span>
               )}
             </div>

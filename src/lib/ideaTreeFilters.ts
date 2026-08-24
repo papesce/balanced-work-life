@@ -71,7 +71,6 @@ export function filterIdeaTree(
   const q = search.toLowerCase();
   const matchesSearch = (idea: Idea): boolean => {
     if (idea.text.toLowerCase().includes(q)) return true;
-    if (idea.description?.toLowerCase().includes(q)) return true;
     if (idea.notes?.toLowerCase().includes(q)) return true;
     return ideas.some((child) => child.parent_id === idea.id && matchesSearch(child));
   };

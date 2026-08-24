@@ -233,11 +233,11 @@ export function IdeaTree({
         )}
         renderTrailing={(node) => (
           <>
-            {(node.description?.trim() || node.notes?.trim()) && (
+            {node.notes?.trim() && (
               <button
                 type="button"
-                title="Has description or notes"
-                aria-label="Show description or notes"
+                title="Has notes"
+                aria-label="Show notes"
                 onClick={(e) => {
                   e.stopPropagation();
                   setSelectedId(node.id);

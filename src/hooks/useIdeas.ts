@@ -59,7 +59,6 @@ function computeCollapsedIds(
     if (!idea) return false;
     const q = search.toLowerCase();
     if (idea.text.toLowerCase().includes(q)) return true;
-    if (idea.description?.toLowerCase().includes(q)) return true;
     if (idea.notes?.toLowerCase().includes(q)) return true;
     return ideas.some((child) => child.parent_id === ideaId && nodeHasSearchMatch(child.id));
   };

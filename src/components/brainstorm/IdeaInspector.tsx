@@ -1,6 +1,6 @@
 "use client";
 
-import { AlignLeft, StickyNote, X } from "lucide-react";
+import { StickyNote, X } from "lucide-react";
 import { Idea } from "@/lib/types";
 import { DetailField } from "./IdeaDetailField";
 
@@ -35,12 +35,6 @@ export function IdeaInspector({
           )}
         </div>
         <div className="space-y-2">
-          <DetailField
-            icon={AlignLeft}
-            value={idea.description}
-            placeholder="Add a short description…"
-            onSave={(next) => onUpdate(idea.id, { description: next })}
-          />
           <DetailField
             icon={StickyNote}
             value={idea.notes}
