@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { FileText, Focus as FocusIcon } from "lucide-react";
+import { RevealInMenu } from "@/components/shared/RevealInMenu";
 import { IdeaNode as IdeaNodeType, Idea, IdeaLink, Tag, LifeArea, LinkType } from "@/lib/types";
 import { filterIdeaTree } from "@/lib/ideaTreeFilters";
 import { getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
@@ -135,6 +136,8 @@ export function IdeaTree({
   onFocus,
 }: IdeaTreeProps) {
   const todayString = getToday();
+  const [revealTarget, setRevealTarget] = useState<Idea | null>(null);
+  const [revealPos, setRevealPos] = useState<{ top: number; right: number } | null>(null);
 
   const filteredTree = useMemo(() => {
     let filtered = filterIdeaTree(tree, ideas, { search, hideClosed, hideCompleted, hideDeferred });
@@ -213,6 +216,11 @@ export function IdeaTree({
         getLabel={(idea) => idea.text}
         emptyLabel="empty"
         editPlaceholder="Type an idea..."
+        onContextMenu={(node, e) => {
+          e.preventDefault();
+          setRevealTarget(node as Idea);
+          setRevealPos({ top: e.clientY + 4, right: window.innerWidth - e.clientX - 4 });
+        }}
         editBehavior={{
           deleteEmptyOnConfirm: true,
           deleteEmptyOnCancel: true,
@@ -291,6 +299,7 @@ export function IdeaTree({
               onMoved={(id) => {
                 if (id) expandIdea(id);
               }}
+              currentView="brainstorm"
             />
           </>
         )}
@@ -306,6 +315,14 @@ export function IdeaTree({
           </p>
         }
       />
+      {revealTarget && revealPos && (
+        <RevealInMenu
+          idea={revealTarget}
+          currentView="brainstorm"
+          position={revealPos}
+          onClose={() => setRevealTarget(null)}
+        />
+      )}
     </div>
   );
 }

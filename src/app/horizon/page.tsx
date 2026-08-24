@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { EyeOff, Target } from "lucide-react";
 import { useIdeas, type CreateIdeaPosition } from "@/hooks/useIdeas";
@@ -138,6 +140,10 @@ export default function HorizonPage() {
   const [focusOnly, setFocusOnly] = useState(false);
   const laneConfigsHook = useLaneConfigsContext();
   const [laneDialogHorizon, setLaneDialogHorizon] = useState<IdeaHorizon | null>(null);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const highlightId = searchParams.get("highlight");
+  const horizonParam = searchParams.get("horizon") as IdeaHorizon | null;
 
   const updateIdea = async (id: string, updates: Partial<Idea>) => {
     const previous = ideasHook.ideas.find((idea) => idea.id === id);
@@ -291,6 +297,53 @@ export default function HorizonPage() {
       });
     };
   };
+
+  useEffect(() => {
+    if (horizonParam && (["short", "medium", "long"] as IdeaHorizon[]).includes(horizonParam)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sync tab from URL param
+      setActiveTab(horizonParam);
+    }
+  }, [horizonParam]);
+
+  useEffect(() => {
+    if (!highlightId || loading) return;
+    const idea = ideas.find((i) => i.id === highlightId);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- highlight deep-link syncs tab
+    if (idea?.horizon) setActiveTab(idea.horizon);
+    // expand ancestors
+    const expandAncestors = (id: string) => {
+      const m = new Map(ideas.map((i) => [i.id, i]));
+      let cur = m.get(id);
+      const ids: string[] = [];
+      while (cur?.parent_id) {
+        ids.push(cur.parent_id);
+        cur = m.get(cur.parent_id);
+      }
+      if (ids.length > 0) {
+        setOverrides((prev) => {
+          const next = new Map(prev);
+          for (const anc of ids) next.set(anc, "expanded");
+          writeTreeOverrides(STORAGE_KEYS.horizonTreeOverrides, next);
+          return next;
+        });
+      }
+    };
+    expandAncestors(highlightId);
+    const timer = setTimeout(() => {
+      const el = document.getElementById(`idea-${highlightId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("highlight-pulse");
+        const cleanup = () => el.classList.remove("highlight-pulse");
+        el.addEventListener("animationend", cleanup, { once: true });
+        setTimeout(cleanup, 2500);
+      }
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("highlight");
+      router.replace(`/horizon?${params.toString()}`, { scroll: false });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [highlightId, loading, ideas, searchParams, router]);
 
   if (loading) {
     return (

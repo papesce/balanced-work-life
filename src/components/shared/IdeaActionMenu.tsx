@@ -12,6 +12,7 @@ import {
   Check,
   Target,
   Layers,
+  Eye,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { Idea, IdeaLink, IdeaHorizon, LinkType, Tag, LaneConfig } from "@/lib/types";
@@ -19,6 +20,8 @@ import { DEFAULT_UNASSIGNED_LABEL } from "@/lib/constants";
 import { LinkPanel } from "@/components/brainstorm/LinkPanel";
 import { MoveIdeaPanel } from "@/components/brainstorm/MoveIdeaPanel";
 import { SchedulePicker } from "@/components/brainstorm/SchedulePicker";
+import { RevealInMenu } from "@/components/shared/RevealInMenu";
+import type { RevealView } from "@/lib/reveal";
 
 interface IdeaActionMenuProps {
   idea: Idea;
@@ -38,6 +41,7 @@ interface IdeaActionMenuProps {
   onMoved?: (parentIdToExpand: string | null) => void;
   hiddenActions?: Array<"edit" | "link" | "move" | "schedule" | "horizon" | "delete">;
   onToggleInFocus?: (id: string, until?: string | null) => Promise<void>;
+  currentView?: RevealView;
 }
 
 export function IdeaActionMenu({
@@ -58,6 +62,7 @@ export function IdeaActionMenu({
   onMoved,
   hiddenActions,
   onToggleInFocus,
+  currentView,
 }: IdeaActionMenuProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
@@ -68,6 +73,7 @@ export function IdeaActionMenu({
   const [deletePos, setDeletePos] = useState<{ top: number; right: number } | null>(null);
   const [showHorizonPicker, setShowHorizonPicker] = useState(false);
   const [showLanePicker, setShowLanePicker] = useState(false);
+  const [showRevealPicker, setShowRevealPicker] = useState(false);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const deleteConfirmRef = useRef<HTMLDivElement>(null);
@@ -108,6 +114,26 @@ export function IdeaActionMenu({
   }, [showMenu]);
 
   useEffect(() => {
+    if (!showRevealPicker) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      // allow clicks inside any portal menu to propagate; close on outside
+      if (!(target instanceof Element && target.closest(".glass-card-strong"))) {
+        setShowRevealPicker(false);
+      }
+    };
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowRevealPicker(false);
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("keydown", keyHandler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("keydown", keyHandler);
+    };
+  }, [showRevealPicker]);
+
+  useEffect(() => {
     if (!showDeleteWarning) return;
     const handler = (e: MouseEvent) => {
       if (deleteConfirmRef.current && !deleteConfirmRef.current.contains(e.target as Node)) {
@@ -133,6 +159,7 @@ export function IdeaActionMenu({
     setShowDeleteWarning(false);
     setShowHorizonPicker(false);
     setShowLanePicker(false);
+    setShowRevealPicker(false);
   };
 
   const handleRequestDelete = () => {
@@ -162,7 +189,8 @@ export function IdeaActionMenu({
     showSchedulePicker ||
     showDeleteWarning ||
     showHorizonPicker ||
-    showLanePicker;
+    showLanePicker ||
+    showRevealPicker;
 
   const laneConfigsForIdea = useMemo(() => {
     if (!idea.horizon || !laneConfigs) return [];
@@ -298,6 +326,21 @@ export function IdeaActionMenu({
               <Target size={12} strokeWidth={1.5} />
               {idea.in_focus ? "Remove from Focus" : "Mark In Focus"}
             </button>
+            {currentView && (
+              <>
+                <div className="my-1 border-t border-black/5 dark:border-white/5" />
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    setShowRevealPicker(true);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                >
+                  <Eye size={12} strokeWidth={1.5} />
+                  Reveal in...
+                </button>
+              </>
+            )}
             {!hidden.includes("delete") && (
               <>
                 <div className="my-1 border-t border-black/5 dark:border-white/5" />
@@ -417,6 +460,15 @@ export function IdeaActionMenu({
           </div>,
           document.body,
         )}
+
+      {showRevealPicker && currentView && menuPos && (
+        <RevealInMenu
+          idea={idea}
+          currentView={currentView}
+          position={menuPos}
+          onClose={() => setShowRevealPicker(false)}
+        />
+      )}
 
       {/* Sub-panels */}
       {showLinkPanel && (

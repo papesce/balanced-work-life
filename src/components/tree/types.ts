@@ -112,4 +112,5 @@ export interface TreeOptions<T extends TreeItem> {
   /** Clicking a row opens the composer below it (insert-focused mode) instead of selecting. */
   clickToInsert?: boolean;
   editBehavior?: TreeEditBehavior;
+  onContextMenu?: (node: TreeNode<T>, e: React.MouseEvent) => void;
 }

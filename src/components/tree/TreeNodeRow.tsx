@@ -268,7 +268,10 @@ export function TreeNodeRow<T extends TreeItem>({
             aria-expanded={hasChildren ? !node.collapsed : undefined}
             tabIndex={isSelected ? 0 : -1}
             className={rowClasses}
+            id={`idea-${node.id}`}
+            data-idea-id={node.id}
             onMouseMove={handleInsertHover}
+            onContextMenu={(e) => options.onContextMenu?.(node, e)}
             onClick={(e) => {
               e.stopPropagation();
               if (clickToInsert && !isEditing) {

@@ -9,6 +9,8 @@ import { TagPicker } from "@/components/shared/TagPicker";
 import { AREA_DOT_COLORS, STATUS_CONFIG } from "@/lib/constants";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { RescheduleAction, DayOccurrence } from "@/lib/tasks/rescheduleTask";
+import { RevealInMenu } from "@/components/shared/RevealInMenu";
+import { Eye } from "lucide-react";
 
 interface DayTaskListProps {
   occurrences: DayOccurrence[];
@@ -274,6 +276,8 @@ function TimelineTaskRow({
   const menuRef = useRef<HTMLDivElement>(null);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const [showReveal, setShowReveal] = useState(false);
+  const [revealPos, setRevealPos] = useState<{ top: number; right: number } | null>(null);
   const statusTriggerRef = useRef<HTMLButtonElement>(null);
   const [statusPickerPos, setStatusPickerPos] = useState<{ top: number; left: number } | null>(
     null,
@@ -393,6 +397,11 @@ function TimelineTaskRow({
       className={`group flex items-center gap-1.5 rounded-xl px-3 py-2 transition-colors ${isHovered ? "bg-black/[0.03] dark:bg-white/[0.04]" : ""}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setRevealPos({ top: e.clientY + 4, right: window.innerWidth - e.clientX - 4 });
+        setShowReveal(true);
+      }}
     >
       <button
         onPointerDown={(e) => dragControls.start(e)}
@@ -629,6 +638,20 @@ function TimelineTaskRow({
               <div className="my-1 border-t border-black/5 dark:border-white/5" />
               <button
                 onClick={() => {
+                  const rect = menuTriggerRef.current?.getBoundingClientRect();
+                  if (rect)
+                    setRevealPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+                  setShowMenu(false);
+                  setShowReveal(true);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+              >
+                <Eye size={12} strokeWidth={1.5} />
+                Reveal in...
+              </button>
+              <div className="my-1 border-t border-black/5 dark:border-white/5" />
+              <button
+                onClick={() => {
                   onUpdate(task.id, { status: "archived" });
                   setShowMenu(false);
                 }}
@@ -639,6 +662,14 @@ function TimelineTaskRow({
             </div>,
             document.body,
           )}
+        {showReveal && revealPos && (
+          <RevealInMenu
+            idea={task}
+            currentView="timeline"
+            position={revealPos}
+            onClose={() => setShowReveal(false)}
+          />
+        )}
       </div>
     </div>
   );

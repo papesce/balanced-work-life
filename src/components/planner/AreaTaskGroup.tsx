@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
 import { Reorder, useDragControls } from "framer-motion";
 import { Star, MoreHorizontal, GripVertical, Clock } from "lucide-react";
 import { areaColors } from "@/styles/tokens";
@@ -13,6 +12,8 @@ import { formatTime } from "./plannerUtils";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { RescheduleAction } from "@/lib/tasks/rescheduleTask";
 import { getToday } from "@/lib/dateUtils";
+import { RevealInMenu } from "@/components/shared/RevealInMenu";
+import { Eye } from "lucide-react";
 
 interface AreaTaskGroupProps {
   area: LifeArea;
@@ -359,7 +360,8 @@ function TaskRow({
     task.status === "deferred" ||
     (task.scheduled_date !== null && task.scheduled_date < getToday());
   const dateActionLabel = isReschedule ? "Reschedule" : "Move";
-  const router = useRouter();
+  const [revealPos, setRevealPos] = useState<{ top: number; right: number } | null>(null);
+  const [showReveal, setShowReveal] = useState(false);
 
   useEffect(() => {
     if (!showDateInput || !dateInputRef.current) return;
@@ -513,6 +515,11 @@ function TaskRow({
         e.dataTransfer.setData("text/plain", task.id);
         e.dataTransfer.setData("text/lifearea", area);
         e.dataTransfer.effectAllowed = "move";
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setRevealPos({ top: e.clientY + 4, right: window.innerWidth - e.clientX - 4 });
+        setShowReveal(true);
       }}
       className="group flex cursor-grab items-center gap-2 px-4 py-2.5 transition-colors hover:bg-black/[0.015] active:cursor-grabbing dark:hover:bg-white/[0.015]"
     >
@@ -798,20 +805,19 @@ function TaskRow({
                 style={{ position: "fixed", top: menuPos.top, right: menuPos.right, zIndex: 9999 }}
                 className="glass-card-strong min-w-[160px] rounded-lg border border-black/5 py-1 shadow-lg dark:border-white/5"
               >
-                {task.scheduled_date && (
-                  <>
-                    <button
-                      onClick={() => {
-                        router.push(`/timeline?date=${task.scheduled_date}&highlight=${task.id}`);
-                        setShowMenu(false);
-                      }}
-                      className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-violet-600 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/20"
-                    >
-                      Reveal in Timeline
-                    </button>
-                    <div className="my-1 border-t border-black/5 dark:border-white/5" />
-                  </>
-                )}
+                <button
+                  onClick={() => {
+                    const rect = menuTriggerRef.current?.getBoundingClientRect();
+                    if (rect)
+                      setRevealPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
+                    setShowMenu(false);
+                    setShowReveal(true);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                >
+                  <Eye size={11} strokeWidth={1.5} />
+                  Reveal in...
+                </button>
                 <div className="my-1 border-t border-black/5 dark:border-white/5" />
                 {task.scheduled_date !== getToday() && (
                   <button
@@ -908,6 +914,14 @@ function TaskRow({
               </div>,
               document.body,
             )}
+          {showReveal && revealPos && (
+            <RevealInMenu
+              idea={task}
+              currentView="planner"
+              position={revealPos}
+              onClose={() => setShowReveal(false)}
+            />
+          )}
         </div>
       </div>
 

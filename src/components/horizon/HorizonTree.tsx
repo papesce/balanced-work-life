@@ -24,6 +24,7 @@ import { IdeaActionMenu } from "@/components/shared/IdeaActionMenu";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { TypePicker } from "@/components/brainstorm/TypePicker";
 import { TagPicker } from "@/components/shared/TagPicker";
+import { RevealInMenu } from "@/components/shared/RevealInMenu";
 
 function PriorityStarSlot({
   node,
@@ -319,6 +320,8 @@ export function HorizonTree({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [composing, setComposing] = useState<ComposingState | null>(null);
+  const [revealTarget, setRevealTarget] = useState<Idea | null>(null);
+  const [revealPos, setRevealPos] = useState<{ top: number; right: number } | null>(null);
 
   const laneIds = new Set(laneConfigs.map((l) => l.id));
 
@@ -335,10 +338,15 @@ export function HorizonTree({
     void onUpdate(draggedId, { focus_lane: lane });
   };
 
-  const treeOptions = {
+  const treeOptions: import("@/components/tree").TreeOptions<Idea> = {
     getLabel: (idea: Idea) => idea.text,
     emptyLabel: "Untitled",
     rowClassName: "px-3 py-2 gap-1.5",
+    onContextMenu: (node, e) => {
+      e.preventDefault();
+      setRevealTarget(node as Idea);
+      setRevealPos({ top: e.clientY + 4, right: window.innerWidth - e.clientX - 4 });
+    },
     renderLeading: (node: IdeaNodeType) => <PriorityStarSlot node={node} onUpdate={onUpdate} />,
     renderTrailing: (node: IdeaNodeType) => (
       <>
@@ -382,6 +390,7 @@ export function HorizonTree({
           onMove={onMove}
           hiddenActions={["move"]}
           onToggleInFocus={onToggleInFocus}
+          currentView="horizon"
         />
       </>
     ),
@@ -467,6 +476,31 @@ export function HorizonTree({
   // When loading, skeleton already returned above, so this is genuine empty.
   if (laneConfigs.length === 0) {
     return (
+      <>
+        <TreeDnd
+          items={ideas}
+          onMove={onMove}
+          getLabel={(idea) => idea.text}
+          onLaneDrop={handleLaneDrop}
+        >
+          <TreeProvider value={{ controller, ui, options: treeOptions }}>
+            <div>{renderLaneContent(nodes)}</div>
+          </TreeProvider>
+        </TreeDnd>
+        {revealTarget && revealPos && (
+          <RevealInMenu
+            idea={revealTarget}
+            currentView="horizon"
+            position={revealPos}
+            onClose={() => setRevealTarget(null)}
+          />
+        )}
+      </>
+    );
+  }
+
+  return (
+    <>
       <TreeDnd
         items={ideas}
         onMove={onMove}
@@ -474,40 +508,35 @@ export function HorizonTree({
         onLaneDrop={handleLaneDrop}
       >
         <TreeProvider value={{ controller, ui, options: treeOptions }}>
-          <div>{renderLaneContent(nodes)}</div>
+          <div className="divide-y divide-black/[0.03] dark:divide-white/[0.03]">
+            <LaneSection
+              laneId={`lane:${horizon}:null`}
+              label={unassignedLabel}
+              count={unassignedNodes.length}
+            >
+              {renderLaneContent(unassignedNodes)}
+            </LaneSection>
+            {laneConfigs.map((lc) => (
+              <LaneSection
+                key={lc.id}
+                laneId={`lane:${horizon}:${lc.id}`}
+                label={lc.label}
+                count={laneGroups.get(lc.id)?.length ?? 0}
+              >
+                {renderLaneContent(laneGroups.get(lc.id) ?? [])}
+              </LaneSection>
+            ))}
+          </div>
         </TreeProvider>
       </TreeDnd>
-    );
-  }
-
-  return (
-    <TreeDnd
-      items={ideas}
-      onMove={onMove}
-      getLabel={(idea) => idea.text}
-      onLaneDrop={handleLaneDrop}
-    >
-      <TreeProvider value={{ controller, ui, options: treeOptions }}>
-        <div className="divide-y divide-black/[0.03] dark:divide-white/[0.03]">
-          <LaneSection
-            laneId={`lane:${horizon}:null`}
-            label={unassignedLabel}
-            count={unassignedNodes.length}
-          >
-            {renderLaneContent(unassignedNodes)}
-          </LaneSection>
-          {laneConfigs.map((lc) => (
-            <LaneSection
-              key={lc.id}
-              laneId={`lane:${horizon}:${lc.id}`}
-              label={lc.label}
-              count={laneGroups.get(lc.id)?.length ?? 0}
-            >
-              {renderLaneContent(laneGroups.get(lc.id) ?? [])}
-            </LaneSection>
-          ))}
-        </div>
-      </TreeProvider>
-    </TreeDnd>
+      {revealTarget && revealPos && (
+        <RevealInMenu
+          idea={revealTarget}
+          currentView="horizon"
+          position={revealPos}
+          onClose={() => setRevealTarget(null)}
+        />
+      )}
+    </>
   );
 }

@@ -17,6 +17,7 @@ import { Idea, LinkType } from "@/lib/types";
 import { STORAGE_KEYS, readRawString, writeRawString } from "@/lib/storage";
 import { getAncestorChain } from "@/lib/ideaTreeFocus";
 import type { IdeasScope } from "@/hooks/useIdeas";
+import { useSearchParams, useRouter } from "next/navigation";
 
 type UndoAction = {
   label: string;
@@ -40,6 +41,9 @@ export default function BrainstormPage() {
   const linksHook = useIdeaLinks();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const highlightId = searchParams.get("highlight");
   const [viewMode, setViewMode] = useState<"tree" | "graph" | "cards">("tree");
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
 
@@ -265,6 +269,35 @@ export default function BrainstormPage() {
     setUndoAction(null);
     await action.run();
   };
+
+  useEffect(() => {
+    if (!highlightId || ideasHook.loading) return;
+    const idea = ideasHook.ideas.find((i) => i.id === highlightId);
+    if (!idea) return;
+    // expand ancestors so node is visible
+    const chain = getAncestorChain(highlightId, ideasHook.ideas);
+    for (const anc of chain) ideasHook.expandIdea(anc.id);
+    ideasHook.expandIdea(highlightId);
+    /* eslint-disable react-hooks/set-state-in-effect -- highlight deep-link syncs selection/view */
+    setSelectedId(highlightId);
+    setViewMode("tree");
+    /* eslint-enable react-hooks/set-state-in-effect */
+    const timer = setTimeout(() => {
+      const el = document.getElementById(`idea-${highlightId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("highlight-pulse");
+        const cleanup = () => el.classList.remove("highlight-pulse");
+        el.addEventListener("animationend", cleanup, { once: true });
+        setTimeout(cleanup, 2500);
+      }
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("highlight");
+      router.replace(`/brainstorm?${params.toString()}`, { scroll: false });
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally run only on highlightId/loading change
+  }, [highlightId, ideasHook.loading]);
 
   if (ideasHook.loading) {
     return (
