@@ -167,6 +167,31 @@ export const DEFAULT_TARGETS: Record<LifeArea, number> = {
   life: 10,
 };
 
+export const DEFAULT_UNASSIGNED_LABEL = "Unassigned";
+
+export const TYPE_BADGE: Record<string, { label: string; className: string }> = {
+  idea: {
+    label: "Idea",
+    className: "bg-orange-100/80 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400",
+  },
+  objective: {
+    label: "Objective",
+    className: "bg-purple-100/80 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400",
+  },
+  project: {
+    label: "Project",
+    className: "bg-blue-100/80 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
+  },
+  initiative: {
+    label: "Initiative",
+    className: "bg-violet-100/80 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400",
+  },
+  task: {
+    label: "Task",
+    className: "bg-gray-100/80 text-gray-500 dark:bg-gray-800/40 dark:text-gray-400",
+  },
+};
+
 export const SCHEDULE_HOURS = [
   "07:00",
   "08:00",

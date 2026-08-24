@@ -59,6 +59,7 @@ export interface Idea {
   attempt_dates: string[];
   status_history: { status: IdeaStatus; at: string }[] | null;
   horizon: IdeaHorizon | null;
+  focus_lane: string | null;
   in_focus: boolean;
   in_focus_until: string | null;
   sort_order: number;
@@ -75,6 +76,21 @@ export interface IdeaLink {
   target_id: string;
   link_type: LinkType;
   created_at: string;
+}
+
+export interface LaneConfig {
+  id: string;
+  user_id: string;
+  horizon: IdeaHorizon;
+  label: string;
+  created_at: string;
+}
+
+export interface HorizonSetting {
+  id: string;
+  user_id: string;
+  horizon: IdeaHorizon;
+  unassigned_label: string;
 }
 
 export interface IdeaNode extends Idea {

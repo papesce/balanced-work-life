@@ -32,6 +32,7 @@ export const IdeasTable = new Table(
     attempt_dates: column.text,
     status_history: column.text,
     horizon: column.text,
+    focus_lane: column.text,
     sort_order: column.real,
     created_at: column.text,
     updated_at: column.text,
@@ -70,11 +71,32 @@ export const TaskTagsTable = new Table(
   { indexes: {} },
 );
 
+export const LaneConfigsTable = new Table(
+  {
+    user_id: column.text,
+    horizon: column.text,
+    label: column.text,
+    created_at: column.text,
+  },
+  { indexes: {} },
+);
+
+export const HorizonSettingsTable = new Table(
+  {
+    user_id: column.text,
+    horizon: column.text,
+    unassigned_label: column.text,
+  },
+  { indexes: {} },
+);
+
 export const AppSchema = new Schema({
   ideas: IdeasTable,
   idea_links: IdeaLinksTable,
   tags: TagsTable,
   task_tags: TaskTagsTable,
+  lane_configs: LaneConfigsTable,
+  horizon_settings: HorizonSettingsTable,
 });
 
 export class SupabaseConnector {
@@ -104,6 +126,27 @@ export class SupabaseConnector {
             break;
           case "DELETE":
             await supabase.from("task_tags").delete().eq("idea_id", idea_id).eq("tag_id", tag_id);
+            break;
+        }
+        continue;
+      }
+      if (op.table === "horizon_settings" || op.table === "lane_configs") {
+        // Lane/horizon tables use standard upsert by id; client validates
+        // duplicate labels and 5-cap for instant UX, DB constraint is enforcement.
+        switch (op.op) {
+          case "PUT":
+            await supabase
+              .from(op.table)
+              .upsert(
+                { id: op.id, ...(op.opData as Record<string, unknown>) },
+                { onConflict: "id" },
+              );
+            break;
+          case "PATCH":
+            await supabase.from(op.table).update(op.opData!).eq("id", op.id);
+            break;
+          case "DELETE":
+            await supabase.from(op.table).delete().eq("id", op.id);
             break;
         }
         continue;

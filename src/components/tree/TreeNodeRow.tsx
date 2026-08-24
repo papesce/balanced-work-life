@@ -352,9 +352,7 @@ export function TreeNodeRow<T extends TreeItem>({
                 // Measure from the grip so the compact drag overlay tracks the
                 // pointer instead of inheriting the full row's dimensions.
                 ref={setDragHandleRef}
-                /* eslint-disable-next-line react-hooks/refs */
                 {...draggable.attributes}
-                /* eslint-disable-next-line react-hooks/refs */
                 {...draggable.listeners}
                 aria-label={`Move ${label || "item"}`}
                 className="flex flex-shrink-0 cursor-grab touch-none items-center text-gray-300 select-none hover:text-gray-500"

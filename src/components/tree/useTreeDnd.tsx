@@ -23,7 +23,8 @@ import { isDescendantOf, itemsById } from "./buildTree";
 import { TreeDndStateProvider, type TreeDndState } from "./context";
 import type { DropTarget, DropZone, TreeItem } from "./types";
 
-const ROW_PREFIX = "row:";
+export const ROW_PREFIX = "row:";
+export const LANE_PREFIX = "lane:";
 
 // Tree drop zones are based on the pointer's third of a row. Prefer its exact
 // position over the dragged preview's rectangle, then fall back to the nearest
@@ -110,6 +111,7 @@ interface TreeDndProps<T extends TreeItem> {
   getLabel: (item: T) => string;
   children: ReactNode;
   indentSize?: number;
+  onLaneDrop?: (draggedId: string, lane: string | null) => void | Promise<void>;
 }
 
 /**
@@ -123,6 +125,7 @@ export function TreeDnd<T extends TreeItem>({
   getLabel,
   children,
   indentSize = 20,
+  onLaneDrop,
 }: TreeDndProps<T>) {
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [over, setOver] = useState<{
@@ -188,7 +191,22 @@ export function TreeDnd<T extends TreeItem>({
 
   const handleDragEnd = (event: DragEndEvent) => {
     const draggedId = String(event.active.id);
-    const overId = event.over?.id ? rowIdToItemId(String(event.over.id)) : null;
+    const rawOverId = event.over?.id ? String(event.over.id) : null;
+    // Lane drop takes precedence when dropping onto a lane container
+    if (rawOverId && rawOverId.startsWith(LANE_PREFIX)) {
+      if (onLaneDrop) {
+        const lanePart = rawOverId.slice(LANE_PREFIX.length);
+        // lane id is "horizon:uuid" or "horizon:null" for unassigned
+        const afterHorizon = lanePart.includes(":")
+          ? lanePart.slice(lanePart.indexOf(":") + 1)
+          : lanePart;
+        const laneValue = afterHorizon === "null" ? null : afterHorizon;
+        void onLaneDrop(draggedId, laneValue);
+      }
+      reset();
+      return;
+    }
+    const overId = rawOverId ? rowIdToItemId(rawOverId) : null;
     if (overId && over.itemId) {
       const overDepth: number = event.over?.data.current?.depth ?? 0;
       const target = resolveDropTarget(

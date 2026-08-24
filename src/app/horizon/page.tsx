@@ -14,8 +14,12 @@ import { AppShell } from "@/components/AppShell";
 import { UndoBar } from "@/components/shared/UndoBar";
 import { QuickAddInput } from "@/components/timeline/QuickAddInput";
 import { HorizonTree } from "@/components/horizon/HorizonTree";
+import { LaneConfigDialog } from "@/components/horizon/LaneConfigDialog";
 import { TypePicker } from "@/components/brainstorm/TypePicker";
 import { Idea, IdeaHorizon, IdeaNode, IdeaType } from "@/lib/types";
+import { TYPE_BADGE } from "@/lib/constants";
+import { useLaneConfigsContext } from "@/contexts/LaneConfigsContext";
+import { Settings2 } from "lucide-react";
 import {
   STORAGE_KEYS,
   TreeOverrideState,
@@ -31,22 +35,24 @@ const HORIZONS: { key: IdeaHorizon; label: string }[] = [
 
 const ACTIVE_STATUSES = new Set(["draft", "planned", "in_progress", "scheduled"]);
 
-function buildFilteredTree(ideas: Idea[], collapsedIds: Set<string>): IdeaNode[] {
-  const activeIdeas = ideas.filter((i) => ACTIVE_STATUSES.has(i.status));
+function buildFilteredTree(
+  ideas: Idea[],
+  collapsedIds: Set<string>,
+  hideClosed: boolean,
+): IdeaNode[] {
+  const pool = hideClosed ? ideas.filter((i) => ACTIVE_STATUSES.has(i.status)) : ideas;
 
-  const activeIds = new Set(activeIdeas.map((i) => i.id));
+  const poolIds = new Set(pool.map((i) => i.id));
   const childIds = new Set(
-    activeIdeas.filter((i) => i.parent_id && activeIds.has(i.parent_id)).map((i) => i.id),
+    pool.filter((i) => i.parent_id && poolIds.has(i.parent_id)).map((i) => i.id),
   );
-  const rootIds = activeIdeas
-    .filter((i) => i.horizon != null && !childIds.has(i.id))
-    .map((i) => i.id);
+  const rootIds = pool.filter((i) => i.horizon != null && !childIds.has(i.id)).map((i) => i.id);
   const rootSet = new Set(rootIds);
 
-  const included = activeIdeas.filter((i) => {
+  const included = pool.filter((i) => {
     if (rootSet.has(i.id)) return true;
     let cur = i;
-    while (cur.parent_id && activeIds.has(cur.parent_id)) {
+    while (cur.parent_id && poolIds.has(cur.parent_id)) {
       cur = ideas.find((p) => p.id === cur.parent_id)!;
       if (rootSet.has(cur.id)) return true;
     }
@@ -72,29 +78,6 @@ function getDescendantIdeaIds(rootId: string, ideas: Idea[]): Set<string> {
   collect(rootId);
   return ids;
 }
-
-const TYPE_BADGE: Record<string, { label: string; className: string }> = {
-  idea: {
-    label: "Idea",
-    className: "bg-orange-100/80 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400",
-  },
-  objective: {
-    label: "Objective",
-    className: "bg-purple-100/80 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400",
-  },
-  project: {
-    label: "Project",
-    className: "bg-blue-100/80 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
-  },
-  initiative: {
-    label: "Initiative",
-    className: "bg-violet-100/80 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400",
-  },
-  task: {
-    label: "Task",
-    className: "bg-gray-100/80 text-gray-500 dark:bg-gray-800/40 dark:text-gray-400",
-  },
-};
 
 function RootAddInput({
   horizon,
@@ -151,8 +134,10 @@ export default function HorizonPage() {
     readTreeOverrides(STORAGE_KEYS.horizonTreeOverrides),
   );
   const [search, setSearch] = useState("");
-  const [hideClosed, setHideClosed] = useState(false);
+  const [hideClosed, setHideClosed] = useState(true);
   const [focusOnly, setFocusOnly] = useState(false);
+  const laneConfigsHook = useLaneConfigsContext();
+  const [laneDialogHorizon, setLaneDialogHorizon] = useState<IdeaHorizon | null>(null);
 
   const updateIdea = async (id: string, updates: Partial<Idea>) => {
     const previous = ideasHook.ideas.find((idea) => idea.id === id);
@@ -247,7 +232,10 @@ export default function HorizonPage() {
     });
   };
 
-  const allTreeNodes = useMemo(() => buildFilteredTree(ideas, collapsedIds), [ideas, collapsedIds]);
+  const allTreeNodes = useMemo(
+    () => buildFilteredTree(ideas, collapsedIds, hideClosed),
+    [ideas, collapsedIds, hideClosed],
+  );
 
   const treesByHorizon = useMemo(() => {
     const grouped: Record<IdeaHorizon, IdeaNode[]> = { short: [], medium: [], long: [] };
@@ -319,15 +307,28 @@ export default function HorizonPage() {
       <div className="glass-card flex min-w-0 flex-1 flex-col rounded-2xl">
         <div className="flex items-center justify-between border-b border-black/5 px-4 py-3 dark:border-white/5">
           <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{h.label}</span>
-          <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-[11px] font-semibold text-gray-400 dark:bg-white/[0.06] dark:text-gray-500">
-            {nodes.length}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-[11px] font-semibold text-gray-400 dark:bg-white/[0.06] dark:text-gray-500">
+              {nodes.length}
+            </span>
+            <button
+              onClick={() => setLaneDialogHorizon(h.key)}
+              title="Configure lanes"
+              className="rounded p-1 text-gray-400 hover:bg-black/5 hover:text-gray-600 dark:hover:bg-white/5"
+            >
+              <Settings2 size={14} />
+            </button>
+          </div>
         </div>
 
         <div className="max-h-[calc(100vh-220px)] min-h-[120px] flex-1 overflow-y-auto">
           <HorizonTree
             nodes={nodes}
             ideas={ideas}
+            horizon={h.key}
+            laneConfigs={laneConfigsHook.getLanesForHorizon(h.key)}
+            unassignedLabel={laneConfigsHook.getUnassignedLabel(h.key)}
+            isLoading={laneConfigsHook.isLoading}
             allTags={tagsHook.tags}
             links={linksHook.links}
             getTagsForIdea={taskTagsHook.getTagsForIdea}
@@ -443,6 +444,14 @@ export default function HorizonPage() {
           </motion.div>
         </AnimatePresence>
       </div>
+      {laneDialogHorizon && (
+        <LaneConfigDialog
+          key={laneDialogHorizon}
+          horizon={laneDialogHorizon}
+          onClose={() => setLaneDialogHorizon(null)}
+          ideasCountByLane={(laneId) => ideas.filter((i) => i.focus_lane === laneId).length}
+        />
+      )}
     </AppShell>
   );
 }

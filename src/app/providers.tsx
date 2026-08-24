@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { PowerSyncContext } from "@powersync/react";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { getPowerSync, SupabaseConnector } from "@/lib/powersync";
+import { LaneConfigsProvider } from "@/contexts/LaneConfigsContext";
 import type { PowerSyncDatabase } from "@powersync/web";
 
 function PowerSyncProvider({ children }: { children: ReactNode }) {
@@ -56,7 +57,7 @@ function AuthGuard({ children }: { children: ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return <LaneConfigsProvider>{children}</LaneConfigsProvider>;
 }
 
 export function Providers({ children }: { children: ReactNode }) {

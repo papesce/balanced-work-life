@@ -11,9 +11,11 @@ import {
   Telescope,
   Check,
   Target,
+  Layers,
 } from "lucide-react";
 import { createPortal } from "react-dom";
-import { Idea, IdeaLink, IdeaHorizon, LinkType, Tag } from "@/lib/types";
+import { Idea, IdeaLink, IdeaHorizon, LinkType, Tag, LaneConfig } from "@/lib/types";
+import { DEFAULT_UNASSIGNED_LABEL } from "@/lib/constants";
 import { LinkPanel } from "@/components/brainstorm/LinkPanel";
 import { MoveIdeaPanel } from "@/components/brainstorm/MoveIdeaPanel";
 import { SchedulePicker } from "@/components/brainstorm/SchedulePicker";
@@ -22,6 +24,8 @@ interface IdeaActionMenuProps {
   idea: Idea;
   allIdeas: Idea[];
   links: IdeaLink[];
+  laneConfigs?: LaneConfig[];
+  unassignedLabel?: string;
   hasChildren: boolean;
   getTagsForIdea?: (ideaId: string) => Tag[];
   onEdit: () => void;
@@ -40,6 +44,8 @@ export function IdeaActionMenu({
   idea,
   allIdeas,
   links,
+  laneConfigs,
+  unassignedLabel,
   hasChildren,
   getTagsForIdea,
   onEdit,
@@ -61,6 +67,7 @@ export function IdeaActionMenu({
   const [showDeleteWarning, setShowDeleteWarning] = useState(false);
   const [deletePos, setDeletePos] = useState<{ top: number; right: number } | null>(null);
   const [showHorizonPicker, setShowHorizonPicker] = useState(false);
+  const [showLanePicker, setShowLanePicker] = useState(false);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const deleteConfirmRef = useRef<HTMLDivElement>(null);
@@ -125,6 +132,7 @@ export function IdeaActionMenu({
     setShowSchedulePicker(false);
     setShowDeleteWarning(false);
     setShowHorizonPicker(false);
+    setShowLanePicker(false);
   };
 
   const handleRequestDelete = () => {
@@ -153,7 +161,15 @@ export function IdeaActionMenu({
     showMovePanel ||
     showSchedulePicker ||
     showDeleteWarning ||
-    showHorizonPicker;
+    showHorizonPicker ||
+    showLanePicker;
+
+  const laneConfigsForIdea = useMemo(() => {
+    if (!idea.horizon || !laneConfigs) return [];
+    return laneConfigs.filter((l) => l.horizon === idea.horizon);
+  }, [laneConfigs, idea.horizon]);
+
+  const showLaneAction = !!idea.horizon && laneConfigs !== undefined;
 
   return (
     <div
@@ -255,6 +271,18 @@ export function IdeaActionMenu({
                 Horizon
               </button>
             )}
+            {showLaneAction && (
+              <button
+                onClick={() => {
+                  setShowMenu(false);
+                  setShowLanePicker(true);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+              >
+                <Layers size={12} strokeWidth={1.5} />
+                Move to lane
+              </button>
+            )}
             <button
               onClick={() => {
                 setShowMenu(false);
@@ -281,6 +309,59 @@ export function IdeaActionMenu({
                   Delete
                 </button>
               </>
+            )}
+          </div>,
+          document.body,
+        )}
+
+      {/* Lane picker flyout */}
+      {showLanePicker &&
+        menuPos &&
+        idea.horizon &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              top: menuPos.top,
+              right: menuPos.right + 200,
+              zIndex: 9999,
+            }}
+            className="glass-card-strong min-w-[160px] rounded-xl py-1.5 shadow-lg"
+          >
+            <p className="px-3 py-1 text-[10px] font-medium tracking-wide text-gray-400 uppercase">
+              Move to lane
+            </p>
+            {laneConfigsForIdea.length > 0 && (
+              <button
+                onClick={() => {
+                  void onUpdate(idea.id, { focus_lane: null });
+                  setShowLanePicker(false);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+              >
+                <span className="w-3">
+                  {idea.focus_lane == null && <Check size={12} strokeWidth={2} />}
+                </span>
+                {unassignedLabel ?? DEFAULT_UNASSIGNED_LABEL}
+              </button>
+            )}
+            {laneConfigsForIdea.map((lane) => (
+              <button
+                key={lane.id}
+                onClick={() => {
+                  void onUpdate(idea.id, { focus_lane: lane.id });
+                  setShowLanePicker(false);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+              >
+                <span className="w-3">
+                  {idea.focus_lane === lane.id && <Check size={12} strokeWidth={2} />}
+                </span>
+                {lane.label}
+              </button>
+            ))}
+            {laneConfigsForIdea.length === 0 && (
+              <p className="px-3 py-2 text-xs text-gray-400 italic">No lanes yet</p>
             )}
           </div>,
           document.body,
