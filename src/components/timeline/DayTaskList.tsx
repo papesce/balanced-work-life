@@ -8,6 +8,7 @@ import { Idea, IdeaStatus, Tag, LifeArea } from "@/lib/types";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { AREA_DOT_COLORS, STATUS_CONFIG } from "@/lib/constants";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
+import { SchedulePicker } from "@/components/brainstorm/SchedulePicker";
 import { RescheduleAction, DayOccurrence } from "@/lib/tasks/rescheduleTask";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";
 import { NotesIndicator } from "@/components/shared/NotesIndicator";
@@ -274,6 +275,7 @@ function TimelineTaskRow({
   const [showMenu, setShowMenu] = useState(false);
   const [showTagPicker, setShowTagPicker] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
@@ -305,7 +307,10 @@ function TimelineTaskRow({
 
   useEffect(() => {
     if (!showMenu) return;
-    const close = () => setShowMenu(false);
+    const close = () => {
+      setShowMenu(false);
+      setShowDatePicker(false);
+    };
     window.addEventListener("scroll", close, { capture: true, passive: true });
     window.addEventListener("resize", close);
     return () => {
@@ -618,25 +623,35 @@ function TimelineTaskRow({
                   {dateActionLabel} to Today
                 </button>
               )}
-              <div className="group/date relative">
-                <button className="flex w-full px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]">
-                  {dateActionLabel} Date…
+              <div className="relative">
+                <button
+                  onClick={() => setShowDatePicker((v) => !v)}
+                  className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                >
+                  {dateActionLabel} Date…{" "}
+                  <span className="text-[10px]">{showDatePicker ? "▴" : "▸"}</span>
                 </button>
-                <input
-                  type="date"
-                  className="pointer-events-none absolute top-0 left-full ml-1 h-0 w-0 rounded-lg border border-black/10 bg-white/80 px-2 py-1.5 text-xs text-gray-800 opacity-0 group-hover/date:pointer-events-auto group-hover/date:h-auto group-hover/date:w-auto group-hover/date:opacity-100 focus:ring-1 focus:ring-violet-500 focus:outline-none dark:border-white/10 dark:bg-gray-800/80 dark:text-gray-200"
-                  onChange={(e) => {
-                    if (e.target.value) {
+                {showDatePicker && (
+                  <SchedulePicker
+                    currentDate={task.scheduled_date}
+                    onSelect={(date) => {
                       void onReschedule(
                         task.id,
                         isReschedule
-                          ? { type: "reschedule", newDate: e.target.value }
-                          : { type: "move", newDate: e.target.value },
+                          ? { type: "reschedule", newDate: date }
+                          : { type: "move", newDate: date },
                       );
+                      setShowDatePicker(false);
                       setShowMenu(false);
-                    }
-                  }}
-                />
+                    }}
+                    onClear={() => {
+                      onUpdate(task.id, { scheduled_date: null });
+                      setShowDatePicker(false);
+                      setShowMenu(false);
+                    }}
+                    onClose={() => setShowDatePicker(false)}
+                  />
+                )}
               </div>
 
               <div className="my-1 border-t border-black/5 dark:border-white/5" />

@@ -1,0 +1,463 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft, FolderKanban, Plus, Search } from "lucide-react";
+import { AppShell } from "@/components/AppShell";
+import { IdeaTree } from "@/components/brainstorm/IdeaTree";
+import { BrainstormBreadcrumb } from "@/components/brainstorm/BrainstormBreadcrumb";
+import { useIdeas, type CreateIdeaPosition } from "@/hooks/useIdeas";
+import { useIdeaLinks } from "@/hooks/useIdeaLinks";
+import { useTags } from "@/hooks/useTags";
+import { useTaskTags } from "@/hooks/useTaskTags";
+import { Idea, LinkType } from "@/lib/types";
+import { getAncestorChain, getChildCount } from "@/lib/ideaTreeFocus";
+
+type UndoAction = { label: string; run: () => Promise<void> };
+
+function getDescendantIdeaIds(rootId: string, ideas: Idea[]): Set<string> {
+  const ids = new Set<string>();
+  const collect = (id: string) => {
+    ids.add(id);
+    ideas.filter((i) => i.parent_id === id).forEach((c) => collect(c.id));
+  };
+  collect(rootId);
+  return ids;
+}
+
+export default function ProjectsPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const initialProjectId = searchParams.get("projectId");
+
+  const [search, setSearch] = useState("");
+  const [hideCompleted, setHideCompleted] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<"all" | "active">("active");
+  const [selectedId, setSelectedId] = useState<string | null>(initialProjectId);
+
+  const ideasHook = useIdeas({ scope: "all", searchQuery: search });
+  const linksHook = useIdeaLinks();
+  const tagsHook = useTags();
+  const taskTagsHook = useTaskTags();
+
+  const [showType] = useState(true);
+  const [showArea] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedTreeId, setSelectedTreeId] = useState<string | null>(null);
+  const [composing, setComposing] = useState<{
+    nodeId: string;
+    parentId: string | null;
+    position: "child" | "top" | "bottom";
+    depth: number;
+  } | null>(null);
+  const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
+
+  useEffect(() => {
+    const pid = searchParams.get("projectId");
+    if (pid !== selectedId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sync URL to state
+      setSelectedId(pid);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const handleSelect = (id: string | null) => {
+    setSelectedId(id);
+    const params = new URLSearchParams(searchParams.toString());
+    if (id) params.set("projectId", id);
+    else params.delete("projectId");
+    const qs = params.toString();
+    router.replace(qs ? `/projects?${qs}` : "/projects", { scroll: false });
+    if (id) ideasHook.expandIdea(id);
+  };
+
+  useEffect(() => {
+    if (selectedId && !ideasHook.loading && !ideasHook.ideas.some((i) => i.id === selectedId)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- self-heal deleted project
+      handleSelect(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ideasHook.ideas, ideasHook.loading]);
+
+  const projects = useMemo(
+    () => ideasHook.ideas.filter((i) => i.type === "project"),
+    [ideasHook.ideas],
+  );
+
+  const visibleProjects = useMemo(() => {
+    let list = projects;
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (p) => p.text.toLowerCase().includes(q) || (p.notes?.toLowerCase().includes(q) ?? false),
+      );
+    }
+    if (statusFilter === "active") {
+      list = list.filter((p) => !["completed", "cancelled", "archived"].includes(p.status));
+    }
+    if (hideCompleted) {
+      list = list.filter((p) => p.status !== "completed");
+    }
+    return [...list].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  }, [projects, search, statusFilter, hideCompleted]);
+
+  const selectedProject = useMemo(
+    () => (selectedId ? (ideasHook.ideas.find((i) => i.id === selectedId) ?? null) : null),
+    [ideasHook.ideas, selectedId],
+  );
+
+  const breadcrumbChain = useMemo(
+    () => (selectedId ? getAncestorChain(selectedId, ideasHook.ideas) : []),
+    [selectedId, ideasHook.ideas],
+  );
+
+  const registerUndo = (undo: UndoAction) => setUndoAction(undo);
+
+  const createIdea = async (
+    text: string,
+    parentId?: string | null,
+    position?: CreateIdeaPosition,
+    initialUpdates?: Partial<Idea>,
+  ): Promise<string> => {
+    const id = await ideasHook.createIdea(text, parentId, position, initialUpdates);
+    if (id)
+      registerUndo({
+        label: "Idea created",
+        run: async () => {
+          await ideasHook.deleteIdea(id);
+        },
+      });
+    return id;
+  };
+
+  const updateIdea = async (id: string, updates: Partial<Idea>) => {
+    const prev = ideasHook.ideas.find((i) => i.id === id);
+    await ideasHook.updateIdea(id, updates);
+    if (!prev) return;
+    const restore: Partial<Idea> = {};
+    for (const k of Object.keys(updates) as Array<keyof Idea>) restore[k] = prev[k] as never;
+    registerUndo({
+      label: "Idea updated",
+      run: async () => {
+        await ideasHook.updateIdea(id, restore);
+      },
+    });
+  };
+
+  const deleteIdea = async (id: string) => {
+    const deletedIds = getDescendantIdeaIds(id, ideasHook.ideas);
+    const deletedIdeas = ideasHook.ideas.filter((i) => deletedIds.has(i.id));
+    const deletedLinks = linksHook.removeLinksForIdeaIds(deletedIds);
+    await ideasHook.deleteIdea(id);
+    if (deletedIdeas.length === 0) return;
+    registerUndo({
+      label: deletedIdeas.length > 1 ? "Ideas deleted" : "Idea deleted",
+      run: async () => {
+        await ideasHook.restoreIdeas(deletedIdeas);
+        await linksHook.restoreLinks(deletedLinks);
+      },
+    });
+    if (selectedId && deletedIds.has(selectedId)) handleSelect(null);
+  };
+
+  const moveIdea = async (id: string, newParentId: string | null, newSortOrder: number) => {
+    const prev = ideasHook.ideas.find((i) => i.id === id);
+    await ideasHook.moveIdea(id, newParentId, newSortOrder);
+    if (!prev) return;
+    registerUndo({
+      label: "Idea moved",
+      run: async () => {
+        await ideasHook.moveIdea(id, prev.parent_id, prev.sort_order);
+      },
+    });
+  };
+
+  const createLink = async (s: string, t: string, type: LinkType): Promise<string> => {
+    const id = await linksHook.createLink(s, t, type);
+    if (id)
+      registerUndo({
+        label: "Link created",
+        run: async () => {
+          await linksHook.deleteLink(id);
+        },
+      });
+    return id;
+  };
+  const deleteLink = async (id: string) => {
+    const del = linksHook.links.find((l) => l.id === id);
+    await linksHook.deleteLink(id);
+    if (!del) return;
+    registerUndo({
+      label: "Link deleted",
+      run: async () => {
+        await linksHook.restoreLinks([del]);
+      },
+    });
+  };
+  const markDone = async (id: string) => {
+    const prev = ideasHook.ideas.find((i) => i.id === id);
+    await ideasHook.markDone(id);
+    if (!prev) return;
+    registerUndo({
+      label: "Idea completed",
+      run: async () => {
+        await ideasHook.updateIdea(id, { status: prev.status, completed_at: prev.completed_at });
+      },
+    });
+  };
+  const markUndone = async (id: string) => {
+    const prev = ideasHook.ideas.find((i) => i.id === id);
+    await ideasHook.markUndone(id);
+    if (!prev) return;
+    registerUndo({
+      label: "Idea reopened",
+      run: async () => {
+        await ideasHook.updateIdea(id, { status: prev.status, completed_at: prev.completed_at });
+      },
+    });
+  };
+  const scheduleIdea = async (id: string, date: string | null) => {
+    const prev = ideasHook.ideas.find((i) => i.id === id);
+    await ideasHook.scheduleIdea(id, date);
+    if (!prev) return;
+    registerUndo({
+      label: date ? "Idea scheduled" : "Schedule cleared",
+      run: async () => {
+        await ideasHook.updateIdea(id, { scheduled_date: prev.scheduled_date });
+      },
+    });
+  };
+
+  const handleAddTask = async () => {
+    if (!selectedId) return;
+    const id = await createIdea("", selectedId, "bottom", { type: "task", status: "draft" });
+    if (id) {
+      ideasHook.expandIdea(selectedId);
+      setSelectedTreeId(id);
+      setEditingId(id);
+    }
+  };
+
+  const handleUndo = async () => {
+    if (!undoAction) return;
+    const a = undoAction;
+    setUndoAction(null);
+    await a.run();
+  };
+
+  if (ideasHook.loading) {
+    return (
+      <AppShell title="Projects">
+        <div className="flex justify-center py-20">
+          <div className="animate-pulse text-gray-400">Loading...</div>
+        </div>
+      </AppShell>
+    );
+  }
+
+  // Detail view — focused project tree
+  if (selectedId && selectedProject) {
+    return (
+      <AppShell
+        title={selectedProject.text || "Untitled project"}
+        headerStartActions={
+          <button
+            onClick={() => handleSelect(null)}
+            className="toolbar-btn flex items-center gap-1.5"
+          >
+            <ArrowLeft size={14} /> Back
+          </button>
+        }
+        headerActions={
+          <button
+            onClick={handleAddTask}
+            className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-violet-700"
+          >
+            <Plus size={13} /> Add task
+          </button>
+        }
+      >
+        {breadcrumbChain.length > 0 && (
+          <div className="mb-3">
+            <BrainstormBreadcrumb
+              chain={breadcrumbChain}
+              focused={selectedProject}
+              onSelect={(id) => handleSelect(id)}
+            />
+          </div>
+        )}
+
+        <div className="mb-4 flex items-center gap-2 text-xs text-gray-500">
+          <span className="capitalize">{selectedProject.status.replace("_", " ")}</span>
+          <span>·</span>
+          <span>{getChildCount(selectedProject.id, ideasHook.ideas)} tasks</span>
+        </div>
+
+        <IdeaTree
+          tree={ideasHook.tree}
+          ideas={ideasHook.ideas}
+          links={linksHook.links}
+          scope="all"
+          createIdea={createIdea}
+          updateIdea={updateIdea}
+          deleteIdea={deleteIdea}
+          moveIdea={moveIdea}
+          toggleCollapse={ideasHook.toggleCollapse}
+          expandIdea={ideasHook.expandIdea}
+          onCreateLink={createLink}
+          onDeleteLink={deleteLink}
+          onMarkDone={markDone}
+          onMarkUndone={markUndone}
+          onSchedule={scheduleIdea}
+          allTags={tagsHook.tags}
+          getTagsForIdea={taskTagsHook.getTagsForIdea}
+          onAddTag={taskTagsHook.addTagToTask}
+          onRemoveTag={taskTagsHook.removeTagFromTask}
+          onCreateTag={tagsHook.createTag}
+          search=""
+          showType={showType}
+          showArea={showArea}
+          editMode="view"
+          editingId={editingId}
+          setEditingId={setEditingId}
+          selectedId={selectedTreeId}
+          setSelectedId={setSelectedTreeId}
+          composing={composing}
+          setComposing={setComposing}
+          showToday={false}
+          hideClosed={false}
+          hideCompleted={false}
+          hideDeferred={false}
+          focusedId={selectedId}
+          onFocus={(id) => handleSelect(id)}
+          cardMode={false}
+        />
+
+        {undoAction && (
+          <div className="fixed bottom-20 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-amber-200/40 bg-white px-4 py-2.5 shadow-lg dark:border-amber-700/30 dark:bg-gray-800">
+            <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
+              {undoAction.label}
+            </span>
+            <button
+              onClick={handleUndo}
+              className="rounded-lg px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100/60"
+            >
+              Undo
+            </button>
+            <button
+              onClick={() => setUndoAction(null)}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-amber-600 hover:bg-amber-100/60"
+            >
+              ×
+            </button>
+          </div>
+        )}
+      </AppShell>
+    );
+  }
+
+  // List view — all projects
+  return (
+    <AppShell title="Projects">
+      <div className="mx-auto max-w-2xl space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[180px] flex-1">
+            <Search
+              size={14}
+              className="absolute top-1/2 left-2.5 -translate-y-1/2 text-gray-400"
+            />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search projects..."
+              className="w-full rounded-xl border border-black/10 bg-white/60 py-2 pr-3 pl-8 text-sm placeholder:text-gray-300 focus:ring-2 focus:ring-violet-500/30 focus:outline-none dark:border-white/10 dark:bg-gray-800/60 dark:placeholder:text-gray-500"
+            />
+          </div>
+          <div className="flex gap-1">
+            <button
+              onClick={() => setStatusFilter("active")}
+              className={`toolbar-btn ${statusFilter === "active" ? "toolbar-btn--accent" : ""}`}
+            >
+              Active
+            </button>
+            <button
+              onClick={() => setStatusFilter("all")}
+              className={`toolbar-btn ${statusFilter === "all" ? "toolbar-btn--accent" : ""}`}
+            >
+              All
+            </button>
+          </div>
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-gray-400">
+            <input
+              type="checkbox"
+              checked={hideCompleted}
+              onChange={(e) => setHideCompleted(e.target.checked)}
+              className="rounded"
+            />
+            Hide completed
+          </label>
+        </div>
+
+        <p className="text-xs text-gray-400">
+          {visibleProjects.length} project{visibleProjects.length !== 1 ? "s" : ""}
+        </p>
+
+        {visibleProjects.length === 0 ? (
+          <div className="py-16 text-center text-gray-400">
+            <FolderKanban size={28} className="mx-auto mb-3 opacity-30" />
+            <p className="text-sm font-semibold">No projects found</p>
+            <p className="mt-1 text-xs">
+              Create a project in Brainstorm with type &quot;project&quot;
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {visibleProjects.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => handleSelect(p.id)}
+                className="glass-card flex w-full cursor-pointer items-center justify-between rounded-2xl border border-black/5 px-4 py-3 text-left transition hover:border-violet-200 dark:border-white/5 dark:hover:border-violet-800"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30">
+                    <FolderKanban size={16} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-gray-800 dark:text-gray-100">
+                      {p.text || "Untitled project"}
+                    </p>
+                    <p className="text-[11px] text-gray-400">
+                      {p.status.replace("_", " ")} · {getChildCount(p.id, ideasHook.ideas)} tasks
+                      {p.scheduled_date ? ` · ${p.scheduled_date}` : ""}
+                    </p>
+                  </div>
+                </div>
+                <span className="shrink-0 text-xs font-semibold text-violet-600">Open →</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {undoAction && (
+          <div className="fixed bottom-20 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-amber-200/40 bg-white px-4 py-2.5 shadow-lg dark:border-amber-700/30 dark:bg-gray-800">
+            <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
+              {undoAction.label}
+            </span>
+            <button
+              onClick={handleUndo}
+              className="rounded-lg px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100/60"
+            >
+              Undo
+            </button>
+            <button
+              onClick={() => setUndoAction(null)}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-amber-600 hover:bg-amber-100/60"
+            >
+              ×
+            </button>
+          </div>
+        )}
+      </div>
+    </AppShell>
+  );
+}

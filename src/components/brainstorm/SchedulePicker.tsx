@@ -8,6 +8,7 @@ interface SchedulePickerProps {
   onSelect: (date: string) => void;
   onClear: () => void;
   onClose: () => void;
+  className?: string;
 }
 
 function getTodayString(): string {
@@ -37,7 +38,13 @@ function formatDate(dateStr: string): string {
   });
 }
 
-export function SchedulePicker({ currentDate, onSelect, onClear, onClose }: SchedulePickerProps) {
+export function SchedulePicker({
+  currentDate,
+  onSelect,
+  onClear,
+  onClose,
+  className,
+}: SchedulePickerProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -57,7 +64,10 @@ export function SchedulePicker({ currentDate, onSelect, onClear, onClose }: Sche
   return (
     <div
       ref={menuRef}
-      className="glass-card-strong absolute top-full right-0 z-50 mt-1 w-56 space-y-1 rounded-xl p-2"
+      className={
+        className ??
+        "glass-card-strong absolute top-full right-0 z-50 mt-1 w-56 space-y-1 rounded-xl p-2"
+      }
     >
       <button
         onClick={() => onSelect(today)}
