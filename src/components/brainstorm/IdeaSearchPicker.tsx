@@ -61,19 +61,19 @@ export function IdeaSearchPicker({
       />
 
       {searchResults.length > 0 && (
-        <div className="mb-2 max-h-[190px] overflow-y-auto rounded-lg border border-black/10 dark:border-white/10">
+        <div className="mb-2 max-h-[220px] overflow-y-auto rounded-lg border border-black/10 dark:border-white/10">
           {searchResults.map((idea) => {
             const tags = getTagsForIdea?.(idea.id) ?? [];
             return (
               <div
                 key={idea.id}
-                className="flex items-center gap-2 px-2 py-1.5 hover:bg-black/[0.02] dark:hover:bg-white/[0.04]"
+                className="flex items-start justify-between gap-2 px-2.5 py-2 hover:bg-black/[0.02] dark:hover:bg-white/[0.04]"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    <span className="truncate text-sm text-gray-800 dark:text-gray-200">
-                      {idea.text || "empty"}
-                    </span>
+                  <p className="line-clamp-2 text-sm leading-snug break-words text-gray-800 dark:text-gray-200">
+                    {idea.text || "empty"}
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     {idea.type && (
                       <span
                         className={`flex-shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium ${TYPE_COLORS[idea.type]}`}
@@ -86,10 +86,8 @@ export function IdeaSearchPicker({
                     >
                       {STATUS_LABELS[idea.status]}
                     </span>
-                  </div>
-                  <div className="flex items-center gap-2 truncate text-xs text-gray-400 dark:text-gray-500">
                     {tags.length > 0 && (
-                      <span className="flex flex-shrink-0 items-center gap-1">
+                      <span className="flex flex-wrap items-center gap-1">
                         {tags.map((tag) => (
                           <span
                             key={tag.id}
@@ -103,10 +101,12 @@ export function IdeaSearchPicker({
                         ))}
                       </span>
                     )}
-                    <span className="truncate">{getPathLabel(idea, ideasById)}</span>
+                    <span className="truncate text-xs text-gray-400 dark:text-gray-500">
+                      {getPathLabel(idea, ideasById)}
+                    </span>
                   </div>
                 </div>
-                <div className="flex flex-shrink-0 gap-1">
+                <div className="flex shrink-0 items-center gap-1 pt-0.5">
                   {renderActions(idea, () => setSearch(""))}
                 </div>
               </div>

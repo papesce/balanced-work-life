@@ -3,12 +3,14 @@
 import { useState, useEffect, useMemo, useRef, KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { Reorder, useDragControls } from "framer-motion";
-import { Star, MoreHorizontal, GripVertical } from "lucide-react";
-import { Idea, IdeaStatus, Tag, LifeArea } from "@/lib/types";
+import { Star, MoreHorizontal, GripVertical, Link2 } from "lucide-react";
+import { Idea, IdeaStatus, IdeaLink, LinkType, Tag, LifeArea } from "@/lib/types";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { AREA_DOT_COLORS, STATUS_CONFIG } from "@/lib/constants";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { SchedulePicker } from "@/components/brainstorm/SchedulePicker";
+import { MoveIdeaPanel } from "@/components/brainstorm/MoveIdeaPanel";
+import { LinkPanel } from "@/components/brainstorm/LinkPanel";
 import { RescheduleAction, DayOccurrence } from "@/lib/tasks/rescheduleTask";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";
 import { NotesIndicator } from "@/components/shared/NotesIndicator";
@@ -22,6 +24,11 @@ interface DayTaskListProps {
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
+  onMove?: (id: string, newParentId: string | null, newSortOrder: number) => Promise<void>;
+  ideas?: Idea[];
+  links?: IdeaLink[];
+  onCreateLink?: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
+  onDeleteLink?: (id: string) => Promise<void>;
   today: string;
   onGoToDate?: (date: string, taskId: string) => void;
   allTags: Tag[];
@@ -38,6 +45,11 @@ export function DayTaskList({
   onUndone,
   onUpdate,
   onReschedule,
+  onMove,
+  ideas,
+  links,
+  onCreateLink,
+  onDeleteLink,
   today,
   onGoToDate,
   allTags,
@@ -82,6 +94,11 @@ export function DayTaskList({
             onUndone={onUndone}
             onUpdate={onUpdate}
             onReschedule={onReschedule}
+            onMove={onMove}
+            ideas={ideas}
+            links={links}
+            onCreateLink={onCreateLink}
+            onDeleteLink={onDeleteLink}
             today={today}
             allTags={allTags}
             taskTags={getTagsForIdea(task.id)}
@@ -107,6 +124,11 @@ export function DayTaskList({
               onUndone={onUndone}
               onUpdate={onUpdate}
               onReschedule={onReschedule}
+              onMove={onMove}
+              ideas={ideas}
+              links={links}
+              onCreateLink={onCreateLink}
+              onDeleteLink={onDeleteLink}
               today={today}
               onGoToDate={onGoToDate}
               allTags={allTags}
@@ -130,6 +152,11 @@ function HistoricalOccurrenceRow({
   onUndone,
   onUpdate,
   onReschedule,
+  onMove,
+  ideas,
+  links,
+  onCreateLink,
+  onDeleteLink,
   today,
   onGoToDate,
   allTags,
@@ -145,6 +172,11 @@ function HistoricalOccurrenceRow({
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
+  onMove?: (id: string, newParentId: string | null, newSortOrder: number) => Promise<void>;
+  ideas?: Idea[];
+  links?: IdeaLink[];
+  onCreateLink?: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
+  onDeleteLink?: (id: string) => Promise<void>;
   today: string;
   onGoToDate?: (date: string, taskId: string) => void;
   allTags: Tag[];
@@ -162,6 +194,11 @@ function HistoricalOccurrenceRow({
         onUndone={onUndone}
         onUpdate={onUpdate}
         onReschedule={onReschedule}
+        onMove={onMove}
+        ideas={ideas}
+        links={links}
+        onCreateLink={onCreateLink}
+        onDeleteLink={onDeleteLink}
         today={today}
         dragControls={useDragControls()}
         allTags={allTags}
@@ -184,6 +221,11 @@ function DayTaskItem({
   onUndone,
   onUpdate,
   onReschedule,
+  onMove,
+  ideas,
+  links,
+  onCreateLink,
+  onDeleteLink,
   today,
   allTags,
   taskTags,
@@ -198,6 +240,11 @@ function DayTaskItem({
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
+  onMove?: (id: string, newParentId: string | null, newSortOrder: number) => Promise<void>;
+  ideas?: Idea[];
+  links?: IdeaLink[];
+  onCreateLink?: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
+  onDeleteLink?: (id: string) => Promise<void>;
   today: string;
   allTags: Tag[];
   taskTags: Tag[];
@@ -215,6 +262,11 @@ function DayTaskItem({
         onUndone={onUndone}
         onUpdate={onUpdate}
         onReschedule={onReschedule}
+        onMove={onMove}
+        ideas={ideas}
+        links={links}
+        onCreateLink={onCreateLink}
+        onDeleteLink={onDeleteLink}
         today={today}
         dragControls={controls}
         allTags={allTags}
@@ -234,6 +286,11 @@ function TimelineTaskRow({
   onUndone,
   onUpdate,
   onReschedule,
+  onMove,
+  ideas,
+  links,
+  onCreateLink,
+  onDeleteLink,
   today,
   dragControls,
   allTags,
@@ -250,6 +307,11 @@ function TimelineTaskRow({
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
+  onMove?: (id: string, newParentId: string | null, newSortOrder: number) => Promise<void>;
+  ideas?: Idea[];
+  links?: IdeaLink[];
+  onCreateLink?: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
+  onDeleteLink?: (id: string) => Promise<void>;
   today: string;
   dragControls: ReturnType<typeof useDragControls>;
   allTags: Tag[];
@@ -276,6 +338,8 @@ function TimelineTaskRow({
   const [showTagPicker, setShowTagPicker] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showAttachPanel, setShowAttachPanel] = useState(false);
+  const [showLinkPanel, setShowLinkPanel] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
@@ -310,6 +374,8 @@ function TimelineTaskRow({
     const close = () => {
       setShowMenu(false);
       setShowDatePicker(false);
+      setShowAttachPanel(false);
+      setShowLinkPanel(false);
     };
     window.addEventListener("scroll", close, { capture: true, passive: true });
     window.addEventListener("resize", close);
@@ -460,6 +526,29 @@ function TimelineTaskRow({
           {task.scheduled_time.slice(0, 5)}
         </span>
       )}
+
+      {(() => {
+        const parent = ideas?.find((i) => i.id === task.parent_id);
+        if (!parent) return null;
+        return (
+          <span
+            title={`in: ${parent.text || "Untitled"}`}
+            className="max-w-[100px] truncate rounded-full bg-black/[0.04] px-2 py-0.5 text-[9px] font-semibold text-gray-500 dark:bg-white/[0.06] dark:text-gray-400"
+          >
+            in: {parent.text || "Untitled"}
+          </span>
+        );
+      })()}
+      {(() => {
+        const count =
+          links?.filter((l) => l.source_id === task.id || l.target_id === task.id).length ?? 0;
+        if (count === 0) return null;
+        return (
+          <span className="flex items-center gap-0.5 rounded-full bg-indigo-50 px-1.5 py-0.5 text-[9px] font-bold text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400">
+            <Link2 size={10} /> {count}
+          </span>
+        );
+      })()}
 
       <div className="relative flex flex-shrink-0 items-center gap-1">
         {taskTags.map((tag) => (
@@ -653,6 +742,56 @@ function TimelineTaskRow({
                   />
                 )}
               </div>
+
+              {onMove && ideas && (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowAttachPanel((v) => !v)}
+                    className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                    title="Keeps deferred occurrence on this day, also shows under selected parent"
+                  >
+                    Attach to… <span className="text-[10px]">{showAttachPanel ? "▴" : "▸"}</span>
+                  </button>
+                  {showAttachPanel && (
+                    <MoveIdeaPanel
+                      idea={task}
+                      ideas={ideas}
+                      variant="attach"
+                      onMove={async (newParentId, newSortOrder) => {
+                        await onMove(task.id, newParentId, newSortOrder);
+                        setShowAttachPanel(false);
+                        setShowMenu(false);
+                      }}
+                      onMoved={() => {
+                        setShowAttachPanel(false);
+                        setShowMenu(false);
+                      }}
+                      onClose={() => setShowAttachPanel(false)}
+                    />
+                  )}
+                </div>
+              )}
+
+              {onCreateLink && onDeleteLink && ideas && links && (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowLinkPanel((v) => !v)}
+                    className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                  >
+                    Link… <span className="text-[10px]">{showLinkPanel ? "▴" : "▸"}</span>
+                  </button>
+                  {showLinkPanel && (
+                    <LinkPanel
+                      ideaId={task.id}
+                      ideas={ideas}
+                      links={links}
+                      onCreateLink={onCreateLink}
+                      onDeleteLink={onDeleteLink}
+                      onClose={() => setShowLinkPanel(false)}
+                    />
+                  )}
+                </div>
+              )}
 
               <div className="my-1 border-t border-black/5 dark:border-white/5" />
               <button

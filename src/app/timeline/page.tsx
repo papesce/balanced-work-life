@@ -16,6 +16,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Sparkles, Clock, CalendarRange, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
+import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { AppShell } from "@/components/AppShell";
@@ -269,11 +270,13 @@ function TimelineInner() {
     markDone,
     markUndone,
     updateIdea,
+    moveIdea,
     reorderTasks,
     smartSortTasks,
   } = useIdeas();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
+  const linksHook = useIdeaLinks();
   const windowMenuRef = useRef<HTMLDivElement>(null);
   const scrolledAnchorRef = useRef<string | null>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -549,6 +552,27 @@ function TimelineInner() {
     [setAnchorParam],
   );
 
+  const handleMove = useCallback(
+    async (id: string, newParentId: string | null, newSortOrder: number) => {
+      await moveIdea(id, newParentId, newSortOrder);
+    },
+    [moveIdea],
+  );
+
+  const handleCreateLink = useCallback(
+    async (sourceId: string, targetId: string, linkType: import("@/lib/types").LinkType) => {
+      return linksHook.createLink(sourceId, targetId, linkType);
+    },
+    [linksHook],
+  );
+
+  const handleDeleteLink = useCallback(
+    async (id: string) => {
+      await linksHook.deleteLink(id);
+    },
+    [linksHook],
+  );
+
   const setAnchorReady = useCallback((date: string, node: HTMLDivElement) => {
     anchorRef.current = node;
     setRenderedAnchor(date);
@@ -772,6 +796,11 @@ function TimelineInner() {
                           onUndone={markUndone}
                           onUpdate={updateIdea}
                           onReschedule={handleReschedule}
+                          onMove={handleMove}
+                          ideas={ideas}
+                          links={linksHook.links}
+                          onCreateLink={handleCreateLink}
+                          onDeleteLink={handleDeleteLink}
                           today={today}
                           onGoToDate={handleGoToDate}
                           allTags={tagsHook.tags}
