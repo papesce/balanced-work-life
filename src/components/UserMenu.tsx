@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
-import { Download, LogOut, Upload, User as UserIcon } from "lucide-react";
+import Link from "next/link";
+import { Download, LogOut, Rows3, Tags, Upload, User as UserIcon } from "lucide-react";
 import { usePowerSync } from "@powersync/react";
 import { useAuth } from "@/hooks/useAuth";
 import { useIdeas } from "@/hooks/useIdeas";
@@ -182,6 +183,28 @@ export function UserMenu() {
                 }}
               />
             </label>
+
+            <div className="mx-1 my-1 border-t border-black/5 dark:border-white/5" />
+
+            <Link
+              href="/settings/tags"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-black/[0.03] dark:text-gray-200 dark:hover:bg-white/[0.04]"
+            >
+              <Tags size={14} />
+              Manage Tags
+            </Link>
+
+            <Link
+              href="/settings/lanes"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-black/[0.03] dark:text-gray-200 dark:hover:bg-white/[0.04]"
+            >
+              <Rows3 size={14} />
+              Manage Lanes
+            </Link>
 
             <div className="mx-1 my-1 border-t border-black/5 dark:border-white/5" />
 
