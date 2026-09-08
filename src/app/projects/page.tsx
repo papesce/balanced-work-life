@@ -12,6 +12,8 @@ import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { Idea, LinkType } from "@/lib/types";
 import { getAncestorChain, getChildCount } from "@/lib/ideaTreeFocus";
+import { getCompletionEffects, hasAnyEffects, CompletionEffects } from "@/lib/linkEffects";
+import { LinkedEffectsReveal } from "@/components/shared/LinkedEffectsReveal";
 
 type UndoAction = { label: string; run: () => Promise<void> };
 
@@ -51,6 +53,10 @@ export default function ProjectsPage() {
     depth: number;
   } | null>(null);
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
+  const [completionEffects, setCompletionEffects] = useState<{
+    effects: CompletionEffects;
+    completedText: string;
+  } | null>(null);
 
   useEffect(() => {
     const pid = searchParams.get("projectId");
@@ -132,6 +138,20 @@ export default function ProjectsPage() {
 
   const updateIdea = async (id: string, updates: Partial<Idea>) => {
     const prev = ideasHook.ideas.find((i) => i.id === id);
+    if (updates.status === "completed" && prev && prev.status !== "completed") {
+      const effects = getCompletionEffects(id, ideasHook.ideas, linksHook.links);
+      await ideasHook.updateIdea(id, updates);
+      const restore: Partial<Idea> = {};
+      for (const k of Object.keys(updates) as Array<keyof Idea>) restore[k] = prev[k] as never;
+      registerUndo({
+        label: "Idea updated",
+        run: async () => {
+          await ideasHook.updateIdea(id, restore);
+        },
+      });
+      if (hasAnyEffects(effects)) setCompletionEffects({ effects, completedText: prev.text });
+      return;
+    }
     await ideasHook.updateIdea(id, updates);
     if (!prev) return;
     const restore: Partial<Idea> = {};
@@ -196,6 +216,7 @@ export default function ProjectsPage() {
   };
   const markDone = async (id: string) => {
     const prev = ideasHook.ideas.find((i) => i.id === id);
+    const effects = getCompletionEffects(id, ideasHook.ideas, linksHook.links);
     await ideasHook.markDone(id);
     if (!prev) return;
     registerUndo({
@@ -204,6 +225,7 @@ export default function ProjectsPage() {
         await ideasHook.updateIdea(id, { status: prev.status, completed_at: prev.completed_at });
       },
     });
+    if (hasAnyEffects(effects)) setCompletionEffects({ effects, completedText: prev.text });
   };
   const markUndone = async (id: string) => {
     const prev = ideasHook.ideas.find((i) => i.id === id);
@@ -332,6 +354,15 @@ export default function ProjectsPage() {
           onFocus={(id) => handleSelect(id)}
           cardMode={false}
         />
+        {completionEffects && hasAnyEffects(completionEffects.effects) && (
+          <div className="mt-4">
+            <LinkedEffectsReveal
+              effects={completionEffects.effects}
+              completedText={completionEffects.completedText}
+              onClose={() => setCompletionEffects(null)}
+            />
+          </div>
+        )}
 
         {undoAction && (
           <div className="fixed bottom-20 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-amber-200/40 bg-white px-4 py-2.5 shadow-lg dark:border-amber-700/30 dark:bg-gray-800">

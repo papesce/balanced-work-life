@@ -35,6 +35,12 @@ export function LinkPanel({
   const ref = useRef<HTMLDivElement>(null);
   const [selectedType, setSelectedType] = useState<LinkType>("related_to");
 
+  const sourceIdea = ideas.find((i) => i.id === ideaId);
+  const sourceLabel = sourceIdea?.type
+    ? sourceIdea.type.charAt(0).toUpperCase() + sourceIdea.type.slice(1).toLowerCase()
+    : "Idea";
+  const headerText = `Link this ${sourceLabel.toLowerCase()}`;
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
@@ -61,11 +67,9 @@ export function LinkPanel({
   return (
     <div
       ref={ref}
-      className="glass-card-strong absolute top-full left-0 z-50 mt-1 max-w-[340px] min-w-[280px] rounded-xl p-3"
+      className="glass-card-strong absolute top-full left-0 z-50 mt-1 w-[440px] max-w-[min(480px,90vw)] min-w-[360px] rounded-xl p-3"
     >
-      <div className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-        Link this idea
-      </div>
+      <div className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">{headerText}</div>
 
       {/* Link type selector */}
       <select
@@ -83,6 +87,7 @@ export function LinkPanel({
       <IdeaSearchPicker
         ideas={ideas}
         excludeIds={linkedIds}
+        excludeDone
         getTagsForIdea={getTagsForIdea}
         renderActions={(idea, clearSearch) => (
           <button

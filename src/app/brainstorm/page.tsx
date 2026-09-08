@@ -14,6 +14,8 @@ import { GraphView } from "@/components/brainstorm/GraphView";
 import { Idea, LinkType } from "@/lib/types";
 import { STORAGE_KEYS, readRawString, writeRawString } from "@/lib/storage";
 import { getAncestorChain } from "@/lib/ideaTreeFocus";
+import { getCompletionEffects, hasAnyEffects, CompletionEffects } from "@/lib/linkEffects";
+import { LinkedEffectsReveal, LinkedEffectsBadge } from "@/components/shared/LinkedEffectsReveal";
 import type { IdeasScope } from "@/hooks/useIdeas";
 import { useSearchParams, useRouter } from "next/navigation";
 
@@ -47,6 +49,10 @@ export default function BrainstormPage() {
     () => readRawString(STORAGE_KEYS.brainstormCardMode) === "true",
   );
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
+  const [completionEffects, setCompletionEffects] = useState<{
+    effects: CompletionEffects;
+    completedText: string;
+  } | null>(null);
 
   type EditMode = "view" | "edit" | "insert";
   const [editMode, setEditMode] = useState<EditMode>(() => {
@@ -156,6 +162,22 @@ export default function BrainstormPage() {
 
   const updateIdea = async (id: string, updates: Partial<Idea>) => {
     const previous = ideasHook.ideas.find((idea) => idea.id === id);
+    if (updates.status === "completed" && previous && previous.status !== "completed") {
+      const effects = getCompletionEffects(id, ideasHook.ideas, linksHook.links);
+      await ideasHook.updateIdea(id, updates);
+      const restore: Partial<Idea> = {};
+      for (const key of Object.keys(updates) as Array<keyof Idea>) {
+        restore[key] = previous[key] as never;
+      }
+      registerUndo({
+        label: "Idea updated",
+        run: async () => {
+          await ideasHook.updateIdea(id, restore);
+        },
+      });
+      if (hasAnyEffects(effects)) setCompletionEffects({ effects, completedText: previous.text });
+      return;
+    }
     await ideasHook.updateIdea(id, updates);
     if (!previous) return;
 
@@ -232,6 +254,8 @@ export default function BrainstormPage() {
 
   const markDone = async (id: string) => {
     const previous = ideasHook.ideas.find((idea) => idea.id === id);
+    // Compute effects BEFORE status flips to completed (uses current statuses)
+    const effects = getCompletionEffects(id, ideasHook.ideas, linksHook.links);
     await ideasHook.markDone(id);
     if (!previous) return;
 
@@ -244,6 +268,9 @@ export default function BrainstormPage() {
         });
       },
     });
+    if (hasAnyEffects(effects)) {
+      setCompletionEffects({ effects, completedText: previous.text });
+    }
   };
 
   const markUndone = async (id: string) => {
@@ -418,6 +445,9 @@ export default function BrainstormPage() {
           <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
             {undoAction.label}
           </span>
+          {completionEffects && hasAnyEffects(completionEffects.effects) && (
+            <LinkedEffectsBadge effects={completionEffects.effects} />
+          )}
           <div className="flex items-center gap-1.5">
             <button
               onClick={handleUndo}
@@ -434,6 +464,15 @@ export default function BrainstormPage() {
             </button>
           </div>
         </motion.div>
+      )}
+      {completionEffects && hasAnyEffects(completionEffects.effects) && (
+        <div className="mx-auto mt-3 max-w-3xl">
+          <LinkedEffectsReveal
+            effects={completionEffects.effects}
+            completedText={completionEffects.completedText}
+            onClose={() => setCompletionEffects(null)}
+          />
+        </div>
       )}
       {effectiveFocusId && focusedIdea && (
         <div className="mb-3">

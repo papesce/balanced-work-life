@@ -12,10 +12,19 @@ interface IdeaSearchPickerProps {
   emptyLabel?: string;
   getTagsForIdea?: (ideaId: string) => Tag[];
   renderActions: (idea: Idea, clearSearch: () => void) => ReactNode;
+  excludeDone?: boolean;
 }
 
 function getTypeLabel(type: IdeaType) {
   return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
+const DONE_STATUSES: Idea["status"][] = ["completed", "cancelled", "archived"];
+
+function formatScheduleLabel(idea: Idea): string | null {
+  if (!idea.scheduled_date) return null;
+  if (idea.scheduled_time) return `${idea.scheduled_date} · ${idea.scheduled_time.slice(0, 5)}`;
+  return idea.scheduled_date;
 }
 
 function getPathLabel(idea: Idea, ideasById: Map<string, Idea>) {
@@ -39,13 +48,19 @@ export function IdeaSearchPicker({
   emptyLabel = "No matching ideas",
   getTagsForIdea,
   renderActions,
+  excludeDone = false,
 }: IdeaSearchPickerProps) {
   const [search, setSearch] = useState("");
   const ideasById = new Map(ideas.map((idea) => [idea.id, idea]));
   const query = search.trim().toLowerCase();
   const searchResults = query
     ? ideas
-        .filter((idea) => !excludeIds.has(idea.id) && idea.text.toLowerCase().includes(query))
+        .filter(
+          (idea) =>
+            !excludeIds.has(idea.id) &&
+            idea.text.toLowerCase().includes(query) &&
+            (!excludeDone || !DONE_STATUSES.includes(idea.status)),
+        )
         .slice(0, 8)
     : [];
 
@@ -99,6 +114,11 @@ export function IdeaSearchPicker({
                             {tag.name}
                           </span>
                         ))}
+                      </span>
+                    )}
+                    {formatScheduleLabel(idea) && (
+                      <span className="flex-shrink-0 rounded border border-violet-200 bg-violet-50 px-1 py-px text-[10px] text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/15 dark:text-violet-300">
+                        {formatScheduleLabel(idea)}
                       </span>
                     )}
                     <span className="truncate text-xs text-gray-400 dark:text-gray-500">

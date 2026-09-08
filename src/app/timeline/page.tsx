@@ -46,6 +46,8 @@ import { QuickAddInput } from "@/components/timeline/QuickAddInput";
 import { UndoBar } from "@/components/shared/UndoBar";
 import { DateNav } from "@/components/planner/DateNav";
 import { formatTimelineDate, getTimelineKicker } from "@/components/timeline/timelineUtils";
+import { getCompletionEffects, hasAnyEffects, CompletionEffects } from "@/lib/linkEffects";
+import { LinkedEffectsReveal } from "@/components/shared/LinkedEffectsReveal";
 
 const cardVariants = {
   hidden: { opacity: 0, y: 12 },
@@ -290,6 +292,10 @@ function TimelineInner() {
   const [anchorVisible, setAnchorVisible] = useState(true);
   const [scrollRequest, setScrollRequest] = useState(0);
   const { undoAction, clearUndo, handleUndo } = useUndoAction();
+  const [completionEffects, setCompletionEffects] = useState<{
+    effects: CompletionEffects;
+    completedText: string;
+  } | null>(null);
 
   const today = getToday();
   const tomorrow = getTomorrow();
@@ -521,6 +527,31 @@ function TimelineInner() {
     [ideas, updateIdea],
   );
 
+  const handleDone = useCallback(
+    async (id: string) => {
+      const prev = ideas.find((i) => i.id === id);
+      const effects = getCompletionEffects(id, ideas, linksHook.links);
+      await markDone(id);
+      if (prev && hasAnyEffects(effects))
+        setCompletionEffects({ effects, completedText: prev.text });
+    },
+    [ideas, markDone, linksHook.links],
+  );
+
+  const handleUpdate = useCallback(
+    async (id: string, patch: Partial<Idea>) => {
+      const prev = ideas.find((i) => i.id === id);
+      if (patch.status === "completed" && prev && prev.status !== "completed") {
+        const effects = getCompletionEffects(id, ideas, linksHook.links);
+        await updateIdea(id, patch);
+        if (hasAnyEffects(effects)) setCompletionEffects({ effects, completedText: prev.text });
+        return;
+      }
+      await updateIdea(id, patch);
+    },
+    [ideas, updateIdea, linksHook.links],
+  );
+
   const handleReorderDate = useCallback(
     (reordered: Idea[]) => {
       reorderTasks(reordered.map((t) => t.id));
@@ -672,6 +703,13 @@ function TimelineInner() {
     >
       <div className={`space-y-4 pb-24 ${rangeFlash ? "timeline-range-updated" : ""}`}>
         <UndoBar undoAction={undoAction} onUndo={() => void handleUndo()} onDismiss={clearUndo} />
+        {completionEffects && hasAnyEffects(completionEffects.effects) && (
+          <LinkedEffectsReveal
+            effects={completionEffects.effects}
+            completedText={completionEffects.completedText}
+            onClose={() => setCompletionEffects(null)}
+          />
+        )}
 
         {noDeferredActivity ? (
           <div className="glass-card rounded-2xl border border-dashed border-black/5 py-20 text-center text-gray-400 dark:border-white/5 dark:text-gray-500">
@@ -792,9 +830,9 @@ function TimelineInner() {
                         <DayTaskList
                           occurrences={dayOccurrences}
                           onReorder={handleReorderDate}
-                          onDone={markDone}
+                          onDone={handleDone}
                           onUndone={markUndone}
-                          onUpdate={updateIdea}
+                          onUpdate={handleUpdate}
                           onReschedule={handleReschedule}
                           onMove={handleMove}
                           ideas={ideas}
