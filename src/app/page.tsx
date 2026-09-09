@@ -156,6 +156,11 @@ function DailyPlannerInner() {
     [taskIdeas, activeDate, today],
   );
 
+  const allTasksForTimeline = useMemo(
+    () => [...pendingOnDate, ...scheduledOnDate, ...doneOnDate],
+    [pendingOnDate, scheduledOnDate, doneOnDate],
+  );
+
   const areaTaskCounts = useMemo(() => {
     const counts: Record<LifeArea, { pending: number; scheduled: number; done: number }> = {
       work: { pending: 0, scheduled: 0, done: 0 },
@@ -483,7 +488,7 @@ function DailyPlannerInner() {
           <div className="min-h-[400px] flex-1">
             <DayslotTimeline
               activeDate={activeDate}
-              allTasks={[...pendingOnDate, ...scheduledOnDate, ...doneOnDate]}
+              allTasks={allTasksForTimeline}
               onUpdateTask={updateIdea}
               onCreateTask={handleCreateScheduledTask}
               getTagsForIdea={taskTagsHook.getTagsForIdea}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { usePowerSync, useQuery } from "@powersync/react";
 import { useAuth } from "./useAuth";
 import { Tag } from "@/lib/types";
@@ -50,14 +50,16 @@ export function useTaskTags() {
     userId ? [userId] : [],
   );
 
-  const tagsByIdea: Map<string, Tag[]> = buildTagsByIdeaFromRows(rawRows as TaskTagJoinRow[]);
+  const tagsByIdea: Map<string, Tag[]> = useMemo(
+    () => buildTagsByIdeaFromRows(rawRows as TaskTagJoinRow[]),
+    [rawRows],
+  );
 
   const getTagsForIdea = useCallback(
     (ideaId: string): Tag[] => {
       return tagsByIdea.get(ideaId) ?? [];
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rawRows],
+    [tagsByIdea],
   );
 
   const addTagToTask = async (ideaId: string, tag: Tag) => {

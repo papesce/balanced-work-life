@@ -232,6 +232,14 @@ export function DayslotTimeline({
     () => allTasks.filter((t) => t.scheduled_time && t.status !== "archived"),
     [allTasks],
   );
+  const taskMap = useMemo(
+    () => new Map(scheduledTasks.map((t) => [t.id, t] as const)),
+    [scheduledTasks],
+  );
+  const stableCustomProps = useMemo(
+    () => ({ "--ds-event-padding": "0" }) as Record<string, string>,
+    [],
+  );
 
   const events = useMemo(
     () => scheduledTasks.map((t) => taskToEvent(t, getTagsForIdea(t.id))),
@@ -283,7 +291,7 @@ export function DayslotTimeline({
 
   const renderEventContent = useCallback(
     (event: TimelineEvent) => {
-      const idea = scheduledTasks.find((t) => t.id === event.id);
+      const idea = taskMap.get(event.id);
       if (!idea) return null;
       const isCompleted = idea.status === "completed";
       const isCancelled = idea.status === "cancelled";
@@ -312,16 +320,7 @@ export function DayslotTimeline({
         />
       );
     },
-    [
-      scheduledTasks,
-      getTagsForIdea,
-      tags,
-      scrollEl,
-      onUpdateTask,
-      onAddTag,
-      onRemoveTag,
-      onCreateTag,
-    ],
+    [taskMap, getTagsForIdea, tags, scrollEl, onUpdateTask, onAddTag, onRemoveTag, onCreateTag],
   );
 
   return (
@@ -344,7 +343,7 @@ export function DayslotTimeline({
         showCurrentTime={isToday}
         slotActionTrigger="button"
         slotMinutes={15}
-        customProperties={{ "--ds-event-padding": "0" }}
+        customProperties={stableCustomProps}
       />
     </div>
   );
