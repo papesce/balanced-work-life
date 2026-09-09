@@ -8,6 +8,7 @@ import {
   Telescope,
   BrainCircuit,
   FolderKanban,
+  Target,
   Eye,
 } from "lucide-react";
 import type { Idea } from "@/lib/types";
@@ -19,6 +20,7 @@ const VIEW_ICON: Record<RevealView, React.ReactNode> = {
   horizon: <Telescope size={12} strokeWidth={1.5} />,
   brainstorm: <BrainCircuit size={12} strokeWidth={1.5} />,
   projects: <FolderKanban size={12} strokeWidth={1.5} />,
+  goals: <Target size={12} strokeWidth={1.5} />,
 };
 
 interface RevealInMenuProps {

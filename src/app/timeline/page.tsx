@@ -506,10 +506,12 @@ function TimelineInner() {
   }, [highlightId, anchor, loading, renderedAnchor, router, searchParams]);
 
   const handleQuickAdd = async (text: string, date: string, area: LifeArea | null) => {
+    const past = isPast(date);
     const id = await createIdea(text, null, "bottom", {
       type: "task",
       scheduled_date: date,
-      status: "planned",
+      status: past ? "completed" : "planned",
+      ...(past ? { completed_at: new Date().toISOString() } : {}),
     });
     if (id && area) {
       const tag = await tagsHook.getOrCreateSystemTag(area);

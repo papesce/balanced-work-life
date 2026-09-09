@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, FolderKanban, Plus, Search } from "lucide-react";
+import { ArrowLeft, Target, Plus, Search } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { IdeaTree } from "@/components/brainstorm/IdeaTree";
 import { BrainstormBreadcrumb } from "@/components/brainstorm/BrainstormBreadcrumb";
@@ -27,15 +27,15 @@ function getDescendantIdeaIds(rootId: string, ideas: Idea[]): Set<string> {
   return ids;
 }
 
-export default function ProjectsPage() {
+export default function GoalsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const initialProjectId = searchParams.get("projectId");
+  const initialGoalId = searchParams.get("goalId");
 
   const [search, setSearch] = useState("");
   const [hideCompleted, setHideCompleted] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"all" | "active">("active");
-  const [selectedId, setSelectedId] = useState<string | null>(initialProjectId);
+  const [selectedId, setSelectedId] = useState<string | null>(initialGoalId);
 
   const ideasHook = useIdeas({ scope: "all", searchQuery: search });
   const linksHook = useIdeaLinks();
@@ -61,15 +61,15 @@ export default function ProjectsPage() {
   const handleSelect = (id: string | null) => {
     setSelectedId(id);
     const params = new URLSearchParams(searchParams.toString());
-    if (id) params.set("projectId", id);
-    else params.delete("projectId");
+    if (id) params.set("goalId", id);
+    else params.delete("goalId");
     const qs = params.toString();
-    router.replace(qs ? `/projects?${qs}` : "/projects", { scroll: false });
+    router.replace(qs ? `/goals?${qs}` : "/goals", { scroll: false });
     if (id) ideasHook.expandIdea(id);
   };
 
   useEffect(() => {
-    const pid = searchParams.get("projectId");
+    const pid = searchParams.get("goalId");
     if (pid !== selectedId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- sync URL to state
       setSelectedId(pid);
@@ -77,35 +77,34 @@ export default function ProjectsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  // Handle highlight deep-link: auto-select containing project and pulse highlight
+  // Handle highlight deep-link: auto-select containing goal and pulse highlight
   useEffect(() => {
     const highlightId = searchParams.get("highlight");
     if (!highlightId || ideasHook.loading) return;
     const idea = ideasHook.ideas.find((i) => i.id === highlightId);
     if (!idea) return;
     const byId = new Map(ideasHook.ideas.map((i) => [i.id, i]));
-    let projectId: string | null = null;
-    if (idea.type === "project") projectId = idea.id;
+    let goalId: string | null = null;
+    if (idea.type === "objective") goalId = idea.id;
     else {
       let cur: Idea | undefined = idea;
       while (cur?.parent_id) {
         const parent = byId.get(cur.parent_id);
         if (!parent) break;
-        if (parent.type === "project") {
-          projectId = parent.id;
+        if (parent.type === "objective") {
+          goalId = parent.id;
           break;
         }
         cur = parent;
       }
     }
-    if (projectId) {
-      if (projectId !== selectedId) {
+    if (goalId) {
+      if (goalId !== selectedId) {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- highlight deep-link syncs selection
-        setSelectedId(projectId);
-        ideasHook.expandIdea(projectId);
+        setSelectedId(goalId);
+        ideasHook.expandIdea(goalId);
       }
       ideasHook.expandIdea(highlightId);
-      // Expand all ancestors so highlighted node is visible
       const chain = getAncestorChain(highlightId, ideasHook.ideas);
       for (const anc of chain) ideasHook.expandIdea(anc.id);
     }
@@ -120,27 +119,27 @@ export default function ProjectsPage() {
     });
     const params = new URLSearchParams(searchParams.toString());
     params.delete("highlight");
-    if (projectId) params.set("projectId", projectId);
+    if (goalId) params.set("goalId", goalId);
     const qs = params.toString();
-    router.replace(qs ? `/projects?${qs}` : "/projects", { scroll: false });
+    router.replace(qs ? `/goals?${qs}` : "/goals", { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, ideasHook.loading]);
 
   useEffect(() => {
     if (selectedId && !ideasHook.loading && !ideasHook.ideas.some((i) => i.id === selectedId)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- self-heal deleted project
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- self-heal deleted goal
       handleSelect(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ideasHook.ideas, ideasHook.loading]);
 
-  const projects = useMemo(
-    () => ideasHook.ideas.filter((i) => i.type === "project"),
+  const goals = useMemo(
+    () => ideasHook.ideas.filter((i) => i.type === "objective"),
     [ideasHook.ideas],
   );
 
-  const visibleProjects = useMemo(() => {
-    let list = projects;
+  const visibleGoals = useMemo(() => {
+    let list = goals;
     const q = search.trim().toLowerCase();
     if (q) {
       list = list.filter(
@@ -154,9 +153,9 @@ export default function ProjectsPage() {
       list = list.filter((p) => p.status !== "completed");
     }
     return [...list].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-  }, [projects, search, statusFilter, hideCompleted]);
+  }, [goals, search, statusFilter, hideCompleted]);
 
-  const selectedProject = useMemo(
+  const selectedGoal = useMemo(
     () => (selectedId ? (ideasHook.ideas.find((i) => i.id === selectedId) ?? null) : null),
     [ideasHook.ideas, selectedId],
   );
@@ -309,15 +308,6 @@ export default function ProjectsPage() {
     }
   };
 
-  const handleAddProject = async () => {
-    const id = await createIdea("", null, "bottom", { type: "project", status: "planned" });
-    if (id) {
-      handleSelect(id);
-      setSelectedTreeId(id);
-      setEditingId(id);
-    }
-  };
-
   const handleUndo = async () => {
     if (!undoAction) return;
     const a = undoAction;
@@ -327,7 +317,7 @@ export default function ProjectsPage() {
 
   if (ideasHook.loading) {
     return (
-      <AppShell title="Projects">
+      <AppShell title="Goals">
         <div className="flex justify-center py-20">
           <div className="animate-pulse text-gray-400">Loading...</div>
         </div>
@@ -335,11 +325,11 @@ export default function ProjectsPage() {
     );
   }
 
-  // Detail view — focused project tree
-  if (selectedId && selectedProject) {
+  // Detail view — focused goal tree
+  if (selectedId && selectedGoal) {
     return (
       <AppShell
-        title={selectedProject.text || "Untitled project"}
+        title={selectedGoal.text || "Untitled goal"}
         headerStartActions={
           <button
             onClick={() => handleSelect(null)}
@@ -361,16 +351,16 @@ export default function ProjectsPage() {
           <div className="mb-3">
             <BrainstormBreadcrumb
               chain={breadcrumbChain}
-              focused={selectedProject}
+              focused={selectedGoal}
               onSelect={(id) => handleSelect(id)}
             />
           </div>
         )}
 
         <div className="mb-4 flex items-center gap-2 text-xs text-gray-500">
-          <span className="capitalize">{selectedProject.status.replace("_", " ")}</span>
+          <span className="capitalize">{selectedGoal.status.replace("_", " ")}</span>
           <span>·</span>
-          <span>{getChildCount(selectedProject.id, ideasHook.ideas)} tasks</span>
+          <span>{getChildCount(selectedGoal.id, ideasHook.ideas)} tasks</span>
         </div>
 
         <IdeaTree
@@ -445,19 +435,9 @@ export default function ProjectsPage() {
     );
   }
 
-  // List view — all projects
+  // List view — all goals
   return (
-    <AppShell
-      title="Projects"
-      headerActions={
-        <button
-          onClick={handleAddProject}
-          className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-violet-700"
-        >
-          <Plus size={13} /> New project
-        </button>
-      }
-    >
+    <AppShell title="Goals">
       <div className="mx-auto max-w-2xl space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[180px] flex-1">
@@ -468,7 +448,7 @@ export default function ProjectsPage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search projects..."
+              placeholder="Search goals..."
               className="w-full rounded-xl border border-black/10 bg-white/60 py-2 pr-3 pl-8 text-sm placeholder:text-gray-300 focus:ring-2 focus:ring-violet-500/30 focus:outline-none dark:border-white/10 dark:bg-gray-800/60 dark:placeholder:text-gray-500"
             />
           </div>
@@ -498,32 +478,32 @@ export default function ProjectsPage() {
         </div>
 
         <p className="text-xs text-gray-400">
-          {visibleProjects.length} project{visibleProjects.length !== 1 ? "s" : ""}
+          {visibleGoals.length} goal{visibleGoals.length !== 1 ? "s" : ""}
         </p>
 
-        {visibleProjects.length === 0 ? (
+        {visibleGoals.length === 0 ? (
           <div className="py-16 text-center text-gray-400">
-            <FolderKanban size={28} className="mx-auto mb-3 opacity-30" />
-            <p className="text-sm font-semibold">No projects found</p>
+            <Target size={28} className="mx-auto mb-3 opacity-30" />
+            <p className="text-sm font-semibold">No goals found</p>
             <p className="mt-1 text-xs">
-              Create a project in Brainstorm with type &quot;project&quot;
+              Create a goal in Brainstorm with type &quot;objective&quot;
             </p>
           </div>
         ) : (
           <div className="space-y-2">
-            {visibleProjects.map((p) => (
+            {visibleGoals.map((p) => (
               <button
                 key={p.id}
                 onClick={() => handleSelect(p.id)}
                 className="glass-card flex w-full cursor-pointer items-center justify-between rounded-2xl border border-black/5 px-4 py-3 text-left transition hover:border-violet-200 dark:border-white/5 dark:hover:border-violet-800"
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30">
-                    <FolderKanban size={16} />
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/30">
+                    <Target size={16} />
                   </span>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-gray-800 dark:text-gray-100">
-                      {p.text || "Untitled project"}
+                      {p.text || "Untitled goal"}
                     </p>
                     <p className="text-[11px] text-gray-400">
                       {p.status.replace("_", " ")} · {getChildCount(p.id, ideasHook.ideas)} tasks

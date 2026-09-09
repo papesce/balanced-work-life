@@ -3,7 +3,7 @@
 import { getToday } from "@/lib/dateUtils";
 import type { Idea, IdeaHorizon } from "@/lib/types";
 
-export type RevealView = "planner" | "timeline" | "horizon" | "brainstorm" | "projects";
+export type RevealView = "planner" | "timeline" | "horizon" | "brainstorm" | "projects" | "goals";
 
 export interface RevealOption {
   view: RevealView;
@@ -18,6 +18,7 @@ const LABELS: Record<RevealView, string> = {
   horizon: "Horizon",
   brainstorm: "Brainstorm",
   projects: "Projects",
+  goals: "Goals",
 };
 
 function getProjectAncestorId(idea: Idea, allIdeas?: Idea[]): string | null {
@@ -29,6 +30,20 @@ function getProjectAncestorId(idea: Idea, allIdeas?: Idea[]): string | null {
     const parent = byId.get(current.parent_id);
     if (!parent) break;
     if (parent.type === "project") return parent.id;
+    current = parent;
+  }
+  return null;
+}
+
+function getGoalAncestorId(idea: Idea, allIdeas?: Idea[]): string | null {
+  if (idea.type === "objective") return idea.id;
+  if (!allIdeas) return null;
+  const byId = new Map(allIdeas.map((i) => [i.id, i]));
+  let current: Idea | undefined = idea;
+  while (current?.parent_id) {
+    const parent = byId.get(current.parent_id);
+    if (!parent) break;
+    if (parent.type === "objective") return parent.id;
     current = parent;
   }
   return null;
@@ -53,6 +68,11 @@ export function getRevealHref(view: RevealView, idea: Idea, allIdeas?: Idea[]): 
       if (ancestorId) return `/projects?projectId=${ancestorId}&highlight=${id}`;
       return `/projects?highlight=${id}`;
     }
+    case "goals": {
+      const ancestorId = getGoalAncestorId(idea, allIdeas);
+      if (ancestorId) return `/goals?goalId=${ancestorId}&highlight=${id}`;
+      return `/goals?highlight=${id}`;
+    }
   }
 }
 
@@ -61,7 +81,7 @@ export function getRevealOptions(
   idea: Idea,
   allIdeas?: Idea[],
 ): RevealOption[] {
-  const views: RevealView[] = ["planner", "timeline", "horizon", "brainstorm", "projects"];
+  const views: RevealView[] = ["planner", "timeline", "horizon", "brainstorm", "projects", "goals"];
   return views
     .filter((v) => v !== currentView)
     .map((v) => ({
