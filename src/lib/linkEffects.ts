@@ -1,4 +1,4 @@
-import { Idea, IdeaLink, LinkType } from "./types";
+import { Idea, IdeaLink } from "./types";
 
 export type EffectKind = "unblocks" | "contributes" | "related" | "blockedBy";
 

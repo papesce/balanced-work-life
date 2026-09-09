@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, KeyboardEvent } from "react";
+import { useState, useEffect, useRef, useCallback, KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { Reorder, useDragControls } from "framer-motion";
 import { Star, MoreHorizontal, GripVertical, Clock } from "lucide-react";
@@ -59,6 +59,16 @@ export function AreaTaskGroup({
   const [isDragOver, setIsDragOver] = useState(false);
   const Icon = AREA_ICONS[area];
   const color = areaColors[area]?.dot;
+
+  useEffect(() => {
+    const clear = () => setIsDragOver(false);
+    window.addEventListener("dragend", clear);
+    window.addEventListener("drop", clear);
+    return () => {
+      window.removeEventListener("dragend", clear);
+      window.removeEventListener("drop", clear);
+    };
+  }, []);
 
   return (
     <div
@@ -195,15 +205,41 @@ function PendingTaskList({
 }) {
   const [items, setItems] = useState(tasks);
   const itemsRef = useRef(items);
+  // Honor PowerSync/supabase optimistic updates but defer UI remount until native drag finishes
+  const isNativeDraggingRef = useRef(false);
+  const queuedTasksRef = useRef<Idea[] | null>(null);
 
   useEffect(() => {
     itemsRef.current = items;
   }, [items]);
-  const [prevTasks, setPrevTasks] = useState(tasks);
-  if (tasks !== prevTasks) {
-    setPrevTasks(tasks);
-    setItems(tasks);
-  }
+
+  useEffect(() => {
+    if (tasks !== itemsRef.current) {
+      if (isNativeDraggingRef.current) {
+        queuedTasksRef.current = tasks;
+      } else {
+        setItems(tasks);
+      }
+    }
+  }, [tasks]);
+
+  const handleNativeDragStart = useCallback(() => {
+    isNativeDraggingRef.current = true;
+  }, []);
+  const handleNativeDragEnd = useCallback(() => {
+    isNativeDraggingRef.current = false;
+    if (queuedTasksRef.current) {
+      setItems(queuedTasksRef.current);
+      queuedTasksRef.current = null;
+    }
+  }, []);
+
+  // Safety: clear stuck state on window dragend (covers external drop to Dayslot)
+  useEffect(() => {
+    const onWindowDragEnd = () => handleNativeDragEnd();
+    window.addEventListener("dragend", onWindowDragEnd);
+    return () => window.removeEventListener("dragend", onWindowDragEnd);
+  }, [handleNativeDragEnd]);
 
   return (
     <Reorder.Group axis="y" values={items} onReorder={setItems} style={{ overflow: "visible" }}>
@@ -225,6 +261,8 @@ function PendingTaskList({
           onCreateTag={onCreateTag}
           onAddTag={onAddTag}
           onRemoveTag={onRemoveTag}
+          onNativeDragStart={handleNativeDragStart}
+          onNativeDragEnd={handleNativeDragEnd}
         />
       ))}
     </Reorder.Group>
@@ -247,6 +285,8 @@ function ReorderItemWrapper({
   onCreateTag,
   onAddTag,
   onRemoveTag,
+  onNativeDragStart,
+  onNativeDragEnd,
 }: {
   task: Idea;
   area: LifeArea;
@@ -263,6 +303,8 @@ function ReorderItemWrapper({
   onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
   onAddTag?: (ideaId: string, tag: Tag) => Promise<void>;
   onRemoveTag?: (ideaId: string, tagId: string) => Promise<void>;
+  onNativeDragStart?: () => void;
+  onNativeDragEnd?: () => void;
 }) {
   const dragControls = useDragControls();
 
@@ -290,6 +332,8 @@ function ReorderItemWrapper({
         onRemoveTag={onRemoveTag}
         showDragHandle
         dragControls={dragControls}
+        onNativeDragStart={onNativeDragStart}
+        onNativeDragEnd={onNativeDragEnd}
       />
     </Reorder.Item>
   );
@@ -311,6 +355,8 @@ function TaskRow({
   onRemoveTag,
   showDragHandle,
   dragControls,
+  onNativeDragStart,
+  onNativeDragEnd,
 }: {
   task: Idea;
   area: LifeArea;
@@ -327,6 +373,8 @@ function TaskRow({
   onRemoveTag?: (ideaId: string, tagId: string) => Promise<void>;
   showDragHandle?: boolean;
   dragControls?: ReturnType<typeof useDragControls>;
+  onNativeDragStart?: () => void;
+  onNativeDragEnd?: () => void;
 }) {
   const isCompleted = task.status === "completed";
   const isCancelled = task.status === "cancelled";
@@ -518,6 +566,10 @@ function TaskRow({
         e.dataTransfer.setData("text/plain", task.id);
         e.dataTransfer.setData("text/lifearea", area);
         e.dataTransfer.effectAllowed = "move";
+        onNativeDragStart?.();
+      }}
+      onDragEnd={() => {
+        onNativeDragEnd?.();
       }}
       onContextMenu={(e) => {
         e.preventDefault();
