@@ -58,15 +58,6 @@ export default function ProjectsPage() {
     completedText: string;
   } | null>(null);
 
-  useEffect(() => {
-    const pid = searchParams.get("projectId");
-    if (pid !== selectedId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- sync URL to state
-      setSelectedId(pid);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
-
   const handleSelect = (id: string | null) => {
     setSelectedId(id);
     const params = new URLSearchParams(searchParams.toString());
@@ -76,6 +67,64 @@ export default function ProjectsPage() {
     router.replace(qs ? `/projects?${qs}` : "/projects", { scroll: false });
     if (id) ideasHook.expandIdea(id);
   };
+
+  useEffect(() => {
+    const pid = searchParams.get("projectId");
+    if (pid !== selectedId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sync URL to state
+      setSelectedId(pid);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  // Handle highlight deep-link: auto-select containing project and pulse highlight
+  useEffect(() => {
+    const highlightId = searchParams.get("highlight");
+    if (!highlightId || ideasHook.loading) return;
+    const idea = ideasHook.ideas.find((i) => i.id === highlightId);
+    if (!idea) return;
+    const byId = new Map(ideasHook.ideas.map((i) => [i.id, i]));
+    let projectId: string | null = null;
+    if (idea.type === "project") projectId = idea.id;
+    else {
+      let cur: Idea | undefined = idea;
+      while (cur?.parent_id) {
+        const parent = byId.get(cur.parent_id);
+        if (!parent) break;
+        if (parent.type === "project") {
+          projectId = parent.id;
+          break;
+        }
+        cur = parent;
+      }
+    }
+    if (projectId) {
+      if (projectId !== selectedId) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- highlight deep-link syncs selection
+        setSelectedId(projectId);
+        ideasHook.expandIdea(projectId);
+      }
+      ideasHook.expandIdea(highlightId);
+      // Expand all ancestors so highlighted node is visible
+      const chain = getAncestorChain(highlightId, ideasHook.ideas);
+      for (const anc of chain) ideasHook.expandIdea(anc.id);
+    }
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = document.getElementById(`idea-${highlightId}`);
+        if (el) {
+          el.classList.add("highlight-pulse");
+          setTimeout(() => el.classList.remove("highlight-pulse"), 1600);
+        }
+      });
+    });
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("highlight");
+    if (projectId) params.set("projectId", projectId);
+    const qs = params.toString();
+    router.replace(qs ? `/projects?${qs}` : "/projects", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, ideasHook.loading]);
 
   useEffect(() => {
     if (selectedId && !ideasHook.loading && !ideasHook.ideas.some((i) => i.id === selectedId)) {

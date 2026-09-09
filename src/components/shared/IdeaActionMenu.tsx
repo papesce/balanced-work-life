@@ -467,6 +467,7 @@ export function IdeaActionMenu({
           currentView={currentView}
           position={menuPos}
           onClose={() => setShowRevealPicker(false)}
+          allIdeas={allIdeas}
         />
       )}
 

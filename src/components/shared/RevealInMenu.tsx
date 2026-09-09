@@ -2,7 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
-import { LayoutDashboard, CalendarDays, Telescope, BrainCircuit, Eye } from "lucide-react";
+import {
+  LayoutDashboard,
+  CalendarDays,
+  Telescope,
+  BrainCircuit,
+  FolderKanban,
+  Eye,
+} from "lucide-react";
 import type { Idea } from "@/lib/types";
 import { getRevealOptions, type RevealView } from "@/lib/reveal";
 
@@ -11,6 +18,7 @@ const VIEW_ICON: Record<RevealView, React.ReactNode> = {
   timeline: <CalendarDays size={12} strokeWidth={1.5} />,
   horizon: <Telescope size={12} strokeWidth={1.5} />,
   brainstorm: <BrainCircuit size={12} strokeWidth={1.5} />,
+  projects: <FolderKanban size={12} strokeWidth={1.5} />,
 };
 
 interface RevealInMenuProps {
@@ -18,12 +26,19 @@ interface RevealInMenuProps {
   currentView: RevealView;
   position: { top: number; right: number } | null;
   onClose: () => void;
+  allIdeas?: Idea[];
 }
 
-export function RevealInMenu({ idea, currentView, position, onClose }: RevealInMenuProps) {
+export function RevealInMenu({
+  idea,
+  currentView,
+  position,
+  onClose,
+  allIdeas,
+}: RevealInMenuProps) {
   const router = useRouter();
   if (!position) return null;
-  const options = getRevealOptions(currentView, idea);
+  const options = getRevealOptions(currentView, idea, allIdeas);
   return createPortal(
     <div
       style={{
