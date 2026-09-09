@@ -16,6 +16,8 @@ import { RevealInMenu } from "@/components/shared/RevealInMenu";
 import { NotesIndicator } from "@/components/shared/NotesIndicator";
 import { useNotes } from "@/contexts/NotesContext";
 import { Eye } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { getRevealHref } from "@/lib/reveal";
 
 interface DayTaskListProps {
   occurrences: DayOccurrence[];
@@ -353,6 +355,9 @@ function TimelineTaskRow({
   const tagTriggerRef = useRef<HTMLButtonElement>(null);
   const [tagPickerPos, setTagPickerPos] = useState<{ top: number; left: number } | null>(null);
   const { openNotes } = useNotes();
+  const router = useRouter();
+  const linkBadgeRef = useRef<HTMLButtonElement>(null);
+  const [linkPanelPos, setLinkPanelPos] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -465,6 +470,26 @@ function TimelineTaskRow({
     }
   };
 
+  useEffect(() => {
+    if (!showLinkPanel || showMenu) return;
+    const close = () => setShowLinkPanel(false);
+    window.addEventListener("scroll", close, { capture: true, passive: true });
+    window.addEventListener("resize", close);
+    const handler = (e: MouseEvent) => {
+      if (linkBadgeRef.current && !linkBadgeRef.current.contains(e.target as Node)) {
+        const linkPanelEl = document.querySelector("[data-link-panel-portal]");
+        if (linkPanelEl && linkPanelEl.contains(e.target as Node)) return;
+        // LinkPanel handles its own outside click, but also close here if click is outside badge and not inside panel
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => {
+      window.removeEventListener("scroll", close, { capture: true });
+      window.removeEventListener("resize", close);
+      document.removeEventListener("mousedown", handler);
+    };
+  }, [showLinkPanel, showMenu]);
+
   return (
     <div
       id={occurrenceDate ? `task-${task.id}-${occurrenceDate}` : undefined}
@@ -530,13 +555,22 @@ function TimelineTaskRow({
       {(() => {
         const parent = ideas?.find((i) => i.id === task.parent_id);
         if (!parent) return null;
+        const isProject = parent.type === "project";
+        const href = isProject
+          ? getRevealHref("projects", parent, ideas)
+          : getRevealHref("brainstorm", parent, ideas);
         return (
-          <span
-            title={`in: ${parent.text || "Untitled"}`}
-            className="max-w-[100px] truncate rounded-full bg-black/[0.04] px-2 py-0.5 text-[9px] font-semibold text-gray-500 dark:bg-white/[0.06] dark:text-gray-400"
+          <button
+            title={`Reveal parent: ${parent.text || "Untitled"}`}
+            aria-label={`Reveal parent ${parent.text || "Untitled"}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push(href);
+            }}
+            className="max-w-[100px] cursor-pointer truncate rounded-full bg-black/[0.04] px-2 py-0.5 text-[9px] font-semibold text-gray-500 transition-colors hover:bg-black/[0.08] hover:text-gray-700 dark:bg-white/[0.06] dark:text-gray-400 dark:hover:bg-white/[0.10] dark:hover:text-gray-200"
           >
             in: {parent.text || "Untitled"}
-          </span>
+          </button>
         );
       })()}
       {(() => {
@@ -544,9 +578,27 @@ function TimelineTaskRow({
           links?.filter((l) => l.source_id === task.id || l.target_id === task.id).length ?? 0;
         if (count === 0) return null;
         return (
-          <span className="flex items-center gap-0.5 rounded-full bg-indigo-50 px-1.5 py-0.5 text-[9px] font-bold text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400">
+          <button
+            ref={linkBadgeRef}
+            aria-label={`View links (${count})`}
+            title="View links"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (showLinkPanel) {
+                setShowLinkPanel(false);
+                return;
+              }
+              const rect = linkBadgeRef.current?.getBoundingClientRect();
+              if (rect) setLinkPanelPos({ top: rect.bottom + 4, left: rect.left });
+              setShowMenu(false);
+              setShowDatePicker(false);
+              setShowAttachPanel(false);
+              setShowLinkPanel(true);
+            }}
+            className="flex cursor-pointer items-center gap-0.5 rounded-full bg-indigo-50 px-1.5 py-0.5 text-[9px] font-bold text-indigo-600 transition-colors hover:bg-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-400 dark:hover:bg-indigo-900/30"
+          >
             <Link2 size={10} /> {count}
-          </span>
+          </button>
         );
       })()}
 
@@ -828,6 +880,34 @@ function TimelineTaskRow({
             onClose={() => setShowReveal(false)}
           />
         )}
+        {showLinkPanel &&
+          linkPanelPos &&
+          !showMenu &&
+          onCreateLink &&
+          onDeleteLink &&
+          ideas &&
+          links &&
+          createPortal(
+            <div
+              data-link-panel-portal
+              style={{
+                position: "fixed",
+                top: linkPanelPos.top,
+                left: linkPanelPos.left,
+                zIndex: 9999,
+              }}
+            >
+              <LinkPanel
+                ideaId={task.id}
+                ideas={ideas}
+                links={links}
+                onCreateLink={onCreateLink}
+                onDeleteLink={onDeleteLink}
+                onClose={() => setShowLinkPanel(false)}
+              />
+            </div>,
+            document.body,
+          )}
       </div>
     </div>
   );
