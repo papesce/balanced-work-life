@@ -228,17 +228,28 @@ function PendingTaskList({
   }, []);
   const handleNativeDragEnd = useCallback(() => {
     isNativeDraggingRef.current = false;
+    // Apply queued update if it arrived during drag, otherwise sync if tasks
+    // changed just after drag (PowerSync optimistic update races dragend)
     if (queuedTasksRef.current) {
       setItems(queuedTasksRef.current);
       queuedTasksRef.current = null;
+    } else if (tasks !== itemsRef.current) {
+      setItems(tasks);
     }
-  }, []);
+  }, [tasks]);
 
   // Safety: clear stuck state on window dragend (covers external drop to Dayslot)
+  // Also listens to drop to ensure Framer's Reorder drag is aborted when native
+  // drop lands outside the middle column (e.g. in Dayslot).
   useEffect(() => {
     const onWindowDragEnd = () => handleNativeDragEnd();
+    const onWindowDrop = () => handleNativeDragEnd();
     window.addEventListener("dragend", onWindowDragEnd);
-    return () => window.removeEventListener("dragend", onWindowDragEnd);
+    window.addEventListener("drop", onWindowDrop);
+    return () => {
+      window.removeEventListener("dragend", onWindowDragEnd);
+      window.removeEventListener("drop", onWindowDrop);
+    };
   }, [handleNativeDragEnd]);
 
   return (
