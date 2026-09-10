@@ -603,9 +603,9 @@ function EventCard({
                 onUpdateTask(idea.id, { scheduled_time: null });
                 setShowMenu(false);
               }}
-              className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-red-500 hover:bg-red-50/50 dark:hover:bg-red-900/20"
+              className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
             >
-              Remove from Timeline
+              Clear time
             </button>
           </div>,
           document.body,

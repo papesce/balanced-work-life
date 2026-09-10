@@ -402,6 +402,10 @@ function TaskRow({
   const areaDotRef = useRef<HTMLButtonElement>(null);
   const areaPickerRef = useRef<HTMLDivElement>(null);
   const [areaPickerPos, setAreaPickerPos] = useState<{ top: number; left: number } | null>(null);
+  const timeRef = useRef<HTMLButtonElement>(null);
+  const timeMenuRef = useRef<HTMLDivElement>(null);
+  const [showTimeMenu, setShowTimeMenu] = useState(false);
+  const [timeMenuPos, setTimeMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const deleteConfirmRef = useRef<HTMLDivElement>(null);
   const [showDateInput, setShowDateInput] = useState(false);
@@ -485,11 +489,19 @@ function TaskRow({
       ) {
         setShowAreaPicker(false);
       }
+      if (
+        timeMenuRef.current &&
+        !timeMenuRef.current.contains(e.target as Node) &&
+        timeRef.current &&
+        !timeRef.current.contains(e.target as Node)
+      ) {
+        setShowTimeMenu(false);
+      }
     };
-    if (showMenu || showStatusPicker || showDurationDropdown || showAreaPicker)
+    if (showMenu || showStatusPicker || showDurationDropdown || showAreaPicker || showTimeMenu)
       document.addEventListener("pointerdown", handler);
     return () => document.removeEventListener("pointerdown", handler);
-  }, [showMenu, showStatusPicker, showDurationDropdown, showAreaPicker]);
+  }, [showMenu, showStatusPicker, showDurationDropdown, showAreaPicker, showTimeMenu]);
 
   useEffect(() => {
     if (!showMenu) return;
@@ -523,6 +535,17 @@ function TaskRow({
       window.removeEventListener("resize", close);
     };
   }, [showAreaPicker]);
+
+  useEffect(() => {
+    if (!showTimeMenu) return;
+    const close = () => setShowTimeMenu(false);
+    window.addEventListener("scroll", close, { capture: true, passive: true });
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, { capture: true });
+      window.removeEventListener("resize", close);
+    };
+  }, [showTimeMenu]);
 
   const handleStatusSelect = (status: IdeaStatus) => {
     const now = new Date().toISOString();
@@ -784,9 +807,50 @@ function TaskRow({
       </div>
 
       {task.scheduled_time && (
-        <span className="flex-shrink-0 rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold text-violet-500 tabular-nums dark:bg-violet-950/20 dark:text-violet-400">
-          {formatTime(task.scheduled_time)}
-        </span>
+        <>
+          <button
+            ref={timeRef}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (showTimeMenu) {
+                setShowTimeMenu(false);
+                return;
+              }
+              const rect = timeRef.current?.getBoundingClientRect();
+              if (rect) setTimeMenuPos({ top: rect.bottom + 6, left: rect.left });
+              setShowTimeMenu(true);
+            }}
+            title="Clear time"
+            className="flex-shrink-0 cursor-pointer rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold text-violet-500 tabular-nums transition-colors hover:bg-violet-100 dark:bg-violet-950/20 dark:text-violet-400 dark:hover:bg-violet-900/30"
+          >
+            {formatTime(task.scheduled_time)}
+          </button>
+          {showTimeMenu &&
+            timeMenuPos &&
+            createPortal(
+              <div
+                ref={timeMenuRef}
+                style={{
+                  position: "fixed",
+                  top: timeMenuPos.top,
+                  left: timeMenuPos.left,
+                  zIndex: 9999,
+                }}
+                className="glass-card-strong min-w-[130px] rounded-lg border border-black/5 py-1 shadow-lg dark:border-white/5"
+              >
+                <button
+                  onClick={() => {
+                    onUpdate(task.id, { scheduled_time: null });
+                    setShowTimeMenu(false);
+                  }}
+                  className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                >
+                  Clear time
+                </button>
+              </div>,
+              document.body,
+            )}
+        </>
       )}
 
       {onMoveTaskBetweenAreas &&
@@ -921,6 +985,17 @@ function TaskRow({
                       }}
                     />
                   </div>
+                )}
+                {task.scheduled_time && (
+                  <button
+                    onClick={() => {
+                      onUpdate(task.id, { scheduled_time: null });
+                      setShowMenu(false);
+                    }}
+                    className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                  >
+                    Clear time
+                  </button>
                 )}
                 <button
                   onClick={() => {
