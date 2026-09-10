@@ -207,6 +207,7 @@ function PendingTaskList({
   const itemsRef = useRef(items);
   // Honor PowerSync/supabase optimistic updates but defer UI remount until native drag finishes
   const isNativeDraggingRef = useRef(false);
+  const isFramerDraggingRef = useRef(false);
   const queuedTasksRef = useRef<Idea[] | null>(null);
 
   useEffect(() => {
@@ -226,31 +227,53 @@ function PendingTaskList({
   const handleNativeDragStart = useCallback(() => {
     isNativeDraggingRef.current = true;
   }, []);
-  const handleNativeDragEnd = useCallback(() => {
-    isNativeDraggingRef.current = false;
-    // Apply queued update if it arrived during drag, otherwise sync if tasks
-    // changed just after drag (PowerSync optimistic update races dragend)
-    if (queuedTasksRef.current) {
-      setItems(queuedTasksRef.current);
-      queuedTasksRef.current = null;
-    } else if (tasks !== itemsRef.current) {
-      setItems(tasks);
-    }
-  }, [tasks]);
+  const handleFramerDragStart = useCallback(() => {
+    isFramerDraggingRef.current = true;
+  }, []);
+  const handleFramerDragEnd = useCallback(() => {
+    isFramerDraggingRef.current = false;
+  }, []);
+  const abortFramerDrag = useCallback(() => {
+    if (!isFramerDraggingRef.current) return;
+    try {
+      window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, cancelable: true }));
+      window.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
+      document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, cancelable: true }));
+    } catch {}
+    isFramerDraggingRef.current = false;
+  }, []);
+  const handleNativeDragEnd = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    (_source: string) => {
+      isNativeDraggingRef.current = false;
+      if (queuedTasksRef.current) {
+        setItems(queuedTasksRef.current);
+        queuedTasksRef.current = null;
+      } else if (tasks !== itemsRef.current) {
+        setItems(tasks);
+      }
+    },
+    [tasks],
+  );
 
   // Safety: clear stuck state on window dragend (covers external drop to Dayslot)
   // Also listens to drop to ensure Framer's Reorder drag is aborted when native
   // drop lands outside the middle column (e.g. in Dayslot).
   useEffect(() => {
-    const onWindowDragEnd = () => handleNativeDragEnd();
-    const onWindowDrop = () => handleNativeDragEnd();
+    const onWindowDragEnd = () => {
+      handleNativeDragEnd("window:dragend");
+    };
+    const onWindowDrop = () => {
+      abortFramerDrag();
+      handleNativeDragEnd("window:drop");
+    };
     window.addEventListener("dragend", onWindowDragEnd);
     window.addEventListener("drop", onWindowDrop);
     return () => {
       window.removeEventListener("dragend", onWindowDragEnd);
       window.removeEventListener("drop", onWindowDrop);
     };
-  }, [handleNativeDragEnd]);
+  }, [handleNativeDragEnd, abortFramerDrag]);
 
   return (
     <Reorder.Group axis="y" values={items} onReorder={setItems} style={{ overflow: "visible" }}>
@@ -274,6 +297,8 @@ function PendingTaskList({
           onRemoveTag={onRemoveTag}
           onNativeDragStart={handleNativeDragStart}
           onNativeDragEnd={handleNativeDragEnd}
+          onFramerDragStart={handleFramerDragStart}
+          onFramerDragEnd={handleFramerDragEnd}
         />
       ))}
     </Reorder.Group>
@@ -298,6 +323,8 @@ function ReorderItemWrapper({
   onRemoveTag,
   onNativeDragStart,
   onNativeDragEnd,
+  onFramerDragStart,
+  onFramerDragEnd,
 }: {
   task: Idea;
   area: LifeArea;
@@ -315,7 +342,9 @@ function ReorderItemWrapper({
   onAddTag?: (ideaId: string, tag: Tag) => Promise<void>;
   onRemoveTag?: (ideaId: string, tagId: string) => Promise<void>;
   onNativeDragStart?: () => void;
-  onNativeDragEnd?: () => void;
+  onNativeDragEnd?: (source: string) => void;
+  onFramerDragStart?: () => void;
+  onFramerDragEnd?: () => void;
 }) {
   const dragControls = useDragControls();
 
@@ -325,7 +354,13 @@ function ReorderItemWrapper({
       dragListener={false}
       dragControls={dragControls}
       className="relative"
-      onDragEnd={() => onReorder(itemsRef.current.map((t) => t.id))}
+      onDragStart={() => {
+        onFramerDragStart?.();
+      }}
+      onDragEnd={() => {
+        onFramerDragEnd?.();
+        onReorder(itemsRef.current.map((t) => t.id));
+      }}
     >
       <TaskRow
         task={task}
@@ -385,7 +420,7 @@ function TaskRow({
   showDragHandle?: boolean;
   dragControls?: ReturnType<typeof useDragControls>;
   onNativeDragStart?: () => void;
-  onNativeDragEnd?: () => void;
+  onNativeDragEnd?: (source: string) => void;
 }) {
   const isCompleted = task.status === "completed";
   const isCancelled = task.status === "cancelled";
@@ -603,7 +638,7 @@ function TaskRow({
         onNativeDragStart?.();
       }}
       onDragEnd={() => {
-        onNativeDragEnd?.();
+        onNativeDragEnd?.("row:dragend");
       }}
       onContextMenu={(e) => {
         e.preventDefault();
