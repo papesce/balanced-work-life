@@ -159,8 +159,18 @@ export const STATUS_LABELS: Record<IdeaStatus, string> = {
 };
 
 export const PRODUCTIVITY_SIGNALS = {
-  productive: { label: "Productive", color: "#22c55e", bg: "rgba(34,197,94,0.15)" },
-  lazy: { label: "Lazy", color: "#f97316", bg: "rgba(249,115,22,0.15)" },
+  productive: {
+    label: "Productive",
+    color: "#22c55e",
+    bg: "rgba(34,197,94,0.06)",
+    pillBg: "rgba(34,197,94,0.15)",
+  },
+  lazy: {
+    label: "Lazy",
+    color: "#f97316",
+    bg: "rgba(249,115,22,0.06)",
+    pillBg: "rgba(249,115,22,0.15)",
+  },
 } as const;
 
 export const DEFAULT_TARGETS: Record<LifeArea, number> = {

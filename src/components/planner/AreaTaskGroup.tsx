@@ -681,7 +681,15 @@ function TaskRow({
       className={`group flex cursor-grab items-center gap-2 px-4 py-2.5 transition-colors hover:bg-black/[0.015] active:cursor-grabbing dark:hover:bg-white/[0.015] ${
         signalCfg ? "border-b-2" : ""
       }`}
-      style={signalCfg ? { borderBottomColor: signalCfg.color } : undefined}
+      style={
+        signalCfg
+          ? {
+              background: signalCfg.bg,
+              borderLeft: `3px solid ${signalCfg.color}`,
+              borderBottomColor: signalCfg.color,
+            }
+          : undefined
+      }
     >
       {showDragHandle && (
         <div
@@ -1087,7 +1095,11 @@ function TaskRow({
                     });
                     setShowMenu(false);
                   }}
-                  className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                  className={`flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${
+                    task.productivity_signal === "lazy"
+                      ? "text-green-600 dark:text-green-400"
+                      : "text-orange-600 dark:text-orange-400"
+                  }`}
                 >
                   {task.productivity_signal === "lazy" ? "✓ Mark as Productive" : "⚡ Mark as Lazy"}
                 </button>

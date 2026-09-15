@@ -572,6 +572,8 @@ function EventCard({
       className={`flex h-full w-full rounded-[9px] border backdrop-blur-md transition-all duration-200 ${bgClass}`}
       style={{
         containerType: "inline-size",
+        background: signalCfg ? signalCfg.bg : undefined,
+        borderLeft: signalCfg ? `3px solid ${signalCfg.color}` : undefined,
         borderBottom: signalCfg ? `3px solid ${signalCfg.color}` : undefined,
       }}
       onContextMenu={handleContextMenu}
@@ -622,6 +624,14 @@ function EventCard({
           {event.durationMinutes > 0 && (
             <span className="rounded bg-black/5 px-1.5 py-0.5 text-[9px] font-bold tabular-nums dark:bg-white/10">
               {event.durationMinutes}m
+            </span>
+          )}
+          {signalCfg && (
+            <span
+              className="rounded-full px-1.5 py-0.5 text-[9px] font-bold"
+              style={{ color: signalCfg.color, background: signalCfg.pillBg }}
+            >
+              {idea.productivity_signal === "lazy" ? "⚡" : "✓"}
             </span>
           )}
         </div>

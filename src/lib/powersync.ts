@@ -67,6 +67,7 @@ export const TagsTable = new Table(
 
 export const TaskTagsTable = new Table(
   {
+    id: column.text,
     idea_id: column.text,
     tag_id: column.text,
     user_id: column.text,
@@ -120,15 +121,17 @@ export class SupabaseConnector {
 
     for (const op of batch.crud) {
       if (op.table === "task_tags") {
-        const { idea_id, tag_id } = op.opData ?? {};
         switch (op.op) {
-          case "PUT":
+          case "PUT": {
+            const { idea_id, tag_id } = op.opData ?? {};
+            if (!idea_id || !tag_id) break;
             await supabase
               .from("task_tags")
-              .upsert({ idea_id, tag_id }, { onConflict: "idea_id,tag_id" });
+              .upsert({ id: op.id, idea_id, tag_id }, { onConflict: "idea_id,tag_id" });
             break;
+          }
           case "DELETE":
-            await supabase.from("task_tags").delete().eq("idea_id", idea_id).eq("tag_id", tag_id);
+            await supabase.from("task_tags").delete().eq("id", op.id);
             break;
         }
         continue;
