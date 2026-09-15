@@ -65,6 +65,7 @@ export interface Idea {
   sort_order: number;
   created_at: string;
   updated_at: string;
+  productivity_signal?: "productive" | "lazy" | null;
 }
 
 export type LinkType = "unblocks" | "contributes_to" | "depends_on" | "related_to" | "part_of";

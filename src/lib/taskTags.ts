@@ -10,7 +10,10 @@ interface TaskTagJoinRow {
   is_system: number;
 }
 
-export type RangedTask = Pick<Idea, "id" | "scheduled_date" | "type" | "status">;
+export type RangedTask = Pick<
+  Idea,
+  "id" | "scheduled_date" | "type" | "status" | "productivity_signal"
+>;
 
 export function emptyAreaCounts(): Record<LifeArea, number> {
   return { work: 0, health: 0, relationships: 0, growth: 0, finances: 0, life: 0 };
@@ -73,7 +76,7 @@ export async function fetchTasksWithTags(
 ): Promise<TasksWithTags> {
   const { start, end } = options;
 
-  let sql = `SELECT id, scheduled_date, type, status FROM ideas WHERE user_id = ? AND type = 'task'`;
+  let sql = `SELECT id, scheduled_date, type, status, productivity_signal FROM ideas WHERE user_id = ? AND type = 'task'`;
   const params: unknown[] = [userId];
 
   if (start) {

@@ -193,8 +193,21 @@ export function StatusPillSlot({
             paused_at: null,
           });
           break;
+        case "deferred":
+          await onUpdate(node.id, {
+            status: "deferred",
+            scheduled_time: null,
+            duration_minutes: null,
+            completed_at: null,
+            cancelled_at: null,
+            paused_at: null,
+          });
+          break;
         case "archived":
           await onUpdate(node.id, { status: "archived" });
+          break;
+        default:
+          window.alert(`Unexpected status "${status}"`);
           break;
       }
     } catch (err) {

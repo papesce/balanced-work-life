@@ -6,7 +6,7 @@ import { Reorder, useDragControls } from "framer-motion";
 import { Star, MoreHorizontal, GripVertical, Clock } from "lucide-react";
 import { areaColors } from "@/styles/tokens";
 import { Idea, IdeaStatus, LifeArea, Tag } from "@/lib/types";
-import { AREA_ICONS, AREA_LABELS, STATUS_CONFIG } from "@/lib/constants";
+import { AREA_ICONS, AREA_LABELS, STATUS_CONFIG, PRODUCTIVITY_SIGNALS } from "@/lib/constants";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { formatTime } from "./plannerUtils";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
@@ -27,7 +27,7 @@ interface AreaTaskGroupProps {
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
   onDelete: (id: string) => void;
-  onAddTask: (text: string, area: LifeArea) => Promise<void>;
+  onAddTask: (text: string, area: LifeArea, productivitySignal?: string) => Promise<void>;
   onReorderTasks: (taskIds: string[]) => void;
   onMoveTaskBetweenAreas?: (taskId: string, fromArea: LifeArea, toArea: LifeArea) => void;
   getTagsForIdea?: (ideaId: string) => Tag[];
@@ -57,6 +57,8 @@ export function AreaTaskGroup({
   onRemoveTag,
 }: AreaTaskGroupProps) {
   const [isDragOver, setIsDragOver] = useState(false);
+  const [areaSignal, setAreaSignal] = useState<"productive" | "lazy">("productive");
+  const [areaInputValue, setAreaInputValue] = useState("");
   const Icon = AREA_ICONS[area];
   const color = areaColors[area]?.dot;
 
@@ -146,6 +148,7 @@ export function AreaTaskGroup({
             onCreateTag={onCreateTag}
             onAddTag={onAddTag}
             onRemoveTag={onRemoveTag}
+            showDragHandle
           />
         ))}
         {pendingTasks.length === 0 && doneTasks.length === 0 && (
@@ -156,17 +159,31 @@ export function AreaTaskGroup({
       </div>
 
       <div className="rounded-b-2xl border-t border-black/[0.02] bg-black/[0.01] px-4 py-2 dark:border-white/[0.02] dark:bg-white/[0.01]">
-        <input
-          type="text"
-          placeholder={`+ Add to ${AREA_LABELS[area]}...`}
-          className="w-full border-none bg-transparent py-1.5 text-xs font-medium text-gray-700 outline-none placeholder:text-gray-400 focus:ring-0 dark:text-gray-300 dark:placeholder:text-gray-600"
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && e.currentTarget.value.trim()) {
-              void onAddTask(e.currentTarget.value.trim(), area);
-              e.currentTarget.value = "";
-            }
-          }}
-        />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setAreaSignal(areaSignal === "lazy" ? "productive" : "lazy")}
+            className={`cursor-pointer rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors ${
+              areaSignal === "lazy"
+                ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
+                : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+            }`}
+          >
+            {areaSignal === "lazy" ? "⚡ Lazy" : "✓ Productive"}
+          </button>
+          <input
+            type="text"
+            value={areaInputValue}
+            onChange={(e) => setAreaInputValue(e.target.value)}
+            placeholder={`+ Add to ${AREA_LABELS[area]}...`}
+            className="w-full border-none bg-transparent py-1.5 text-xs font-medium text-gray-700 outline-none placeholder:text-gray-400 focus:ring-0 dark:text-gray-300 dark:placeholder:text-gray-600"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && areaInputValue.trim()) {
+                void onAddTask(areaInputValue.trim(), area, areaSignal);
+                setAreaInputValue("");
+              }
+            }}
+          />
+        </div>
       </div>
     </div>
   );
@@ -614,6 +631,19 @@ function TaskRow({
       case "scheduled":
         onUndone(task.id);
         break;
+      case "deferred":
+        onUpdate(task.id, {
+          status: "deferred",
+          scheduled_time: null,
+          duration_minutes: null,
+          completed_at: null,
+          cancelled_at: null,
+          paused_at: null,
+        });
+        break;
+      default:
+        window.alert(`Unexpected status "${status}"`);
+        break;
     }
     setShowStatusPicker(false);
   };
@@ -626,6 +656,9 @@ function TaskRow({
   };
 
   const taskTags = getTagsForIdea?.(task.id) ?? [];
+  const signalCfg =
+    task.productivity_signal &&
+    PRODUCTIVITY_SIGNALS[task.productivity_signal as keyof typeof PRODUCTIVITY_SIGNALS];
 
   return (
     <div
@@ -645,7 +678,10 @@ function TaskRow({
         setRevealPos({ top: e.clientY + 4, right: window.innerWidth - e.clientX - 4 });
         setShowReveal(true);
       }}
-      className="group flex cursor-grab items-center gap-2 px-4 py-2.5 transition-colors hover:bg-black/[0.015] active:cursor-grabbing dark:hover:bg-white/[0.015]"
+      className={`group flex cursor-grab items-center gap-2 px-4 py-2.5 transition-colors hover:bg-black/[0.015] active:cursor-grabbing dark:hover:bg-white/[0.015] ${
+        signalCfg ? "border-b-2" : ""
+      }`}
+      style={signalCfg ? { borderBottomColor: signalCfg.color } : undefined}
     >
       {showDragHandle && (
         <div
@@ -1043,6 +1079,18 @@ function TaskRow({
                     Clear time
                   </button>
                 )}
+                <button
+                  onClick={() => {
+                    onUpdate(task.id, {
+                      productivity_signal:
+                        task.productivity_signal === "lazy" ? "productive" : "lazy",
+                    });
+                    setShowMenu(false);
+                  }}
+                  className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                >
+                  {task.productivity_signal === "lazy" ? "✓ Mark as Productive" : "⚡ Mark as Lazy"}
+                </button>
                 <button
                   onClick={() => {
                     setShowDeleteConfirm(true);

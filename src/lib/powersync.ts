@@ -35,6 +35,7 @@ export const IdeasTable = new Table(
     focus_lane: column.text,
     in_focus: column.integer,
     in_focus_until: column.text,
+    productivity_signal: column.text,
     sort_order: column.real,
     created_at: column.text,
     updated_at: column.text,

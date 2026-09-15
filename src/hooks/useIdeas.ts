@@ -222,6 +222,7 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
       focus_lane: null,
       in_focus: false,
       in_focus_until: null,
+      productivity_signal: "productive",
       sort_order: sortOrder,
       created_at: now,
       updated_at: now,
@@ -232,8 +233,8 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
         `INSERT INTO ideas (id, user_id, parent_id, text, description, type, effort, impact, urgency,
           scheduled_date, scheduled_time, duration_minutes, is_priority, priority_order,
           status, notes, completed_at, cancelled_at, paused_at, attempt_dates, status_history,
-          horizon, focus_lane, in_focus, in_focus_until, sort_order, created_at, updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          horizon, focus_lane, in_focus, in_focus_until, productivity_signal, sort_order, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
           idea.id,
           idea.user_id,
@@ -260,6 +261,7 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
           idea.focus_lane,
           idea.in_focus ? 1 : 0,
           idea.in_focus_until,
+          idea.productivity_signal ?? "productive",
           idea.sort_order,
           idea.created_at,
           idea.updated_at,
@@ -328,7 +330,7 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
           `INSERT OR REPLACE INTO ideas (id, user_id, parent_id, text, description, type, effort, impact, urgency,
             scheduled_date, scheduled_time, duration_minutes, is_priority, priority_order,
             status, notes, completed_at, cancelled_at, paused_at, attempt_dates, status_history,
-            horizon, focus_lane, in_focus, in_focus_until, sort_order, created_at, updated_at)
+            horizon, focus_lane, in_focus, in_focus_until, productivity_signal, sort_order, created_at, updated_at)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
           [
             idea.id,
@@ -356,6 +358,7 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
             idea.focus_lane ?? null,
             idea.in_focus ? 1 : 0,
             idea.in_focus_until,
+            idea.productivity_signal ?? "productive",
             idea.sort_order,
             idea.created_at,
             idea.updated_at,

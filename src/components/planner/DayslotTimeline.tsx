@@ -13,7 +13,7 @@ import {
   getPrimaryTagForIdea,
   Tag,
 } from "@/lib/types";
-import { AREA_LABELS, STATUS_CONFIG } from "@/lib/constants";
+import { AREA_LABELS, STATUS_CONFIG, PRODUCTIVITY_SIGNALS } from "@/lib/constants";
 import { minutesToTimeString, parseTimeToMinutes } from "./dayslotAdapter";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
@@ -36,13 +36,20 @@ interface DayslotTimelineProps {
   activeDate: string;
   allTasks: Idea[];
   onUpdateTask: (id: string, updates: Partial<Idea>) => void;
-  onCreateTask: (text: string, time: string, area?: LifeArea, tag?: Tag) => Promise<void>;
+  onCreateTask: (
+    text: string,
+    time: string,
+    area?: LifeArea,
+    tag?: Tag,
+    productivitySignal?: string,
+  ) => Promise<void>;
   getTagsForIdea: (ideaId: string) => Tag[];
   tags: Tag[];
   selectedArea: LifeArea | null;
   onAddTag?: (ideaId: string, tag: Tag) => Promise<void>;
   onRemoveTag?: (ideaId: string, tagId: string) => Promise<void>;
   onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
+  onSelectEvent?: (eventId: string) => void;
 }
 
 const AREA_ACCENT_COLORS: Record<LifeArea, string> = {
@@ -87,7 +94,13 @@ function SlotForm({
 }: {
   startMinute: number;
   close: () => void;
-  onCreateTask: (text: string, time: string, area?: LifeArea, tag?: Tag) => Promise<void>;
+  onCreateTask: (
+    text: string,
+    time: string,
+    area?: LifeArea,
+    tag?: Tag,
+    productivitySignal?: string,
+  ) => Promise<void>;
   defaultArea: LifeArea | null;
   tags: Tag[];
   onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
@@ -95,6 +108,7 @@ function SlotForm({
   const [text, setText] = useState("");
   const [selectedArea, setSelectedArea] = useState<LifeArea | null>(defaultArea);
   const [selectedTag, setSelectedTag] = useState<Tag | null>(null);
+  const [signal, setSignal] = useState<"productive" | "lazy">("productive");
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const areaBtnRef = useRef<HTMLButtonElement>(null);
   const [areaPickerPos, setAreaPickerPos] = useState<{ top: number; left: number } | null>(null);
@@ -113,7 +127,13 @@ function SlotForm({
     submittingRef.current = true;
     close();
     try {
-      await onCreateTask(text.trim(), timeStr, selectedArea ?? undefined, selectedTag ?? undefined);
+      await onCreateTask(
+        text.trim(),
+        timeStr,
+        selectedArea ?? undefined,
+        selectedTag ?? undefined,
+        signal,
+      );
     } catch (err) {
       console.error("Failed to create scheduled task", err);
     }
@@ -134,6 +154,16 @@ function SlotForm({
         autoFocus
       />
       <div className="flex items-center justify-between gap-2">
+        <button
+          onClick={() => setSignal(signal === "lazy" ? "productive" : "lazy")}
+          className={`cursor-pointer rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors ${
+            signal === "lazy"
+              ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
+              : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+          }`}
+        >
+          {signal === "lazy" ? "⚡ Lazy" : "✓ Productive"}
+        </button>
         <button
           ref={areaBtnRef}
           onClick={() => {
@@ -220,6 +250,7 @@ export function DayslotTimeline({
   onAddTag,
   onRemoveTag,
   onCreateTag,
+  onSelectEvent,
 }: DayslotTimelineProps) {
   const isToday = activeDate === new Date().toISOString().slice(0, 10);
   const isMobile = useIsMobile();
@@ -264,6 +295,13 @@ export function DayslotTimeline({
       });
     },
     [onUpdateTask],
+  );
+
+  const handleEventClick = useCallback(
+    (event: TimelineEvent) => {
+      onSelectEvent?.(event.id);
+    },
+    [onSelectEvent],
   );
 
   const handleEventRemove = useCallback(
@@ -335,6 +373,7 @@ export function DayslotTimeline({
         title="Daily Timeline"
         timelineRef={handleTimelineRef}
         onEventChange={handleEventChange}
+        onEventClick={handleEventClick}
         onExternalDrop={handleExternalDrop}
         onEventRemove={handleEventRemove}
         externalDragDuration={30}
@@ -378,6 +417,9 @@ function EventCard({
   onRemoveTag?: (ideaId: string, tagId: string) => Promise<void>;
   onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
 }) {
+  const signalCfg =
+    idea.productivity_signal &&
+    PRODUCTIVITY_SIGNALS[idea.productivity_signal as keyof typeof PRODUCTIVITY_SIGNALS];
   const [showMenu, setShowMenu] = useState(false);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
@@ -454,13 +496,25 @@ function EventCard({
         case "planned":
         case "scheduled":
         case "draft":
-        case "deferred":
           onUpdateTask(idea.id, {
             status,
             completed_at: null,
             cancelled_at: null,
             paused_at: null,
           });
+          break;
+        case "deferred":
+          onUpdateTask(idea.id, {
+            status: "deferred",
+            scheduled_time: null,
+            duration_minutes: null,
+            completed_at: null,
+            cancelled_at: null,
+            paused_at: null,
+          });
+          break;
+        default:
+          window.alert(`Unexpected status "${status}"`);
           break;
       }
       setShowStatusPicker(false);
@@ -516,7 +570,10 @@ function EventCard({
   return (
     <div
       className={`flex h-full w-full rounded-[9px] border backdrop-blur-md transition-all duration-200 ${bgClass}`}
-      style={{ containerType: "inline-size" }}
+      style={{
+        containerType: "inline-size",
+        borderBottom: signalCfg ? `3px solid ${signalCfg.color}` : undefined,
+      }}
       onContextMenu={handleContextMenu}
     >
       <div
