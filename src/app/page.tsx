@@ -209,12 +209,19 @@ function DailyPlannerInner() {
 
   const visibleAreas = selectedArea ? [selectedArea] : AREA_ORDER;
 
-  const handleAddToArea = async (text: string, area: LifeArea, productivitySignal?: string) => {
+  const handleAddToArea = async (
+    text: string,
+    area: LifeArea,
+    productivitySignal?: string | null,
+  ) => {
     const id = await createIdea(text, null, "bottom", {
       type: "task",
       scheduled_date: activeDate,
       status: "planned",
-      productivity_signal: (productivitySignal as "productive" | "lazy") ?? "productive",
+      productivity_signal:
+        productivitySignal === null
+          ? null
+          : ((productivitySignal as "productive" | "lazy") ?? "productive"),
     });
     // Auto-tag with the system tag for this area (created on demand if missing)
     if (id) {
@@ -239,14 +246,17 @@ function DailyPlannerInner() {
     time: string,
     area?: LifeArea,
     tag?: Tag,
-    productivitySignal?: string,
+    productivitySignal?: string | null,
   ) => {
     const id = await createIdea(text, null, "bottom", {
       type: "task",
       scheduled_date: activeDate,
       scheduled_time: time,
       status: "scheduled",
-      productivity_signal: (productivitySignal as "productive" | "lazy") ?? "productive",
+      productivity_signal:
+        productivitySignal === null
+          ? null
+          : ((productivitySignal as "productive" | "lazy") ?? "productive"),
     });
     if (id && area) {
       const systemTag = await tagsHook.getOrCreateSystemTag(area);

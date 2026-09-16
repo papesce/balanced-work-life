@@ -27,7 +27,7 @@ interface AreaTaskGroupProps {
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
   onDelete: (id: string) => void;
-  onAddTask: (text: string, area: LifeArea, productivitySignal?: string) => Promise<void>;
+  onAddTask: (text: string, area: LifeArea, productivitySignal?: string | null) => Promise<void>;
   onReorderTasks: (taskIds: string[]) => void;
   onMoveTaskBetweenAreas?: (taskId: string, fromArea: LifeArea, toArea: LifeArea) => void;
   getTagsForIdea?: (ideaId: string) => Tag[];
@@ -57,7 +57,7 @@ export function AreaTaskGroup({
   onRemoveTag,
 }: AreaTaskGroupProps) {
   const [isDragOver, setIsDragOver] = useState(false);
-  const [areaSignal, setAreaSignal] = useState<"productive" | "lazy">("productive");
+  const [areaSignal, setAreaSignal] = useState<"productive" | "lazy" | null>("productive");
   const [areaInputValue, setAreaInputValue] = useState("");
   const Icon = AREA_ICONS[area];
   const color = areaColors[area]?.dot;
@@ -161,14 +161,20 @@ export function AreaTaskGroup({
       <div className="rounded-b-2xl border-t border-black/[0.02] bg-black/[0.01] px-4 py-2 dark:border-white/[0.02] dark:bg-white/[0.01]">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setAreaSignal(areaSignal === "lazy" ? "productive" : "lazy")}
+            onClick={() =>
+              setAreaSignal(
+                areaSignal === "productive" ? "lazy" : areaSignal === "lazy" ? null : "productive",
+              )
+            }
             className={`cursor-pointer rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors ${
               areaSignal === "lazy"
                 ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
-                : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                : areaSignal === null
+                  ? "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+                  : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
             }`}
           >
-            {areaSignal === "lazy" ? "⚡ Lazy" : "✓ Productive"}
+            {areaSignal === "lazy" ? "⚡ Lazy" : areaSignal === null ? "— None" : "✓ Productive"}
           </button>
           <input
             type="text"
@@ -1085,6 +1091,17 @@ function TaskRow({
                     className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
                   >
                     Clear time
+                  </button>
+                )}
+                {task.productivity_signal && (
+                  <button
+                    onClick={() => {
+                      onUpdate(task.id, { productivity_signal: null });
+                      setShowMenu(false);
+                    }}
+                    className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-500 hover:bg-black/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.04]"
+                  >
+                    Clear signal
                   </button>
                 )}
                 <button

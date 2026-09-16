@@ -41,7 +41,7 @@ interface DayslotTimelineProps {
     time: string,
     area?: LifeArea,
     tag?: Tag,
-    productivitySignal?: string,
+    productivitySignal?: string | null,
   ) => Promise<void>;
   getTagsForIdea: (ideaId: string) => Tag[];
   tags: Tag[];
@@ -99,7 +99,7 @@ function SlotForm({
     time: string,
     area?: LifeArea,
     tag?: Tag,
-    productivitySignal?: string,
+    productivitySignal?: string | null,
   ) => Promise<void>;
   defaultArea: LifeArea | null;
   tags: Tag[];
@@ -108,7 +108,7 @@ function SlotForm({
   const [text, setText] = useState("");
   const [selectedArea, setSelectedArea] = useState<LifeArea | null>(defaultArea);
   const [selectedTag, setSelectedTag] = useState<Tag | null>(null);
-  const [signal, setSignal] = useState<"productive" | "lazy">("productive");
+  const [signal, setSignal] = useState<"productive" | "lazy" | null>("productive");
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const areaBtnRef = useRef<HTMLButtonElement>(null);
   const [areaPickerPos, setAreaPickerPos] = useState<{ top: number; left: number } | null>(null);
@@ -140,7 +140,7 @@ function SlotForm({
   };
 
   return (
-    <div className="flex w-full flex-col gap-1.5 rounded-xl border border-black/5 bg-black/[0.02] p-2 dark:border-white/5 dark:bg-white/[0.02]">
+    <div className="flex w-full flex-col gap-1.5 rounded-xl border border-black/5 bg-white p-2 dark:border-white/10 dark:bg-gray-900">
       <input
         type="text"
         placeholder={`Add task at ${timeStr}...`}
@@ -150,19 +150,23 @@ function SlotForm({
           if (e.key === "Enter" && text.trim()) void handleAdd();
           if (e.key === "Escape") close();
         }}
-        className="w-full rounded-lg border border-black/10 bg-white/80 px-2 py-1 text-xs text-gray-800 focus:ring-1 focus:ring-violet-500 focus:outline-none dark:border-white/10 dark:bg-gray-800/80 dark:text-gray-200"
+        className="w-full rounded-lg border border-black/10 bg-white/80 px-2 py-1 text-xs text-gray-800 focus:ring-1 focus:ring-violet-500 focus:outline-none dark:border-white/20 dark:bg-gray-800 dark:text-gray-200"
         autoFocus
       />
       <div className="flex items-center justify-between gap-2">
         <button
-          onClick={() => setSignal(signal === "lazy" ? "productive" : "lazy")}
+          onClick={() =>
+            setSignal(signal === "productive" ? "lazy" : signal === "lazy" ? null : "productive")
+          }
           className={`cursor-pointer rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors ${
             signal === "lazy"
-              ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
-              : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+              ? "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300"
+              : signal === null
+                ? "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+                : "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
           }`}
         >
-          {signal === "lazy" ? "⚡ Lazy" : "✓ Productive"}
+          {signal === "lazy" ? "⚡ Lazy" : signal === null ? "— None" : "✓ Productive"}
         </button>
         <button
           ref={areaBtnRef}
@@ -182,7 +186,7 @@ function SlotForm({
         <div className="flex items-center gap-2">
           <button
             onClick={close}
-            className="cursor-pointer px-2 py-1 text-[10px] text-gray-400 hover:text-gray-600"
+            className="cursor-pointer px-2 py-1 text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
           >
             Cancel
           </button>
