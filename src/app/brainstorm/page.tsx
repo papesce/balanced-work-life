@@ -13,26 +13,12 @@ import { BrainstormBreadcrumb } from "@/components/brainstorm/BrainstormBreadcru
 import { GraphView } from "@/components/brainstorm/GraphView";
 import { Idea, LinkType } from "@/lib/types";
 import { STORAGE_KEYS, readRawString, writeRawString } from "@/lib/storage";
-import { getAncestorChain } from "@/lib/ideaTreeFocus";
+import { getAncestorChain, getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
 import { getCompletionEffects, hasAnyEffects, CompletionEffects } from "@/lib/linkEffects";
 import { LinkedEffectsReveal, LinkedEffectsBadge } from "@/components/shared/LinkedEffectsReveal";
 import type { IdeasScope } from "@/hooks/useIdeas";
 import { useSearchParams, useRouter } from "next/navigation";
-
-type UndoAction = {
-  label: string;
-  run: () => Promise<void>;
-};
-
-function getDescendantIdeaIds(rootId: string, ideas: Idea[]): Set<string> {
-  const ids = new Set<string>();
-  const collect = (id: string) => {
-    ids.add(id);
-    ideas.filter((idea) => idea.parent_id === id).forEach((child) => collect(child.id));
-  };
-  collect(rootId);
-  return ids;
-}
+import { useUndoAction } from "@/lib/tasks/undo";
 
 export default function BrainstormPage() {
   const [timeScope, setTimeScope] = useState<IdeasScope>("this_month");
@@ -48,7 +34,7 @@ export default function BrainstormPage() {
   const [cardMode, setCardMode] = useState(
     () => readRawString(STORAGE_KEYS.brainstormCardMode) === "true",
   );
-  const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
+  const { undoAction, registerUndo, clearUndo, handleUndo } = useUndoAction();
   const [completionEffects, setCompletionEffects] = useState<{
     effects: CompletionEffects;
     completedText: string;
@@ -127,14 +113,6 @@ export default function BrainstormPage() {
 
   const hasLinks = linksHook.links.length > 0;
 
-  const registerUndo = (undo: UndoAction) => {
-    setUndoAction(undo);
-  };
-
-  const clearUndo = () => {
-    setUndoAction(null);
-  };
-
   const handleAddRoot = async () => {
     const id = await createIdea("", effectiveFocusId, "top");
     if (id) {
@@ -194,7 +172,7 @@ export default function BrainstormPage() {
   };
 
   const deleteIdea = async (id: string) => {
-    const deletedIds = getDescendantIdeaIds(id, ideasHook.ideas);
+    const deletedIds = getFocusedSubtreeIds(id, ideasHook.ideas);
     const deletedIdeas = ideasHook.ideas.filter((idea) => deletedIds.has(idea.id));
     const deletedLinks = linksHook.removeLinksForIdeaIds(deletedIds);
     await ideasHook.deleteIdea(id);
@@ -300,13 +278,6 @@ export default function BrainstormPage() {
         await ideasHook.updateIdea(id, { scheduled_date: previous.scheduled_date });
       },
     });
-  };
-
-  const handleUndo = async () => {
-    if (!undoAction) return;
-    const action = undoAction;
-    setUndoAction(null);
-    await action.run();
   };
 
   useEffect(() => {

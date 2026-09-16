@@ -15,6 +15,7 @@ import {
   Tag,
   LaneConfig,
 } from "@/lib/types";
+import { computeStatusUpdates } from "@/lib/tasks/statusTransition";
 import { STATUS_LABELS, STATUS_STYLES, TYPE_BADGE } from "@/lib/constants";
 import { type ComposingState, type CreateIdeaPosition, type TreeNode } from "@/components/tree";
 import { TreeDnd } from "@/components/tree/useTreeDnd";
@@ -170,11 +171,7 @@ function StatusChipSlot({
   const [showPicker, setShowPicker] = useState(false);
 
   const handleStatusSelect = (status: IdeaStatus) => {
-    const updates: Partial<Idea> = { status };
-    if (status === "completed") updates.completed_at = new Date().toISOString();
-    if (status === "paused") updates.paused_at = new Date().toISOString();
-    if (status === "cancelled") updates.cancelled_at = new Date().toISOString();
-    void onUpdate(node.id, updates);
+    void onUpdate(node.id, computeStatusUpdates(status));
     setShowPicker(false);
   };
 

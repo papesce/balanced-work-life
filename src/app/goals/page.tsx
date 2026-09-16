@@ -11,21 +11,11 @@ import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { Idea, LinkType } from "@/lib/types";
-import { getAncestorChain, getChildCount } from "@/lib/ideaTreeFocus";
+import { getAncestorChain, getChildCount, getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
 import { getCompletionEffects, hasAnyEffects, CompletionEffects } from "@/lib/linkEffects";
 import { LinkedEffectsReveal } from "@/components/shared/LinkedEffectsReveal";
-
-type UndoAction = { label: string; run: () => Promise<void> };
-
-function getDescendantIdeaIds(rootId: string, ideas: Idea[]): Set<string> {
-  const ids = new Set<string>();
-  const collect = (id: string) => {
-    ids.add(id);
-    ideas.filter((i) => i.parent_id === id).forEach((c) => collect(c.id));
-  };
-  collect(rootId);
-  return ids;
-}
+import { useUndoAction } from "@/lib/tasks/undo";
+import { UndoBar } from "@/components/shared/UndoBar";
 
 export default function GoalsPage() {
   const searchParams = useSearchParams();
@@ -52,7 +42,7 @@ export default function GoalsPage() {
     position: "child" | "top" | "bottom";
     depth: number;
   } | null>(null);
-  const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
+  const { undoAction, registerUndo, clearUndo, handleUndo } = useUndoAction();
   const [completionEffects, setCompletionEffects] = useState<{
     effects: CompletionEffects;
     completedText: string;
@@ -165,8 +155,6 @@ export default function GoalsPage() {
     [selectedId, ideasHook.ideas],
   );
 
-  const registerUndo = (undo: UndoAction) => setUndoAction(undo);
-
   const createIdea = async (
     text: string,
     parentId?: string | null,
@@ -213,7 +201,7 @@ export default function GoalsPage() {
   };
 
   const deleteIdea = async (id: string) => {
-    const deletedIds = getDescendantIdeaIds(id, ideasHook.ideas);
+    const deletedIds = getFocusedSubtreeIds(id, ideasHook.ideas);
     const deletedIdeas = ideasHook.ideas.filter((i) => deletedIds.has(i.id));
     const deletedLinks = linksHook.removeLinksForIdeaIds(deletedIds);
     await ideasHook.deleteIdea(id);
@@ -306,13 +294,6 @@ export default function GoalsPage() {
       setSelectedTreeId(id);
       setEditingId(id);
     }
-  };
-
-  const handleUndo = async () => {
-    if (!undoAction) return;
-    const a = undoAction;
-    setUndoAction(null);
-    await a.run();
   };
 
   if (ideasHook.loading) {
@@ -412,25 +393,7 @@ export default function GoalsPage() {
           </div>
         )}
 
-        {undoAction && (
-          <div className="fixed bottom-20 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-amber-200/40 bg-white px-4 py-2.5 shadow-lg dark:border-amber-700/30 dark:bg-gray-800">
-            <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
-              {undoAction.label}
-            </span>
-            <button
-              onClick={handleUndo}
-              className="rounded-lg px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100/60"
-            >
-              Undo
-            </button>
-            <button
-              onClick={() => setUndoAction(null)}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-amber-600 hover:bg-amber-100/60"
-            >
-              ×
-            </button>
-          </div>
-        )}
+        <UndoBar undoAction={undoAction} onUndo={handleUndo} onDismiss={clearUndo} />
       </AppShell>
     );
   }
@@ -517,25 +480,7 @@ export default function GoalsPage() {
           </div>
         )}
 
-        {undoAction && (
-          <div className="fixed bottom-20 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-amber-200/40 bg-white px-4 py-2.5 shadow-lg dark:border-amber-700/30 dark:bg-gray-800">
-            <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
-              {undoAction.label}
-            </span>
-            <button
-              onClick={handleUndo}
-              className="rounded-lg px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100/60"
-            >
-              Undo
-            </button>
-            <button
-              onClick={() => setUndoAction(null)}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-amber-600 hover:bg-amber-100/60"
-            >
-              ×
-            </button>
-          </div>
-        )}
+        <UndoBar undoAction={undoAction} onUndo={handleUndo} onDismiss={clearUndo} />
       </div>
     </AppShell>
   );

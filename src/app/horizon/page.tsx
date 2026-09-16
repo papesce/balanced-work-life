@@ -11,6 +11,7 @@ import { useTaskTags } from "@/hooks/useTaskTags";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useUndoAction } from "@/lib/tasks/undo";
 import { filterTreeBySearch, filterTreeByFocus } from "@/lib/ideaTreeFilters";
+import { getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
 import { buildTree as buildTreeGeneric } from "@/components/tree/buildTree";
 import { AppShell } from "@/components/AppShell";
 import { UndoBar } from "@/components/shared/UndoBar";
@@ -71,16 +72,6 @@ function compareIdeasForTree(a: Idea, b: Idea): number {
   const bDone = b.completed_at ? 1 : 0;
   if (aDone !== bDone) return aDone - bDone;
   return a.sort_order - b.sort_order;
-}
-
-function getDescendantIdeaIds(rootId: string, ideas: Idea[]): Set<string> {
-  const ids = new Set<string>();
-  const collect = (id: string) => {
-    ids.add(id);
-    ideas.filter((idea) => idea.parent_id === id).forEach((child) => collect(child.id));
-  };
-  collect(rootId);
-  return ids;
 }
 
 function RootAddInput({
@@ -171,7 +162,7 @@ export default function HorizonPage() {
   };
 
   const deleteIdea = async (id: string) => {
-    const deletedIds = getDescendantIdeaIds(id, ideasHook.ideas);
+    const deletedIds = getFocusedSubtreeIds(id, ideasHook.ideas);
     const deletedIdeas = ideasHook.ideas.filter((idea) => deletedIds.has(idea.id));
     const deletedLinks = linksHook.removeLinksForIdeaIds(deletedIds);
     await ideasHook.deleteIdea(id);

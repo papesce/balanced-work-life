@@ -12,6 +12,7 @@ import {
   LifeArea,
 } from "@/lib/types";
 import { AREA_DOT_COLORS, STATUS_CONFIG, STATUS_LABELS, STATUS_STYLES } from "@/lib/constants";
+import { computeStatusUpdates } from "@/lib/tasks/statusTransition";
 import { TypePicker } from "./TypePicker";
 import { StatusPicker } from "./StatusPicker";
 import { TagPicker } from "@/components/shared/TagPicker";
@@ -167,49 +168,9 @@ export function StatusPillSlot({
   const [showPicker, setShowPicker] = useState(false);
 
   const handleStatusSelect = async (status: IdeaStatus) => {
-    const now = new Date().toISOString();
     setShowPicker(false);
     try {
-      switch (status) {
-        case "completed":
-          await onUpdate(node.id, { status: "completed", completed_at: now });
-          break;
-        case "cancelled":
-          await onUpdate(node.id, { status: "cancelled", cancelled_at: now });
-          break;
-        case "in_progress":
-          await onUpdate(node.id, { status: "in_progress" });
-          break;
-        case "paused":
-          await onUpdate(node.id, { status: "paused", paused_at: now });
-          break;
-        case "planned":
-        case "scheduled":
-        case "draft":
-          await onUpdate(node.id, {
-            status,
-            completed_at: null,
-            cancelled_at: null,
-            paused_at: null,
-          });
-          break;
-        case "deferred":
-          await onUpdate(node.id, {
-            status: "deferred",
-            scheduled_time: null,
-            duration_minutes: null,
-            completed_at: null,
-            cancelled_at: null,
-            paused_at: null,
-          });
-          break;
-        case "archived":
-          await onUpdate(node.id, { status: "archived" });
-          break;
-        default:
-          window.alert(`Unexpected status "${status}"`);
-          break;
-      }
+      await onUpdate(node.id, computeStatusUpdates(status));
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
       window.alert(`Couldn't change status to "${status}": ${message}`);
