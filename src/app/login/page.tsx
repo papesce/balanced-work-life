@@ -18,11 +18,28 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
+    if (!email || !password) {
+      setError("Email and password are required");
+      setLoading(false);
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters");
+      setLoading(false);
+      return;
+    }
+
     const action = mode === "login" ? signIn : signUp;
     const { error } = await action(email, password);
 
     if (error) {
-      setError(error.message);
+      const sanitizedMessage = error.message.includes("Invalid login credentials")
+        ? "Invalid email or password"
+        : error.message.includes("User already registered")
+          ? "An account with this email already exists"
+          : "An error occurred. Please try again.";
+      setError(sanitizedMessage);
       setLoading(false);
     } else {
       router.push("/");
