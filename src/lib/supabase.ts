@@ -1,6 +1,16 @@
-import { createClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "http://localhost";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder";
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  {
+    cookieOptions: {
+      sameSite: "lax",
+      path: "/",
+      maxAge: 400 * 24 * 60 * 60,
+    },
+    auth: {
+      lock: async (name, acquireTimeout, fn) => await fn(),
+    },
+  },
+);
