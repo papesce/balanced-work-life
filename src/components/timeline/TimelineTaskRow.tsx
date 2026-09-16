@@ -6,7 +6,7 @@ import { useDragControls } from "framer-motion";
 import { Star, MoreHorizontal, Link2, GripVertical } from "lucide-react";
 import { Idea, IdeaStatus, IdeaLink, LinkType, Tag, LifeArea } from "@/lib/types";
 import { TagPicker } from "@/components/shared/TagPicker";
-import { AREA_DOT_COLORS, STATUS_CONFIG } from "@/lib/constants";
+import { AREA_DOT_COLORS, STATUS_CONFIG, PRODUCTIVITY_SIGNALS } from "@/lib/constants";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { SchedulePicker } from "@/components/brainstorm/SchedulePicker";
 import { MoveIdeaPanel } from "@/components/brainstorm/MoveIdeaPanel";
@@ -203,10 +203,23 @@ export function TimelineTaskRow({
     };
   }, [showLinkPanel, showMenu]);
 
+  const signalCfg =
+    task.productivity_signal &&
+    PRODUCTIVITY_SIGNALS[task.productivity_signal as keyof typeof PRODUCTIVITY_SIGNALS];
+
   return (
     <div
       id={occurrenceDate ? `task-${task.id}-${occurrenceDate}` : undefined}
-      className={`group flex items-center gap-1.5 rounded-xl px-3 py-2 transition-colors ${isHovered ? "bg-black/[0.03] dark:bg-white/[0.04]" : ""}`}
+      className={`group flex items-center gap-1.5 rounded-xl px-3 py-2 transition-colors ${isHovered ? "bg-black/[0.03] dark:bg-white/[0.04]" : ""} ${signalCfg ? "border-b-2" : ""}`}
+      style={
+        signalCfg
+          ? {
+              background: signalCfg.bg,
+              borderLeft: `3px solid ${signalCfg.color}`,
+              borderBottomColor: signalCfg.color,
+            }
+          : undefined
+      }
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onContextMenu={(e) => {
@@ -214,6 +227,7 @@ export function TimelineTaskRow({
         setRevealPos({ top: e.clientY + 4, right: window.innerWidth - e.clientX - 4 });
         setShowReveal(true);
       }}
+      aria-label={signalCfg ? `Productivity: ${signalCfg.label}` : undefined}
     >
       <button
         onPointerDown={(e) => dragControls.start(e)}
@@ -424,6 +438,15 @@ export function TimelineTaskRow({
       >
         <Star size={14} strokeWidth={1.5} className={task.is_priority ? "fill-amber-400" : ""} />
       </button>
+
+      {signalCfg && (
+        <span
+          className="flex-shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold"
+          style={{ color: signalCfg.color, background: signalCfg.pillBg }}
+        >
+          {signalCfg.icon}
+        </span>
+      )}
 
       <div className="relative">
         <button
