@@ -164,12 +164,14 @@ export const PRODUCTIVITY_SIGNALS = {
     color: "#22c55e",
     bg: "rgba(34,197,94,0.06)",
     pillBg: "rgba(34,197,94,0.15)",
+    icon: "🎯",
   },
   lazy: {
     label: "Lazy",
     color: "#f97316",
     bg: "rgba(249,115,22,0.06)",
     pillBg: "rgba(249,115,22,0.15)",
+    icon: "☕",
   },
 } as const;
 

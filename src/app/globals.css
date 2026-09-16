@@ -217,6 +217,11 @@ body {
     border: none !important;
     box-shadow: none !important;
   }
+
+  .ds-timeline__slot-action,
+  .ds-timeline__slot-action-overlay {
+    background: transparent !important;
+  }
 }
 
 /* EventCard container query: hide status badge when too narrow */

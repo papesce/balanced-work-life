@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ProductivitySegment } from "@/components/shared/ProductivitySegment";
 import { UndoAction } from "@/lib/tasks/undo";
 import { areaColors } from "@/styles/tokens";
 import { Idea, LifeArea, Tag } from "@/lib/types";
@@ -19,7 +18,7 @@ interface AreaTaskGroupProps {
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
   onDelete: (id: string) => void;
-  onAddTask: (text: string, area: LifeArea, productivitySignal?: string | null) => Promise<void>;
+  onAddTask: (text: string, area: LifeArea) => Promise<void>;
   onReorderTasks: (taskIds: string[]) => void;
   onMoveTaskBetweenAreas?: (taskId: string, fromArea: LifeArea, toArea: LifeArea) => void;
   getTagsForIdea?: (ideaId: string) => Tag[];
@@ -51,7 +50,6 @@ export function AreaTaskGroup({
   onUndoAction,
 }: AreaTaskGroupProps) {
   const [isDragOver, setIsDragOver] = useState(false);
-  const [areaSignal, setAreaSignal] = useState<"productive" | "lazy" | null>("productive");
   const [areaInputValue, setAreaInputValue] = useState("");
   const Icon = AREA_ICONS[area];
   const color = areaColors[area]?.dot;
@@ -156,7 +154,6 @@ export function AreaTaskGroup({
 
       <div className="rounded-b-2xl border-t border-black/[0.02] bg-black/[0.01] px-4 py-2 dark:border-white/[0.02] dark:bg-white/[0.01]">
         <div className="flex items-center gap-2">
-          <ProductivitySegment value={areaSignal} onChange={setAreaSignal} size="xs" />
           <input
             type="text"
             value={areaInputValue}
@@ -165,7 +162,7 @@ export function AreaTaskGroup({
             className="w-full border-none bg-transparent py-1.5 text-xs font-medium text-gray-700 outline-none placeholder:text-gray-400 focus:ring-0 dark:text-gray-300 dark:placeholder:text-gray-600"
             onKeyDown={(e) => {
               if (e.key === "Enter" && areaInputValue.trim()) {
-                void onAddTask(areaInputValue.trim(), area, areaSignal);
+                void onAddTask(areaInputValue.trim(), area);
                 setAreaInputValue("");
               }
             }}

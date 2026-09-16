@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import { usePowerSync, useQuery } from "@powersync/react";
+import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "./useAuth";
 import { Tag } from "@/lib/types";
 import type { BackupTaskTag } from "@/lib/backup";
@@ -64,7 +65,7 @@ export function useTaskTags() {
 
   const addTagToTask = async (ideaId: string, tag: Tag) => {
     await db.execute(`INSERT OR IGNORE INTO task_tags (id, idea_id, tag_id) VALUES (?,?,?)`, [
-      `${ideaId}:${tag.id}`,
+      uuidv4(),
       ideaId,
       tag.id,
     ]);
@@ -88,7 +89,7 @@ export function useTaskTags() {
     if (restoredTaskTags.length === 0) return;
     for (const taskTag of restoredTaskTags) {
       await db.execute(`INSERT OR REPLACE INTO task_tags (id, idea_id, tag_id) VALUES (?,?,?)`, [
-        taskTag.id ?? `${taskTag.idea_id}:${taskTag.tag_id}`,
+        taskTag.id ?? uuidv4(),
         taskTag.idea_id,
         taskTag.tag_id,
       ]);

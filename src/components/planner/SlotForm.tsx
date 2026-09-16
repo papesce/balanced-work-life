@@ -6,7 +6,6 @@ import { LifeArea, Tag } from "@/lib/types";
 import { AREA_LABELS } from "@/lib/constants";
 import { minutesToTimeString } from "./dayslotAdapter";
 import { TagPicker } from "@/components/shared/TagPicker";
-import { ProductivitySegment } from "@/components/shared/ProductivitySegment";
 
 export function SlotForm({
   startMinute,
@@ -18,13 +17,7 @@ export function SlotForm({
 }: {
   startMinute: number;
   close: () => void;
-  onCreateTask: (
-    text: string,
-    time: string,
-    area?: LifeArea,
-    tag?: Tag,
-    productivitySignal?: string | null,
-  ) => Promise<void>;
+  onCreateTask: (text: string, time: string, area?: LifeArea, tag?: Tag) => Promise<void>;
   defaultArea: LifeArea | null;
   tags: Tag[];
   onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
@@ -32,7 +25,6 @@ export function SlotForm({
   const [text, setText] = useState("");
   const [selectedArea, setSelectedArea] = useState<LifeArea | null>(defaultArea);
   const [selectedTag, setSelectedTag] = useState<Tag | null>(null);
-  const [signal, setSignal] = useState<"productive" | "lazy" | null>(null);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const areaBtnRef = useRef<HTMLButtonElement>(null);
   const [areaPickerPos, setAreaPickerPos] = useState<{ top: number; left: number } | null>(null);
@@ -51,13 +43,7 @@ export function SlotForm({
     submittingRef.current = true;
     close();
     try {
-      await onCreateTask(
-        text.trim(),
-        timeStr,
-        selectedArea ?? undefined,
-        selectedTag ?? undefined,
-        signal,
-      );
+      await onCreateTask(text.trim(), timeStr, selectedArea ?? undefined, selectedTag ?? undefined);
     } catch (err) {
       console.error("Failed to create scheduled task", err);
     }
@@ -78,7 +64,6 @@ export function SlotForm({
         autoFocus
       />
       <div className="flex items-center justify-between gap-2">
-        <ProductivitySegment value={signal} onChange={setSignal} size="xs" />
         <button
           ref={areaBtnRef}
           onClick={() => {
