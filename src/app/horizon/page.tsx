@@ -4,13 +4,13 @@ import { useMemo, useState } from "react";
 import { useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { EyeOff, Target } from "lucide-react";
+import { EyeOff, Target, Tag } from "lucide-react";
 import { useIdeas, type CreateIdeaPosition } from "@/hooks/useIdeas";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useUndoAction } from "@/lib/tasks/undo";
-import { filterTreeBySearch, filterTreeByFocus } from "@/lib/ideaTreeFilters";
+import { filterTreeBySearch, filterTreeByFocus, filterTreeByType } from "@/lib/ideaTreeFilters";
 import { getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
 import { buildTree as buildTreeGeneric } from "@/components/tree/buildTree";
 import { AppShell } from "@/components/AppShell";
@@ -19,6 +19,7 @@ import { QuickAddInput } from "@/components/timeline/QuickAddInput";
 import { HorizonTree } from "@/components/horizon/HorizonTree";
 import { LaneConfigDialog } from "@/components/horizon/LaneConfigDialog";
 import { TypePicker } from "@/components/brainstorm/TypePicker";
+import { TypeFilterPicker } from "@/components/shared/TypeFilterPicker";
 import { Idea, IdeaHorizon, IdeaNode, IdeaType } from "@/lib/types";
 import { TYPE_BADGE } from "@/lib/constants";
 import { useLaneConfigsContext } from "@/contexts/LaneConfigsContext";
@@ -131,6 +132,8 @@ export default function HorizonPage() {
   const [search, setSearch] = useState("");
   const [hideClosed, setHideClosed] = useState(true);
   const [focusOnly, setFocusOnly] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<IdeaType[]>([]);
+  const [typePickerOpen, setTypePickerOpen] = useState(false);
   const [cardMode, setCardMode] = useState(
     () => readRawString(STORAGE_KEYS.brainstormCardMode) === "true",
   );
@@ -286,8 +289,15 @@ export default function HorizonPage() {
       }
       result = focused;
     }
+    if (typeFilter.length > 0) {
+      const typed: Record<IdeaHorizon, IdeaNode[]> = { short: [], medium: [], long: [] };
+      for (const key of Object.keys(result) as IdeaHorizon[]) {
+        typed[key] = filterTreeByType(result[key], typeFilter);
+      }
+      result = typed;
+    }
     return result;
-  }, [treesByHorizon, search, focusOnly, ideas]);
+  }, [treesByHorizon, search, focusOnly, typeFilter, ideas]);
 
   const handleAdd = (horizon: IdeaHorizon) => {
     return async (text: string, type?: IdeaType): Promise<void> => {
@@ -446,6 +456,36 @@ export default function HorizonPage() {
         <Target size={12} />
         <span className="hidden sm:inline">Focus only</span>
       </button>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setTypePickerOpen((v) => !v)}
+          className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+            typeFilter.length > 0
+              ? "border-indigo-300 bg-white text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
+              : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
+          }`}
+        >
+          <Tag size={12} />
+          <span className="hidden sm:inline">
+            {typeFilter.length > 0
+              ? `${typeFilter.length} type${typeFilter.length > 1 ? "s" : ""}`
+              : "Type"}
+          </span>
+        </button>
+        {typePickerOpen && (
+          <TypeFilterPicker
+            selected={typeFilter}
+            onToggle={(type) =>
+              setTypeFilter((prev) =>
+                prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type],
+              )
+            }
+            onClear={() => setTypeFilter([])}
+            onClose={() => setTypePickerOpen(false)}
+          />
+        )}
+      </div>
       <button
         type="button"
         onClick={() => setCardMode((v) => !v)}

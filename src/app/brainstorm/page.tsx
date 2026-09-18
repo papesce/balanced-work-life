@@ -11,7 +11,7 @@ import { IdeaTree } from "@/components/brainstorm/IdeaTree";
 import { BrainstormToolbar } from "@/components/brainstorm/BrainstormToolbar";
 import { BrainstormBreadcrumb } from "@/components/brainstorm/BrainstormBreadcrumb";
 import { GraphView } from "@/components/brainstorm/GraphView";
-import { Idea, LinkType } from "@/lib/types";
+import { Idea, IdeaType, LinkType } from "@/lib/types";
 import { STORAGE_KEYS, readRawString, writeRawString } from "@/lib/storage";
 import { getAncestorChain, getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
 import { getCompletionEffects, hasAnyEffects, CompletionEffects } from "@/lib/linkEffects";
@@ -66,6 +66,7 @@ export default function BrainstormPage() {
   const [hideClosed, setHideClosed] = useState(false);
   const [hideCompleted, setHideCompleted] = useState(false);
   const [hideDeferred, setHideDeferred] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<IdeaType[]>([]);
 
   const [focusedId, setFocusedId] = useState<string | null>(() => {
     const saved = readRawString(STORAGE_KEYS.brainstormFocusId);
@@ -336,6 +337,8 @@ export default function BrainstormPage() {
       setHideCompleted={setHideCompleted}
       hideDeferred={hideDeferred}
       setHideDeferred={setHideDeferred}
+      typeFilter={typeFilter}
+      setTypeFilter={setTypeFilter}
       onAddRoot={handleAddRoot}
       expandAll={ideasHook.expandAll}
       collapseAll={ideasHook.collapseAll}
@@ -490,6 +493,7 @@ export default function BrainstormPage() {
           hideClosed={hideClosed}
           hideCompleted={hideCompleted}
           hideDeferred={hideDeferred}
+          typeFilter={typeFilter}
           focusedId={effectiveFocusId}
           onFocus={handleFocus}
           cardMode={cardMode}

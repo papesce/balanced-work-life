@@ -5,7 +5,15 @@ import { Focus as FocusIcon } from "lucide-react";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";
 import { NotesIndicator } from "@/components/shared/NotesIndicator";
 import { useNotes } from "@/contexts/NotesContext";
-import { IdeaNode as IdeaNodeType, Idea, IdeaLink, Tag, LifeArea, LinkType } from "@/lib/types";
+import {
+  IdeaNode as IdeaNodeType,
+  Idea,
+  IdeaType,
+  IdeaLink,
+  Tag,
+  LifeArea,
+  LinkType,
+} from "@/lib/types";
 import { filterIdeaTree } from "@/lib/ideaTreeFilters";
 import { getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
 import { pruneTreeToIds } from "@/components/tree/filterTree";
@@ -61,6 +69,7 @@ interface IdeaTreeProps {
   hideClosed: boolean;
   hideCompleted: boolean;
   hideDeferred: boolean;
+  typeFilter?: IdeaType[];
   focusedId: string | null;
   onFocus: (id: string | null) => void;
   cardMode?: boolean;
@@ -135,6 +144,7 @@ export function IdeaTree({
   hideClosed,
   hideCompleted,
   hideDeferred,
+  typeFilter,
   focusedId,
   onFocus,
   cardMode,
@@ -145,7 +155,13 @@ export function IdeaTree({
   const { openNotes } = useNotes();
 
   const filteredTree = useMemo(() => {
-    let filtered = filterIdeaTree(tree, ideas, { search, hideClosed, hideCompleted, hideDeferred });
+    let filtered = filterIdeaTree(tree, ideas, {
+      search,
+      hideClosed,
+      hideCompleted,
+      hideDeferred,
+      typeFilter,
+    });
 
     if (showToday) {
       const passingIds = new Set<string>();
@@ -180,6 +196,7 @@ export function IdeaTree({
     hideClosed,
     hideCompleted,
     hideDeferred,
+    typeFilter,
     showToday,
     focusedId,
     todayString,

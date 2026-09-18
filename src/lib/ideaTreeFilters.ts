@@ -1,4 +1,4 @@
-import { IdeaNode, Idea } from "@/lib/types";
+import { IdeaNode, Idea, IdeaType } from "@/lib/types";
 import { dropSubtrees, pruneTree, pruneTreeToIds } from "@/components/tree/filterTree";
 
 export function filterTreeBySearch(nodes: IdeaNode[], query: string): IdeaNode[] {
@@ -37,6 +37,12 @@ export function filterTreeByFocus(nodes: IdeaNode[], ideas: Idea[]): IdeaNode[] 
   return pruneTreeToIds(nodes, focusedIds);
 }
 
+export function filterTreeByType(nodes: IdeaNode[], types: IdeaType[]): IdeaNode[] {
+  if (types.length === 0) return nodes;
+  const typeSet = new Set(types);
+  return pruneTree(nodes, (node) => node.type != null && typeSet.has(node.type));
+}
+
 export function filterIdeaTree(
   tree: IdeaNode[],
   ideas: Idea[],
@@ -45,11 +51,21 @@ export function filterIdeaTree(
     hideClosed?: boolean;
     hideCompleted?: boolean;
     hideDeferred?: boolean;
+    typeFilter?: IdeaType[];
   } = {},
 ): IdeaNode[] {
-  const { search = "", hideClosed = false, hideCompleted = false, hideDeferred = false } = options;
+  const {
+    search = "",
+    hideClosed = false,
+    hideCompleted = false,
+    hideDeferred = false,
+    typeFilter,
+  } = options;
 
-  if (!search.trim() && !hideClosed && !hideCompleted && !hideDeferred) return tree;
+  const hasTypeFilter = typeFilter && typeFilter.length > 0;
+
+  if (!search.trim() && !hideClosed && !hideCompleted && !hideDeferred && !hasTypeFilter)
+    return tree;
 
   const hasHideFilters = hideClosed || hideCompleted || hideDeferred;
 
@@ -94,5 +110,9 @@ export function filterIdeaTree(
   for (const id of visibleSearchIds) {
     if (!hasHideFilters || hidePassedIds.has(id)) finalIds.add(id);
   }
-  return pruneTreeToIds(tree, finalIds);
+  let result = pruneTreeToIds(tree, finalIds);
+  if (hasTypeFilter) {
+    result = filterTreeByType(result, typeFilter!);
+  }
+  return result;
 }

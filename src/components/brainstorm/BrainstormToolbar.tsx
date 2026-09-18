@@ -11,7 +11,10 @@ import {
   Pencil,
   Plus,
   SlidersHorizontal,
+  Tag,
 } from "lucide-react";
+import { IdeaType } from "@/lib/types";
+import { TypeFilterPicker } from "@/components/shared/TypeFilterPicker";
 
 export type BrainstormEditMode = "view" | "edit" | "insert";
 
@@ -32,6 +35,8 @@ export interface BrainstormToolbarProps {
   setHideCompleted: (v: boolean) => void;
   hideDeferred: boolean;
   setHideDeferred: (v: boolean) => void;
+  typeFilter: IdeaType[];
+  setTypeFilter: React.Dispatch<React.SetStateAction<IdeaType[]>>;
   onAddRoot: () => void;
   expandAll: () => void;
   collapseAll: () => void;
@@ -63,14 +68,18 @@ export function BrainstormToolbar({
   setHideCompleted,
   hideDeferred,
   setHideDeferred,
+  typeFilter,
+  setTypeFilter,
   onAddRoot,
   expandAll,
   collapseAll,
   cardMode,
 }: BrainstormToolbarProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [typePickerOpen, setTypePickerOpen] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const filtersRef = useRef<HTMLDivElement>(null);
+  const typePickerRef = useRef<HTMLDivElement>(null);
   const overflowRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -89,6 +98,23 @@ export function BrainstormToolbar({
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [filtersOpen]);
+
+  useEffect(() => {
+    if (!typePickerOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (typePickerRef.current && !typePickerRef.current.contains(e.target as Node))
+        setTypePickerOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setTypePickerOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [typePickerOpen]);
 
   useEffect(() => {
     if (!overflowOpen) return;
@@ -112,6 +138,7 @@ export function BrainstormToolbar({
     (hideClosed ? 1 : 0) +
     (hideCompleted ? 1 : 0) +
     (hideDeferred ? 1 : 0) +
+    (typeFilter.length > 0 ? 1 : 0) +
     (!showType ? 1 : 0) +
     (!showArea ? 1 : 0);
 
@@ -259,6 +286,37 @@ export function BrainstormToolbar({
             </motion.div>
           )}
         </AnimatePresence>
+      </div>
+
+      <div ref={typePickerRef} className="relative">
+        <button
+          type="button"
+          onClick={() => setTypePickerOpen((v) => !v)}
+          className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+            typeFilter.length > 0
+              ? "border-indigo-300 bg-white text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
+              : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
+          }`}
+        >
+          <Tag size={12} />
+          <span className="hidden sm:inline">
+            {typeFilter.length > 0
+              ? `${typeFilter.length} type${typeFilter.length > 1 ? "s" : ""}`
+              : "Type"}
+          </span>
+        </button>
+        {typePickerOpen && (
+          <TypeFilterPicker
+            selected={typeFilter}
+            onToggle={(type) =>
+              setTypeFilter((prev) =>
+                prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type],
+              )
+            }
+            onClear={() => setTypeFilter([])}
+            onClose={() => setTypePickerOpen(false)}
+          />
+        )}
       </div>
 
       <div ref={overflowRef} className="relative">
