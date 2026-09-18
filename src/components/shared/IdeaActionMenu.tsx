@@ -79,6 +79,8 @@ export function IdeaActionMenu({
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const deleteConfirmRef = useRef<HTMLDivElement>(null);
+  const horizonPickerRef = useRef<HTMLDivElement>(null);
+  const lanePickerRef = useRef<HTMLDivElement>(null);
 
   const descendantCount = useMemo(() => {
     if (!hasChildren) return 0;
@@ -152,6 +154,54 @@ export function IdeaActionMenu({
       document.removeEventListener("keydown", keyHandler);
     };
   }, [showDeleteWarning]);
+
+  useEffect(() => {
+    if (!showHorizonPicker) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        horizonPickerRef.current &&
+        !horizonPickerRef.current.contains(target) &&
+        menuTriggerRef.current &&
+        !menuTriggerRef.current.contains(target)
+      ) {
+        setShowHorizonPicker(false);
+      }
+    };
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowHorizonPicker(false);
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("keydown", keyHandler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("keydown", keyHandler);
+    };
+  }, [showHorizonPicker]);
+
+  useEffect(() => {
+    if (!showLanePicker) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        lanePickerRef.current &&
+        !lanePickerRef.current.contains(target) &&
+        menuTriggerRef.current &&
+        !menuTriggerRef.current.contains(target)
+      ) {
+        setShowLanePicker(false);
+      }
+    };
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowLanePicker(false);
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("keydown", keyHandler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("keydown", keyHandler);
+    };
+  }, [showLanePicker]);
 
   const closeAll = () => {
     setShowMenu(false);
@@ -262,7 +312,7 @@ export function IdeaActionMenu({
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
               >
                 <Link2 size={12} strokeWidth={1.5} />
-                Link
+                Link…
               </button>
             )}
             {!hidden.includes("move") && (
@@ -274,7 +324,7 @@ export function IdeaActionMenu({
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
               >
                 <ArrowUpDown size={12} strokeWidth={1.5} />
-                Move
+                Move…
               </button>
             )}
             {!hidden.includes("attach") && (
@@ -312,7 +362,7 @@ export function IdeaActionMenu({
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
               >
                 <Telescope size={12} strokeWidth={1.5} />
-                Horizon
+                Assign Horizon…
               </button>
             )}
             {showLaneAction && (
@@ -379,6 +429,7 @@ export function IdeaActionMenu({
         idea.horizon &&
         createPortal(
           <div
+            ref={lanePickerRef}
             style={{
               position: "fixed",
               top: menuPos.top,
@@ -431,7 +482,7 @@ export function IdeaActionMenu({
         menuPos &&
         createPortal(
           <div
-            ref={menuRef}
+            ref={horizonPickerRef}
             style={{
               position: "fixed",
               top: menuPos.top,
