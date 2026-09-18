@@ -13,6 +13,7 @@ import {
   Target,
   Layers,
   Eye,
+  CornerDownRight,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { Idea, IdeaLink, IdeaHorizon, LinkType, Tag, LaneConfig } from "@/lib/types";
@@ -39,7 +40,7 @@ interface IdeaActionMenuProps {
   onDeleteLink: (id: string) => Promise<void>;
   onMove: (id: string, newParentId: string | null, newSortOrder: number) => Promise<void>;
   onMoved?: (parentIdToExpand: string | null) => void;
-  hiddenActions?: Array<"edit" | "link" | "move" | "schedule" | "horizon" | "delete">;
+  hiddenActions?: Array<"edit" | "link" | "move" | "attach" | "schedule" | "horizon" | "delete">;
   onToggleInFocus?: (id: string, until?: string | null) => Promise<void>;
   currentView?: RevealView;
 }
@@ -68,6 +69,7 @@ export function IdeaActionMenu({
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [showLinkPanel, setShowLinkPanel] = useState(false);
   const [showMovePanel, setShowMovePanel] = useState(false);
+  const [showAttachPanel, setShowAttachPanel] = useState(false);
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const [showDeleteWarning, setShowDeleteWarning] = useState(false);
   const [deletePos, setDeletePos] = useState<{ top: number; right: number } | null>(null);
@@ -155,6 +157,7 @@ export function IdeaActionMenu({
     setShowMenu(false);
     setShowLinkPanel(false);
     setShowMovePanel(false);
+    setShowAttachPanel(false);
     setShowSchedulePicker(false);
     setShowDeleteWarning(false);
     setShowHorizonPicker(false);
@@ -186,6 +189,7 @@ export function IdeaActionMenu({
     showMenu ||
     showLinkPanel ||
     showMovePanel ||
+    showAttachPanel ||
     showSchedulePicker ||
     showDeleteWarning ||
     showHorizonPicker ||
@@ -271,6 +275,18 @@ export function IdeaActionMenu({
               >
                 <ArrowUpDown size={12} strokeWidth={1.5} />
                 Move
+              </button>
+            )}
+            {!hidden.includes("attach") && (
+              <button
+                onClick={() => {
+                  setShowMenu(false);
+                  setShowAttachPanel(true);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+              >
+                <CornerDownRight size={12} strokeWidth={1.5} />
+                Attach to…
               </button>
             )}
             {!hidden.includes("schedule") && (
@@ -491,6 +507,17 @@ export function IdeaActionMenu({
           onMove={handleMove}
           onMoved={handleMoved}
           onClose={() => setShowMovePanel(false)}
+        />
+      )}
+      {showAttachPanel && (
+        <MoveIdeaPanel
+          idea={idea}
+          ideas={allIdeas}
+          getTagsForIdea={getTagsForIdea}
+          variant="attach"
+          onMove={handleMove}
+          onMoved={handleMoved}
+          onClose={() => setShowAttachPanel(false)}
         />
       )}
       {showSchedulePicker && (

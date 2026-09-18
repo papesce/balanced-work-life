@@ -27,6 +27,8 @@ interface AreaTaskGroupProps {
   onAddTag?: (ideaId: string, tag: Tag) => Promise<void>;
   onRemoveTag?: (ideaId: string, tagId: string) => Promise<void>;
   onUndoAction?: (action: UndoAction) => void;
+  onAttach?: (taskId: string, parentId: string) => Promise<void>;
+  allIdeas?: Idea[];
 }
 
 export function AreaTaskGroup({
@@ -48,6 +50,8 @@ export function AreaTaskGroup({
   onAddTag,
   onRemoveTag,
   onUndoAction,
+  onAttach,
+  allIdeas,
 }: AreaTaskGroupProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [areaInputValue, setAreaInputValue] = useState("");
@@ -123,6 +127,8 @@ export function AreaTaskGroup({
             onAddTag={onAddTag}
             onRemoveTag={onRemoveTag}
             onUndoAction={onUndoAction}
+            onAttach={onAttach}
+            allIdeas={allIdeas}
           />
         )}
         {doneTasks.map((task) => (
@@ -143,6 +149,8 @@ export function AreaTaskGroup({
             onAddTag={onAddTag}
             onRemoveTag={onRemoveTag}
             onUndoAction={onUndoAction}
+            onAttach={onAttach}
+            allIdeas={allIdeas}
           />
         ))}
         {pendingTasks.length === 0 && doneTasks.length === 0 && (

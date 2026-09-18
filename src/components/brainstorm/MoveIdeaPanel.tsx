@@ -14,6 +14,7 @@ interface MoveIdeaPanelProps {
   onClose: () => void;
   variant?: "move" | "attach";
   className?: string;
+  onAttach?: (parentId: string) => Promise<void>;
 }
 
 function getDescendantIds(ideaId: string, ideas: Idea[]) {
@@ -37,6 +38,7 @@ export function MoveIdeaPanel({
   onClose,
   variant = "move",
   className,
+  onAttach,
 }: MoveIdeaPanelProps) {
   const ref = useRef<HTMLDivElement>(null);
   const excludedIds = getDescendantIds(idea.id, ideas);
@@ -57,7 +59,11 @@ export function MoveIdeaPanel({
   };
 
   const moveAsChild = async (target: Idea) => {
-    await onMove(target.id, 0);
+    if (onAttach) {
+      await onAttach(target.id);
+    } else {
+      await onMove(target.id, 0);
+    }
     onMoved(target.id);
     onClose();
   };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import { useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -121,6 +121,10 @@ function RootAddInput({
 export default function HorizonPage() {
   const ideasHook = useIdeas();
   const { ideas, loading, moveIdea, scheduleIdea } = ideasHook;
+  const ideasRef = useRef(ideas);
+  useEffect(() => {
+    ideasRef.current = ideas;
+  });
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
   const linksHook = useIdeaLinks();
@@ -318,12 +322,11 @@ export default function HorizonPage() {
 
   useEffect(() => {
     if (!highlightId || loading) return;
-    const idea = ideas.find((i) => i.id === highlightId);
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- highlight deep-link syncs tab
+    const currentIdeas = ideasRef.current;
+    const idea = currentIdeas.find((i) => i.id === highlightId);
     if (idea?.horizon) setActiveTab(idea.horizon);
-    // expand ancestors
     const expandAncestors = (id: string) => {
-      const m = new Map(ideas.map((i) => [i.id, i]));
+      const m = new Map(currentIdeas.map((i) => [i.id, i]));
       let cur = m.get(id);
       const ids: string[] = [];
       while (cur?.parent_id) {
@@ -354,7 +357,7 @@ export default function HorizonPage() {
       router.replace(`/horizon?${params.toString()}`, { scroll: false });
     }, 400);
     return () => clearTimeout(timer);
-  }, [highlightId, loading, ideas, searchParams, router]);
+  }, [highlightId, loading, searchParams, router]);
 
   if (loading) {
     return (

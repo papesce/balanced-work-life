@@ -234,6 +234,13 @@ function DailyPlannerInner() {
     if (targetTag) await taskTagsHook.addTagToTask(taskId, targetTag).catch(() => {});
   };
 
+  const handleAttach = useCallback(
+    async (taskId: string, parentId: string) => {
+      await updateIdea(taskId, { parent_id: parentId });
+    },
+    [updateIdea],
+  );
+
   const handleCreateScheduledTask = async (
     text: string,
     time: string,
@@ -463,6 +470,8 @@ function DailyPlannerInner() {
                     await taskTagsHook.removeTagFromTask(ideaId, tagId);
                   }}
                   onUndoAction={registerUndo}
+                  onAttach={handleAttach}
+                  allIdeas={ideas}
                 />
               );
             })}

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { Reorder, useDragControls } from "framer-motion";
-import { Star, MoreHorizontal, GripVertical, Clock } from "lucide-react";
+import { Star, MoreHorizontal, GripVertical, Clock, CornerDownRight } from "lucide-react";
 import { UndoAction } from "@/lib/tasks/undo";
 import { areaColors } from "@/styles/tokens";
 import { Idea, IdeaStatus, LifeArea, Tag } from "@/lib/types";
@@ -11,6 +11,7 @@ import { STATUS_CONFIG, PRODUCTIVITY_SIGNALS } from "@/lib/constants";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { formatTime } from "./plannerUtils";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
+import { MoveIdeaPanel } from "@/components/brainstorm/MoveIdeaPanel";
 import { RescheduleAction } from "@/lib/tasks/rescheduleTask";
 import { getToday } from "@/lib/dateUtils";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";
@@ -35,6 +36,8 @@ interface PendingTaskListProps {
   onAddTag?: (ideaId: string, tag: Tag) => Promise<void>;
   onRemoveTag?: (ideaId: string, tagId: string) => Promise<void>;
   onUndoAction?: (action: UndoAction) => void;
+  onAttach?: (taskId: string, parentId: string) => Promise<void>;
+  allIdeas?: Idea[];
 }
 
 export function PendingTaskList({
@@ -53,6 +56,8 @@ export function PendingTaskList({
   onAddTag,
   onRemoveTag,
   onUndoAction,
+  onAttach,
+  allIdeas,
 }: PendingTaskListProps) {
   const [items, setItems] = useState(tasks);
   const itemsRef = useRef(items);
@@ -147,6 +152,8 @@ export function PendingTaskList({
           onFramerDragStart={handleFramerDragStart}
           onFramerDragEnd={handleFramerDragEnd}
           onUndoAction={onUndoAction}
+          onAttach={onAttach}
+          allIdeas={allIdeas}
         />
       ))}
     </Reorder.Group>
@@ -174,6 +181,8 @@ function ReorderItemWrapper({
   onFramerDragStart,
   onFramerDragEnd,
   onUndoAction,
+  onAttach,
+  allIdeas,
 }: {
   task: Idea;
   area: LifeArea;
@@ -195,6 +204,8 @@ function ReorderItemWrapper({
   onFramerDragStart?: () => void;
   onFramerDragEnd?: () => void;
   onUndoAction?: (action: UndoAction) => void;
+  onAttach?: (taskId: string, parentId: string) => Promise<void>;
+  allIdeas?: Idea[];
 }) {
   const dragControls = useDragControls();
 
@@ -231,6 +242,8 @@ function ReorderItemWrapper({
         onNativeDragStart={onNativeDragStart}
         onNativeDragEnd={onNativeDragEnd}
         onUndoAction={onUndoAction}
+        onAttach={onAttach}
+        allIdeas={allIdeas}
       />
     </Reorder.Item>
   );
@@ -255,6 +268,8 @@ function TaskRow({
   onNativeDragStart,
   onNativeDragEnd,
   onUndoAction,
+  onAttach,
+  allIdeas,
 }: {
   task: Idea;
   area: LifeArea;
@@ -274,6 +289,8 @@ function TaskRow({
   onNativeDragStart?: () => void;
   onNativeDragEnd?: (source: string) => void;
   onUndoAction?: (action: UndoAction) => void;
+  onAttach?: (taskId: string, parentId: string) => Promise<void>;
+  allIdeas?: Idea[];
 }) {
   const isCompleted = task.status === "completed";
   const isCancelled = task.status === "cancelled";
@@ -307,6 +324,7 @@ function TaskRow({
   const [timeMenuPos, setTimeMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const deleteConfirmRef = useRef<HTMLDivElement>(null);
+  const [showAttachPanel, setShowAttachPanel] = useState(false);
   const [showDateInput, setShowDateInput] = useState(false);
   const dateInputRef = useRef<HTMLInputElement>(null);
   const isReschedule =
@@ -832,6 +850,20 @@ function TaskRow({
                   <Eye size={11} strokeWidth={1.5} />
                   Reveal in...
                 </button>
+                {onAttach && allIdeas && (
+                  <div className="relative">
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        setShowAttachPanel(true);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                    >
+                      <CornerDownRight size={11} strokeWidth={1.5} />
+                      Attach to…
+                    </button>
+                  </div>
+                )}
                 <div className="my-1 border-t border-black/5 dark:border-white/5" />
                 {task.scheduled_date !== getToday() && (
                   <button
@@ -986,6 +1018,23 @@ function TaskRow({
               currentView="planner"
               position={revealPos}
               onClose={() => setShowReveal(false)}
+            />
+          )}
+          {showAttachPanel && allIdeas && (
+            <MoveIdeaPanel
+              idea={task}
+              ideas={allIdeas}
+              variant="attach"
+              getTagsForIdea={getTagsForIdea}
+              onMove={async (newParentId) => {
+                if (onAttach && newParentId) {
+                  await onAttach(task.id, newParentId);
+                }
+                setShowAttachPanel(false);
+              }}
+              onAttach={onAttach ? (parentId) => onAttach(task.id, parentId) : undefined}
+              onMoved={() => setShowAttachPanel(false)}
+              onClose={() => setShowAttachPanel(false)}
             />
           )}
         </div>
