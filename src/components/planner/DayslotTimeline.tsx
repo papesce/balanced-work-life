@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { DailyTimeline } from "@papesce/dayslot";
 import type { TimelineEvent, DailyTimelineHandle } from "@papesce/dayslot";
 import "@papesce/dayslot/style.css";
@@ -106,6 +106,10 @@ export function DayslotTimeline({
   const isToday = activeDate === new Date().toISOString().slice(0, 10);
   const isMobile = useIsMobile();
   const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
+  const pendingCounter = useRef(0);
+  const [pendingEvents, setPendingEvents] = useState<
+    Array<{ id: string; startMinute: number; text: string; durationMinutes: number }>
+  >([]);
 
   const handleTimelineRef = useCallback((handle: DailyTimelineHandle | null) => {
     setScrollEl(handle?.scrollElement ?? null);
@@ -124,8 +128,18 @@ export function DayslotTimeline({
   );
 
   const events = useMemo(
-    () => scheduledTasks.map((t) => taskToEvent(t, getTagsForIdea(t.id))),
-    [scheduledTasks, getTagsForIdea],
+    () => [
+      ...scheduledTasks.map((t) => taskToEvent(t, getTagsForIdea(t.id))),
+      ...pendingEvents.map((pe) => ({
+        id: pe.id,
+        title: pe.text,
+        startMinute: pe.startMinute,
+        durationMinutes: pe.durationMinutes,
+        color: undefined,
+        category: undefined,
+      })),
+    ],
+    [scheduledTasks, getTagsForIdea, pendingEvents],
   );
 
   const handleEventChange = useCallback(
@@ -162,24 +176,61 @@ export function DayslotTimeline({
     [onUpdateTask],
   );
 
+  const wrappedOnCreateTask = useCallback(
+    async (
+      text: string,
+      time: string,
+      area?: LifeArea,
+      tag?: Tag,
+      productivitySignal?: string | null,
+    ) => {
+      const tempId = `pending-${++pendingCounter.current}`;
+      setPendingEvents((prev) => [
+        ...prev,
+        { id: tempId, startMinute: parseTimeToMinutes(time), text, durationMinutes: 30 },
+      ]);
+      try {
+        await onCreateTask(text, time, area, tag, productivitySignal);
+      } finally {
+        setPendingEvents((prev) => prev.filter((e) => e.id !== tempId));
+      }
+    },
+    [onCreateTask],
+  );
+
   const renderSlotAction = useCallback(
     (startMinute: number, close: () => void) => {
       return (
         <SlotForm
           startMinute={startMinute}
           close={close}
-          onCreateTask={onCreateTask}
+          onCreateTask={wrappedOnCreateTask}
           defaultArea={selectedArea}
           tags={tags}
           onCreateTag={onCreateTag}
         />
       );
     },
-    [onCreateTask, selectedArea, tags, onCreateTag],
+    [wrappedOnCreateTask, selectedArea, tags, onCreateTag],
   );
 
   const renderEventContent = useCallback(
     (event: TimelineEvent) => {
+      if (event.id.startsWith("pending-")) {
+        return (
+          <div className="flex h-full w-full animate-pulse rounded-[9px] border border-dashed border-gray-300 bg-gray-100/50 dark:border-gray-700 dark:bg-gray-800/50">
+            <div className="my-1.5 ml-1.5 w-1 flex-shrink-0 rounded-full bg-gray-300 dark:bg-gray-600" />
+            <div className="flex min-w-0 flex-1 flex-col justify-between px-2 py-1.5">
+              <div className="h-2.5 w-3/4 rounded bg-gray-300 dark:bg-gray-600" />
+              <div className="mt-auto flex items-center gap-2 pt-1 pb-2">
+                <div className="h-2 w-8 rounded bg-gray-200 dark:bg-gray-700" />
+                <div className="h-2 w-6 rounded bg-gray-200 dark:bg-gray-700" />
+              </div>
+            </div>
+          </div>
+        );
+      }
+
       const idea = taskMap.get(event.id);
       if (!idea) return null;
       const isCompleted = idea.status === "completed";
