@@ -115,6 +115,7 @@ export default function BrainstormPage() {
   const hasLinks = linksHook.links.length > 0;
 
   const handleAddRoot = async () => {
+    if (searchActive) setSearch("");
     const id = await createIdea("", effectiveFocusId, "top");
     if (id) {
       setSelectedId(id);
