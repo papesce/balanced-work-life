@@ -471,7 +471,8 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
         }
 
         // 5. Mark line resolved
-        const newText = markLineResolved(currentText, index);
+        const matchedId = action.type === "match" ? action.ideaId : undefined;
+        const newText = markLineResolved(currentText, index, matchedId);
         const now = new Date().toISOString();
 
         // 6. Check if any unresolved non-empty lines remain
@@ -527,8 +528,13 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
               const uLines = uText.split("\n");
               const uLine = uLines[capturedIndex];
               // Only remove prefix if the line still starts with it
+              // Handles both "✓ text" and "✓ [matched:id] text"
               if (uLine && uLine.startsWith("✓ ")) {
-                uLines[capturedIndex] = uLine.slice(2);
+                const afterCheck = uLine.slice(2);
+                const tagMatch = afterCheck.match(/^\[matched:[^\]]+\]\s*/);
+                uLines[capturedIndex] = tagMatch
+                  ? afterCheck.slice(tagMatch[0].length)
+                  : afterCheck;
               }
               const now = new Date().toISOString();
               if (capturedDidArchive) {

@@ -1,11 +1,9 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useQuery } from "@powersync/react";
-import { useAuth } from "@/hooks/useAuth";
-import { Plus, GitBranch, Search, Trash2, Check } from "lucide-react";
+import { Plus, GitBranch, Search, Trash2, Check, MoreHorizontal } from "lucide-react";
 import { useQuickNoteContext } from "@/contexts/QuickNoteContext";
-import { NoteLine } from "@/lib/quickNotes";
+import { NoteLine, MatchResult } from "@/lib/quickNotes";
 import { Idea } from "@/lib/types";
 import { IdeaSearchPicker } from "@/components/brainstorm/IdeaSearchPicker";
 
@@ -13,23 +11,16 @@ type PickerMode = null | "create_under" | "match";
 
 interface QuickNoteLineRowProps {
   line: NoteLine;
+  suggestedMatch: MatchResult | null;
+  allIdeas: Idea[];
 }
 
-export function QuickNoteLineRow({ line }: QuickNoteLineRowProps) {
-  const { user } = useAuth();
+export function QuickNoteLineRow({ line, suggestedMatch, allIdeas }: QuickNoteLineRowProps) {
   const { resolveLine, updateLineText } = useQuickNoteContext();
   const [localText, setLocalText] = useState(line.text);
   const [saving, setSaving] = useState(false);
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
-
-  // Load ideas for the picker (only when picker is open)
-  const { data: ideaRows } = useQuery<Record<string, unknown>>(
-    pickerMode && user
-      ? "SELECT * FROM ideas WHERE user_id = ? ORDER BY sort_order ASC"
-      : "SELECT * FROM ideas WHERE 0",
-    pickerMode && user ? [user.id] : [],
-  );
-  const ideas: Idea[] = (ideaRows as unknown as Idea[]) ?? [];
+  const [overflowOpen, setOverflowOpen] = useState(false);
 
   const handleTextChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,15 +68,27 @@ export function QuickNoteLineRow({ line }: QuickNoteLineRowProps) {
     setSaving(false);
   }, [resolveLine, line.index, line.text]);
 
+  const handleAcceptMatch = useCallback(() => {
+    if (suggestedMatch) {
+      void handleMatch(suggestedMatch.idea.id);
+    }
+  }, [suggestedMatch, handleMatch]);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        void handleCreate();
+        if (suggestedMatch) {
+          handleAcceptMatch();
+        } else {
+          void handleCreate();
+        }
       }
     },
-    [handleCreate],
+    [handleCreate, handleAcceptMatch, suggestedMatch],
   );
+
+  const hasMatch = suggestedMatch && suggestedMatch.score >= 0.6;
 
   return (
     <div className="flex flex-col gap-1.5 rounded-lg border border-black/5 bg-white/60 p-2 dark:border-white/5 dark:bg-white/[0.02]">
@@ -102,40 +105,149 @@ export function QuickNoteLineRow({ line }: QuickNoteLineRowProps) {
 
       {!pickerMode && (
         <div className="flex flex-wrap items-center gap-1">
-          <button
-            onClick={handleCreate}
-            disabled={saving || !localText.trim()}
-            className="flex cursor-pointer items-center gap-1 rounded-lg bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-600 transition-colors hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-violet-950/20 dark:text-violet-400 dark:hover:bg-violet-900/30"
-          >
-            <Plus size={11} />
-            Create
-          </button>
-          <button
-            onClick={() => setPickerMode("create_under")}
-            disabled={saving || !localText.trim()}
-            className="flex cursor-pointer items-center gap-1 rounded-lg bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-          >
-            <GitBranch size={11} />
-            Create under…
-          </button>
-          <button
-            onClick={() => setPickerMode("match")}
-            disabled={saving || !localText.trim()}
-            className="flex cursor-pointer items-center gap-1 rounded-lg bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-          >
-            <Search size={11} />
-            Match existing
-          </button>
-          {/* EXTENSION POINT: idea_comments ("also add as comment") — when the idea_comments
-              table exists, add a checkbox here that inserts a comment row on the matched idea. */}
-          <button
-            onClick={handleDiscard}
-            disabled={saving}
-            className="flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-          >
-            <Trash2 size={11} />
-            Discard
-          </button>
+          {hasMatch ? (
+            <>
+              {/* Primary: Accept match suggestion */}
+              <button
+                onClick={handleAcceptMatch}
+                disabled={saving}
+                className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-violet-50 px-2.5 py-1.5 text-[11px] font-semibold text-violet-600 transition-colors hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-violet-950/20 dark:text-violet-400 dark:hover:bg-violet-900/30"
+              >
+                <Check size={12} />
+                Match &quot;{suggestedMatch.idea.text}&quot;
+              </button>
+
+              {/* Secondary: Create new */}
+              <button
+                onClick={handleCreate}
+                disabled={saving || !localText.trim()}
+                className="flex cursor-pointer items-center gap-1 rounded-lg bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+              >
+                <Plus size={11} />
+                Create new
+              </button>
+
+              {/* Overflow menu for secondary actions */}
+              <div className="relative">
+                <button
+                  onClick={() => setOverflowOpen(!overflowOpen)}
+                  disabled={saving}
+                  className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                  aria-label="More actions"
+                >
+                  <MoreHorizontal size={14} />
+                </button>
+
+                {overflowOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setOverflowOpen(false)} />
+                    <div className="absolute right-0 z-20 mt-1 w-44 rounded-xl border border-black/10 bg-white py-1 shadow-lg dark:border-white/10 dark:bg-gray-800">
+                      <button
+                        onClick={() => {
+                          setOverflowOpen(false);
+                          setPickerMode("create_under");
+                        }}
+                        disabled={saving || !localText.trim()}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                      >
+                        <GitBranch size={12} />
+                        Create under…
+                      </button>
+                      <button
+                        onClick={() => {
+                          setOverflowOpen(false);
+                          setPickerMode("match");
+                        }}
+                        disabled={saving || !localText.trim()}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                      >
+                        <Search size={12} />
+                        Search manually…
+                      </button>
+                      <div className="my-1 border-t border-black/5 dark:border-white/5" />
+                      <button
+                        onClick={() => {
+                          setOverflowOpen(false);
+                          void handleDiscard();
+                        }}
+                        disabled={saving}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"
+                      >
+                        <Trash2 size={12} />
+                        Discard
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              {/* No match: Create is primary */}
+              <button
+                onClick={handleCreate}
+                disabled={saving || !localText.trim()}
+                className="flex cursor-pointer items-center gap-1 rounded-lg bg-violet-50 px-2.5 py-1.5 text-[11px] font-semibold text-violet-600 transition-colors hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-violet-950/20 dark:text-violet-400 dark:hover:bg-violet-900/30"
+              >
+                <Plus size={11} />
+                Create
+              </button>
+
+              {/* Overflow menu for secondary actions */}
+              <div className="relative">
+                <button
+                  onClick={() => setOverflowOpen(!overflowOpen)}
+                  disabled={saving}
+                  className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                  aria-label="More actions"
+                >
+                  <MoreHorizontal size={14} />
+                </button>
+
+                {overflowOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setOverflowOpen(false)} />
+                    <div className="absolute right-0 z-20 mt-1 w-44 rounded-xl border border-black/10 bg-white py-1 shadow-lg dark:border-white/10 dark:bg-gray-800">
+                      <button
+                        onClick={() => {
+                          setOverflowOpen(false);
+                          setPickerMode("create_under");
+                        }}
+                        disabled={saving || !localText.trim()}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                      >
+                        <GitBranch size={12} />
+                        Create under…
+                      </button>
+                      <button
+                        onClick={() => {
+                          setOverflowOpen(false);
+                          setPickerMode("match");
+                        }}
+                        disabled={saving || !localText.trim()}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                      >
+                        <Search size={12} />
+                        Match existing…
+                      </button>
+                      <div className="my-1 border-t border-black/5 dark:border-white/5" />
+                      <button
+                        onClick={() => {
+                          setOverflowOpen(false);
+                          void handleDiscard();
+                        }}
+                        disabled={saving}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"
+                      >
+                        <Trash2 size={12} />
+                        Discard
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -145,7 +257,7 @@ export function QuickNoteLineRow({ line }: QuickNoteLineRowProps) {
             Choose parent idea
           </p>
           <IdeaSearchPicker
-            ideas={ideas}
+            ideas={allIdeas}
             placeholder="Search for a parent idea..."
             matchAllWords
             renderActions={(idea, clearSearch) => (
@@ -176,7 +288,7 @@ export function QuickNoteLineRow({ line }: QuickNoteLineRowProps) {
             Match to existing idea
           </p>
           <IdeaSearchPicker
-            ideas={ideas}
+            ideas={allIdeas}
             initialQuery={localText}
             matchAllWords
             placeholder="Search for a matching idea..."
