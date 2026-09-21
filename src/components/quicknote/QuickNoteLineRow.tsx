@@ -1,10 +1,27 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Plus, GitBranch, Search, Trash2, Check, MoreHorizontal } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  Plus,
+  GitBranch,
+  Search,
+  Trash2,
+  Check,
+  MoreHorizontal,
+  Eye,
+  LayoutDashboard,
+  CalendarDays,
+  Telescope,
+  BrainCircuit,
+  FolderKanban,
+  Target,
+  ChevronLeft,
+} from "lucide-react";
 import { useQuickNoteContext } from "@/contexts/QuickNoteContext";
 import { NoteLine, MatchResult } from "@/lib/quickNotes";
 import { Idea } from "@/lib/types";
+import { getRevealHref, type RevealView } from "@/lib/reveal";
 import { IdeaSearchPicker } from "@/components/brainstorm/IdeaSearchPicker";
 
 type PickerMode = null | "create_under" | "match";
@@ -16,11 +33,13 @@ interface QuickNoteLineRowProps {
 }
 
 export function QuickNoteLineRow({ line, suggestedMatch, allIdeas }: QuickNoteLineRowProps) {
-  const { resolveLine, updateLineText } = useQuickNoteContext();
+  const router = useRouter();
+  const { resolveLine, updateLineText, closePanel } = useQuickNoteContext();
   const [localText, setLocalText] = useState(line.text);
   const [saving, setSaving] = useState(false);
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
   const [overflowOpen, setOverflowOpen] = useState(false);
+  const [revealSubmenuOpen, setRevealSubmenuOpen] = useState(false);
 
   const handleTextChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -73,6 +92,16 @@ export function QuickNoteLineRow({ line, suggestedMatch, allIdeas }: QuickNoteLi
       void handleMatch(suggestedMatch.idea.id);
     }
   }, [suggestedMatch, handleMatch]);
+
+  const handleRevealNavigate = useCallback(
+    (view: RevealView) => {
+      if (!suggestedMatch) return;
+      const href = getRevealHref(view, suggestedMatch.idea, allIdeas);
+      closePanel();
+      router.push(href);
+    },
+    [suggestedMatch, allIdeas, closePanel, router],
+  );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -130,7 +159,10 @@ export function QuickNoteLineRow({ line, suggestedMatch, allIdeas }: QuickNoteLi
               {/* Overflow menu for secondary actions */}
               <div className="relative">
                 <button
-                  onClick={() => setOverflowOpen(!overflowOpen)}
+                  onClick={() => {
+                    setOverflowOpen(!overflowOpen);
+                    setRevealSubmenuOpen(false);
+                  }}
                   disabled={saving}
                   className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                   aria-label="More actions"
@@ -140,42 +172,107 @@ export function QuickNoteLineRow({ line, suggestedMatch, allIdeas }: QuickNoteLi
 
                 {overflowOpen && (
                   <>
-                    <div className="fixed inset-0 z-10" onClick={() => setOverflowOpen(false)} />
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => {
+                        setOverflowOpen(false);
+                        setRevealSubmenuOpen(false);
+                      }}
+                    />
                     <div className="absolute right-0 z-20 mt-1 w-44 rounded-xl border border-black/10 bg-white py-1 shadow-lg dark:border-white/10 dark:bg-gray-800">
-                      <button
-                        onClick={() => {
-                          setOverflowOpen(false);
-                          setPickerMode("create_under");
-                        }}
-                        disabled={saving || !localText.trim()}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                      >
-                        <GitBranch size={12} />
-                        Create under…
-                      </button>
-                      <button
-                        onClick={() => {
-                          setOverflowOpen(false);
-                          setPickerMode("match");
-                        }}
-                        disabled={saving || !localText.trim()}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                      >
-                        <Search size={12} />
-                        Search manually…
-                      </button>
-                      <div className="my-1 border-t border-black/5 dark:border-white/5" />
-                      <button
-                        onClick={() => {
-                          setOverflowOpen(false);
-                          void handleDiscard();
-                        }}
-                        disabled={saving}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"
-                      >
-                        <Trash2 size={12} />
-                        Discard
-                      </button>
+                      {revealSubmenuOpen ? (
+                        <>
+                          <button
+                            onClick={() => setRevealSubmenuOpen(false)}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                          >
+                            <ChevronLeft size={12} />
+                            Back
+                          </button>
+                          <div className="my-1 border-t border-black/5 dark:border-white/5" />
+                          <RevealOption
+                            view="planner"
+                            icon={<LayoutDashboard size={12} />}
+                            label="Daily Planner"
+                            onSelect={handleRevealNavigate}
+                          />
+                          <RevealOption
+                            view="timeline"
+                            icon={<CalendarDays size={12} />}
+                            label="Timeline"
+                            onSelect={handleRevealNavigate}
+                          />
+                          <RevealOption
+                            view="horizon"
+                            icon={<Telescope size={12} />}
+                            label="Horizon"
+                            onSelect={handleRevealNavigate}
+                          />
+                          <RevealOption
+                            view="brainstorm"
+                            icon={<BrainCircuit size={12} />}
+                            label="Brainstorm"
+                            onSelect={handleRevealNavigate}
+                          />
+                          <RevealOption
+                            view="projects"
+                            icon={<FolderKanban size={12} />}
+                            label="Projects"
+                            onSelect={handleRevealNavigate}
+                          />
+                          <RevealOption
+                            view="goals"
+                            icon={<Target size={12} />}
+                            label="Goals"
+                            onSelect={handleRevealNavigate}
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => {
+                              setOverflowOpen(false);
+                              setPickerMode("create_under");
+                            }}
+                            disabled={saving || !localText.trim()}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                          >
+                            <GitBranch size={12} />
+                            Create under…
+                          </button>
+                          <button
+                            onClick={() => {
+                              setOverflowOpen(false);
+                              setPickerMode("match");
+                            }}
+                            disabled={saving || !localText.trim()}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                          >
+                            <Search size={12} />
+                            Search manually…
+                          </button>
+                          <button
+                            onClick={() => setRevealSubmenuOpen(true)}
+                            disabled={saving}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                          >
+                            <Eye size={12} />
+                            Reveal in…
+                          </button>
+                          <div className="my-1 border-t border-black/5 dark:border-white/5" />
+                          <button
+                            onClick={() => {
+                              setOverflowOpen(false);
+                              void handleDiscard();
+                            }}
+                            disabled={saving}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"
+                          >
+                            <Trash2 size={12} />
+                            Discard
+                          </button>
+                        </>
+                      )}
                     </div>
                   </>
                 )}
@@ -314,5 +411,27 @@ export function QuickNoteLineRow({ line, suggestedMatch, allIdeas }: QuickNoteLi
         </div>
       )}
     </div>
+  );
+}
+
+function RevealOption({
+  view,
+  icon,
+  label,
+  onSelect,
+}: {
+  view: RevealView;
+  icon: React.ReactNode;
+  label: string;
+  onSelect: (view: RevealView) => void;
+}) {
+  return (
+    <button
+      onClick={() => onSelect(view)}
+      className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
