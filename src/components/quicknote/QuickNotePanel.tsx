@@ -12,6 +12,17 @@ import { QuickNoteList } from "./QuickNoteList";
 
 type PanelMode = "capture" | "process" | "list";
 
+const MODE_STORAGE_KEY = "quicknote-panel-mode";
+const VALID_MODES: PanelMode[] = ["capture", "process", "list"];
+
+function readStoredMode(): PanelMode {
+  try {
+    const stored = localStorage.getItem(MODE_STORAGE_KEY);
+    if (stored && VALID_MODES.includes(stored as PanelMode)) return stored as PanelMode;
+  } catch {}
+  return "capture";
+}
+
 export function QuickNotePanel() {
   const { note, panelOpen, closePanel, discardNote, unreadCount, isSelectedNoteLive } =
     useQuickNoteContext();
@@ -19,7 +30,16 @@ export function QuickNotePanel() {
   const [mode, setMode] = useState<PanelMode>("capture");
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // Persist mode to localStorage
+  const persistMode = useCallback((next: PanelMode) => {
+    setMode(next);
+    try {
+      localStorage.setItem(MODE_STORAGE_KEY, next);
+    } catch {}
+  }, []);
+
   useEffect(() => {
+    setMode(readStoredMode());
     setMounted(true);
   }, []);
 
@@ -36,10 +56,9 @@ export function QuickNotePanel() {
     return () => document.removeEventListener("keydown", handler);
   }, [panelOpen, closePanel]);
 
-  // Reset mode when panel opens
+  // Reset menu when panel opens
   useEffect(() => {
     if (panelOpen) {
-      setMode("capture");
       setMenuOpen(false);
     }
   }, [panelOpen]);
@@ -73,7 +92,7 @@ export function QuickNotePanel() {
           <div className="flex items-center gap-2">
             {mode === "list" ? (
               <button
-                onClick={() => setMode("capture")}
+                onClick={() => persistMode("capture")}
                 className="flex cursor-pointer items-center gap-1 rounded-lg px-1.5 py-1 text-xs font-medium text-gray-500 transition-colors hover:bg-black/5 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"
               >
                 <ChevronLeft size={14} />
@@ -81,7 +100,7 @@ export function QuickNotePanel() {
               </button>
             ) : mode === "process" ? (
               <button
-                onClick={() => setMode("capture")}
+                onClick={() => persistMode("capture")}
                 className="flex cursor-pointer items-center gap-1 rounded-lg px-1.5 py-1 text-xs font-medium text-gray-500 transition-colors hover:bg-black/5 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"
               >
                 <ChevronLeft size={14} />
@@ -100,7 +119,7 @@ export function QuickNotePanel() {
           <div className="flex items-center gap-1">
             {mode === "capture" && isSelectedNoteLive && (
               <button
-                onClick={() => canProcess && setMode("process")}
+                onClick={() => canProcess && persistMode("process")}
                 disabled={!canProcess}
                 className="cursor-pointer rounded-lg px-2.5 py-1.5 text-xs font-semibold text-violet-600 transition-colors hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-violet-400 dark:hover:bg-violet-950/20"
               >
@@ -111,7 +130,7 @@ export function QuickNotePanel() {
             {mode !== "list" && (
               <button
                 onClick={() => {
-                  setMode("list");
+                  persistMode("list");
                   setMenuOpen(false);
                 }}
                 className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:hover:bg-white/5 dark:hover:text-gray-200"

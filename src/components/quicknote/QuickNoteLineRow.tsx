@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus,
@@ -40,6 +40,20 @@ export function QuickNoteLineRow({ line, suggestedMatch, allIdeas }: QuickNoteLi
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [revealSubmenuOpen, setRevealSubmenuOpen] = useState(false);
+  const overflowRef = useRef<HTMLDivElement>(null);
+
+  // Dismiss overflow menu on click outside
+  useEffect(() => {
+    if (!overflowOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (overflowRef.current && !overflowRef.current.contains(e.target as Node)) {
+        setOverflowOpen(false);
+        setRevealSubmenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [overflowOpen]);
 
   const handleTextChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -157,7 +171,7 @@ export function QuickNoteLineRow({ line, suggestedMatch, allIdeas }: QuickNoteLi
               </button>
 
               {/* Overflow menu for secondary actions */}
-              <div className="relative">
+              <div className="relative" ref={overflowRef}>
                 <button
                   onClick={() => {
                     setOverflowOpen(!overflowOpen);
@@ -171,110 +185,101 @@ export function QuickNoteLineRow({ line, suggestedMatch, allIdeas }: QuickNoteLi
                 </button>
 
                 {overflowOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-10"
-                      onClick={() => {
-                        setOverflowOpen(false);
-                        setRevealSubmenuOpen(false);
-                      }}
-                    />
-                    <div className="absolute right-0 z-20 mt-1 w-44 rounded-xl border border-black/10 bg-white py-1 shadow-lg dark:border-white/10 dark:bg-gray-800">
-                      {revealSubmenuOpen ? (
-                        <>
-                          <button
-                            onClick={() => setRevealSubmenuOpen(false)}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                          >
-                            <ChevronLeft size={12} />
-                            Back
-                          </button>
-                          <div className="my-1 border-t border-black/5 dark:border-white/5" />
-                          <RevealOption
-                            view="planner"
-                            icon={<LayoutDashboard size={12} />}
-                            label="Daily Planner"
-                            onSelect={handleRevealNavigate}
-                          />
-                          <RevealOption
-                            view="timeline"
-                            icon={<CalendarDays size={12} />}
-                            label="Timeline"
-                            onSelect={handleRevealNavigate}
-                          />
-                          <RevealOption
-                            view="horizon"
-                            icon={<Telescope size={12} />}
-                            label="Horizon"
-                            onSelect={handleRevealNavigate}
-                          />
-                          <RevealOption
-                            view="brainstorm"
-                            icon={<BrainCircuit size={12} />}
-                            label="Brainstorm"
-                            onSelect={handleRevealNavigate}
-                          />
-                          <RevealOption
-                            view="projects"
-                            icon={<FolderKanban size={12} />}
-                            label="Projects"
-                            onSelect={handleRevealNavigate}
-                          />
-                          <RevealOption
-                            view="goals"
-                            icon={<Target size={12} />}
-                            label="Goals"
-                            onSelect={handleRevealNavigate}
-                          />
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => {
-                              setOverflowOpen(false);
-                              setPickerMode("create_under");
-                            }}
-                            disabled={saving || !localText.trim()}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                          >
-                            <GitBranch size={12} />
-                            Create under…
-                          </button>
-                          <button
-                            onClick={() => {
-                              setOverflowOpen(false);
-                              setPickerMode("match");
-                            }}
-                            disabled={saving || !localText.trim()}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                          >
-                            <Search size={12} />
-                            Search manually…
-                          </button>
-                          <button
-                            onClick={() => setRevealSubmenuOpen(true)}
-                            disabled={saving}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                          >
-                            <Eye size={12} />
-                            Reveal in…
-                          </button>
-                          <div className="my-1 border-t border-black/5 dark:border-white/5" />
-                          <button
-                            onClick={() => {
-                              setOverflowOpen(false);
-                              void handleDiscard();
-                            }}
-                            disabled={saving}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"
-                          >
-                            <Trash2 size={12} />
-                            Discard
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </>
+                  <div className="absolute right-0 z-20 mt-1 w-44 rounded-xl border border-black/10 bg-white py-1 shadow-lg dark:border-white/10 dark:bg-gray-800">
+                    {revealSubmenuOpen ? (
+                      <>
+                        <button
+                          onClick={() => setRevealSubmenuOpen(false)}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                        >
+                          <ChevronLeft size={12} />
+                          Back
+                        </button>
+                        <div className="my-1 border-t border-black/5 dark:border-white/5" />
+                        <RevealOption
+                          view="planner"
+                          icon={<LayoutDashboard size={12} />}
+                          label="Daily Planner"
+                          onSelect={handleRevealNavigate}
+                        />
+                        <RevealOption
+                          view="timeline"
+                          icon={<CalendarDays size={12} />}
+                          label="Timeline"
+                          onSelect={handleRevealNavigate}
+                        />
+                        <RevealOption
+                          view="horizon"
+                          icon={<Telescope size={12} />}
+                          label="Horizon"
+                          onSelect={handleRevealNavigate}
+                        />
+                        <RevealOption
+                          view="brainstorm"
+                          icon={<BrainCircuit size={12} />}
+                          label="Brainstorm"
+                          onSelect={handleRevealNavigate}
+                        />
+                        <RevealOption
+                          view="projects"
+                          icon={<FolderKanban size={12} />}
+                          label="Projects"
+                          onSelect={handleRevealNavigate}
+                        />
+                        <RevealOption
+                          view="goals"
+                          icon={<Target size={12} />}
+                          label="Goals"
+                          onSelect={handleRevealNavigate}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => {
+                            setOverflowOpen(false);
+                            setPickerMode("create_under");
+                          }}
+                          disabled={saving || !localText.trim()}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                        >
+                          <GitBranch size={12} />
+                          Create under…
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOverflowOpen(false);
+                            setPickerMode("match");
+                          }}
+                          disabled={saving || !localText.trim()}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                        >
+                          <Search size={12} />
+                          Search manually…
+                        </button>
+                        <button
+                          onClick={() => setRevealSubmenuOpen(true)}
+                          disabled={saving}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                        >
+                          <Eye size={12} />
+                          Reveal in…
+                        </button>
+                        <div className="my-1 border-t border-black/5 dark:border-white/5" />
+                        <button
+                          onClick={() => {
+                            setOverflowOpen(false);
+                            void handleDiscard();
+                          }}
+                          disabled={saving}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"
+                        >
+                          <Trash2 size={12} />
+                          Discard
+                        </button>
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
             </>
@@ -291,7 +296,7 @@ export function QuickNoteLineRow({ line, suggestedMatch, allIdeas }: QuickNoteLi
               </button>
 
               {/* Overflow menu for secondary actions */}
-              <div className="relative">
+              <div className="relative" ref={overflowRef}>
                 <button
                   onClick={() => setOverflowOpen(!overflowOpen)}
                   disabled={saving}
@@ -302,45 +307,42 @@ export function QuickNoteLineRow({ line, suggestedMatch, allIdeas }: QuickNoteLi
                 </button>
 
                 {overflowOpen && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setOverflowOpen(false)} />
-                    <div className="absolute right-0 z-20 mt-1 w-44 rounded-xl border border-black/10 bg-white py-1 shadow-lg dark:border-white/10 dark:bg-gray-800">
-                      <button
-                        onClick={() => {
-                          setOverflowOpen(false);
-                          setPickerMode("create_under");
-                        }}
-                        disabled={saving || !localText.trim()}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                      >
-                        <GitBranch size={12} />
-                        Create under…
-                      </button>
-                      <button
-                        onClick={() => {
-                          setOverflowOpen(false);
-                          setPickerMode("match");
-                        }}
-                        disabled={saving || !localText.trim()}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                      >
-                        <Search size={12} />
-                        Match existing…
-                      </button>
-                      <div className="my-1 border-t border-black/5 dark:border-white/5" />
-                      <button
-                        onClick={() => {
-                          setOverflowOpen(false);
-                          void handleDiscard();
-                        }}
-                        disabled={saving}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"
-                      >
-                        <Trash2 size={12} />
-                        Discard
-                      </button>
-                    </div>
-                  </>
+                  <div className="absolute right-0 z-20 mt-1 w-44 rounded-xl border border-black/10 bg-white py-1 shadow-lg dark:border-white/10 dark:bg-gray-800">
+                    <button
+                      onClick={() => {
+                        setOverflowOpen(false);
+                        setPickerMode("create_under");
+                      }}
+                      disabled={saving || !localText.trim()}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                    >
+                      <GitBranch size={12} />
+                      Create under…
+                    </button>
+                    <button
+                      onClick={() => {
+                        setOverflowOpen(false);
+                        setPickerMode("match");
+                      }}
+                      disabled={saving || !localText.trim()}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                    >
+                      <Search size={12} />
+                      Match existing…
+                    </button>
+                    <div className="my-1 border-t border-black/5 dark:border-white/5" />
+                    <button
+                      onClick={() => {
+                        setOverflowOpen(false);
+                        void handleDiscard();
+                      }}
+                      disabled={saving}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"
+                    >
+                      <Trash2 size={12} />
+                      Discard
+                    </button>
+                  </div>
                 )}
               </div>
             </>

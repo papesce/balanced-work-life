@@ -30,6 +30,9 @@ export function QuickNoteCapture() {
     [updateText, readonly],
   );
 
+  // Strip [matched:UUID] tags for display — they are internal metadata
+  const displayDraft = draft.replace(/\[matched:[^\]]+\]\s*/g, "");
+
   const handleBlur = useCallback(() => {
     if (readonly) return;
     flushNow();
@@ -44,7 +47,7 @@ export function QuickNoteCapture() {
       )}
       <textarea
         ref={textareaRef}
-        value={draft}
+        value={displayDraft}
         onChange={handleChange}
         onBlur={handleBlur}
         readOnly={readonly}
