@@ -27,6 +27,7 @@ import {
 } from "@/lib/tasks/rescheduleTask";
 import { useUndoAction } from "@/lib/tasks/undo";
 import { TriageActions } from "@/components/triage/TriageActions";
+import { QuickNoteChip } from "@/components/quicknote/QuickNoteChip";
 import { formatDayLabel } from "@/components/planner/plannerUtils";
 import { STORAGE_KEYS, loadAreaTargets, readRawString, writeRawString } from "@/lib/storage";
 
@@ -417,6 +418,7 @@ function DailyPlannerInner() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <QuickNoteChip />
               <button
                 onClick={() => {
                   const next = !hideCompleted;

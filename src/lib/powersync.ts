@@ -95,6 +95,19 @@ export const HorizonSettingsTable = new Table(
   { indexes: {} },
 );
 
+export const QuickNotesTable = new Table(
+  {
+    user_id: column.text,
+    text: column.text,
+    status: column.text,
+    created_at: column.text,
+    updated_at: column.text,
+    archived_at: column.text,
+    deleted_at: column.text,
+  },
+  { indexes: {} },
+);
+
 export const AppSchema = new Schema({
   ideas: IdeasTable,
   idea_links: IdeaLinksTable,
@@ -102,6 +115,7 @@ export const AppSchema = new Schema({
   task_tags: TaskTagsTable,
   lane_configs: LaneConfigsTable,
   horizon_settings: HorizonSettingsTable,
+  quick_notes: QuickNotesTable,
 });
 
 export class SupabaseConnector {

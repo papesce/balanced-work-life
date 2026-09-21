@@ -99,3 +99,14 @@ export interface IdeaNode extends Idea {
   children: IdeaNode[];
   collapsed: boolean;
 }
+
+export interface QuickNote {
+  id: string;
+  user_id: string;
+  text: string;
+  status: "open" | "archived";
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+  deleted_at: string | null;
+}

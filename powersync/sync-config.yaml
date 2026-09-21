@@ -15,3 +15,4 @@ streams:
       - "SELECT id, idea_id, tag_id, user_id FROM task_tags WHERE user_id = auth.user_id()"
       - SELECT * FROM lane_configs WHERE user_id = auth.user_id()
       - SELECT * FROM horizon_settings WHERE user_id = auth.user_id()
+      - SELECT * FROM quick_notes WHERE user_id = auth.user_id()

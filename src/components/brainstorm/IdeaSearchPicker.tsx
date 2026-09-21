@@ -13,6 +13,10 @@ interface IdeaSearchPickerProps {
   getTagsForIdea?: (ideaId: string) => Tag[];
   renderActions: (idea: Idea, clearSearch: () => void) => ReactNode;
   excludeDone?: boolean;
+  /** Prefill the search input. */
+  initialQuery?: string;
+  /** When true, match when every whitespace-separated word is contained in idea text (not just substring). */
+  matchAllWords?: boolean;
 }
 
 function getTypeLabel(type: IdeaType) {
@@ -49,18 +53,24 @@ export function IdeaSearchPicker({
   getTagsForIdea,
   renderActions,
   excludeDone = false,
+  initialQuery,
+  matchAllWords = false,
 }: IdeaSearchPickerProps) {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialQuery ?? "");
   const ideasById = new Map(ideas.map((idea) => [idea.id, idea]));
   const query = search.trim().toLowerCase();
   const searchResults = query
     ? ideas
-        .filter(
-          (idea) =>
-            !excludeIds.has(idea.id) &&
-            idea.text.toLowerCase().includes(query) &&
-            (!excludeDone || !DONE_STATUSES.includes(idea.status)),
-        )
+        .filter((idea) => {
+          if (excludeIds.has(idea.id)) return false;
+          if (excludeDone && DONE_STATUSES.includes(idea.status)) return false;
+          if (matchAllWords) {
+            const words = query.split(/\s+/).filter(Boolean);
+            const text = idea.text.toLowerCase();
+            return words.every((w) => text.includes(w));
+          }
+          return idea.text.toLowerCase().includes(query);
+        })
         .slice(0, 8)
     : [];
 

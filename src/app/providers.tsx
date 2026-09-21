@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { getPowerSync, SupabaseConnector } from "@/lib/powersync";
 import { LaneConfigsProvider } from "@/contexts/LaneConfigsContext";
 import { NotesProvider } from "@/contexts/NotesContext";
+import { QuickNoteProvider } from "@/contexts/QuickNoteContext";
 import type { PowerSyncDatabase } from "@powersync/web";
 
 function PowerSyncProvider({ children }: { children: ReactNode }) {
@@ -60,7 +61,9 @@ function AuthGuard({ children }: { children: ReactNode }) {
 
   return (
     <LaneConfigsProvider>
-      <NotesProvider>{children}</NotesProvider>
+      <NotesProvider>
+        <QuickNoteProvider>{children}</QuickNoteProvider>
+      </NotesProvider>
     </LaneConfigsProvider>
   );
 }

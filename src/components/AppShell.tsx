@@ -1,10 +1,12 @@
 "use client";
 
 import { ReactNode, useState, useEffect, useCallback } from "react";
+import { FileText } from "lucide-react";
 import { Navigation } from "@/components/Navigation";
 import { QuickAddButton } from "@/components/QuickAddButton";
 import { DesktopSidebar } from "@/components/DesktopSidebar";
 import { UserMenu } from "@/components/UserMenu";
+import { useQuickNoteContext } from "@/contexts/QuickNoteContext";
 import { STORAGE_KEYS, readRawString, writeRawString } from "@/lib/storage";
 
 const COLLAPSE_BELOW = 1024;
@@ -26,6 +28,8 @@ export function AppShell({
   fullWidth,
   onAdd,
 }: AppShellProps) {
+  const { openPanel: openQuickNote } = useQuickNoteContext();
+
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     const saved = readRawString(STORAGE_KEYS.sidebarCollapsed);
@@ -90,6 +94,13 @@ export function AppShell({
 
       <Navigation className="md:hidden" />
       {onAdd && <QuickAddButton onAdd={onAdd} />}
+      <button
+        onClick={openQuickNote}
+        className="fixed right-6 bottom-24 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-white/80 text-gray-600 shadow-lg backdrop-blur-lg transition-all hover:bg-white hover:shadow-xl active:scale-95 dark:border-white/10 dark:bg-gray-800/80 dark:text-gray-300 dark:hover:bg-gray-800"
+        title="Quick Note (⌘⌥N)"
+      >
+        <FileText size={18} />
+      </button>
     </div>
   );
 }

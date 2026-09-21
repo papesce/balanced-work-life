@@ -89,6 +89,28 @@ Override the foreground launcher port with `PORT=4000 pnpm dev:open`.
 Open [http://localhost:3000](http://localhost:3000) in your browser (auto-opened by `:open` variants).
 The background launcher uses [http://localhost:4327](http://localhost:4327) by default.
 
+### Database & Sync
+
+After creating or modifying Supabase migrations, push them:
+
+```bash
+supabase db push
+```
+
+When adding new tables or changing sync rules in `powersync/sync-config.yaml`, deploy to PowerSync Cloud:
+
+```bash
+powersync deploy sync-config
+```
+
+New tables also need to be added to the PostgreSQL `powersync` publication for replication:
+
+```sql
+alter publication powersync add table public.<table_name>;
+```
+
+This is done in a migration file (see `supabase/migrations/` for examples using `do $$ begin ... exception when duplicate_object then null; end $$;` for idempotency).
+
 ## Features
 
 - **Today view** — Focus on what matters now with a balance chart
