@@ -80,6 +80,7 @@ export const LaneConfigsTable = new Table(
     user_id: column.text,
     horizon: column.text,
     label: column.text,
+    sort_order: column.integer,
     created_at: column.text,
   },
   { indexes: {} },

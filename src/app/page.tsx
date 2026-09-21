@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Sparkles, Layers, Clock, BarChart3 } from "lucide-react";
+import { Sparkles, Layers, Clock, BarChart3, EyeOff, Eye } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
@@ -86,6 +86,9 @@ function DailyPlannerInner() {
   }, [highlightId, loading, router, searchParams]);
 
   const [selectedArea, setSelectedArea] = useState<LifeArea | null>(null);
+  const [hideCompleted, setHideCompleted] = useState(
+    () => readRawString(STORAGE_KEYS.plannerHideCompleted) === "true",
+  );
   const [activeMobileTab, setActiveMobileTab] = useState<"tasks" | "schedule" | "balance">("tasks");
   const [targets] = useState<Record<LifeArea, number>>(() => loadAreaTargets());
   const [showDateInput, setShowDateInput] = useState(false);
@@ -139,6 +142,11 @@ function DailyPlannerInner() {
   const doneOnDate = useMemo(
     () => taskIdeas.filter((i) => i.status === "completed" && i.scheduled_date === activeDate),
     [taskIdeas, activeDate],
+  );
+
+  const visibleDoneOnDate = useMemo(
+    () => (hideCompleted ? [] : doneOnDate),
+    [doneOnDate, hideCompleted],
   );
 
   const pendingOnDate = useMemo(
@@ -404,11 +412,22 @@ function DailyPlannerInner() {
                 {selectedArea ? `${AREA_LABELS[selectedArea]} Focus` : "Today's Agenda"}
               </h2>
               <p className="mt-0.5 text-[10px] font-medium text-gray-400 dark:text-gray-500">
-                {pendingOnDate.length + scheduledOnDate.length} pending tasks · {doneOnDate.length}{" "}
-                completed
+                {pendingOnDate.length + scheduledOnDate.length} pending tasks ·{" "}
+                {visibleDoneOnDate.length} completed
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const next = !hideCompleted;
+                  setHideCompleted(next);
+                  writeRawString(STORAGE_KEYS.plannerHideCompleted, String(next));
+                }}
+                className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-gray-100 px-3 py-1.5 text-[11px] font-bold text-gray-600 transition-all hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+              >
+                {hideCompleted ? <Eye size={12} /> : <EyeOff size={12} />}
+                <span>{hideCompleted ? "Show Done" : "Hide Done"}</span>
+              </button>
               {pendingOnDate.length > 0 && (
                 <button
                   onClick={() => smartSortTasks(pendingOnDate)}
@@ -439,7 +458,7 @@ function DailyPlannerInner() {
                 const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(t.id));
                 return areas.length === 0 ? area === "life" : areas.includes(area);
               });
-              const done = doneOnDate.filter((t) => {
+              const done = visibleDoneOnDate.filter((t) => {
                 const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(t.id));
                 return areas.length === 0 ? area === "life" : areas.includes(area);
               });

@@ -17,7 +17,7 @@ import { AppShell } from "@/components/AppShell";
 import { UndoBar } from "@/components/shared/UndoBar";
 import { QuickAddInput } from "@/components/timeline/QuickAddInput";
 import { HorizonTree } from "@/components/horizon/HorizonTree";
-import { LaneConfigDialog } from "@/components/horizon/LaneConfigDialog";
+import { LaneConfigPanel } from "@/components/horizon/LaneConfigPanel";
 import { TypePicker } from "@/components/brainstorm/TypePicker";
 import { TypeFilterPicker } from "@/components/shared/TypeFilterPicker";
 import { Idea, IdeaHorizon, IdeaNode, IdeaType } from "@/lib/types";
@@ -552,11 +552,15 @@ export default function HorizonPage() {
         </AnimatePresence>
       </div>
       {laneDialogHorizon && (
-        <LaneConfigDialog
+        <LaneConfigPanel
           key={laneDialogHorizon}
           horizon={laneDialogHorizon}
           onClose={() => setLaneDialogHorizon(null)}
-          ideasCountByLane={(laneId) => ideas.filter((i) => i.focus_lane === laneId).length}
+          ideasCountByLane={(laneId) =>
+            laneId === "unassigned"
+              ? ideas.filter((i) => i.focus_lane == null).length
+              : ideas.filter((i) => i.focus_lane === laneId).length
+          }
         />
       )}
     </AppShell>

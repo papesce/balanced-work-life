@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { useLaneConfigsContext } from "@/contexts/LaneConfigsContext";
 import { useIdeas } from "@/hooks/useIdeas";
-import { LaneConfigDialog } from "@/components/horizon/LaneConfigDialog";
+import { LaneConfigPanel } from "@/components/horizon/LaneConfigPanel";
 import { IdeaHorizon } from "@/lib/types";
 
 const HORIZONS: { key: IdeaHorizon; label: string }[] = [
@@ -76,11 +76,15 @@ export default function LanesSettingsPage() {
         </div>
       </div>
       {dialogHorizon && (
-        <LaneConfigDialog
+        <LaneConfigPanel
           key={dialogHorizon}
           horizon={dialogHorizon}
           onClose={() => setDialogHorizon(null)}
-          ideasCountByLane={(laneId) => ideas.filter((i) => i.focus_lane === laneId).length}
+          ideasCountByLane={(laneId) =>
+            laneId === "unassigned"
+              ? ideas.filter((i) => i.focus_lane == null).length
+              : ideas.filter((i) => i.focus_lane === laneId).length
+          }
         />
       )}
     </AppShell>

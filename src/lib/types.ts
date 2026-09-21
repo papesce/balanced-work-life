@@ -84,6 +84,7 @@ export interface LaneConfig {
   user_id: string;
   horizon: IdeaHorizon;
   label: string;
+  sort_order: number;
   created_at: string;
 }
 

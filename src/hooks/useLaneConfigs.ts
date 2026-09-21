@@ -14,7 +14,7 @@ export function useLaneConfigs() {
 
   const { data: laneRows, isLoading: lanesLoading } = useQuery<Record<string, unknown>>(
     userId
-      ? "SELECT * FROM lane_configs WHERE user_id = ? ORDER BY created_at ASC"
+      ? "SELECT * FROM lane_configs WHERE user_id = ? ORDER BY sort_order ASC, created_at ASC"
       : "SELECT * FROM lane_configs WHERE 0",
     userId ? [userId] : [],
   );
@@ -51,9 +51,10 @@ export function useLaneConfigs() {
     if (existing.length >= 5) return null;
     if (existing.some((l) => l.label.toLowerCase() === label.toLowerCase())) return null;
     const id = uuidv4();
+    const maxSort = existing.reduce((max, l) => Math.max(max, l.sort_order), -1);
     await db.execute(
-      `INSERT INTO lane_configs (id, user_id, horizon, label, created_at) VALUES (?,?,?,?,?)`,
-      [id, user.id, horizon, label, new Date().toISOString()],
+      `INSERT INTO lane_configs (id, user_id, horizon, label, sort_order, created_at) VALUES (?,?,?,?,?,?)`,
+      [id, user.id, horizon, label, maxSort + 1, new Date().toISOString()],
     );
     return id;
   };
@@ -63,14 +64,44 @@ export function useLaneConfigs() {
     await db.execute(`UPDATE lane_configs SET label = ? WHERE id = ?`, [label, laneId]);
   };
 
-  const deleteLane = async (laneId: string) => {
+  const deleteLane = async (laneId: string, moveToUnassigned = false) => {
     const count = await db.get<{ c: number }>(
       `SELECT COUNT(*) as c FROM ideas WHERE focus_lane = ?`,
       [laneId],
     );
-    if (count && count.c > 0) return false;
+    if (count && count.c > 0) {
+      if (!moveToUnassigned) return false;
+      await db.execute(`UPDATE ideas SET focus_lane = NULL WHERE focus_lane = ?`, [laneId]);
+    }
     await db.execute(`DELETE FROM lane_configs WHERE id = ?`, [laneId]);
     return true;
+  };
+
+  const moveLane = async (laneId: string, direction: "up" | "down") => {
+    if (isLoading) return;
+    const lane = laneConfigs.find((l) => l.id === laneId);
+    if (!lane) return;
+    const siblings = getLanesForHorizon(lane.horizon);
+    const idx = siblings.findIndex((l) => l.id === laneId);
+    if (idx === -1) return;
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= siblings.length) return;
+    const other = siblings[swapIdx];
+    await db.execute(`UPDATE lane_configs SET sort_order = ? WHERE id = ?`, [
+      other.sort_order,
+      lane.id,
+    ]);
+    await db.execute(`UPDATE lane_configs SET sort_order = ? WHERE id = ?`, [
+      lane.sort_order,
+      other.id,
+    ]);
+  };
+
+  const reorderLanes = async (orderedIds: string[]) => {
+    if (isLoading) return;
+    for (let i = 0; i < orderedIds.length; i++) {
+      await db.execute(`UPDATE lane_configs SET sort_order = ? WHERE id = ?`, [i, orderedIds[i]]);
+    }
   };
 
   const setUnassignedLabel = async (horizon: IdeaHorizon, label: string) => {
@@ -102,6 +133,8 @@ export function useLaneConfigs() {
     createLane,
     updateLaneLabel,
     deleteLane,
+    moveLane,
+    reorderLanes,
     setUnassignedLabel,
   };
 }

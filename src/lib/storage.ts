@@ -10,6 +10,7 @@ const APP_STORAGE_KEYS = [
   "daily-planner-area-targets",
   "sidebar-collapsed",
   "planner-right-col-width",
+  "planner-hide-completed",
   "timeline-prefs",
 ] as const;
 
@@ -24,6 +25,7 @@ export const STORAGE_KEYS = {
   dailyPlannerAreaTargets: "daily-planner-area-targets",
   sidebarCollapsed: "sidebar-collapsed",
   plannerRightColWidth: "planner-right-col-width",
+  plannerHideCompleted: "planner-hide-completed",
   timelinePrefs: "timeline-prefs",
 } as const satisfies Record<string, AppStorageKey>;
 
