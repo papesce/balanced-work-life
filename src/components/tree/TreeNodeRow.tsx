@@ -192,7 +192,7 @@ export function TreeNodeRow<T extends TreeItem>({
         "group relative flex items-center gap-1 rounded-md px-1 py-1",
         options.rowClassName ?? "",
         dropZone === "center" ? "bg-indigo-50 dark:bg-indigo-500/10" : "",
-        !dropZone && isSelected ? "bg-indigo-50/60 dark:bg-indigo-500/10" : "",
+        !dropZone && isSelected ? "bg-indigo-100/70 dark:bg-indigo-500/15" : "",
         isDragging ? "opacity-40" : "",
       ]
         .filter(Boolean)

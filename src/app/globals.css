@@ -360,17 +360,17 @@ body {
 @keyframes highlight-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.4);
-    background-color: rgba(139, 92, 246, 0.06);
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.6);
+    background-color: rgba(139, 92, 246, 0.12);
   }
   50% {
-    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.2);
-    background-color: rgba(139, 92, 246, 0.1);
+    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.35);
+    background-color: rgba(139, 92, 246, 0.18);
   }
 }
 
 .highlight-pulse {
-  animation: highlight-pulse 0.8s ease-in-out 2;
+  animation: highlight-pulse 0.8s ease-in-out 3;
   border-radius: 10px;
 }
 
