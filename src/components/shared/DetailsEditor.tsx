@@ -3,7 +3,7 @@
 import { StickyNote } from "lucide-react";
 import { DetailField } from "@/components/brainstorm/IdeaDetailField";
 
-export function NotesEditor({
+export function DetailsEditor({
   value,
   onSave,
 }: {

@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, ReactNode } from "react";
-import { NotesDrawer } from "@/components/shared/NotesDrawer";
+import { DetailsDrawer } from "@/components/shared/DetailsDrawer";
 
 interface NotesContextValue {
   openNotes: (ideaId: string) => void;
@@ -25,7 +25,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   return (
     <NotesContext.Provider value={{ openNotes, closeNotes }}>
       {children}
-      <NotesDrawer ideaId={selectedId} onClose={closeNotes} />
+      <DetailsDrawer ideaId={selectedId} onClose={closeNotes} />
     </NotesContext.Provider>
   );
 }
