@@ -8,6 +8,7 @@ import { Idea, IdeaNode } from "@/lib/types";
 import { buildTree as buildTreeGeneric } from "@/components/tree/buildTree";
 import { getToday, getWindowRange } from "@/lib/dateUtils";
 import { appendStatusHistory } from "@/lib/statusHistory";
+import { ideaInsertSql, ideaInsertParams } from "@/lib/ideaInsert";
 import {
   STORAGE_KEYS,
   TreeOverrideState,
@@ -230,42 +231,38 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
     };
     await db.writeTransaction(async (tx) => {
       await tx.execute(
-        `INSERT INTO ideas (id, user_id, parent_id, text, description, type, effort, impact, urgency,
-          scheduled_date, scheduled_time, duration_minutes, is_priority, priority_order,
-          status, notes, completed_at, cancelled_at, paused_at, attempt_dates, status_history,
-          horizon, focus_lane, in_focus, in_focus_until, productivity_signal, sort_order, created_at, updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [
-          idea.id,
-          idea.user_id,
-          idea.parent_id,
-          idea.text,
-          idea.description,
-          idea.type,
-          idea.effort,
-          idea.impact,
-          idea.urgency,
-          idea.scheduled_date,
-          idea.scheduled_time,
-          idea.duration_minutes,
-          idea.is_priority ? 1 : 0,
-          idea.priority_order,
-          idea.status,
-          idea.notes,
-          idea.completed_at,
-          idea.cancelled_at,
-          idea.paused_at,
-          JSON.stringify(idea.attempt_dates),
-          idea.status_history ? JSON.stringify(idea.status_history) : null,
-          idea.horizon,
-          idea.focus_lane,
-          idea.in_focus ? 1 : 0,
-          idea.in_focus_until,
-          idea.productivity_signal ?? null,
-          idea.sort_order,
-          idea.created_at,
-          idea.updated_at,
-        ],
+        ideaInsertSql(),
+        ideaInsertParams({
+          id: idea.id,
+          user_id: idea.user_id,
+          parent_id: idea.parent_id,
+          text: idea.text,
+          description: idea.description,
+          type: idea.type,
+          effort: idea.effort,
+          impact: idea.impact,
+          urgency: idea.urgency,
+          scheduled_date: idea.scheduled_date,
+          scheduled_time: idea.scheduled_time,
+          duration_minutes: idea.duration_minutes,
+          is_priority: idea.is_priority,
+          priority_order: idea.priority_order,
+          status: idea.status,
+          notes: idea.notes,
+          completed_at: idea.completed_at,
+          cancelled_at: idea.cancelled_at,
+          paused_at: idea.paused_at,
+          attempt_dates: idea.attempt_dates,
+          status_history: idea.status_history,
+          horizon: idea.horizon,
+          focus_lane: idea.focus_lane,
+          in_focus: idea.in_focus,
+          in_focus_until: idea.in_focus_until,
+          productivity_signal: idea.productivity_signal ?? null,
+          sort_order: idea.sort_order,
+          created_at: idea.created_at,
+          updated_at: idea.updated_at,
+        }),
       );
       for (const sibling of reorderedSiblings) {
         await tx.execute(`UPDATE ideas SET sort_order = ?, updated_at = ? WHERE id = ?`, [

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { PowerSyncContext } from "@powersync/react";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { getPowerSync, SupabaseConnector } from "@/lib/powersync";
+import { qnLoggingEnabled } from "@/lib/quicknote/log";
 import { LaneConfigsProvider } from "@/contexts/LaneConfigsContext";
 import { NotesProvider } from "@/contexts/NotesContext";
 import { QuickNoteProvider } from "@/contexts/QuickNoteContext";
@@ -18,11 +19,12 @@ function PowerSyncProvider({ children }: { children: ReactNode }) {
     const db = getPowerSync();
     dbRef.current = db;
 
-    // Log sync-status transitions: shows whether the client is connected and
-    // whether uploads/downloads are flowing. Previously silent — a dead
-    // connection looked identical to a healthy one in the console.
+    // Log sync-status transitions when debugging (quicknote-debug=1): shows
+    // whether the client is connected and whether uploads/downloads flow.
+    // Upload failures are always logged by the connector itself — never silent.
     const unregister = db.registerListener({
       statusChanged: (status) => {
+        if (!qnLoggingEnabled()) return;
         let detail = "";
         try {
           detail = JSON.stringify(status, (_k, v) => (v instanceof Error ? v.message : v));
