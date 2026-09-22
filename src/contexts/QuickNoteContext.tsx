@@ -240,6 +240,15 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
   // Getter for the latest draft value (avoids stale closures in flushAutosave)
   const getDraft = useCallback(() => draft, [draft]);
 
+  // Keep the mutable ref in sync with state so writeTransactions never
+  // operate on a stale ("") draft — previously draftRef was only updated
+  // on edits, so a freshly loaded note resolved via Match/Create silently
+  // no-oped (target not found in "").
+  const draftRef = useRef(draft);
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+
   // Sync draft from DB only when not dirty AND not waiting for a write to land.
   // Without the writingRef guard, PowerSync can re-emit the query with stale text
   // before the write completes, overwriting the user's edits.
@@ -294,7 +303,6 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
   // ── Autosave ─────────────────────────────────────────────────────
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const noteRef = useRef(note);
-  const draftRef = useRef(draft);
   useEffect(() => {
     noteRef.current = note;
   });
@@ -443,9 +451,19 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
         const lines = parseNoteLines(currentText);
         const target = lines.find((l) => l.index === index);
 
-        // 3. Guard: line missing, already resolved, or content mismatch
+        // 3. Guard: line missing or already resolved.
+        // NOTE: the old strict `target.text !== expectedText` check caused
+        // silent no-ops (notably on the last line) when the row's prop was
+        // stale vs. the flushed draft. The draft is authoritative — proceed
+        // with the current text and only warn on mismatch.
         if (!target || target.resolved) return;
-        if (target.text !== action.expectedText) return;
+        if (target.text !== action.expectedText) {
+          console.warn("[QuickNote] resolveLine text mismatch — proceeding with current draft", {
+            index,
+            expected: action.expectedText,
+            actual: target.text,
+          });
+        }
 
         // 4. Side effects
         if (action.type === "create" || action.type === "create_under") {

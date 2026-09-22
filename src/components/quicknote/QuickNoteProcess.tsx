@@ -44,21 +44,24 @@ export function QuickNoteProcess() {
   }, [unresolved, ideas]);
 
   // Track which line index should auto-focus. null = none focused.
+  // Reconciled during render (no effect) so focus never sticks on an
+  // already-resolved index after `draft` updates.
   const [focusedIndex, setFocusedIndex] = useState<number | null>(() =>
     unresolved.length > 0 ? unresolved[0].index : null,
   );
+  const validFocus =
+    unresolved.length === 0
+      ? null
+      : focusedIndex !== null && unresolved.some((l) => l.index === focusedIndex)
+        ? focusedIndex
+        : unresolved[0].index;
+  if (validFocus !== focusedIndex) {
+    setFocusedIndex(validFocus);
+  }
 
   const handleLineResolved = useCallback(() => {
-    requestAnimationFrame(() => {
-      const nextLines = parseNoteLines(draft);
-      const nextUnresolved = nextLines.filter((l) => !l.resolved);
-      if (nextUnresolved.length > 0) {
-        setFocusedIndex(nextUnresolved[0].index);
-      } else {
-        setFocusedIndex(null);
-      }
-    });
-  }, [draft]);
+    // Focus is reconciled during render once `draft` updates.
+  }, []);
 
   const unresolvedCount = unresolved.length;
   const totalLines = unresolved.length + resolved.length;
@@ -91,7 +94,7 @@ export function QuickNoteProcess() {
           line={line}
           suggestedMatch={matchMap.get(line.index) ?? null}
           allIdeas={ideas}
-          autoFocus={focusedIndex === line.index}
+          autoFocus={validFocus === line.index}
           onResolved={handleLineResolved}
           readonly
         />

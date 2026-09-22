@@ -193,6 +193,15 @@ export function QuickNoteLineRow({
   const { resolveLine, updateLineText, closePanel } = useQuickNoteContext();
   const inputRef = useRef<HTMLInputElement>(null);
   const [localText, setLocalText] = useState(line.text);
+  const [prevLineText, setPrevLineText] = useState(line.text);
+  // Re-sync the editable copy when the draft updates underneath this row
+  // (e.g. another line resolved). Render-time adjustment avoids a
+  // set-state-in-effect cascade. Without this, expectedText goes stale
+  // and resolveLine silently no-ops.
+  if (line.text !== prevLineText) {
+    setPrevLineText(line.text);
+    setLocalText(line.text);
+  }
   const [saving, setSaving] = useState(false);
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
   const [overflowOpen, setOverflowOpen] = useState(false);
