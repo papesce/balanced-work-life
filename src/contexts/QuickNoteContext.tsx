@@ -50,12 +50,17 @@ type ResolveAction =
   | { type: "match"; expectedText: string; ideaId: string }
   | { type: "discard"; expectedText: string };
 
+export type QuickNotePanelMode = "capture" | "process" | "list";
+
 interface QuickNoteContextValue {
   note: QuickNote | null;
   loading: boolean;
   panelOpen: boolean;
-  openPanel: () => void;
+  openPanel: (mode?: QuickNotePanelMode) => void;
   closePanel: () => void;
+  /** Requested panel mode (consumed by the panel on open). Null = no request. */
+  requestedMode: QuickNotePanelMode | null;
+  consumeRequestedMode: () => void;
   /** Flush pending autosave immediately. */
   flushNow: () => void;
   /** Update the full note text (capture mode). Creates the note lazily on first non-whitespace input. */
@@ -66,8 +71,10 @@ interface QuickNoteContextValue {
   resolveLine: (index: number, action: ResolveAction) => Promise<void>;
   /** Soft-delete the entire note. */
   discardNote: () => Promise<void>;
-  /** Number of unresolved non-empty lines. */
+  /** Number of unresolved non-empty lines in the active note. */
   unreadCount: number;
+  /** Total unresolved lines across all open notes. */
+  totalUnreadCount: number;
   /** Undo bar state (owned by this context, not the page). */
   undoAction: ReturnType<typeof useUndoAction>["undoAction"];
   handleUndo: ReturnType<typeof useUndoAction>["handleUndo"];
@@ -76,11 +83,15 @@ interface QuickNoteContextValue {
   draft: string;
   /** All quick notes (open + archived, excluding deleted). */
   allNotes: QuickNote[];
+  /** All open notes, newest first. */
+  openNotes: QuickNote[];
   /** The currently selected note in the panel (may be open or archived). */
   selectedNote: QuickNote | null;
-  /** Select a note by id to view in the panel. */
-  selectNote: (id: string) => void;
-  /** Whether the currently selected note is the live open note (editable). */
+  /** Select a note by id to view in the panel. Flushes dirty draft first. */
+  selectNote: (id: string) => Promise<void>;
+  /** Create a new blank open note and select it. Returns the new id. */
+  createNote: () => Promise<string | null>;
+  /** Whether the currently selected note is an open note (editable). */
   isSelectedNoteLive: boolean;
 }
 
@@ -163,45 +174,13 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
     const rows = ((rawRows as unknown as QuickNote[]) ?? []).map((r) => ({ ...r }));
     return rows.sort(
       (a, b) =>
-        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime() ||
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime() ||
         b.id.localeCompare(a.id),
     );
   }, [rawRows]);
 
-  // ── Heal: merge offline-duplicate open notes ─────────────────────
-  // Runs whenever !isLoading && openNotes.length > 1.
-  // In-flight ref guards against concurrent runs.
-  const healingRef = useRef(false);
-  useEffect(() => {
-    if (isLoading || openNotes.length <= 1 || healingRef.current) return;
-    healingRef.current = true;
-    const [canonical, ...duplicates] = openNotes;
-    // Append older notes' text ordered by created_at ASC
-    const sortedDups = [...duplicates].sort(
-      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-    );
-    const mergedText = [
-      canonical.text,
-      ...sortedDups.map((d) => d.text).filter((t) => t.trim() !== ""),
-    ].join("\n");
-    const now = new Date().toISOString();
-    void db
-      .writeTransaction(async (tx) => {
-        await tx.execute("UPDATE quick_notes SET text = ?, updated_at = ? WHERE id = ?", [
-          mergedText,
-          now,
-          canonical.id,
-        ]);
-        for (const dup of sortedDups) {
-          await tx.execute("UPDATE quick_notes SET deleted_at = ? WHERE id = ?", [now, dup.id]);
-        }
-      })
-      .then(() => {
-        healingRef.current = false;
-      });
-  }, [isLoading, openNotes, db]);
-
-  const note = openNotes[0] ?? null;
+  // Multiple open notes are intentional (explicit + New note button).
+  // No auto-merge: each note lives until fully processed → archived.
 
   // ── Query all notes (open + archived) for the list view ──────────
   const { data: allRawRows } = useQuery<Record<string, unknown>>(
@@ -223,13 +202,20 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
   // ── Selected note for browsing ───────────────────────────────────
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
 
-  const selectedNote = useMemo(() => {
-    const id = selectedNoteId ?? note?.id;
-    if (!id) return note;
-    return allNotes.find((n) => n.id === id) ?? note;
-  }, [selectedNoteId, allNotes, note]);
+  const latestOpenNote = openNotes[0] ?? null;
 
-  const isSelectedNoteLive = selectedNote?.id === note?.id;
+  const selectedNote = useMemo(() => {
+    const id = selectedNoteId ?? latestOpenNote?.id;
+    if (!id) return latestOpenNote;
+    return allNotes.find((n) => n.id === id) ?? latestOpenNote;
+  }, [selectedNoteId, allNotes, latestOpenNote]);
+
+  // Active note = selected note when it is open, else the latest open note.
+  // All editing/processing operates on the active note so each note can be
+  // processed as usual.
+  const note = selectedNote?.status === "open" ? selectedNote : latestOpenNote;
+
+  const isSelectedNoteLive = selectedNote?.status === "open";
 
   // ── Local draft state ────────────────────────────────────────────
   const [draft, setDraft] = useState("");
@@ -275,21 +261,8 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
     // prevNoteIdRef guard ensures the body only executes on note ID transitions.
   }, [note?.id, note?.text]);
 
-  const selectNote = useCallback(
-    (id: string) => {
-      setSelectedNoteId(id);
-      const target = allNotes.find((n) => n.id === id) ?? note;
-      if (target && target.id !== note?.id) {
-        // Viewing an archived note — show its text, not the live draft
-        setDraft(target.text);
-        dirtyRef.current = false;
-      } else if (target?.id === note?.id && !dirtyRef.current) {
-        // Switched back to the live note — sync from DB
-        setDraft(note?.text ?? "");
-      }
-    },
-    [allNotes, note],
-  );
+  // selectNote / createNote are defined after autosave refs below
+  // (they flush the dirty draft before switching notes).
 
   // ── Lazy note creation refs ──────────────────────────────────────
   // On first non-whitespace input, generate id client-side, INSERT with text.
@@ -388,14 +361,87 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   // ── Panel open/close ─────────────────────────────────────────────
-  const openPanel = useCallback(() => {
-    setSelectedNoteId(null); // reset to default (live note)
+  const [requestedMode, setRequestedMode] = useState<QuickNotePanelMode | null>(null);
+  const openPanel = useCallback((mode?: QuickNotePanelMode) => {
+    if (mode) setRequestedMode(mode);
+    else setRequestedMode(null);
     setPanelOpen(true);
   }, []);
+  const consumeRequestedMode = useCallback(() => setRequestedMode(null), []);
   const closePanel = useCallback(() => {
     flushAutosave();
     setPanelOpen(false);
   }, [flushAutosave]);
+
+  // ── Select / create notes ──────────────────────────────────────────
+  // Both flush the dirty draft to the previously active note first so
+  // switching never loses typed text.
+  const selectNote = useCallback(
+    async (id: string) => {
+      if (autosaveTimer.current) {
+        clearTimeout(autosaveTimer.current);
+        autosaveTimer.current = null;
+      }
+      const prevId = noteRef.current?.id ?? null;
+      if (dirtyRef.current && prevId) {
+        const text = draftRef.current;
+        dirtyRef.current = false;
+        writingRef.current = true;
+        lastWrittenRef.current = text;
+        const now = new Date().toISOString();
+        try {
+          await db.execute("UPDATE quick_notes SET text = ?, updated_at = ? WHERE id = ?", [
+            text,
+            now,
+            prevId,
+          ]);
+        } finally {
+          writingRef.current = false;
+        }
+      } else {
+        dirtyRef.current = false;
+      }
+      setSelectedNoteId(id);
+      const target = allNotes.find((n) => n.id === id);
+      if (target) {
+        setDraft(target.text);
+      }
+    },
+    [allNotes, db],
+  );
+
+  const createNote = useCallback(async () => {
+    if (!userId) return null;
+    if (autosaveTimer.current) {
+      clearTimeout(autosaveTimer.current);
+      autosaveTimer.current = null;
+    }
+    const prevId = noteRef.current?.id ?? null;
+    if (dirtyRef.current && prevId) {
+      const text = draftRef.current;
+      dirtyRef.current = false;
+      const now = new Date().toISOString();
+      await db.execute("UPDATE quick_notes SET text = ?, updated_at = ? WHERE id = ?", [
+        text,
+        now,
+        prevId,
+      ]);
+    } else {
+      dirtyRef.current = false;
+    }
+    const id = uuidv4();
+    const now = new Date().toISOString();
+    await db.execute(
+      "INSERT INTO quick_notes (id, user_id, text, status, created_at, updated_at) VALUES (?,?,?,?,?,?)",
+      [id, userId, "", "open", now, now],
+    );
+    pendingNoteIdRef.current = null;
+    writingRef.current = false;
+    lastWrittenRef.current = null;
+    setSelectedNoteId(id);
+    setDraft("");
+    return id;
+  }, [db, userId]);
 
   // ── Text update (capture mode) ───────────────────────────────────
   const updateText = useCallback(
@@ -601,6 +647,14 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
     () => (note ? unresolvedNonEmptyCount(draft || note.text) : 0),
     [note, draft],
   );
+  const totalUnreadCount = useMemo(
+    () =>
+      openNotes.reduce(
+        (sum, n) => sum + unresolvedNonEmptyCount(n.id === note?.id ? draft || n.text : n.text),
+        0,
+      ),
+    [openNotes, note?.id, draft],
+  );
 
   // ── Context value ────────────────────────────────────────────────
   const value: QuickNoteContextValue = useMemo(
@@ -610,19 +664,24 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
       panelOpen,
       openPanel,
       closePanel,
+      requestedMode,
+      consumeRequestedMode,
       flushNow: flushAutosave,
       updateText,
       updateLineText,
       resolveLine,
       discardNote,
       unreadCount,
+      totalUnreadCount,
       undoAction,
       handleUndo,
       clearUndo,
       draft,
       allNotes,
+      openNotes,
       selectedNote,
       selectNote,
+      createNote,
       isSelectedNoteLive,
     }),
     [
@@ -631,19 +690,24 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
       panelOpen,
       openPanel,
       closePanel,
+      requestedMode,
+      consumeRequestedMode,
       flushAutosave,
       updateText,
       updateLineText,
       resolveLine,
       discardNote,
       unreadCount,
+      totalUnreadCount,
       undoAction,
       handleUndo,
       clearUndo,
       draft,
       allNotes,
+      openNotes,
       selectedNote,
       selectNote,
+      createNote,
       isSelectedNoteLive,
     ],
   );

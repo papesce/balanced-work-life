@@ -15,23 +15,26 @@ function useFormattedAge(isoTimestamp: string, intervalMs: number): string {
 }
 
 /**
- * Small chip shown in the Daily Planner header when an open note has content.
- * Shows unresolved line count and age. Clicking opens the panel.
+ * Small chip shown in the Daily Planner header when open notes have content.
+ * Shows total unresolved line count across all open notes and age of the
+ * latest note. Clicking opens the panel in list mode.
  */
 export function QuickNoteChip() {
-  const { note, unreadCount, openPanel } = useQuickNoteContext();
+  const { note, totalUnreadCount, openNotes, openPanel } = useQuickNoteContext();
   const age = useFormattedAge(note?.created_at ?? "", 60_000);
 
-  if (!note || unreadCount === 0) return null;
+  if (!note || totalUnreadCount === 0) return null;
+
+  const noteCount = openNotes.length;
 
   return (
     <button
-      onClick={openPanel}
+      onClick={() => openPanel(noteCount > 1 ? "list" : undefined)}
       className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-violet-50 px-2.5 py-1.5 text-[11px] font-bold text-violet-600 transition-colors hover:bg-violet-100 dark:bg-violet-950/20 dark:text-violet-400 dark:hover:bg-violet-900/30"
-      title={`Quick Note (${unreadCount} unresolved)`}
+      title={`Quick Notes (${totalUnreadCount} unresolved across ${noteCount} note${noteCount === 1 ? "" : "s"})`}
     >
       <FileText size={12} />
-      <span>{unreadCount}</span>
+      <span>{totalUnreadCount}</span>
       <span className="font-medium text-violet-400/70 dark:text-violet-500/50">· {age}</span>
     </button>
   );

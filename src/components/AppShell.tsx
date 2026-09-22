@@ -95,7 +95,7 @@ export function AppShell({
       <Navigation className="md:hidden" />
       {onAdd && <QuickAddButton onAdd={onAdd} />}
       <button
-        onClick={openQuickNote}
+        onClick={() => openQuickNote()}
         className="fixed right-6 bottom-24 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-white/80 text-gray-600 shadow-lg backdrop-blur-lg transition-all hover:bg-white hover:shadow-xl active:scale-95 dark:border-white/10 dark:bg-gray-800/80 dark:text-gray-300 dark:hover:bg-gray-800"
         title="Quick Note (⌘⌥N)"
       >
