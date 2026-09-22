@@ -52,6 +52,9 @@ type ResolveAction =
 
 export type QuickNotePanelMode = "capture" | "process" | "list";
 
+/** Autosave feedback state for the quick-note editor. */
+export type QuickNoteSaveStatus = "idle" | "editing" | "saving" | "saved" | "error";
+
 interface QuickNoteContextValue {
   note: QuickNote | null;
   loading: boolean;
@@ -61,8 +64,10 @@ interface QuickNoteContextValue {
   /** Requested panel mode (consumed by the panel on open). Null = no request. */
   requestedMode: QuickNotePanelMode | null;
   consumeRequestedMode: () => void;
-  /** Flush pending autosave immediately. */
-  flushNow: () => void;
+  /** Flush pending autosave immediately. Resolves after the write lands (or fails). */
+  flushNow: () => Promise<void>;
+  /** True while there are edits not yet confirmed persisted (drives close guards). */
+  hasUnsaved: boolean;
   /** Update the full note text (capture mode). Creates the note lazily on first non-whitespace input. */
   updateText: (text: string) => void;
   /** Replace a single line's text and update the full draft. */
@@ -93,9 +98,26 @@ interface QuickNoteContextValue {
   createNote: () => Promise<string | null>;
   /** Whether the currently selected note is an open note (editable). */
   isSelectedNoteLive: boolean;
+  /** Autosave feedback: current status + when the draft was last persisted. */
+  saveStatus: QuickNoteSaveStatus;
+  /** ISO timestamp of the last successful save (null until first save). */
+  lastSavedAt: string | null;
 }
 
 const QuickNoteContext = createContext<QuickNoteContextValue | null>(null);
+
+/** Temporary debug logging for the paste-not-saving investigation.
+ *  Enable in the browser console with: localStorage.setItem("quicknote-debug", "1")
+ *  Disable with: localStorage.removeItem("quicknote-debug") */
+function qnDebug(...args: unknown[]) {
+  try {
+    if (typeof window !== "undefined" && window.localStorage?.getItem("quicknote-debug") === "1") {
+      console.log("[QuickNote]", ...args);
+    }
+  } catch {
+    /* ignore (SSR / blocked storage) */
+  }
+}
 
 export function useQuickNoteContext() {
   const ctx = useContext(QuickNoteContext);
@@ -246,6 +268,13 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const currentId = note?.id ?? null;
     if (currentId === prevNoteIdRef.current) return;
+    qnDebug("draft-sync: note switch", {
+      prevId: prevNoteIdRef.current,
+      currentId,
+      dbTextLength: note?.text?.length ?? 0,
+      dirty: dirtyRef.current,
+      writing: writingRef.current,
+    });
     prevNoteIdRef.current = currentId;
 
     if (writingRef.current) {
@@ -266,8 +295,10 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
 
   // ── Lazy note creation refs ──────────────────────────────────────
   // On first non-whitespace input, generate id client-side, INSERT with text.
-  // Subsequent flushes UPDATE by pendingNoteId.
+  // Subsequent flushes UPDATE by pendingNoteId once the INSERT has landed
+  // (tracked by pendingInsertedRef so we never double-INSERT the same id).
   const pendingNoteIdRef = useRef<string | null>(null);
+  const pendingInsertedRef = useRef(false);
 
   // ── Panel state ──────────────────────────────────────────────────
   const [panelOpen, setPanelOpen] = useState(false);
@@ -275,42 +306,114 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
 
   // ── Autosave ─────────────────────────────────────────────────────
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [saveStatus, setSaveStatus] = useState<QuickNoteSaveStatus>("idle");
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const noteRef = useRef(note);
   useEffect(() => {
     noteRef.current = note;
   });
 
-  const flushAutosave = useCallback(() => {
+  // When switching to a note with no local edits, the persisted
+  // `updated_at` is the last-saved time — the indicator falls back to it
+  // while saveStatus is idle (no edits yet this session).
+
+  /**
+   * Persist `text` for the active-or-pending note. Truthful: the dirty flag
+   * is only cleared after the write succeeds, so a failed flush retries
+   * instead of silently dropping text. Returns true on success / nothing
+   * to do, false on failure.
+   */
+  const persistText = useCallback(
+    async (text: string): Promise<boolean> => {
+      const existingNote = noteRef.current;
+      const pendingId = pendingNoteIdRef.current;
+      const now = new Date().toISOString();
+      try {
+        if (existingNote) {
+          writingRef.current = true;
+          lastWrittenRef.current = text;
+          qnDebug("flush: UPDATE", { id: existingNote.id, textLength: text.length, now });
+          await db.execute("UPDATE quick_notes SET text = ?, updated_at = ? WHERE id = ?", [
+            text,
+            now,
+            existingNote.id,
+          ]);
+        } else if (pendingId && userId) {
+          if (pendingInsertedRef.current) {
+            writingRef.current = true;
+            lastWrittenRef.current = text;
+            qnDebug("flush: UPDATE pending", { id: pendingId, textLength: text.length, now });
+            await db.execute("UPDATE quick_notes SET text = ?, updated_at = ? WHERE id = ?", [
+              text,
+              now,
+              pendingId,
+            ]);
+          } else {
+            writingRef.current = true;
+            lastWrittenRef.current = text;
+            qnDebug("flush: INSERT", { id: pendingId, textLength: text.length, now });
+            await db.execute(
+              "INSERT INTO quick_notes (id, user_id, text, status, created_at, updated_at) VALUES (?,?,?,?,?,?)",
+              [pendingId, userId, text, "open", now, now],
+            );
+            pendingInsertedRef.current = true;
+          }
+        } else if (text.trim().length > 0 && userId) {
+          // No target yet (e.g. note was discarded mid-typing): mint an id now
+          // rather than dropping the text.
+          const id = uuidv4();
+          pendingNoteIdRef.current = id;
+          writingRef.current = true;
+          lastWrittenRef.current = text;
+          qnDebug("flush: INSERT (recovered, no target)", { id, textLength: text.length, now });
+          await db.execute(
+            "INSERT INTO quick_notes (id, user_id, text, status, created_at, updated_at) VALUES (?,?,?,?,?,?)",
+            [id, userId, text, "open", now, now],
+          );
+          pendingInsertedRef.current = true;
+        } else {
+          qnDebug("flush: no target and empty text — nothing to persist");
+          return true;
+        }
+        qnDebug("flush: success", { now });
+        setLastSavedAt(now);
+        setSaveStatus("saved");
+        return true;
+      } catch (err) {
+        qnDebug("flush: FAILED", err);
+        setSaveStatus("error");
+        return false;
+      }
+    },
+    [db, userId],
+  );
+
+  const flushAutosave = useCallback(async () => {
     if (autosaveTimer.current) {
       clearTimeout(autosaveTimer.current);
       autosaveTimer.current = null;
     }
-    if (!dirtyRef.current) return;
-    const text = getDraft();
-    dirtyRef.current = false;
-
-    const existingNote = noteRef.current;
-    const pendingId = pendingNoteIdRef.current;
-
-    if (existingNote) {
-      writingRef.current = true;
-      lastWrittenRef.current = text;
-      const now = new Date().toISOString();
-      void db.execute("UPDATE quick_notes SET text = ?, updated_at = ? WHERE id = ?", [
-        text,
-        now,
-        existingNote.id,
-      ]);
-    } else if (pendingId && userId) {
-      writingRef.current = true;
-      lastWrittenRef.current = text;
-      const now = new Date().toISOString();
-      void db.execute(
-        "INSERT INTO quick_notes (id, user_id, text, status, created_at, updated_at) VALUES (?,?,?,?,?,?)",
-        [pendingId, userId, text, "open", now, now],
-      );
+    if (!dirtyRef.current) {
+      qnDebug("flush: skipped (not dirty)");
+      return;
     }
-  }, [db, userId, getDraft]);
+    const text = getDraft();
+    qnDebug("flush: start", {
+      textLength: text.length,
+      preview: text.slice(0, 200),
+      existingNoteId: noteRef.current?.id ?? null,
+      pendingId: pendingNoteIdRef.current,
+    });
+
+    setSaveStatus("saving");
+    const ok = await persistText(text);
+    if (ok) {
+      dirtyRef.current = false;
+    } else {
+      // Keep dirty=true so the text survives panel close and retries.
+      dirtyRef.current = true;
+    }
+  }, [persistText, getDraft]);
 
   const scheduleAutosave = useCallback(() => {
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
@@ -323,16 +426,16 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
   // Flush on unmount (page navigation)
   useEffect(() => {
     return () => {
-      flushAutosave();
+      void flushAutosave();
     };
   }, [flushAutosave]);
 
   // Flush on visibilitychange (hidden) and pagehide
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.visibilityState === "hidden") flushAutosave();
+      if (document.visibilityState === "hidden") void flushAutosave();
     };
-    const handlePageHide = () => flushAutosave();
+    const handlePageHide = () => void flushAutosave();
     document.addEventListener("visibilitychange", handleVisibility);
     window.addEventListener("pagehide", handlePageHide);
     return () => {
@@ -368,36 +471,32 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
     setPanelOpen(true);
   }, []);
   const consumeRequestedMode = useCallback(() => setRequestedMode(null), []);
-  const closePanel = useCallback(() => {
-    flushAutosave();
+  const closePanel = useCallback(async () => {
+    // Await the flush so the last ~500ms of typing isn't lost behind the
+    // unmount. On failure dirtyRef stays true and the draft survives in
+    // provider state, so reopening shows the unsaved text.
+    await flushAutosave();
     setPanelOpen(false);
   }, [flushAutosave]);
 
   // ── Select / create notes ──────────────────────────────────────────
   // Both flush the dirty draft to the previously active note first so
-  // switching never loses typed text.
+  // switching never loses typed text. The switch is aborted when the
+  // flush fails, keeping the user's text in place.
   const selectNote = useCallback(
     async (id: string) => {
       if (autosaveTimer.current) {
         clearTimeout(autosaveTimer.current);
         autosaveTimer.current = null;
       }
-      const prevId = noteRef.current?.id ?? null;
-      if (dirtyRef.current && prevId) {
-        const text = draftRef.current;
-        dirtyRef.current = false;
-        writingRef.current = true;
-        lastWrittenRef.current = text;
-        const now = new Date().toISOString();
-        try {
-          await db.execute("UPDATE quick_notes SET text = ?, updated_at = ? WHERE id = ?", [
-            text,
-            now,
-            prevId,
-          ]);
-        } finally {
-          writingRef.current = false;
+      if (dirtyRef.current) {
+        setSaveStatus("saving");
+        const ok = await persistText(draftRef.current);
+        if (!ok) {
+          dirtyRef.current = true;
+          return;
         }
+        dirtyRef.current = false;
       } else {
         dirtyRef.current = false;
       }
@@ -405,9 +504,12 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
       const target = allNotes.find((n) => n.id === id);
       if (target) {
         setDraft(target.text);
+        draftRef.current = target.text;
+        setLastSavedAt(target.updated_at ?? null);
+        setSaveStatus("idle");
       }
     },
-    [allNotes, db],
+    [allNotes, persistText],
   );
 
   const createNote = useCallback(async () => {
@@ -416,32 +518,44 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
       clearTimeout(autosaveTimer.current);
       autosaveTimer.current = null;
     }
-    const prevId = noteRef.current?.id ?? null;
-    if (dirtyRef.current && prevId) {
-      const text = draftRef.current;
+    if (dirtyRef.current) {
+      // Persist pending text (existing row UPDATE or pending INSERT) before
+      // abandoning it — previously this path only handled existing rows and
+      // silently dropped not-yet-saved typing.
+      setSaveStatus("saving");
+      const ok = await persistText(draftRef.current);
+      if (!ok) {
+        dirtyRef.current = true;
+        return null;
+      }
       dirtyRef.current = false;
-      const now = new Date().toISOString();
-      await db.execute("UPDATE quick_notes SET text = ?, updated_at = ? WHERE id = ?", [
-        text,
-        now,
-        prevId,
-      ]);
     } else {
       dirtyRef.current = false;
     }
     const id = uuidv4();
     const now = new Date().toISOString();
-    await db.execute(
-      "INSERT INTO quick_notes (id, user_id, text, status, created_at, updated_at) VALUES (?,?,?,?,?,?)",
-      [id, userId, "", "open", now, now],
-    );
+    try {
+      await db.execute(
+        "INSERT INTO quick_notes (id, user_id, text, status, created_at, updated_at) VALUES (?,?,?,?,?,?)",
+        [id, userId, "", "open", now, now],
+      );
+    } catch (err) {
+      qnDebug("createNote: FAILED", err);
+      setSaveStatus("error");
+      dirtyRef.current = true;
+      return null;
+    }
     pendingNoteIdRef.current = null;
+    pendingInsertedRef.current = false;
     writingRef.current = false;
     lastWrittenRef.current = null;
     setSelectedNoteId(id);
     setDraft("");
+    draftRef.current = "";
+    setLastSavedAt(null);
+    setSaveStatus("idle");
     return id;
-  }, [db, userId]);
+  }, [db, userId, persistText]);
 
   // ── Text update (capture mode) ───────────────────────────────────
   const updateText = useCallback(
@@ -449,6 +563,13 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
       dirtyRef.current = true;
       draftRef.current = text;
       setDraft(text);
+      setSaveStatus("editing");
+      qnDebug("updateText", {
+        textLength: text.length,
+        preview: text.slice(0, 200),
+        hasNote: !!noteRef.current,
+        pendingId: pendingNoteIdRef.current,
+      });
       // Lazily create note on first non-whitespace input
       if (text.trim().length > 0 && !noteRef.current && !pendingNoteIdRef.current && userId) {
         pendingNoteIdRef.current = uuidv4();
@@ -462,6 +583,7 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
   const updateLineText = useCallback(
     (index: number, newText: string) => {
       dirtyRef.current = true;
+      setSaveStatus("editing");
       const nextText = replaceLine(draftRef.current, index, newText);
       draftRef.current = nextText;
       setDraft(nextText);
@@ -474,6 +596,14 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
   const resolveLine = useCallback(
     async (index: number, action: ResolveAction) => {
       if (!note) return;
+
+      // Validate BEFORE flushing: previously the dirty draft was flushed as
+      // statement 1 of the transaction and then a missing/already-resolved
+      // line caused an early return with dirty=false — a silent no-op that
+      // also left save state inconsistent.
+      const preLines = parseNoteLines(draftRef.current);
+      const preTarget = preLines.find((l) => l.index === index);
+      if (!preTarget || preTarget.resolved) return;
 
       let resultText: string | null = null;
       let didArchive = false;
@@ -497,7 +627,9 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
         const lines = parseNoteLines(currentText);
         const target = lines.find((l) => l.index === index);
 
-        // 3. Guard: line missing or already resolved.
+        // 3. Guard: line missing or already resolved (re-checked post-flush
+        // to cover races with concurrent edits; the pre-transaction check
+        // above handles the common case without touching dirty state).
         // NOTE: the old strict `target.text !== expectedText` check caused
         // silent no-ops (notably on the last line) when the row's prop was
         // stale vs. the flushed draft. The draft is authoritative — proceed
@@ -622,15 +754,42 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
   );
 
   // ── Discard note ─────────────────────────────────────────────────
+  // Clears any pending autosave first: previously a dirty draft (<500ms old)
+  // would be flushed AFTER the soft-delete by closePanel, resurrecting text
+  // on a deleted row or orphan-INSERTing. A never-persisted pending note is
+  // simply dropped locally with no DB write and no undo needed.
   const discardNote = useCallback(async () => {
-    if (!note) return;
-    const capturedNoteId = note.id;
+    if (autosaveTimer.current) {
+      clearTimeout(autosaveTimer.current);
+      autosaveTimer.current = null;
+    }
+    const existing = noteRef.current;
+    if (!existing) {
+      pendingNoteIdRef.current = null;
+      pendingInsertedRef.current = false;
+      dirtyRef.current = false;
+      writingRef.current = false;
+      lastWrittenRef.current = null;
+      setDraft("");
+      draftRef.current = "";
+      setSaveStatus("idle");
+      return;
+    }
+    const capturedNoteId = existing.id;
     const now = new Date().toISOString();
     await db.execute("UPDATE quick_notes SET deleted_at = ?, updated_at = ? WHERE id = ?", [
       now,
       now,
       capturedNoteId,
     ]);
+    // Drop local edit state AFTER the delete so a trailing flush can't
+    // resurrect the row. Undo restores the last-saved text, not the
+    // unsaved keystrokes — the confirm step in the panel makes this explicit.
+    dirtyRef.current = false;
+    pendingNoteIdRef.current = null;
+    pendingInsertedRef.current = false;
+    writingRef.current = false;
+    lastWrittenRef.current = null;
     registerUndo({
       label: "Note discarded",
       run: async () => {
@@ -640,9 +799,10 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
         );
       },
     });
-  }, [note, db, registerUndo]);
+  }, [db, registerUndo]);
 
   // ── Derived values ───────────────────────────────────────────────
+  const hasUnsaved = saveStatus === "editing" || saveStatus === "saving" || saveStatus === "error";
   const unreadCount = useMemo(
     () => (note ? unresolvedNonEmptyCount(draft || note.text) : 0),
     [note, draft],
@@ -683,6 +843,9 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
       selectNote,
       createNote,
       isSelectedNoteLive,
+      saveStatus,
+      hasUnsaved,
+      lastSavedAt,
     }),
     [
       note,
@@ -709,6 +872,9 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
       selectNote,
       createNote,
       isSelectedNoteLive,
+      saveStatus,
+      hasUnsaved,
+      lastSavedAt,
     ],
   );
 
