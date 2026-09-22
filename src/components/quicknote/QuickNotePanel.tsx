@@ -126,12 +126,16 @@ export function QuickNotePanel() {
   }, [creating, createNote, persistMode]);
 
   const selectedIndex = selectedNote ? openNotes.findIndex((n) => n.id === selectedNote.id) : -1;
-  const canPrev = selectedIndex > 0;
-  const canNext = selectedIndex >= 0 && selectedIndex < openNotes.length - 1;
+  // Displayed numbers are chronological (oldest = 1, newest = N) while
+  // openNotes is sorted newest-first, so "previous" (‹, lower number) moves
+  // toward the END of the array and "next" (›, higher number) toward index 0.
+  const canOlder = selectedIndex >= 0 && selectedIndex < openNotes.length - 1;
+  const canNewer = selectedIndex > 0;
 
   const stepNote = useCallback(
     (dir: -1 | 1) => {
-      const next = openNotes[selectedIndex + dir];
+      // dir -1 = previous/older (‹), dir +1 = next/newer (›).
+      const next = openNotes[selectedIndex - dir];
       if (next) void selectNote(next.id);
     },
     [openNotes, selectedIndex, selectNote],
@@ -196,16 +200,18 @@ export function QuickNotePanel() {
                   <span className="flex shrink-0 items-center">
                     <button
                       onClick={() => stepNote(-1)}
-                      disabled={!canPrev}
+                      disabled={!canOlder}
                       aria-label="Previous note"
+                      title="Previous (older) note"
                       className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-white/5"
                     >
                       <ChevronLeft size={13} />
                     </button>
                     <button
                       onClick={() => stepNote(1)}
-                      disabled={!canNext}
+                      disabled={!canNewer}
                       aria-label="Next note"
+                      title="Next (newer) note"
                       className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-white/5"
                     >
                       <ChevronRight size={13} />

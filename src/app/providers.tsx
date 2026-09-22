@@ -18,11 +18,37 @@ function PowerSyncProvider({ children }: { children: ReactNode }) {
     const db = getPowerSync();
     dbRef.current = db;
 
+    // Log sync-status transitions: shows whether the client is connected and
+    // whether uploads/downloads are flowing. Previously silent — a dead
+    // connection looked identical to a healthy one in the console.
+    const unregister = db.registerListener({
+      statusChanged: (status) => {
+        let detail = "";
+        try {
+          detail = JSON.stringify(status, (_k, v) => (v instanceof Error ? v.message : v));
+        } catch {
+          detail = String(status);
+        }
+        console.log(`[QuickNote:sync] statusChanged: ${detail}`);
+      },
+    });
+
     if (session) {
-      void db.connect(new SupabaseConnector());
+      db.connect(new SupabaseConnector()).catch((err) => {
+        console.error(
+          "[QuickNote:sync] db.connect() FAILED:",
+          err instanceof Error ? err.message : err,
+        );
+      });
     } else {
-      void db.disconnect();
+      db.disconnect().catch((err) => {
+        console.error(
+          "[QuickNote:sync] db.disconnect() FAILED:",
+          err instanceof Error ? err.message : err,
+        );
+      });
     }
+    return () => unregister();
   }, [session]);
 
   const db = getPowerSync();

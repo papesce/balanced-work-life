@@ -46,7 +46,7 @@ export function QuickNoteCapture() {
   // verbatim — tags stay intact; Process mode renders the pretty view.
   const handleBlur = useCallback(() => {
     if (readonly) return;
-    void flushNow();
+    void flushNow("blur");
   }, [flushNow, readonly]);
 
   return (

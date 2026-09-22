@@ -135,57 +135,99 @@ export class SupabaseConnector {
     if (!batch) return;
 
     for (const op of batch.crud) {
-      if (op.table === "task_tags") {
-        switch (op.op) {
-          case "PUT": {
-            const { idea_id, tag_id } = op.opData ?? {};
-            if (!idea_id || !tag_id) break;
-            await supabase
-              .from("task_tags")
-              .upsert({ id: op.id, idea_id, tag_id }, { onConflict: "idea_id,tag_id" });
-            break;
-          }
-          case "DELETE":
-            await supabase.from("task_tags").delete().eq("id", op.id);
-            break;
-        }
-        continue;
-      }
-      if (op.table === "horizon_settings" || op.table === "lane_configs") {
-        // Lane/horizon tables use standard upsert by id; client validates
-        // duplicate labels and 5-cap for instant UX, DB constraint is enforcement.
-        switch (op.op) {
-          case "PUT":
-            await supabase
-              .from(op.table)
-              .upsert(
-                { id: op.id, ...(op.opData as Record<string, unknown>) },
-                { onConflict: "id" },
-              );
-            break;
-          case "PATCH":
-            await supabase.from(op.table).update(op.opData!).eq("id", op.id);
-            break;
-          case "DELETE":
-            await supabase.from(op.table).delete().eq("id", op.id);
-            break;
-        }
-        continue;
-      }
-
-      switch (op.op) {
-        case "PUT":
-          await supabase.from(op.table).upsert({ id: op.id, ...op.opData });
-          break;
-        case "PATCH":
-          await supabase.from(op.table).update(op.opData!).eq("id", op.id);
-          break;
-        case "DELETE":
-          await supabase.from(op.table).delete().eq("id", op.id);
-          break;
+      const tag = `upload ${op.table} ${op.op} id=${op.id}`;
+      try {
+        await this.uploadOp(op);
+      } catch (err) {
+        // Surface the failing op before rethrowing: PowerSync retries the
+        // batch forever, so without this the root cause (missing table,
+        // RLS rejection, constraint violation) is invisible.
+        console.error(
+          `[QuickNote:sql] ${tag} FAILED: ${err instanceof Error ? err.message : String(err)}`,
+          err,
+        );
+        throw err;
       }
     }
     await batch.complete();
+  }
+
+  private async uploadOp(op: {
+    table: string;
+    op: string;
+    id: string;
+    opData?: Record<string, unknown> | null;
+  }): Promise<void> {
+    const throwIfSupabaseError = (
+      error: { message: string; code?: string } | null,
+      tag: string,
+    ) => {
+      if (error) {
+        throw new Error(`${tag}: ${error.message}${error.code ? ` (code ${error.code})` : ""}`);
+      }
+    };
+
+    if (op.table === "task_tags") {
+      switch (op.op) {
+        case "PUT": {
+          const { idea_id, tag_id } = op.opData ?? {};
+          if (!idea_id || !tag_id) break;
+          const { error } = await supabase
+            .from("task_tags")
+            .upsert({ id: op.id, idea_id, tag_id }, { onConflict: "idea_id,tag_id" });
+          throwIfSupabaseError(error, `upsert task_tags id=${op.id}`);
+          break;
+        }
+        case "DELETE": {
+          const { error } = await supabase.from("task_tags").delete().eq("id", op.id);
+          throwIfSupabaseError(error, `delete task_tags id=${op.id}`);
+          break;
+        }
+      }
+      return;
+    }
+    if (op.table === "horizon_settings" || op.table === "lane_configs") {
+      // Lane/horizon tables use standard upsert by id; client validates
+      // duplicate labels and 5-cap for instant UX, DB constraint is enforcement.
+      switch (op.op) {
+        case "PUT": {
+          const { error } = await supabase
+            .from(op.table)
+            .upsert({ id: op.id, ...(op.opData as Record<string, unknown>) }, { onConflict: "id" });
+          throwIfSupabaseError(error, `upsert ${op.table} id=${op.id}`);
+          break;
+        }
+        case "PATCH": {
+          const { error } = await supabase.from(op.table).update(op.opData!).eq("id", op.id);
+          throwIfSupabaseError(error, `update ${op.table} id=${op.id}`);
+          break;
+        }
+        case "DELETE": {
+          const { error } = await supabase.from(op.table).delete().eq("id", op.id);
+          throwIfSupabaseError(error, `delete ${op.table} id=${op.id}`);
+          break;
+        }
+      }
+      return;
+    }
+
+    switch (op.op) {
+      case "PUT": {
+        const { error } = await supabase.from(op.table).upsert({ id: op.id, ...op.opData });
+        throwIfSupabaseError(error, `upsert ${op.table} id=${op.id}`);
+        break;
+      }
+      case "PATCH": {
+        const { error } = await supabase.from(op.table).update(op.opData!).eq("id", op.id);
+        throwIfSupabaseError(error, `update ${op.table} id=${op.id}`);
+        break;
+      }
+      case "DELETE": {
+        const { error } = await supabase.from(op.table).delete().eq("id", op.id);
+        throwIfSupabaseError(error, `delete ${op.table} id=${op.id}`);
+        break;
+      }
+    }
   }
 }
 
