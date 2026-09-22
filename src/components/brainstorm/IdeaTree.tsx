@@ -295,7 +295,7 @@ export function IdeaTree({
               links={links}
               hasChildren={node.children.length > 0}
               getTagsForIdea={getTagsForIdea}
-              hiddenActions={editMode === "edit" ? [] : ["edit"]}
+              hiddenActions={editMode === "edit" ? ["horizon"] : ["edit", "horizon"]}
               onEdit={() => {
                 setSelectedId(node.id);
                 setEditingId(node.id);

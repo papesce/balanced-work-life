@@ -95,3 +95,14 @@ export function getRevealOptions(
 export function getRevealLabel(view: RevealView): string {
   return LABELS[view];
 }
+
+/**
+ * Determine the single best view to navigate to for a given idea.
+ * Priority: scheduled → projects → goals → brainstorm.
+ */
+export function getSmartRevealView(idea: Idea, allIdeas?: Idea[]): RevealView {
+  if (idea.scheduled_date) return "timeline";
+  if (idea.type === "project" || getProjectAncestorId(idea, allIdeas)) return "projects";
+  if (idea.type === "objective" || getGoalAncestorId(idea, allIdeas)) return "goals";
+  return "brainstorm";
+}
