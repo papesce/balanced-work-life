@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@powersync/react";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,18 +14,16 @@ import { QuickNoteLineRow } from "./QuickNoteLineRow";
  * Process mode: renders one row per non-blank, unresolved line.
  * Pre-computes match suggestions for each line using all user ideas.
  * Resolved lines are shown dimmed at the bottom.
- * When viewing an archived note, lines are displayed read-only.
+ * Line text is read-only; only actions (match, create, discard) are available.
  */
 export function QuickNoteProcess() {
-  const { draft, isSelectedNoteLive } = useQuickNoteContext();
+  const { draft } = useQuickNoteContext();
   const { user } = useAuth();
-  const readonly = !isSelectedNoteLive;
 
   const lines = useMemo(() => parseNoteLines(draft), [draft]);
   const unresolved = lines.filter((l) => !l.resolved);
   const resolved = lines.filter((l) => l.resolved);
 
-  // Load all ideas once at the process level for match pre-computation
   const { data: ideaRows } = useQuery<Record<string, unknown>>(
     user
       ? "SELECT * FROM ideas WHERE user_id = ? ORDER BY sort_order ASC"
@@ -34,7 +32,6 @@ export function QuickNoteProcess() {
   );
   const ideas: Idea[] = useMemo(() => (ideaRows as unknown as Idea[]) ?? [], [ideaRows]);
 
-  // Pre-compute match suggestions for each unresolved line
   const matchMap = useMemo(() => {
     const map = new Map<number, MatchResult>();
     for (const line of unresolved) {
@@ -46,17 +43,28 @@ export function QuickNoteProcess() {
     return map;
   }, [unresolved, ideas]);
 
+  // Track which line index should auto-focus. null = none focused.
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(() =>
+    unresolved.length > 0 ? unresolved[0].index : null,
+  );
+
+  const handleLineResolved = useCallback(() => {
+    requestAnimationFrame(() => {
+      const nextLines = parseNoteLines(draft);
+      const nextUnresolved = nextLines.filter((l) => !l.resolved);
+      if (nextUnresolved.length > 0) {
+        setFocusedIndex(nextUnresolved[0].index);
+      } else {
+        setFocusedIndex(null);
+      }
+    });
+  }, [draft]);
+
   const unresolvedCount = unresolved.length;
   const totalLines = unresolved.length + resolved.length;
 
   return (
     <div className="flex flex-col gap-1 p-4">
-      {readonly && (
-        <p className="mb-2 text-[10px] font-bold tracking-wider text-gray-400 uppercase dark:text-gray-500">
-          Read-only
-        </p>
-      )}
-
       {unresolvedCount > 0 && totalLines > 1 && (
         <div className="mb-2 flex items-center gap-2">
           <div className="h-1 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
@@ -77,24 +85,17 @@ export function QuickNoteProcess() {
         </p>
       )}
 
-      {unresolved.map((line) =>
-        readonly ? (
-          <div
-            key={line.index}
-            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300"
-          >
-            <span className="text-gray-300 dark:text-gray-600">○</span>
-            <span className="truncate">{line.text}</span>
-          </div>
-        ) : (
-          <QuickNoteLineRow
-            key={line.index}
-            line={line}
-            suggestedMatch={matchMap.get(line.index) ?? null}
-            allIdeas={ideas}
-          />
-        ),
-      )}
+      {unresolved.map((line) => (
+        <QuickNoteLineRow
+          key={line.index}
+          line={line}
+          suggestedMatch={matchMap.get(line.index) ?? null}
+          allIdeas={ideas}
+          autoFocus={focusedIndex === line.index}
+          onResolved={handleLineResolved}
+          readonly
+        />
+      ))}
 
       {resolved.length > 0 && (
         <div className="mt-2 border-t border-black/5 pt-2 dark:border-white/5">
@@ -124,7 +125,6 @@ function MatchedIdeaChip({ ideaId, ideas }: { ideaId: string; ideas: Idea[] }) {
 
   const handleGoToTask = useCallback(() => {
     if (!idea) return;
-    // Determine the best view to navigate to
     let view: RevealView = "brainstorm";
     if (idea.scheduled_date) {
       view = "planner";

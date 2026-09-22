@@ -20,9 +20,12 @@ export interface NoteLine {
   matchedIdeaId?: string;
 }
 
+export type ConfidenceTier = "high" | "medium";
+
 export interface MatchResult {
   idea: Idea;
   score: number;
+  tier: ConfidenceTier;
 }
 
 const RESOLVED_PREFIX = "✓ ";
@@ -100,6 +103,17 @@ export function unresolvedNonEmptyCount(text: string): number {
   return parseNoteLines(text).filter((l) => !l.resolved && l.text.trim() !== "").length;
 }
 
+export function formatAge(isoTimestamp: string, style: "long" | "short" = "long"): string {
+  const diffMs = Date.now() - new Date(isoTimestamp).getTime();
+  const mins = Math.floor(diffMs / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return style === "long" ? `${mins} min ago` : `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return style === "long" ? `${hrs} hr ago` : `${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  return style === "long" ? `${days} day${days === 1 ? "" : "s"} ago` : `${days}d`;
+}
+
 const DONE_STATUSES: Idea["status"][] = ["completed", "cancelled", "archived"];
 
 /**
@@ -138,7 +152,8 @@ export function findBestMatch(lineText: string, ideas: Idea[]): MatchResult | nu
     const score = wordScore * 0.7 + lengthRatio * 0.3;
 
     if (score >= 0.6 && (!best || score > best.score)) {
-      best = { idea, score };
+      const tier: ConfidenceTier = score >= 0.7 ? "high" : "medium";
+      best = { idea, score, tier };
     }
   }
 

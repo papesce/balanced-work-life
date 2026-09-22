@@ -1,27 +1,17 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { FileText } from "lucide-react";
 import { useQuickNoteContext } from "@/contexts/QuickNoteContext";
+import { formatAge } from "@/lib/quickNotes";
 
-function useNow(intervalMs: number) {
-  const [tick, setTick] = useState(0);
+function useFormattedAge(isoTimestamp: string, intervalMs: number): string {
+  const [age, setAge] = useState(() => formatAge(isoTimestamp));
   useEffect(() => {
-    const id = setInterval(() => setTick((n) => n + 1), intervalMs);
+    const id = setInterval(() => setAge(formatAge(isoTimestamp)), intervalMs);
     return () => clearInterval(id);
-  }, [intervalMs]);
-  return tick;
-}
-
-function formatAge(isoTimestamp: string): string {
-  const diffMs = Date.now() - new Date(isoTimestamp).getTime();
-  const mins = Math.floor(diffMs / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins} min ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs} hr ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days} day${days === 1 ? "" : "s"} ago`;
+  }, [isoTimestamp, intervalMs]);
+  return age;
 }
 
 /**
@@ -30,13 +20,7 @@ function formatAge(isoTimestamp: string): string {
  */
 export function QuickNoteChip() {
   const { note, unreadCount, openPanel } = useQuickNoteContext();
-  const tick = useNow(60_000);
-
-  const age = useMemo(
-    () => (note ? formatAge(note.created_at) : ""),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [note?.id, note?.created_at, tick],
-  );
+  const age = useFormattedAge(note?.created_at ?? "", 60_000);
 
   if (!note || unreadCount === 0) return null;
 

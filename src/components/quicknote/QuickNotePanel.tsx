@@ -1,7 +1,5 @@
 "use client";
 
-/* eslint-disable react-hooks/set-state-in-effect -- standard pattern for resetting state on prop change */
-
 import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X, FileText, MoreHorizontal, Trash2, ChevronLeft, Clock } from "lucide-react";
@@ -26,21 +24,15 @@ function readStoredMode(): PanelMode {
 export function QuickNotePanel() {
   const { note, panelOpen, closePanel, discardNote, unreadCount, isSelectedNoteLive } =
     useQuickNoteContext();
-  const [mounted, setMounted] = useState(false);
-  const [mode, setMode] = useState<PanelMode>("capture");
+  const [mode, setMode] = useState<PanelMode>(readStoredMode);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Persist mode to localStorage
   const persistMode = useCallback((next: PanelMode) => {
     setMode(next);
+    setMenuOpen(false);
     try {
       localStorage.setItem(MODE_STORAGE_KEY, next);
     } catch {}
-  }, []);
-
-  useEffect(() => {
-    setMode(readStoredMode());
-    setMounted(true);
   }, []);
 
   // Escape to close
@@ -49,6 +41,7 @@ export function QuickNotePanel() {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
+        setMenuOpen(false);
         closePanel();
       }
     };
@@ -56,20 +49,13 @@ export function QuickNotePanel() {
     return () => document.removeEventListener("keydown", handler);
   }, [panelOpen, closePanel]);
 
-  // Reset menu when panel opens
-  useEffect(() => {
-    if (panelOpen) {
-      setMenuOpen(false);
-    }
-  }, [panelOpen]);
-
   const handleDiscard = useCallback(async () => {
     setMenuOpen(false);
     await discardNote();
     closePanel();
   }, [discardNote, closePanel]);
 
-  if (!mounted || !panelOpen) return null;
+  if (!panelOpen) return null;
 
   const canProcess = note && unreadCount > 0 && isSelectedNoteLive;
 
@@ -90,15 +76,7 @@ export function QuickNotePanel() {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-black/5 px-4 py-3 dark:border-white/5">
           <div className="flex items-center gap-2">
-            {mode === "list" ? (
-              <button
-                onClick={() => persistMode("capture")}
-                className="flex cursor-pointer items-center gap-1 rounded-lg px-1.5 py-1 text-xs font-medium text-gray-500 transition-colors hover:bg-black/5 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"
-              >
-                <ChevronLeft size={14} />
-                <span>Back</span>
-              </button>
-            ) : mode === "process" ? (
+            {mode !== "capture" ? (
               <button
                 onClick={() => persistMode("capture")}
                 className="flex cursor-pointer items-center gap-1 rounded-lg px-1.5 py-1 text-xs font-medium text-gray-500 transition-colors hover:bg-black/5 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"
@@ -129,10 +107,7 @@ export function QuickNotePanel() {
 
             {mode !== "list" && (
               <button
-                onClick={() => {
-                  persistMode("list");
-                  setMenuOpen(false);
-                }}
+                onClick={() => persistMode("list")}
                 className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:hover:bg-white/5 dark:hover:text-gray-200"
                 title="Browse all notes"
                 aria-label="Browse all notes"

@@ -1,7 +1,5 @@
 "use client";
 
-/* eslint-disable react-hooks/set-state-in-effect -- standard pattern for resetting state on prop change */
-
 /**
  * QuickNoteContext
  *
@@ -225,23 +223,13 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
   // ── Selected note for browsing ───────────────────────────────────
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
 
-  // Default selection to the open note
-  useEffect(() => {
-    if (note && !selectedNoteId) {
-      setSelectedNoteId(note.id);
-    }
-  }, [note, selectedNoteId]);
-
   const selectedNote = useMemo(() => {
-    if (!selectedNoteId) return note;
-    return allNotes.find((n) => n.id === selectedNoteId) ?? note;
+    const id = selectedNoteId ?? note?.id;
+    if (!id) return note;
+    return allNotes.find((n) => n.id === id) ?? note;
   }, [selectedNoteId, allNotes, note]);
 
   const isSelectedNoteLive = selectedNote?.id === note?.id;
-
-  const selectNote = useCallback((id: string) => {
-    setSelectedNoteId(id);
-  }, []);
 
   // ── Local draft state ────────────────────────────────────────────
   const [draft, setDraft] = useState("");
@@ -256,7 +244,15 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
   // Without the writingRef guard, PowerSync can re-emit the query with stale text
   // before the write completes, overwriting the user's edits.
   // When the DB text matches what we last wrote, the write has landed — clear writingRef.
+  // Depends only on note?.id: runs when switching notes (initial load, selection change).
+  // External text updates to the same note are ignored while the user is editing —
+  // the next save/selection switch will pick them up.
+  const prevNoteIdRef = useRef<string | null>(null);
   useEffect(() => {
+    const currentId = note?.id ?? null;
+    if (currentId === prevNoteIdRef.current) return;
+    prevNoteIdRef.current = currentId;
+
     if (writingRef.current) {
       if (note?.text === lastWrittenRef.current) {
         writingRef.current = false;
@@ -266,20 +262,25 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
     if (!dirtyRef.current) {
       setDraft(note?.text ?? "");
     }
-  }, [note?.text, note?.id]);
+    // note?.text is tracked so the effect runs when DB text changes, but the
+    // prevNoteIdRef guard ensures the body only executes on note ID transitions.
+  }, [note?.id, note?.text]);
 
-  // Sync draft when switching to a different (archived) note via selectNote.
-  useEffect(() => {
-    if (selectedNote && selectedNote.id !== note?.id) {
-      // Viewing an archived note — show its text, not the live draft
-      setDraft(selectedNote.text);
-      dirtyRef.current = false;
-    } else if (selectedNote?.id === note?.id && !dirtyRef.current) {
-      // Switched back to the live note — sync from DB
-      setDraft(note?.text ?? "");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to selection changes
-  }, [selectedNote?.id]);
+  const selectNote = useCallback(
+    (id: string) => {
+      setSelectedNoteId(id);
+      const target = allNotes.find((n) => n.id === id) ?? note;
+      if (target && target.id !== note?.id) {
+        // Viewing an archived note — show its text, not the live draft
+        setDraft(target.text);
+        dirtyRef.current = false;
+      } else if (target?.id === note?.id && !dirtyRef.current) {
+        // Switched back to the live note — sync from DB
+        setDraft(note?.text ?? "");
+      }
+    },
+    [allNotes, note],
+  );
 
   // ── Lazy note creation refs ──────────────────────────────────────
   // On first non-whitespace input, generate id client-side, INSERT with text.
@@ -436,13 +437,8 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
           dirtyRef.current = false;
         }
 
-        // 2. Re-read the latest text inside the transaction
-        const rows = await tx.getAll<{ text: string }>(
-          "SELECT text FROM quick_notes WHERE id = ?",
-          [note.id],
-        );
-        if (rows.length === 0) return;
-        const currentText = rows[0].text;
+        // 2. Use the current draft directly (avoids stale read from DB)
+        const currentText = draftRef.current;
 
         const lines = parseNoteLines(currentText);
         const target = lines.find((l) => l.index === index);

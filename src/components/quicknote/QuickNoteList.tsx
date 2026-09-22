@@ -3,19 +3,8 @@
 import { useMemo } from "react";
 import { FileText, Archive } from "lucide-react";
 import { useQuickNoteContext } from "@/contexts/QuickNoteContext";
-import { parseNoteLines } from "@/lib/quickNotes";
+import { parseNoteLines, formatAge } from "@/lib/quickNotes";
 import { QuickNote } from "@/lib/types";
-
-function formatAge(isoTimestamp: string): string {
-  const diffMs = Date.now() - new Date(isoTimestamp).getTime();
-  const mins = Math.floor(diffMs / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d`;
-}
 
 function getPreview(text: string): string {
   const lines = parseNoteLines(text);
@@ -36,7 +25,7 @@ function NoteRow({
   onSelect: () => void;
 }) {
   const preview = useMemo(() => getPreview(note.text), [note.text]);
-  const age = useMemo(() => formatAge(note.created_at), [note.created_at]);
+  const age = useMemo(() => formatAge(note.created_at, "short"), [note.created_at]);
   const unresolvedCount = useMemo(
     () => parseNoteLines(note.text).filter((l) => !l.resolved && l.text.trim() !== "").length,
     [note.text],
