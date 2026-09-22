@@ -74,6 +74,8 @@ interface QuickNoteContextValue {
   unreadCount: number;
   /** Total unresolved lines across all open notes. */
   totalUnreadCount: number;
+  /** Number of open notes with at least one unresolved non-empty line. */
+  pendingNotesCount: number;
   /** Undo bar state (owned by this context, not the page). */
   undoAction: ReturnType<typeof useUndoAction>["undoAction"];
   handleUndo: ReturnType<typeof useUndoAction>["handleUndo"];
@@ -213,6 +215,14 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
       ),
     [notes.openNotes, notes.note?.id, draft.draft],
   );
+  const pendingNotesCount = useMemo(
+    () =>
+      notes.openNotes.reduce((count, n) => {
+        const text = n.id === notes.note?.id ? draft.draft || n.text : n.text;
+        return count + (unresolvedNonEmptyCount(text) > 0 ? 1 : 0);
+      }, 0),
+    [notes.openNotes, notes.note?.id, draft.draft],
+  );
 
   // ── Context value ────────────────────────────────────────────────
   const value: QuickNoteContextValue = useMemo(
@@ -232,6 +242,7 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
       discardNote: ops.discardNote,
       unreadCount,
       totalUnreadCount,
+      pendingNotesCount,
       undoAction,
       handleUndo,
       clearUndo,
@@ -257,6 +268,7 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
       consumeRequestedMode,
       unreadCount,
       totalUnreadCount,
+      pendingNotesCount,
       undoAction,
       handleUndo,
       clearUndo,

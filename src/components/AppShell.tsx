@@ -28,7 +28,7 @@ export function AppShell({
   fullWidth,
   onAdd,
 }: AppShellProps) {
-  const { openPanel: openQuickNote } = useQuickNoteContext();
+  const { openPanel: openQuickNote, pendingNotesCount } = useQuickNoteContext();
 
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -97,9 +97,26 @@ export function AppShell({
       <button
         onClick={() => openQuickNote()}
         className="fixed right-6 bottom-24 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-white/80 text-gray-600 shadow-lg backdrop-blur-lg transition-all hover:bg-white hover:shadow-xl active:scale-95 dark:border-white/10 dark:bg-gray-800/80 dark:text-gray-300 dark:hover:bg-gray-800"
-        title="Quick Note (⌘⌥N)"
+        title={
+          pendingNotesCount > 0
+            ? `Quick Notes (${pendingNotesCount} to process) (⌘⌥N)`
+            : "Quick Note (⌘⌥N)"
+        }
+        aria-label={
+          pendingNotesCount > 0
+            ? `Open quick notes, ${pendingNotesCount} to process`
+            : "Open quick notes"
+        }
       >
         <FileText size={18} />
+        {pendingNotesCount > 0 && (
+          <span
+            aria-hidden="true"
+            className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-violet-600 px-1 text-[10px] leading-none font-bold text-white shadow-md"
+          >
+            {pendingNotesCount > 99 ? "99+" : pendingNotesCount}
+          </span>
+        )}
       </button>
     </div>
   );
