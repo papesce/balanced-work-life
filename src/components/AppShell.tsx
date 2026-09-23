@@ -6,6 +6,7 @@ import { Navigation } from "@/components/Navigation";
 import { QuickAddButton } from "@/components/QuickAddButton";
 import { DesktopSidebar } from "@/components/DesktopSidebar";
 import { UserMenu } from "@/components/UserMenu";
+import { GlobalSearchBar } from "@/components/shared/GlobalSearchBar";
 import { useQuickNoteContext } from "@/contexts/QuickNoteContext";
 import { STORAGE_KEYS, readRawString, writeRawString } from "@/lib/storage";
 
@@ -76,6 +77,7 @@ export function AppShell({
             )}
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <GlobalSearchBar />
             {headerActions}
             {headerActions && (
               <>

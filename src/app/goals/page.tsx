@@ -73,6 +73,12 @@ export default function GoalsPage() {
     if (!highlightId || ideasHook.loading) return;
     const idea = ideasHook.ideas.find((i) => i.id === highlightId);
     if (!idea) return;
+    // Guarantee the highlight target stays visible in the goal list.
+    if (["completed", "cancelled", "archived"].includes(idea.status)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- highlight deep-link syncs selection + lifts hiding filters
+      setHideCompleted(false);
+      setStatusFilter("all");
+    }
     const byId = new Map(ideasHook.ideas.map((i) => [i.id, i]));
     let goalId: string | null = null;
     if (idea.type === "objective") goalId = idea.id;
@@ -90,7 +96,6 @@ export default function GoalsPage() {
     }
     if (goalId) {
       if (goalId !== selectedId) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- highlight deep-link syncs selection
         setSelectedId(goalId);
         ideasHook.expandIdea(goalId);
       }

@@ -68,8 +68,25 @@ function DailyPlannerInner() {
     if (urlDate) setActiveDate(urlDate);
   }
 
+  const [selectedArea, setSelectedArea] = useState<LifeArea | null>(null);
+  const [hideCompleted, setHideCompleted] = useState(
+    () => readRawString(STORAGE_KEYS.plannerHideCompleted) === "true",
+  );
+
   useEffect(() => {
     if (!highlightId || loading) return;
+    // Guarantee the highlight target is visible: lift filters that could hide it.
+    const target = ideas.find((i) => i.id === highlightId);
+    if (target?.status === "completed" && hideCompleted) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- highlight deep-link lifts hiding filter
+      setHideCompleted(false);
+      writeRawString(STORAGE_KEYS.plannerHideCompleted, "false");
+    }
+    if (target && selectedArea) {
+      const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(target.id));
+      const effective = areas.length === 0 ? (["life"] as LifeArea[]) : areas;
+      if (!effective.includes(selectedArea)) setSelectedArea(null);
+    }
     const timer = setTimeout(() => {
       const el = document.getElementById(`task-${highlightId}`);
       if (el) {
@@ -84,12 +101,9 @@ function DailyPlannerInner() {
       router.replace(`/?${params.toString()}`, { scroll: false });
     }, 100);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- highlight deep-link runs once per highlightId
   }, [highlightId, loading, router, searchParams]);
 
-  const [selectedArea, setSelectedArea] = useState<LifeArea | null>(null);
-  const [hideCompleted, setHideCompleted] = useState(
-    () => readRawString(STORAGE_KEYS.plannerHideCompleted) === "true",
-  );
   const [activeMobileTab, setActiveMobileTab] = useState<"tasks" | "schedule" | "balance">("tasks");
   const [targets] = useState<Record<LifeArea, number>>(() => loadAreaTargets());
   const [showDateInput, setShowDateInput] = useState(false);

@@ -325,6 +325,14 @@ export default function HorizonPage() {
     const currentIdeas = ideasRef.current;
     const idea = currentIdeas.find((i) => i.id === highlightId);
     if (idea?.horizon) setActiveTab(idea.horizon);
+    // Guarantee the highlight target is visible: lift filters that could hide it.
+    if (idea && !ACTIVE_STATUSES.has(idea.status)) {
+      setHideClosed(false);
+    }
+    if (idea && idea.type) {
+      setFocusOnly(false);
+      setTypeFilter([]);
+    }
     const expandAncestors = (id: string) => {
       const m = new Map(currentIdeas.map((i) => [i.id, i]));
       let cur = m.get(id);

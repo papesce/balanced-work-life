@@ -479,6 +479,17 @@ function TimelineInner() {
 
   useEffect(() => {
     if (!highlightId || loading || renderedAnchor !== anchor) return;
+    // Guarantee the highlight target is visible: the "Deferred" filter hides
+    // completed/cancelled occurrences on past dates.
+    const target = ideas.find((i) => i.id === highlightId);
+    if (
+      target &&
+      (target.status === "completed" || target.status === "cancelled") &&
+      filter !== "all"
+    ) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- highlight deep-link lifts hiding filter
+      setFilter("all");
+    }
     let attempts = 0;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const tryPulse = () => {
@@ -503,6 +514,7 @@ function TimelineInner() {
     return () => {
       if (timer) clearTimeout(timer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- highlight deep-link runs once per highlightId
   }, [highlightId, anchor, loading, renderedAnchor, router, searchParams]);
 
   const handleQuickAdd = async (text: string, date: string, area: LifeArea | null) => {
