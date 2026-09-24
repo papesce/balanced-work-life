@@ -20,10 +20,28 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useQuickNoteContext } from "@/contexts/QuickNoteContext";
-import { NoteLine, MatchResult } from "@/lib/quickNotes";
-import { Idea } from "@/lib/types";
+import { NoteLine, MatchResult, parseTaskAll } from "@/lib/quickNotes";
+import { Idea, IdeaType } from "@/lib/types";
 import { getRevealHref, getSmartRevealView, getRevealLabel, type RevealView } from "@/lib/reveal";
 import { IdeaSearchPicker } from "@/components/brainstorm/IdeaSearchPicker";
+
+const KIND_PILL_STYLES: Record<IdeaType, string> = {
+  idea: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
+  objective: "bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300",
+  project: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+  initiative: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+  task: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
+};
+
+export function KindPill({ kind }: { kind: IdeaType }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-md px-1.5 py-px text-[10px] font-bold ${KIND_PILL_STYLES[kind]}`}
+    >
+      {kind === "objective" ? "goal" : kind}
+    </span>
+  );
+}
 
 type PickerMode = null | "create_under" | "match";
 
@@ -207,6 +225,10 @@ export function QuickNoteLineRow({
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [revealSubmenuOpen, setRevealSubmenuOpen] = useState(false);
   const overflowRef = useRef<HTMLDivElement>(null);
+  // Live-parse `[title](notes)` + trailing `#type` so the previews follow edits.
+  const parsed = parseTaskAll(localText);
+  const parsedDetail = parsed.detail;
+  const parsedKind = parsed.kind;
 
   useEffect(() => {
     if (!overflowOpen) return;
@@ -230,7 +252,11 @@ export function QuickNoteLineRow({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const newText = e.target.value;
       setLocalText(newText);
-      updateLineText(line.index, newText);
+      // The row edits the dash-stripped task content; write it back with the
+      // `- ` prefix preserved so the line stays actionable in the draft.
+      // An emptied input writes a blank line (ignored, not a task).
+      const writeBack = newText.trim() === "" || /^\s*-/.test(newText) ? newText : `- ${newText}`;
+      updateLineText(line.index, writeBack);
     },
     [updateLineText, line.index],
   );
@@ -364,7 +390,7 @@ export function QuickNoteLineRow({
             </p>
             <IdeaSearchPicker
               ideas={allIdeas}
-              initialQuery={localText}
+              initialQuery={parseTaskAll(localText).title}
               matchAllWords
               placeholder="Search for a matching idea..."
               renderActions={(idea, clearSearch) => (
@@ -404,6 +430,16 @@ export function QuickNoteLineRow({
         readOnly={readonly}
         disabled={saving}
       />
+      {(line.detail || parsedDetail || line.kind || parsedKind) && (
+        <div className="flex flex-wrap items-center gap-1.5 px-1.5">
+          {(parsedKind ?? line.kind) && <KindPill kind={(parsedKind ?? line.kind)!} />}
+          {(parsedDetail ?? line.detail) && (
+            <p className="text-[11px] leading-snug text-gray-400 dark:text-gray-500">
+              📝 {parsedDetail ?? line.detail}
+            </p>
+          )}
+        </div>
+      )}
 
       {hasMatch ? (
         <div className="flex flex-wrap items-center gap-1">

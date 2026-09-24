@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useDroppable } from "@dnd-kit/core";
 import { UndoAction } from "@/lib/tasks/undo";
 import { areaColors } from "@/styles/tokens";
 import { Idea, LifeArea, Tag } from "@/lib/types";
 import { AREA_ICONS, AREA_LABELS } from "@/lib/constants";
 import { RescheduleAction } from "@/lib/tasks/rescheduleTask";
 import { PendingTaskList } from "./PendingTaskList";
+import { plannerLaneId, usePlannerDnd } from "./PlannerDnd";
 
 interface AreaTaskGroupProps {
   area: LifeArea;
-  activeDate: string;
   pendingTasks: Idea[];
   doneTasks: Idea[];
   onDone: (id: string) => void;
@@ -19,7 +20,6 @@ interface AreaTaskGroupProps {
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
   onDelete: (id: string) => void;
   onAddTask: (text: string, area: LifeArea) => Promise<void>;
-  onReorderTasks: (taskIds: string[]) => void;
   onMoveTaskBetweenAreas?: (taskId: string, fromArea: LifeArea, toArea: LifeArea) => void;
   getTagsForIdea?: (ideaId: string) => Tag[];
   allTags?: Tag[];
@@ -33,7 +33,6 @@ interface AreaTaskGroupProps {
 
 export function AreaTaskGroup({
   area,
-  activeDate,
   pendingTasks,
   doneTasks,
   onDone,
@@ -42,7 +41,6 @@ export function AreaTaskGroup({
   onReschedule,
   onDelete,
   onAddTask,
-  onReorderTasks,
   onMoveTaskBetweenAreas,
   getTagsForIdea,
   allTags,
@@ -53,42 +51,20 @@ export function AreaTaskGroup({
   onAttach,
   allIdeas,
 }: AreaTaskGroupProps) {
-  const [isDragOver, setIsDragOver] = useState(false);
   const [areaInputValue, setAreaInputValue] = useState("");
   const Icon = AREA_ICONS[area];
   const color = areaColors[area]?.dot;
-
-  useEffect(() => {
-    const clear = () => setIsDragOver(false);
-    window.addEventListener("dragend", clear);
-    window.addEventListener("drop", clear);
-    return () => {
-      window.removeEventListener("dragend", clear);
-      window.removeEventListener("drop", clear);
-    };
-  }, []);
+  const { setNodeRef, isOver } = useDroppable({ id: plannerLaneId(area) });
+  const { overLane, activeDrag } = usePlannerDnd();
+  const isDragOver =
+    isOver || (overLane === area && activeDrag !== null && activeDrag.area !== area);
 
   return (
     <div
+      ref={setNodeRef}
       className={`glass-card rounded-2xl border border-black/5 transition-all duration-200 dark:border-white/5 ${
         isDragOver ? "scale-[1.005] bg-violet-500/[0.03] ring-2 ring-violet-500/50" : ""
       }`}
-      onDragOver={(e) => {
-        e.preventDefault();
-        setIsDragOver(true);
-      }}
-      onDragLeave={() => setIsDragOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setIsDragOver(false);
-        const taskId = e.dataTransfer.getData("text/plain");
-        const sourceArea = e.dataTransfer.getData("text/lifearea") as LifeArea | "";
-        if (taskId && sourceArea && sourceArea !== area) {
-          onMoveTaskBetweenAreas?.(taskId, sourceArea, area);
-        } else if (taskId) {
-          void onReschedule(taskId, { type: "reschedule", newDate: activeDate });
-        }
-      }}
     >
       <div
         className="flex items-center gap-2 rounded-t-2xl border-b border-black/5 bg-black/[0.01] px-4 py-3 dark:border-white/5 dark:bg-white/[0.01]"
@@ -114,7 +90,6 @@ export function AreaTaskGroup({
           <PendingTaskList
             tasks={pendingTasks}
             area={area}
-            onReorder={onReorderTasks}
             onDone={onDone}
             onUndone={onUndone}
             onUpdate={onUpdate}
@@ -136,7 +111,6 @@ export function AreaTaskGroup({
             key={task.id}
             tasks={[task]}
             area={area}
-            onReorder={() => {}}
             onDone={onDone}
             onUndone={onUndone}
             onUpdate={onUpdate}

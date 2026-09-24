@@ -20,12 +20,12 @@ function useFormattedAge(isoTimestamp: string, intervalMs: number): string {
  * latest note. Clicking opens the panel in list mode.
  */
 export function QuickNoteChip() {
-  const { note, totalUnreadCount, openNotes, openPanel } = useQuickNoteContext();
+  const { note, totalUnreadCount, pendingNotesCount, openPanel } = useQuickNoteContext();
   const age = useFormattedAge(note?.created_at ?? "", 60_000);
 
   if (!note || totalUnreadCount === 0) return null;
 
-  const noteCount = openNotes.length;
+  const noteCount = pendingNotesCount;
 
   return (
     <button

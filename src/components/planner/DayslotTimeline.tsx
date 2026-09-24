@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useDroppable } from "@dnd-kit/core";
 import { DailyTimeline } from "@papesce/dayslot";
 import type { TimelineEvent, DailyTimelineHandle } from "@papesce/dayslot";
 import "@papesce/dayslot/style.css";
@@ -9,6 +10,7 @@ import { AREA_LABELS } from "@/lib/constants";
 import { minutesToTimeString, parseTimeToMinutes } from "./dayslotAdapter";
 import { SlotForm } from "./SlotForm";
 import { EventCard } from "./TimelineEventCard";
+import { PLANNER_TIMELINE_ID, usePlannerDnd } from "./PlannerDnd";
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(() => {
@@ -107,6 +109,14 @@ export function DayslotTimeline({
   const isMobile = useIsMobile();
   const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
   const pendingCounter = useRef(0);
+  const hourHeight = isMobile ? 80 : 128;
+  const startHour = 7;
+  const endHour = 22;
+  const snapMinutes = 15;
+  const { setNodeRef: setTimelineDropRef, isOver: isDropOver } = useDroppable({
+    id: PLANNER_TIMELINE_ID,
+  });
+  const { registerTimeline, overTimeline } = usePlannerDnd();
   const [pendingEvents, setPendingEvents] = useState<
     Array<{ id: string; startMinute: number; text: string; durationMinutes: number }>
   >([]);
@@ -114,6 +124,12 @@ export function DayslotTimeline({
   const handleTimelineRef = useCallback((handle: DailyTimelineHandle | null) => {
     setScrollEl(handle?.scrollElement ?? null);
   }, []);
+
+  // Publish the timeline scroll body + grid metrics so the planner DndContext
+  // can convert pointer position into a snapped drop minute (no dataTransfer).
+  useEffect(() => {
+    registerTimeline({ scrollElement: scrollEl, startHour, endHour, hourHeight, snapMinutes });
+  }, [scrollEl, hourHeight, registerTimeline]);
   const scheduledTasks = useMemo(
     () => allTasks.filter((t) => t.scheduled_time && t.status !== "archived"),
     [allTasks],
@@ -147,16 +163,6 @@ export function DayslotTimeline({
       onUpdateTask(event.id, {
         scheduled_time: minutesToTimeString(event.startMinute),
         duration_minutes: event.durationMinutes,
-      });
-    },
-    [onUpdateTask],
-  );
-
-  const handleExternalDrop = useCallback(
-    (taskId: string, startMinute: number) => {
-      onUpdateTask(taskId, {
-        scheduled_time: minutesToTimeString(startMinute),
-        status: "scheduled",
       });
     },
     [onUpdateTask],
@@ -264,21 +270,24 @@ export function DayslotTimeline({
   );
 
   return (
-    <div className="glass-card overflow-hidden rounded-2xl border border-black/5 dark:border-white/5">
+    <div
+      ref={setTimelineDropRef}
+      className={`glass-card overflow-hidden rounded-2xl border border-black/5 transition-all duration-200 dark:border-white/5 ${
+        isDropOver || overTimeline ? "bg-violet-500/[0.03] ring-2 ring-violet-500/50" : ""
+      }`}
+    >
       <DailyTimeline
         events={events}
-        startHour={7}
-        endHour={22}
-        hourHeight={isMobile ? 80 : 128}
-        snapMinutes={15}
+        startHour={startHour}
+        endHour={endHour}
+        hourHeight={hourHeight}
+        snapMinutes={snapMinutes}
         height={isMobile ? "auto" : "1100px"}
         title="Daily Timeline"
         timelineRef={handleTimelineRef}
         onEventChange={handleEventChange}
         onEventClick={handleEventClick}
-        onExternalDrop={handleExternalDrop}
         onEventRemove={handleEventRemove}
-        externalDragDuration={30}
         renderEventContent={renderEventContent}
         renderSlotAction={renderSlotAction}
         showCurrentTime={isToday}

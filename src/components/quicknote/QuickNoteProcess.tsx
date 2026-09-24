@@ -8,21 +8,22 @@ import { useQuickNoteContext } from "@/contexts/QuickNoteContext";
 import { parseNoteLines, findBestMatch, type MatchResult } from "@/lib/quickNotes";
 import { Idea } from "@/lib/types";
 import { getRevealHref, type RevealView } from "@/lib/reveal";
-import { QuickNoteLineRow } from "./QuickNoteLineRow";
+import { QuickNoteLineRow, KindPill } from "./QuickNoteLineRow";
 
 /**
- * Process mode: renders one row per non-blank, unresolved line.
+ * Process mode: renders one row per actionable (`- `), unresolved line.
  * Pre-computes match suggestions for each line using all user ideas.
- * Resolved lines are shown dimmed at the bottom.
- * Line text is read-only; only actions (match, create, discard) are available.
+ * Resolved lines are shown dimmed at the bottom. Plain non-dash lines
+ * are free-form context and never become ideas.
  */
 export function QuickNoteProcess() {
   const { draft } = useQuickNoteContext();
   const { user } = useAuth();
 
   const lines = useMemo(() => parseNoteLines(draft), [draft]);
-  const unresolved = lines.filter((l) => !l.resolved);
-  const resolved = lines.filter((l) => l.resolved);
+  const unresolved = lines.filter((l) => !l.resolved && l.actionable);
+  const resolved = lines.filter((l) => l.resolved && l.actionable);
+  const ignoredCount = lines.filter((l) => !l.resolved && !l.actionable).length;
 
   const { data: ideaRows } = useQuery<Record<string, unknown>>(
     user
@@ -35,7 +36,7 @@ export function QuickNoteProcess() {
   const matchMap = useMemo(() => {
     const map = new Map<number, MatchResult>();
     for (const line of unresolved) {
-      const result = findBestMatch(line.text, ideas);
+      const result = findBestMatch(line.title, ideas);
       if (result) {
         map.set(line.index, result);
       }
@@ -84,7 +85,14 @@ export function QuickNoteProcess() {
 
       {unresolved.length === 0 && resolved.length === 0 && (
         <p className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">
-          No lines to process.
+          {ignoredCount > 0
+            ? "No tasks to process — start a line with “- ” to make it an idea."
+            : "No lines to process."}
+        </p>
+      )}
+      {unresolved.length === 0 && resolved.length > 0 && ignoredCount > 0 && (
+        <p className="pb-1 text-center text-[11px] text-gray-400 dark:text-gray-500">
+          {ignoredCount} context line{ignoredCount === 1 ? "" : "s"} (no “- ”) ignored.
         </p>
       )}
 
@@ -111,7 +119,17 @@ export function QuickNoteProcess() {
               className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-gray-400 line-through dark:text-gray-500"
             >
               <span className="text-green-500">✓</span>
-              <span className="truncate">{line.text}</span>
+              <span className="truncate">{line.title}</span>
+              {line.kind && (
+                <span className="flex-shrink-0 font-normal no-underline">
+                  <KindPill kind={line.kind} />
+                </span>
+              )}
+              {line.detail && (
+                <span className="truncate font-normal text-gray-300 no-underline dark:text-gray-600">
+                  {line.detail}
+                </span>
+              )}
               {line.matchedIdeaId && <MatchedIdeaChip ideaId={line.matchedIdeaId} ideas={ideas} />}
             </div>
           ))}

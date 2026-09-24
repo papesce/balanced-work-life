@@ -29,6 +29,8 @@ import { useUndoAction } from "@/lib/tasks/undo";
 import { TriageActions } from "@/components/triage/TriageActions";
 import { QuickNoteChip } from "@/components/quicknote/QuickNoteChip";
 import { formatDayLabel } from "@/components/planner/plannerUtils";
+import { PlannerDndProvider } from "@/components/planner/PlannerDnd";
+import { minutesToTimeString } from "@/components/planner/dayslotAdapter";
 import { STORAGE_KEYS, loadAreaTargets, readRawString, writeRawString } from "@/lib/storage";
 
 export default function DailyPlannerPage() {
@@ -232,6 +234,34 @@ function DailyPlannerInner() {
 
   const visibleAreas = selectedArea ? [selectedArea] : AREA_ORDER;
 
+  // Per-area groupings shared by the render loop and the dnd-kit provider
+  // (reorder + drop-target resolution).
+  const pendingByArea = useMemo(() => {
+    const grouped = Object.fromEntries(AREA_ORDER.map((a) => [a, [] as Idea[]])) as Record<
+      LifeArea,
+      Idea[]
+    >;
+    for (const t of [...pendingOnDate, ...scheduledOnDate]) {
+      const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(t.id));
+      const effective = areas.length === 0 ? (["life"] as LifeArea[]) : areas;
+      for (const a of effective) grouped[a].push(t);
+    }
+    return grouped;
+  }, [pendingOnDate, scheduledOnDate, taskTagsHook]);
+
+  const doneByArea = useMemo(() => {
+    const grouped = Object.fromEntries(AREA_ORDER.map((a) => [a, [] as Idea[]])) as Record<
+      LifeArea,
+      Idea[]
+    >;
+    for (const t of visibleDoneOnDate) {
+      const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(t.id));
+      const effective = areas.length === 0 ? (["life"] as LifeArea[]) : areas;
+      for (const a of effective) grouped[a].push(t);
+    }
+    return grouped;
+  }, [visibleDoneOnDate, taskTagsHook]);
+
   const handleAddToArea = async (text: string, area: LifeArea) => {
     const id = await createIdea(text, null, "bottom", {
       type: "task",
@@ -263,6 +293,33 @@ function DailyPlannerInner() {
     },
     [updateIdea],
   );
+
+  const handleDndMoveBetweenAreas = async (
+    taskId: string,
+    fromArea: LifeArea,
+    toArea: LifeArea,
+    insertBeforeId: string | null,
+  ) => {
+    await handleMoveTaskBetweenAreas(taskId, fromArea, toArea);
+    if (insertBeforeId) {
+      const ids = pendingByArea[toArea].map((t) => t.id).filter((id) => id !== taskId);
+      const idx = ids.indexOf(insertBeforeId);
+      if (idx === -1) ids.push(taskId);
+      else ids.splice(idx, 0, taskId);
+      await reorderTasks(ids);
+    }
+  };
+
+  const handleScheduleFromDrop = (taskId: string, startMinute: number) => {
+    void updateIdea(taskId, {
+      scheduled_time: minutesToTimeString(startMinute),
+      status: "scheduled",
+    });
+  };
+
+  const handleSortInArea = (_area: LifeArea, taskIds: string[]) => {
+    void reorderTasks(taskIds);
+  };
 
   const handleCreateScheduledTask = async (
     text: string,
@@ -398,168 +455,170 @@ function DailyPlannerInner() {
 
       <UndoBar undoAction={undoAction} onUndo={() => void handleUndo()} onDismiss={clearUndo} />
 
-      <div className="flex flex-col gap-5 md:flex-row">
-        {/* LEFT COLUMN */}
-        <div
-          className={`w-full flex-shrink-0 space-y-4 md:w-[260px] ${activeMobileTab === "balance" ? "block" : "hidden md:block"} md:sticky md:top-[53px] md:self-start`}
-        >
-          <BalanceRing
-            counts={balanceRingCounts}
-            modeLabel="Work-Life Balance Ring"
-            statLabel="Total Minutes"
-            statSub="scheduled today"
-          />
-          <AreaFilters
-            areaTaskCounts={areaTaskCounts}
-            selectedArea={selectedArea}
-            onSelectArea={(area) => setSelectedArea(selectedArea === area ? null : area)}
-            targets={targets}
-          />
-        </div>
-
-        {/* MIDDLE COLUMN */}
-        <div
-          className={`min-w-0 flex-1 space-y-4 ${activeMobileTab === "tasks" ? "block" : "hidden md:block"}`}
-        >
-          <div className="glass-card flex items-center justify-between gap-4 rounded-2xl border border-black/5 p-4 dark:border-white/5">
-            <div className="flex flex-col">
-              <h2 className="text-xs font-bold text-gray-700 dark:text-gray-200">
-                {selectedArea ? `${AREA_LABELS[selectedArea]} Focus` : "Today's Agenda"}
-              </h2>
-              <p className="mt-0.5 text-[10px] font-medium text-gray-400 dark:text-gray-500">
-                {pendingOnDate.length + scheduledOnDate.length} pending tasks ·{" "}
-                {visibleDoneOnDate.length} completed
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <QuickNoteChip />
-              <button
-                onClick={() => {
-                  const next = !hideCompleted;
-                  setHideCompleted(next);
-                  writeRawString(STORAGE_KEYS.plannerHideCompleted, String(next));
-                }}
-                className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-gray-100 px-3 py-1.5 text-[11px] font-bold text-gray-600 transition-all hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-              >
-                {hideCompleted ? <Eye size={12} /> : <EyeOff size={12} />}
-                <span>{hideCompleted ? "Show Done" : "Hide Done"}</span>
-              </button>
-              {pendingOnDate.length > 0 && (
-                <button
-                  onClick={() => smartSortTasks(pendingOnDate)}
-                  className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-violet-50 px-3 py-1.5 text-[11px] font-bold text-violet-600 transition-all hover:bg-violet-100 dark:bg-violet-950/20 dark:text-violet-400 dark:hover:bg-violet-900/30"
-                  title="Prioritize tasks by priority score"
-                >
-                  <Sparkles size={12} />
-                  <span>Smart Sort</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {deferredOnDate.length > 0 && (
-            <DeferredOnDateSection
-              occurrences={deferredOnDate}
-              today={today}
-              onReschedule={handleReschedule}
-              onComplete={handleComplete}
-              onCancel={handleCancel}
-              getTagsForIdea={taskTagsHook.getTagsForIdea}
+      <PlannerDndProvider
+        pendingByArea={pendingByArea}
+        doneByArea={doneByArea}
+        onSortInArea={handleSortInArea}
+        onMoveBetweenAreas={handleDndMoveBetweenAreas}
+        onSchedule={handleScheduleFromDrop}
+      >
+        <div className="flex flex-col gap-5 md:flex-row">
+          {/* LEFT COLUMN */}{" "}
+          <div
+            className={`w-full flex-shrink-0 space-y-4 md:w-[260px] ${activeMobileTab === "balance" ? "block" : "hidden md:block"} md:sticky md:top-[53px] md:self-start`}
+          >
+            <BalanceRing
+              counts={balanceRingCounts}
+              modeLabel="Work-Life Balance Ring"
+              statLabel="Total Minutes"
+              statSub="scheduled today"
             />
-          )}
-
-          <div className="space-y-4">
-            {visibleAreas.map((area) => {
-              const pending = [...pendingOnDate, ...scheduledOnDate].filter((t) => {
-                const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(t.id));
-                return areas.length === 0 ? area === "life" : areas.includes(area);
-              });
-              const done = visibleDoneOnDate.filter((t) => {
-                const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(t.id));
-                return areas.length === 0 ? area === "life" : areas.includes(area);
-              });
-              if (pending.length === 0 && done.length === 0 && selectedArea !== area && !dayIsEmpty)
-                return null;
-              return (
-                <AreaTaskGroup
-                  key={area}
-                  area={area}
-                  activeDate={activeDate}
-                  pendingTasks={pending}
-                  doneTasks={done}
-                  onDone={markDone}
-                  onUndone={markUndone}
-                  onUpdate={updateIdea}
-                  onReschedule={handleReschedule}
-                  onDelete={handleDeleteTask}
-                  onAddTask={handleAddToArea}
-                  onReorderTasks={reorderTasks}
-                  onMoveTaskBetweenAreas={handleMoveTaskBetweenAreas}
-                  getTagsForIdea={taskTagsHook.getTagsForIdea}
-                  allTags={tagsHook.tags}
-                  onCreateTag={tagsHook.createTag}
-                  onAddTag={async (ideaId, tag) => {
-                    await taskTagsHook.addTagToTask(ideaId, tag);
-                  }}
-                  onRemoveTag={async (ideaId, tagId) => {
-                    await taskTagsHook.removeTagFromTask(ideaId, tagId);
-                  }}
-                  onUndoAction={registerUndo}
-                  onAttach={handleAttach}
-                  allIdeas={ideas}
-                />
-              );
-            })}
-          </div>
-        </div>
-
-        {/* RESIZE HANDLE */}
-        <div
-          onMouseDown={handleResizeStart}
-          className="group hidden w-3 flex-shrink-0 cursor-col-resize items-center justify-center md:flex"
-        >
-          <div className="flex flex-col gap-[3px] opacity-40 transition-opacity group-hover:opacity-100">
-            <div className="h-[3px] w-[3px] rounded-full bg-gray-400 group-hover:bg-violet-400 dark:bg-gray-500" />
-            <div className="h-[3px] w-[3px] rounded-full bg-gray-400 group-hover:bg-violet-400 dark:bg-gray-500" />
-            <div className="h-[3px] w-[3px] rounded-full bg-gray-400 group-hover:bg-violet-400 dark:bg-gray-500" />
-          </div>
-        </div>
-
-        {/* RIGHT COLUMN */}
-        <div
-          style={{ "--right-col-width": `${rightColWidth}px` } as React.CSSProperties}
-          className={`resizable-right-col flex w-full flex-shrink-0 flex-col gap-4 ${
-            activeMobileTab === "schedule" ? "block" : "hidden lg:flex"
-          }`}
-        >
-          <div className="min-h-[400px] flex-1">
-            <DayslotTimeline
-              activeDate={activeDate}
-              allTasks={allTasksForTimeline}
-              onUpdateTask={updateIdea}
-              onCreateTask={handleCreateScheduledTask}
-              getTagsForIdea={taskTagsHook.getTagsForIdea}
-              tags={tagsHook.tags}
+            <AreaFilters
+              areaTaskCounts={areaTaskCounts}
               selectedArea={selectedArea}
-              onAddTag={async (ideaId, tag) => {
-                await taskTagsHook.addTagToTask(ideaId, tag);
-              }}
-              onRemoveTag={async (ideaId, tagId) => {
-                await taskTagsHook.removeTagFromTask(ideaId, tagId);
-              }}
-              onCreateTag={async (name, area) => {
-                const tag = await tagsHook.createTag(name, area);
-                return tag ?? null;
-              }}
-              onSelectEvent={(eventId) => {
-                const params = new URLSearchParams(searchParams.toString());
-                params.set("highlight", eventId);
-                router.replace(`/?${params.toString()}`, { scroll: false });
-              }}
+              onSelectArea={(area) => setSelectedArea(selectedArea === area ? null : area)}
+              targets={targets}
             />
           </div>
+          {/* MIDDLE COLUMN */}
+          <div
+            className={`min-w-0 flex-1 space-y-4 ${activeMobileTab === "tasks" ? "block" : "hidden md:block"}`}
+          >
+            <div className="glass-card flex items-center justify-between gap-4 rounded-2xl border border-black/5 p-4 dark:border-white/5">
+              <div className="flex flex-col">
+                <h2 className="text-xs font-bold text-gray-700 dark:text-gray-200">
+                  {selectedArea ? `${AREA_LABELS[selectedArea]} Focus` : "Today's Agenda"}
+                </h2>
+                <p className="mt-0.5 text-[10px] font-medium text-gray-400 dark:text-gray-500">
+                  {pendingOnDate.length + scheduledOnDate.length} pending tasks ·{" "}
+                  {visibleDoneOnDate.length} completed
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <QuickNoteChip />
+                <button
+                  onClick={() => {
+                    const next = !hideCompleted;
+                    setHideCompleted(next);
+                    writeRawString(STORAGE_KEYS.plannerHideCompleted, String(next));
+                  }}
+                  className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-gray-100 px-3 py-1.5 text-[11px] font-bold text-gray-600 transition-all hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+                >
+                  {hideCompleted ? <Eye size={12} /> : <EyeOff size={12} />}
+                  <span>{hideCompleted ? "Show Done" : "Hide Done"}</span>
+                </button>
+                {pendingOnDate.length > 0 && (
+                  <button
+                    onClick={() => smartSortTasks(pendingOnDate)}
+                    className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-violet-50 px-3 py-1.5 text-[11px] font-bold text-violet-600 transition-all hover:bg-violet-100 dark:bg-violet-950/20 dark:text-violet-400 dark:hover:bg-violet-900/30"
+                    title="Prioritize tasks by priority score"
+                  >
+                    <Sparkles size={12} />
+                    <span>Smart Sort</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {deferredOnDate.length > 0 && (
+              <DeferredOnDateSection
+                occurrences={deferredOnDate}
+                today={today}
+                onReschedule={handleReschedule}
+                onComplete={handleComplete}
+                onCancel={handleCancel}
+                getTagsForIdea={taskTagsHook.getTagsForIdea}
+              />
+            )}
+
+            <div className="space-y-4">
+              {visibleAreas.map((area) => {
+                const pending = pendingByArea[area];
+                const done = doneByArea[area];
+                if (
+                  pending.length === 0 &&
+                  done.length === 0 &&
+                  selectedArea !== area &&
+                  !dayIsEmpty
+                )
+                  return null;
+                return (
+                  <AreaTaskGroup
+                    key={area}
+                    area={area}
+                    pendingTasks={pending}
+                    doneTasks={done}
+                    onDone={markDone}
+                    onUndone={markUndone}
+                    onUpdate={updateIdea}
+                    onReschedule={handleReschedule}
+                    onDelete={handleDeleteTask}
+                    onAddTask={handleAddToArea}
+                    onMoveTaskBetweenAreas={handleMoveTaskBetweenAreas}
+                    getTagsForIdea={taskTagsHook.getTagsForIdea}
+                    allTags={tagsHook.tags}
+                    onCreateTag={tagsHook.createTag}
+                    onAddTag={async (ideaId, tag) => {
+                      await taskTagsHook.addTagToTask(ideaId, tag);
+                    }}
+                    onRemoveTag={async (ideaId, tagId) => {
+                      await taskTagsHook.removeTagFromTask(ideaId, tagId);
+                    }}
+                    onUndoAction={registerUndo}
+                    onAttach={handleAttach}
+                    allIdeas={ideas}
+                  />
+                );
+              })}
+            </div>
+          </div>
+          {/* RESIZE HANDLE */}
+          <div
+            onMouseDown={handleResizeStart}
+            className="group hidden w-3 flex-shrink-0 cursor-col-resize items-center justify-center md:flex"
+          >
+            <div className="flex flex-col gap-[3px] opacity-40 transition-opacity group-hover:opacity-100">
+              <div className="h-[3px] w-[3px] rounded-full bg-gray-400 group-hover:bg-violet-400 dark:bg-gray-500" />
+              <div className="h-[3px] w-[3px] rounded-full bg-gray-400 group-hover:bg-violet-400 dark:bg-gray-500" />
+              <div className="h-[3px] w-[3px] rounded-full bg-gray-400 group-hover:bg-violet-400 dark:bg-gray-500" />
+            </div>
+          </div>
+          {/* RIGHT COLUMN */}
+          <div
+            style={{ "--right-col-width": `${rightColWidth}px` } as React.CSSProperties}
+            className={`resizable-right-col flex w-full flex-shrink-0 flex-col gap-4 ${
+              activeMobileTab === "schedule" ? "block" : "hidden lg:flex"
+            }`}
+          >
+            <div className="min-h-[400px] flex-1">
+              <DayslotTimeline
+                activeDate={activeDate}
+                allTasks={allTasksForTimeline}
+                onUpdateTask={updateIdea}
+                onCreateTask={handleCreateScheduledTask}
+                getTagsForIdea={taskTagsHook.getTagsForIdea}
+                tags={tagsHook.tags}
+                selectedArea={selectedArea}
+                onAddTag={async (ideaId, tag) => {
+                  await taskTagsHook.addTagToTask(ideaId, tag);
+                }}
+                onRemoveTag={async (ideaId, tagId) => {
+                  await taskTagsHook.removeTagFromTask(ideaId, tagId);
+                }}
+                onCreateTag={async (name, area) => {
+                  const tag = await tagsHook.createTag(name, area);
+                  return tag ?? null;
+                }}
+                onSelectEvent={(eventId) => {
+                  const params = new URLSearchParams(searchParams.toString());
+                  params.set("highlight", eventId);
+                  router.replace(`/?${params.toString()}`, { scroll: false });
+                }}
+              />
+            </div>
+          </div>
         </div>
-      </div>
+      </PlannerDndProvider>
     </AppShell>
   );
 }

@@ -5,19 +5,41 @@
  * "resolved" if and only if it starts with the two-character sequence
  * U+2713 (✓) followed by one space. An optional `[matched:<ideaId>]`
  * tag may follow the checkmark to record which idea was matched.
+ *
+ * Task syntax:
+ * - Only lines starting with `- ` (after optional leading whitespace) are
+ *   actionable tasks. All other non-blank lines are ignored for processing
+ *   (free-form context, not ideas).
+ * - A task may carry notes via markdown-link syntax: `[title](notes)`.
+ *   On creation, `title` becomes the idea text and `notes` the idea notes.
+ * - A task may carry a trailing type hashtag: `#project`, `#task`,
+ *   `#goal` (→ objective), `#idea`, `#initiative` (case-insensitive).
+ *   Untagged tasks default to `idea`. Unknown trailing tags stay literal.
  */
 
-import type { Idea } from "@/lib/types";
+import type { Idea, IdeaType } from "@/lib/types";
 
 export interface NoteLine {
   /** Original index in the full newline-split array (excluding blank lines). */
   index: number;
-  /** Text content without any prefix. */
+  /**
+   * Task content with the `- ` prefix stripped but markdown-link syntax kept
+   * verbatim (e.g. `[Buy milk](2L whole)`). For non-actionable lines this is
+   * the raw trimmed content.
+   */
   text: string;
   /** Whether this line is resolved (starts with '✓ '). */
   resolved: boolean;
   /** If this line was resolved via "Match existing", the matched idea ID. */
   matchedIdeaId?: string;
+  /** True only for `- ` lines (the only lines that become ideas). */
+  actionable: boolean;
+  /** Parsed idea title (`[title](notes)` → `title`, `#tag` stripped, else `text`). */
+  title: string;
+  /** Parsed idea notes (`[title](notes)` → `notes`, else null). */
+  detail: string | null;
+  /** Parsed idea type from a trailing hashtag (null = untagged → `idea`). */
+  kind: IdeaType | null;
 }
 
 export type ConfidenceTier = "high" | "medium";
@@ -30,10 +52,100 @@ export interface MatchResult {
 
 const RESOLVED_PREFIX = "✓ ";
 const MATCHED_TAG_RE = /^\[matched:([^\]]+)\]\s*/;
+const TASK_PREFIX_RE = /^\s*-\s?/;
+const TASK_SYNTAX_RE = /\[([^\]]+)\]\(([^)]+)\)/;
+const TYPE_TAG_RE = /(?:\s|^)#(project|task|goals?|idea|initiative)\s*$/i;
+
+const TYPE_ALIASES: Record<string, IdeaType> = {
+  idea: "idea",
+  objective: "objective",
+  goal: "objective",
+  goals: "objective",
+  project: "project",
+  initiative: "initiative",
+  task: "task",
+};
+
+/**
+ * Split a trailing type hashtag off a task string.
+ * Only a trailing `#project|#task|#goal(s)|#idea|#initiative`
+ * (case-insensitive) counts — mid-line hashtags stay literal.
+ */
+export function parseTaskKind(taskText: string): { kind: IdeaType | null; rest: string } {
+  const match = taskText.match(TYPE_TAG_RE);
+  if (!match) return { kind: null, rest: taskText };
+  const key = match[1].toLowerCase();
+  const kind = TYPE_ALIASES[key] ?? null;
+  if (!kind) return { kind: null, rest: taskText };
+  return { kind, rest: taskText.slice(0, match.index).trimEnd() };
+}
+
+/** Parse a dash-stripped task string into title + notes + kind. */
+export function parseTaskAll(taskText: string): {
+  title: string;
+  detail: string | null;
+  kind: IdeaType | null;
+} {
+  const { kind, rest } = parseTaskKind(taskText);
+  const { title, detail } = parseTaskTitleDetail(rest);
+  return { title, detail, kind };
+}
+
+/** True when the (unresolved, untagged) line content starts with `- `. */
+export function isTaskLine(content: string): boolean {
+  return TASK_PREFIX_RE.test(content);
+}
+
+/** Strip a leading `- ` (after optional whitespace) if present. */
+export function stripTaskPrefix(content: string): string {
+  return content.replace(TASK_PREFIX_RE, "");
+}
+
+/**
+ * Split a task string into title + detail via `[title](notes)` syntax.
+ * First match wins; surrounding text is preserved in the title when the
+ * whole line isn't a single link (e.g. `Buy [milk](2L)` → title
+ * `Buy milk`, detail `2L`). Returns detail=null when no link present.
+ */
+export function parseTaskTitleDetail(taskText: string): { title: string; detail: string | null } {
+  const trimmed = taskText.trim();
+  const match = trimmed.match(TASK_SYNTAX_RE);
+  if (!match) return { title: trimmed, detail: null };
+  const fullMatch = match[0];
+  const title = trimmed.replace(fullMatch, `${match[1]}`).replace(/\s+/g, " ").trim();
+  const detail = match[2].trim();
+  return { title, detail: detail === "" ? null : detail };
+}
+
+function toNoteLine(
+  index: number,
+  content: string,
+  resolved: boolean,
+  matchedIdeaId?: string,
+): NoteLine {
+  const actionable = isTaskLine(content);
+  const text = actionable ? stripTaskPrefix(content).trim() : content.trim();
+  if (!actionable) {
+    return {
+      index,
+      text,
+      resolved,
+      matchedIdeaId,
+      actionable,
+      title: text,
+      detail: null,
+      kind: null,
+    };
+  }
+  const { title, detail, kind } = parseTaskAll(text);
+  return { index, text, resolved, matchedIdeaId, actionable, title, detail, kind };
+}
 
 /**
  * Parse the note text into an ordered list of non-blank lines.
  * Each line carries its original index in the full split array.
+ * Only `- ` lines are actionable (become ideas); other lines are kept
+ * with actionable=false so callers can ignore or render them as context.
  */
 export function parseNoteLines(text: string): NoteLine[] {
   const allLines = text.split("\n");
@@ -46,25 +158,13 @@ export function parseNoteLines(text: string): NoteLine[] {
       const afterPrefix = raw.slice(RESOLVED_PREFIX.length);
       const match = afterPrefix.match(MATCHED_TAG_RE);
       if (match) {
-        result.push({
-          index: i,
-          text: afterPrefix.slice(match[0].length),
-          resolved: true,
-          matchedIdeaId: match[1],
-        });
+        const content = afterPrefix.slice(match[0].length);
+        result.push(toNoteLine(i, content, true, match[1]));
       } else {
-        result.push({
-          index: i,
-          text: afterPrefix,
-          resolved: true,
-        });
+        result.push(toNoteLine(i, afterPrefix, true));
       }
     } else {
-      result.push({
-        index: i,
-        text: raw,
-        resolved: false,
-      });
+      result.push(toNoteLine(i, raw, false));
     }
   }
   return result;
@@ -97,10 +197,12 @@ export function replaceLine(text: string, index: number, newText: string): strin
 }
 
 /**
- * Count the number of non-blank, unresolved lines.
+ * Count the number of actionable (`- `), non-blank, unresolved lines.
+ * Plain non-dash lines are free-form context and never count.
  */
 export function unresolvedNonEmptyCount(text: string): number {
-  return parseNoteLines(text).filter((l) => !l.resolved && l.text.trim() !== "").length;
+  return parseNoteLines(text).filter((l) => !l.resolved && l.actionable && l.title.trim() !== "")
+    .length;
 }
 
 export function formatAge(isoTimestamp: string, style: "long" | "short" = "long"): string {

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, KeyboardEvent } from "react";
+import { useState, useEffect, useRef, useMemo, KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
-import { Reorder, useDragControls } from "framer-motion";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Star, MoreHorizontal, GripVertical, Clock, CornerDownRight } from "lucide-react";
 import { UndoAction } from "@/lib/tasks/undo";
 import { areaColors } from "@/styles/tokens";
@@ -23,7 +24,6 @@ import { applyStatusTransition } from "@/lib/tasks/statusTransition";
 interface PendingTaskListProps {
   tasks: Idea[];
   area: LifeArea;
-  onReorder: (taskIds: string[]) => void;
   onDone: (id: string) => void;
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
@@ -43,7 +43,6 @@ interface PendingTaskListProps {
 export function PendingTaskList({
   tasks,
   area,
-  onReorder,
   onDone,
   onUndone,
   onUpdate,
@@ -59,83 +58,17 @@ export function PendingTaskList({
   onAttach,
   allIdeas,
 }: PendingTaskListProps) {
-  const [items, setItems] = useState(tasks);
-  const itemsRef = useRef(items);
-  const isNativeDraggingRef = useRef(false);
-  const isFramerDraggingRef = useRef(false);
-  const queuedTasksRef = useRef<Idea[] | null>(null);
-
-  useEffect(() => {
-    itemsRef.current = items;
-  }, [items]);
-
-  useEffect(() => {
-    if (tasks !== itemsRef.current) {
-      if (isNativeDraggingRef.current) {
-        queuedTasksRef.current = tasks;
-      } else {
-        setItems(tasks);
-      }
-    }
-  }, [tasks]);
-
-  const handleNativeDragStart = useCallback(() => {
-    isNativeDraggingRef.current = true;
-  }, []);
-  const handleFramerDragStart = useCallback(() => {
-    isFramerDraggingRef.current = true;
-  }, []);
-  const handleFramerDragEnd = useCallback(() => {
-    isFramerDraggingRef.current = false;
-  }, []);
-  const abortFramerDrag = useCallback(() => {
-    if (!isFramerDraggingRef.current) return;
-    try {
-      window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, cancelable: true }));
-      window.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
-      document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, cancelable: true }));
-    } catch {}
-    isFramerDraggingRef.current = false;
-  }, []);
-  const handleNativeDragEnd = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    (_source: string) => {
-      isNativeDraggingRef.current = false;
-      if (queuedTasksRef.current) {
-        setItems(queuedTasksRef.current);
-        queuedTasksRef.current = null;
-      } else if (tasks !== itemsRef.current) {
-        setItems(tasks);
-      }
-    },
-    [tasks],
-  );
-
-  useEffect(() => {
-    const onWindowDragEnd = () => {
-      handleNativeDragEnd("window:dragend");
-    };
-    const onWindowDrop = () => {
-      abortFramerDrag();
-      handleNativeDragEnd("window:drop");
-    };
-    window.addEventListener("dragend", onWindowDragEnd);
-    window.addEventListener("drop", onWindowDrop);
-    return () => {
-      window.removeEventListener("dragend", onWindowDragEnd);
-      window.removeEventListener("drop", onWindowDrop);
-    };
-  }, [handleNativeDragEnd, abortFramerDrag]);
+  // Sortable ids derive directly from props — dnd-kit handles drag
+  // transforms internally, so no local reorder state is needed.
+  const itemIds = useMemo(() => tasks.map((t) => t.id), [tasks]);
 
   return (
-    <Reorder.Group axis="y" values={items} onReorder={setItems} style={{ overflow: "visible" }}>
-      {items.map((task) => (
-        <ReorderItemWrapper
+    <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
+      {tasks.map((task) => (
+        <SortableItemWrapper
           key={task.id}
           task={task}
           area={area}
-          onReorder={onReorder}
-          itemsRef={itemsRef}
           onDone={onDone}
           onUndone={onUndone}
           onUpdate={onUpdate}
@@ -147,24 +80,18 @@ export function PendingTaskList({
           onCreateTag={onCreateTag}
           onAddTag={onAddTag}
           onRemoveTag={onRemoveTag}
-          onNativeDragStart={handleNativeDragStart}
-          onNativeDragEnd={handleNativeDragEnd}
-          onFramerDragStart={handleFramerDragStart}
-          onFramerDragEnd={handleFramerDragEnd}
           onUndoAction={onUndoAction}
           onAttach={onAttach}
           allIdeas={allIdeas}
         />
       ))}
-    </Reorder.Group>
+    </SortableContext>
   );
 }
 
-function ReorderItemWrapper({
+function SortableItemWrapper({
   task,
   area,
-  onReorder,
-  itemsRef,
   onDone,
   onUndone,
   onUpdate,
@@ -176,18 +103,12 @@ function ReorderItemWrapper({
   onCreateTag,
   onAddTag,
   onRemoveTag,
-  onNativeDragStart,
-  onNativeDragEnd,
-  onFramerDragStart,
-  onFramerDragEnd,
   onUndoAction,
   onAttach,
   allIdeas,
 }: {
   task: Idea;
   area: LifeArea;
-  onReorder: (taskIds: string[]) => void;
-  itemsRef: React.MutableRefObject<Idea[]>;
   onDone: (id: string) => void;
   onUndone: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Idea>) => void;
@@ -199,29 +120,26 @@ function ReorderItemWrapper({
   onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
   onAddTag?: (ideaId: string, tag: Tag) => Promise<void>;
   onRemoveTag?: (ideaId: string, tagId: string) => Promise<void>;
-  onNativeDragStart?: () => void;
-  onNativeDragEnd?: (source: string) => void;
-  onFramerDragStart?: () => void;
-  onFramerDragEnd?: () => void;
   onUndoAction?: (action: UndoAction) => void;
   onAttach?: (taskId: string, parentId: string) => Promise<void>;
   allIdeas?: Idea[];
 }) {
-  const dragControls = useDragControls();
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: task.id,
+    data: {
+      kind: "planner-task",
+      taskId: task.id,
+      area,
+      title: task.text,
+      durationMinutes: task.duration_minutes ?? 30,
+    },
+  });
 
   return (
-    <Reorder.Item
-      value={task}
-      dragListener={false}
-      dragControls={dragControls}
-      className="relative"
-      onDragStart={() => {
-        onFramerDragStart?.();
-      }}
-      onDragEnd={() => {
-        onFramerDragEnd?.();
-        onReorder(itemsRef.current.map((t) => t.id));
-      }}
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`relative ${isDragging ? "z-10 opacity-40" : ""}`}
     >
       <TaskRow
         task={task}
@@ -238,14 +156,13 @@ function ReorderItemWrapper({
         onAddTag={onAddTag}
         onRemoveTag={onRemoveTag}
         showDragHandle
-        dragControls={dragControls}
-        onNativeDragStart={onNativeDragStart}
-        onNativeDragEnd={onNativeDragEnd}
+        dragHandleProps={{ attributes, listeners }}
+        isDragging={isDragging}
         onUndoAction={onUndoAction}
         onAttach={onAttach}
         allIdeas={allIdeas}
       />
-    </Reorder.Item>
+    </div>
   );
 }
 
@@ -264,9 +181,8 @@ function TaskRow({
   onAddTag,
   onRemoveTag,
   showDragHandle,
-  dragControls,
-  onNativeDragStart,
-  onNativeDragEnd,
+  dragHandleProps,
+  isDragging,
   onUndoAction,
   onAttach,
   allIdeas,
@@ -285,9 +201,11 @@ function TaskRow({
   onAddTag?: (ideaId: string, tag: Tag) => Promise<void>;
   onRemoveTag?: (ideaId: string, tagId: string) => Promise<void>;
   showDragHandle?: boolean;
-  dragControls?: ReturnType<typeof useDragControls>;
-  onNativeDragStart?: () => void;
-  onNativeDragEnd?: (source: string) => void;
+  dragHandleProps?: {
+    attributes: React.HTMLAttributes<HTMLElement>;
+    listeners: ReturnType<typeof useSortable>["listeners"];
+  };
+  isDragging?: boolean;
   onUndoAction?: (action: UndoAction) => void;
   onAttach?: (taskId: string, parentId: string) => Promise<void>;
   allIdeas?: Idea[];
@@ -484,24 +402,14 @@ function TaskRow({
   return (
     <div
       id={`task-${task.id}`}
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData("text/plain", task.id);
-        e.dataTransfer.setData("text/lifearea", area);
-        e.dataTransfer.effectAllowed = "move";
-        onNativeDragStart?.();
-      }}
-      onDragEnd={() => {
-        onNativeDragEnd?.("row:dragend");
-      }}
       onContextMenu={(e) => {
         e.preventDefault();
         setRevealPos({ top: e.clientY + 4, right: window.innerWidth - e.clientX - 4 });
         setShowReveal(true);
       }}
-      className={`group flex cursor-grab items-center gap-2 px-4 py-2.5 transition-colors hover:bg-black/[0.015] active:cursor-grabbing dark:hover:bg-white/[0.015] ${
+      className={`group flex items-center gap-2 px-4 py-2.5 transition-colors hover:bg-black/[0.015] dark:hover:bg-white/[0.015] ${
         signalCfg ? "border-b-2" : ""
-      }`}
+      } ${isDragging ? "opacity-40" : ""}`}
       style={
         signalCfg
           ? {
@@ -515,15 +423,9 @@ function TaskRow({
     >
       {showDragHandle && (
         <div
-          onPointerDown={(e) => {
-            dragControls?.start(e);
-          }}
-          onDragStart={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          draggable={false}
-          className="flex-shrink-0 cursor-grab text-gray-300 transition-colors hover:text-gray-400 active:cursor-grabbing md:opacity-0 md:group-hover:opacity-100 dark:text-gray-600"
+          {...dragHandleProps?.attributes}
+          {...dragHandleProps?.listeners}
+          className="flex-shrink-0 cursor-grab touch-none text-gray-300 transition-colors hover:text-gray-400 active:cursor-grabbing md:opacity-0 md:group-hover:opacity-100 dark:text-gray-600"
         >
           <GripVertical size={11} />
         </div>

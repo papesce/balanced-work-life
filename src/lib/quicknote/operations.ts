@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
 import type { AbstractPowerSyncDatabase } from "@powersync/web";
 import { parseNoteLines, markLineResolved, unresolvedNonEmptyCount } from "@/lib/quickNotes";
+import { parseTaskAll, stripTaskPrefix, isTaskLine } from "@/lib/quickNotes";
 import type { QuickNote } from "@/lib/types";
 import { ideaInsertSql, ideaInsertParams } from "@/lib/ideaInsert";
 import type { ResolveAction } from "./types";
@@ -40,6 +41,8 @@ function insertQuickNoteIdea(
     userId: string;
     parentId: string | null;
     text: string;
+    notes: string | null;
+    type: string | null;
     sortOrder: number;
     now: string;
   },
@@ -54,7 +57,7 @@ function insertQuickNoteIdea(
         parent_id: opts.parentId,
         text: opts.text,
         description: null,
-        type: "idea",
+        type: opts.type ?? "idea",
         effort: null,
         impact: null,
         urgency: null,
@@ -64,7 +67,7 @@ function insertQuickNoteIdea(
         is_priority: false,
         priority_order: null,
         status: "draft",
-        notes: null,
+        notes: opts.notes,
         completed_at: null,
         cancelled_at: null,
         paused_at: null,
@@ -176,7 +179,7 @@ export function useQuickNoteOperations({
       // no-op left save state inconsistent).
       const preLines = parseNoteLines(draft.draftRef.current);
       const preTarget = preLines.find((l) => l.index === index);
-      if (!preTarget || preTarget.resolved) return;
+      if (!preTarget || preTarget.resolved || !preTarget.actionable) return;
 
       let resultText: string | null = null;
       let didArchive = false;
@@ -213,7 +216,7 @@ export function useQuickNoteOperations({
         // silent no-ops (notably on the last line) when the row's prop was
         // stale vs. the flushed draft. The draft is authoritative — proceed
         // with the current text and only warn on mismatch.
-        if (!target || target.resolved) return;
+        if (!target || target.resolved || !target.actionable) return;
         if (target.text !== action.expectedText) {
           qnWarn(
             `resolveLine text mismatch — proceeding with current draft (index=${index}, expected=${JSON.stringify(action.expectedText)?.slice(0, 100)}, actual=${JSON.stringify(target.text)?.slice(0, 100)})`,
@@ -229,10 +232,17 @@ export function useQuickNoteOperations({
           );
           const sortOrder = (maxRow[0]?.max_order ?? -1) + 1;
           const now = new Date().toISOString();
+          // The edited text may still carry the `- ` prefix, `[title](notes)`
+          // syntax, and/or a trailing `#type` hashtag — normalize to title +
+          // notes + type so the idea row holds clean values.
+          const rawTask = isTaskLine(action.text) ? stripTaskPrefix(action.text) : action.text;
+          const { title, detail, kind } = parseTaskAll(rawTask);
           const id = await insertQuickNoteIdea(tx, {
             userId,
             parentId,
-            text: action.text.trim(),
+            text: title.trim(),
+            notes: detail,
+            type: kind ?? "idea",
             sortOrder,
             now,
           });
