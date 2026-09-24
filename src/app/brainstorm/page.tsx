@@ -22,8 +22,7 @@ import { useUndoAction } from "@/lib/tasks/undo";
 
 export default function BrainstormPage() {
   const [timeScope, setTimeScope] = useState<IdeasScope>("this_month");
-  const [search, setSearch] = useState("");
-  const ideasHook = useIdeas({ scope: timeScope, searchQuery: search });
+  const ideasHook = useIdeas({ scope: timeScope });
   const linksHook = useIdeaLinks();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
@@ -92,11 +91,9 @@ export default function BrainstormPage() {
     }
   }, [cardMode, editMode]);
 
-  // Search spans every idea: focus is suspended while a search is active.
-  // Focus also self-heals when the focused idea no longer exists (deleted).
-  const searchActive = search.trim().length > 0;
+  // Focus self-heals when the focused idea no longer exists (deleted).
   const focusValid = focusedId !== null && ideasHook.ideas.some((i) => i.id === focusedId);
-  const effectiveFocusId = searchActive || !focusValid ? null : focusedId;
+  const effectiveFocusId = !focusValid ? null : focusedId;
 
   const focusedIdea = useMemo(
     () => ideasHook.ideas.find((idea) => idea.id === effectiveFocusId) ?? null,
@@ -115,7 +112,6 @@ export default function BrainstormPage() {
   const hasLinks = linksHook.links.length > 0;
 
   const handleAddRoot = async () => {
-    if (searchActive) setSearch("");
     const id = await createIdea("", effectiveFocusId, "top");
     if (id) {
       setSelectedId(id);
@@ -293,6 +289,15 @@ export default function BrainstormPage() {
     /* eslint-disable react-hooks/set-state-in-effect -- highlight deep-link syncs selection/view */
     setSelectedId(highlightId);
     setViewMode("tree");
+    // Guarantee the highlight target is visible: lift filters that could hide it.
+    if (focusedId && !getFocusedSubtreeIds(focusedId, ideasHook.ideas).has(highlightId)) {
+      setFocusedId(null);
+    }
+    if (hideClosed && (idea.status === "cancelled" || idea.status === "archived")) {
+      setHideClosed(false);
+    }
+    if (hideCompleted && idea.status === "completed") setHideCompleted(false);
+    if (hideDeferred && idea.status === "deferred") setHideDeferred(false);
     /* eslint-enable react-hooks/set-state-in-effect */
     const timer = setTimeout(() => {
       const el = document.getElementById(`idea-${highlightId}`);
@@ -321,8 +326,6 @@ export default function BrainstormPage() {
 
   const headerStartActions = (
     <BrainstormToolbar
-      search={search}
-      setSearch={setSearch}
       editMode={editMode}
       setEditMode={changeEditMode}
       cardMode={cardMode}
@@ -480,7 +483,6 @@ export default function BrainstormPage() {
           onAddTag={taskTagsHook.addTagToTask}
           onRemoveTag={taskTagsHook.removeTagFromTask}
           onCreateTag={tagsHook.createTag}
-          search={search}
           showType={showType}
           showArea={showArea}
           editMode={editMode}

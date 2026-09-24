@@ -10,7 +10,7 @@ import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useUndoAction } from "@/lib/tasks/undo";
-import { filterTreeBySearch, filterTreeByFocus, filterTreeByType } from "@/lib/ideaTreeFilters";
+import { filterTreeByFocus, filterTreeByType } from "@/lib/ideaTreeFilters";
 import { getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
 import { buildTree as buildTreeGeneric } from "@/components/tree/buildTree";
 import { AppShell } from "@/components/AppShell";
@@ -145,7 +145,6 @@ export default function HorizonPage() {
   const [overrides, setOverrides] = useState<Map<string, TreeOverrideState>>(() =>
     readTreeOverrides(STORAGE_KEYS.horizonTreeOverrides),
   );
-  const [search, setSearch] = useState("");
   const [hideClosed, setHideClosed] = useState(true);
   const [focusOnly, setFocusOnly] = useState(false);
   const [typeFilter, setTypeFilter] = useState<IdeaType[]>([]);
@@ -245,25 +244,14 @@ export default function HorizonPage() {
       ideas.filter((i) => ideas.some((c) => c.parent_id === i.id)).map((i) => i.id),
     );
     const collapsed = new Set<string>();
-    const hasSearch = search.trim().length > 0;
-
-    const nodeHasSearchMatch = (ideaId: string): boolean => {
-      const idea = ideas.find((i) => i.id === ideaId);
-      if (!idea) return false;
-      const q = search.toLowerCase();
-      if (idea.text.toLowerCase().includes(q)) return true;
-      if (idea.notes?.toLowerCase().includes(q)) return true;
-      return ideas.some((child) => child.parent_id === ideaId && nodeHasSearchMatch(child.id));
-    };
 
     for (const id of parentIds) {
       const override = overrides.get(id);
       if (override === "expanded") continue;
-      if (hasSearch && nodeHasSearchMatch(id)) continue;
       collapsed.add(id);
     }
     return collapsed;
-  }, [ideas, overrides, search]);
+  }, [ideas, overrides]);
 
   const onToggleCollapse = (id: string) => {
     setOverrides((prev) => {
@@ -311,28 +299,8 @@ export default function HorizonPage() {
     return grouped;
   }, [allTreeNodes, termOf]);
 
-  const originalTreeLengths = useMemo(() => {
-    const lengths: Record<TermGroupKey, number> = { short: 0, medium: 0, long: 0, unclassified: 0 };
-    for (const key of Object.keys(treesByHorizon) as TermGroupKey[]) {
-      lengths[key] = treesByHorizon[key].length;
-    }
-    return lengths;
-  }, [treesByHorizon]);
-
   const filteredTreesByHorizon = useMemo(() => {
     let result = treesByHorizon;
-    if (search.trim()) {
-      const filtered: Record<TermGroupKey, IdeaNode[]> = {
-        short: [],
-        medium: [],
-        long: [],
-        unclassified: [],
-      };
-      for (const key of Object.keys(treesByHorizon) as TermGroupKey[]) {
-        filtered[key] = filterTreeBySearch(treesByHorizon[key], search);
-      }
-      result = filtered;
-    }
     if (focusOnly) {
       const focused: Record<TermGroupKey, IdeaNode[]> = {
         short: [],
@@ -358,7 +326,7 @@ export default function HorizonPage() {
       result = typed;
     }
     return result;
-  }, [treesByHorizon, search, focusOnly, typeFilter, ideas]);
+  }, [treesByHorizon, focusOnly, typeFilter, ideas]);
 
   const handleSetTerm = async (id: string, term: TermValue | null) => {
     const previous = termOf(id);
@@ -450,7 +418,6 @@ export default function HorizonPage() {
 
   const renderColumn = (h: { key: TermGroupKey; label: string }) => {
     const nodes = filteredTreesByHorizon[h.key];
-    const wasOriginallyEmpty = originalTreeLengths[h.key] === 0;
     return (
       <div className="glass-card flex min-w-0 flex-1 flex-col rounded-2xl">
         <div className="flex items-center justify-between border-b border-black/5 px-4 py-3 dark:border-white/5">
@@ -485,7 +452,7 @@ export default function HorizonPage() {
             onToggleInFocus={ideasHook.toggleInFocus}
             emptyMessage={
               <p className="px-4 py-6 text-center text-xs text-gray-400 italic dark:text-gray-500">
-                {wasOriginallyEmpty ? "No items yet" : "No matches"}
+                No items yet
               </p>
             }
           />
@@ -498,13 +465,6 @@ export default function HorizonPage() {
 
   const headerStartActions = (
     <>
-      <input
-        type="text"
-        placeholder="Search\u2026"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-32 rounded-lg border border-black/10 bg-white/60 px-3 py-1.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-indigo-500 sm:w-44 md:w-56 dark:border-white/10 dark:bg-gray-800/60 dark:text-gray-200 dark:placeholder:text-gray-500 dark:focus:border-indigo-400"
-      />
       <button
         type="button"
         onClick={() => setHideClosed((v) => !v)}

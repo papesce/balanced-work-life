@@ -55,7 +55,8 @@ interface IdeaTreeProps {
   onAddTag: (ideaId: string, tag: Tag) => Promise<void>;
   onRemoveTag: (ideaId: string, tagId: string) => Promise<void>;
   onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
-  search: string;
+  /** Optional tree filter; brainstorm no longer passes it (global search only). */
+  search?: string;
   showType: boolean;
   showArea: boolean;
   editMode: "view" | "edit" | "insert";
@@ -130,7 +131,7 @@ export function IdeaTree({
   onAddTag,
   onRemoveTag,
   onCreateTag,
-  search,
+  search = "",
   showType,
   showArea,
   editMode,

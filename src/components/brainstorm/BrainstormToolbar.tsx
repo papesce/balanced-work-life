@@ -19,8 +19,6 @@ import { TypeFilterPicker } from "@/components/shared/TypeFilterPicker";
 export type BrainstormEditMode = "view" | "edit" | "insert";
 
 export interface BrainstormToolbarProps {
-  search: string;
-  setSearch: (v: string) => void;
   editMode: BrainstormEditMode;
   setEditMode: (v: BrainstormEditMode) => void;
   showType: boolean;
@@ -52,8 +50,6 @@ function pillClass(active: boolean) {
 }
 
 export function BrainstormToolbar({
-  search,
-  setSearch,
   editMode,
   setEditMode,
   showType,
@@ -152,14 +148,6 @@ export function BrainstormToolbar({
         <Plus size={14} />
         <span className="hidden sm:inline">New</span>
       </button>
-
-      <input
-        type="text"
-        placeholder="Search…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-32 rounded-lg border border-black/10 bg-white/60 px-3 py-1.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-indigo-500 sm:w-44 md:w-56 dark:border-white/10 dark:bg-gray-800/60 dark:text-gray-200 dark:placeholder:text-gray-500 dark:focus:border-indigo-400"
-      />
 
       <div role="radiogroup" aria-label="Editing mode" className="flex gap-1">
         <button
