@@ -8,6 +8,7 @@ const APP_STORAGE_KEYS = [
   "brainstorm-card-mode",
   "horizon-tree-overrides",
   "horizon-lens",
+  "horizon-secondary-map",
   "horizon-unclassified-expanded",
   "daily-planner-area-targets",
   "sidebar-collapsed",
@@ -25,6 +26,7 @@ export const STORAGE_KEYS = {
   brainstormCardMode: "brainstorm-card-mode",
   horizonTreeOverrides: "horizon-tree-overrides",
   horizonLens: "horizon-lens",
+  horizonSecondaryMap: "horizon-secondary-map",
   horizonUnclassifiedExpanded: "horizon-unclassified-expanded",
   dailyPlannerAreaTargets: "daily-planner-area-targets",
   sidebarCollapsed: "sidebar-collapsed",
@@ -78,6 +80,28 @@ export function clearAppStorage(): void {
 }
 
 export type TreeOverrideState = "expanded" | "collapsed";
+
+/** Per-value secondary lens: primaryKey -> (primary option value -> secondary scheme key | null). */
+export type SecondaryLensMap = Record<string, Record<string, string | null>>;
+
+export function readSecondaryLensMap(key: AppStorageKey): SecondaryLensMap {
+  const parsed = readJson<SecondaryLensMap>(key);
+  if (!parsed || typeof parsed !== "object") return {};
+  const clean: SecondaryLensMap = {};
+  for (const [primaryKey, perValue] of Object.entries(parsed)) {
+    if (!perValue || typeof perValue !== "object") continue;
+    clean[primaryKey] = {};
+    for (const [value, secondaryKey] of Object.entries(perValue)) {
+      clean[primaryKey][value] =
+        typeof secondaryKey === "string" && secondaryKey.length > 0 ? secondaryKey : null;
+    }
+  }
+  return clean;
+}
+
+export function writeSecondaryLensMap(key: AppStorageKey, map: SecondaryLensMap): void {
+  writeJson(key, map);
+}
 
 export function readTreeOverrides(key: AppStorageKey): Map<string, TreeOverrideState> {
   const parsed = readJson<Record<string, TreeOverrideState>>(key) ?? {};

@@ -112,6 +112,11 @@ interface TreeDndProps<T extends TreeItem> {
   children: ReactNode;
   indentSize?: number;
   onGroupDrop?: (draggedId: string, value: string | null) => void | Promise<void>;
+  onSecondaryGroupDrop?: (
+    draggedId: string,
+    secondaryKey: string,
+    value: string | null,
+  ) => void | Promise<void>;
 }
 
 /**
@@ -126,6 +131,7 @@ export function TreeDnd<T extends TreeItem>({
   children,
   indentSize = 20,
   onGroupDrop,
+  onSecondaryGroupDrop,
 }: TreeDndProps<T>) {
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [over, setOver] = useState<{
@@ -194,8 +200,18 @@ export function TreeDnd<T extends TreeItem>({
     const rawOverId = event.over?.id ? String(event.over.id) : null;
     // Group drop takes precedence when dropping onto a group container
     if (rawOverId && rawOverId.startsWith(GROUP_PREFIX)) {
+      const groupPart = rawOverId.slice(GROUP_PREFIX.length);
+      const segments = groupPart.split(":");
+      // Secondary sub-group id: "lens:primary:secondaryKey:secondaryValue"
+      if (segments.length >= 4 && onSecondaryGroupDrop) {
+        const secondaryKey = segments[2];
+        const valuePart = segments.slice(3).join(":") || "null";
+        const value = valuePart === "null" ? null : valuePart;
+        void onSecondaryGroupDrop(draggedId, secondaryKey, value);
+        reset();
+        return;
+      }
       if (onGroupDrop) {
-        const groupPart = rawOverId.slice(GROUP_PREFIX.length);
         // group id is "namespace:value" or "namespace:null" for unclassified
         const valuePart = groupPart.includes(":")
           ? groupPart.slice(groupPart.indexOf(":") + 1)

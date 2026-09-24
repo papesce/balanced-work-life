@@ -228,6 +228,120 @@ function ComposingTypePill({
   );
 }
 
+function SecondarySubGroup({
+  lensKey,
+  groupValue,
+  secondaryKey,
+  secondaryValue,
+  label,
+  nodes,
+  renderRows,
+  onAddSecondary,
+  muted = false,
+}: {
+  lensKey: string;
+  groupValue: string | null;
+  secondaryKey: string;
+  secondaryValue: string | null;
+  label: string;
+  nodes: TreeNode<Idea>[];
+  renderRows: (rows: TreeNode<Idea>[]) => React.ReactNode;
+  onAddSecondary?: (text: string, type: IdeaType, secondaryValue: string | null) => Promise<void>;
+  muted?: boolean;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `group:${lensKey}:${groupValue ?? "null"}:${secondaryKey}:${secondaryValue ?? "null"}`,
+  });
+  const [draftType, setDraftType] = useState<IdeaType>("task");
+  const [showTypePicker, setShowTypePicker] = useState(false);
+  return (
+    <div
+      ref={setNodeRef}
+      className={`mx-2 rounded-xl border border-black/[0.04] dark:border-white/[0.06] ${isOver ? "bg-indigo-50/60 dark:bg-indigo-500/10" : "bg-black/[0.015] dark:bg-white/[0.015]"}`}
+    >
+      <div className="flex items-center justify-between px-3 py-1.5">
+        <span
+          className={`text-[11px] font-semibold tracking-wide uppercase ${muted ? "text-gray-400 dark:text-gray-500" : "text-gray-500 dark:text-gray-400"}`}
+        >
+          {label}
+        </span>
+        <span className="rounded-full bg-black/[0.04] px-1.5 py-0 text-[10px] font-semibold text-gray-400 dark:bg-white/[0.06] dark:text-gray-500">
+          {nodes.length}
+        </span>
+      </div>
+      {nodes.length > 0 ? (
+        renderRows(nodes)
+      ) : (
+        <p className="px-3 pb-1 text-[11px] text-gray-400 italic dark:text-gray-500">
+          Drop here or add below
+        </p>
+      )}
+      {onAddSecondary && (
+        <div className="flex items-center gap-1.5 border-t border-black/[0.04] px-3 py-1.5 dark:border-white/[0.06]">
+          <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setShowTypePicker(!showTypePicker)}
+              className={`rounded-full px-1.5 py-0 text-[10px] font-semibold ${TYPE_BADGE[draftType].className} cursor-pointer transition-opacity hover:opacity-80`}
+            >
+              {TYPE_BADGE[draftType].label}
+            </button>
+            {showTypePicker && (
+              <TypePicker
+                current={draftType}
+                onSelect={(type) => {
+                  setDraftType(type ?? "task");
+                  setShowTypePicker(false);
+                }}
+                onClose={() => setShowTypePicker(false)}
+              />
+            )}
+          </div>
+          <QuickAddInline
+            secondaryValue={secondaryValue}
+            draftType={draftType}
+            onAdd={onAddSecondary}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuickAddInline({
+  secondaryValue,
+  draftType,
+  onAdd,
+}: {
+  secondaryValue: string | null;
+  draftType: IdeaType;
+  onAdd: (text: string, type: IdeaType, secondaryValue: string | null) => Promise<void>;
+}) {
+  const [text, setText] = useState("");
+  return (
+    <form
+      className="flex flex-1 items-center gap-1.5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const trimmed = text.trim();
+        if (!trimmed) return;
+        void onAdd(trimmed, draftType, secondaryValue).then(() => setText(""));
+      }}
+    >
+      <input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="+ Add..."
+        className="min-w-0 flex-1 bg-transparent text-xs text-gray-700 outline-none placeholder:text-gray-400 dark:text-gray-200 dark:placeholder:text-gray-500"
+      />
+    </form>
+  );
+}
+
+export interface SecondaryOption {
+  key: string;
+  label: string;
+}
+
 export interface HorizonTreeProps {
   nodes: TreeNode<Idea>[];
   ideas: Idea[];
@@ -236,6 +350,13 @@ export interface HorizonTreeProps {
   /** Option value this column shows; null = the explicit unclassified group. */
   groupValue: string | null;
   onSetValue: (id: string, value: string | null) => Promise<void>;
+  /** Optional secondary split within this column. Null = flat list (legacy). */
+  secondaryKey?: string | null;
+  secondaryOptions?: SecondaryOption[];
+  secondaryLabel?: string;
+  secondaryValueOf?: (ideaId: string) => string | null;
+  onSetSecondary?: (id: string, value: string | null) => Promise<void>;
+  onAddSecondary?: (text: string, type: IdeaType, secondaryValue: string | null) => Promise<void>;
   allTags: Tag[];
   links: IdeaLink[];
   getTagsForIdea: (ideaId: string) => Tag[];
@@ -292,6 +413,11 @@ export function HorizonTree({
   collapsed = false,
   onToggleCollapsed,
   groupLabel = "Unclassified",
+  secondaryKey = null,
+  secondaryOptions = [],
+  secondaryValueOf,
+  onSetSecondary,
+  onAddSecondary,
 }: HorizonTreeProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -301,8 +427,15 @@ export function HorizonTree({
   const { openNotes } = useNotes();
   const { setNodeRef, isOver } = useDroppable({ id: `group:${lensKey}:${groupValue ?? "null"}` });
 
+  const hasSecondary = !!secondaryKey && !!onSetSecondary;
+  const secondaryOf = secondaryValueOf ?? (() => null);
+
   const handleGroupDrop = (draggedId: string, value: string | null) => {
     void onSetValue(draggedId, value);
+  };
+
+  const handleSecondaryDrop = (draggedId: string, _key: string, value: string | null) => {
+    if (onSetSecondary) void onSetSecondary(draggedId, value);
   };
 
   const treeOptions: import("@/components/tree").TreeOptions<Idea> = {
@@ -406,6 +539,19 @@ export function HorizonTree({
     return <div>{emptyMessage}</div>;
   }
 
+  const renderRows = (rows: TreeNode<Idea>[]) => (
+    <div>
+      {rows.map((node, index) => (
+        <TreeNodeRow
+          key={node.id}
+          node={node}
+          depth={0}
+          isLastSibling={index === rows.length - 1}
+        />
+      ))}
+    </div>
+  );
+
   const renderContent = () => {
     if (nodes.length === 0) {
       return (
@@ -414,16 +560,40 @@ export function HorizonTree({
         </p>
       );
     }
+    if (!hasSecondary) return renderRows(nodes);
+    const grouped = new Map<string | null, TreeNode<Idea>[]>();
+    for (const node of nodes) {
+      const v = secondaryOf(node.id);
+      const list = grouped.get(v) ?? [];
+      list.push(node);
+      grouped.set(v, list);
+    }
     return (
-      <div>
-        {nodes.map((node, index) => (
-          <TreeNodeRow
-            key={node.id}
-            node={node}
-            depth={0}
-            isLastSibling={index === nodes.length - 1}
+      <div className="flex flex-col gap-1 py-1">
+        {secondaryOptions.map((opt) => (
+          <SecondarySubGroup
+            key={opt.key}
+            lensKey={lensKey}
+            groupValue={groupValue}
+            secondaryKey={secondaryKey!}
+            secondaryValue={opt.key}
+            label={opt.label}
+            nodes={grouped.get(opt.key) ?? []}
+            renderRows={renderRows}
+            onAddSecondary={onAddSecondary}
           />
         ))}
+        <SecondarySubGroup
+          lensKey={lensKey}
+          groupValue={groupValue}
+          secondaryKey={secondaryKey!}
+          secondaryValue={null}
+          label="Unclassified"
+          nodes={grouped.get(null) ?? []}
+          renderRows={renderRows}
+          onAddSecondary={onAddSecondary}
+          muted
+        />
       </div>
     );
   };
@@ -435,6 +605,7 @@ export function HorizonTree({
         onMove={onMove}
         getLabel={(idea) => idea.text}
         onGroupDrop={handleGroupDrop}
+        onSecondaryGroupDrop={handleSecondaryDrop}
       >
         <TreeProvider value={{ controller, ui, options: treeOptions }}>
           <div

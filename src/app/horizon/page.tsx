@@ -24,10 +24,13 @@ import { TYPE_BADGE } from "@/lib/constants";
 import { useClassifications } from "@/hooks/useClassifications";
 import {
   STORAGE_KEYS,
+  SecondaryLensMap,
   TreeOverrideState,
   readRawString,
   writeRawString,
+  readSecondaryLensMap,
   readTreeOverrides,
+  writeSecondaryLensMap,
   writeTreeOverrides,
 } from "@/lib/storage";
 
@@ -168,11 +171,48 @@ export default function HorizonPage() {
     () => lensParam ?? readRawString(STORAGE_KEYS.horizonLens) ?? "term",
   );
 
+  const [secondaryMap, setSecondaryMap] = useState<SecondaryLensMap>(() =>
+    readSecondaryLensMap(STORAGE_KEYS.horizonSecondaryMap),
+  );
+
   /** Active lens scheme; unknown keys fall back to Term. */
   const activeScheme = useMemo(
     () => schemes.find((s) => s.key === lensKey) ?? schemes.find((s) => s.key === "term") ?? null,
     [schemes, lensKey],
   );
+
+  const schemeByKey = useMemo(() => new Map(schemes.map((s) => [s.key, s])), [schemes]);
+
+  const optionsBySchemeId = useMemo(() => {
+    const map = new Map<string, { value: string; label: string }[]>();
+    for (const o of classificationOptions) {
+      const list = map.get(o.scheme_id) ?? [];
+      list.push({ value: o.value, label: o.label });
+      map.set(o.scheme_id, list);
+    }
+    // classificationOptions arrive ordered by sort_order from the hook query.
+    return map;
+  }, [classificationOptions]);
+
+  /** Generic ideaId -> value map for any scheme key. */
+  const valuesBySchemeKey = useMemo(() => {
+    const outer = new Map<string, Map<string, string>>();
+    const optionValueById = new Map(classificationOptions.map((o) => [o.id, o.value]));
+    const schemeIdById = new Map(schemes.map((s) => [s.id, s.key]));
+    for (const c of classifications) {
+      const schemeKey = schemeIdById.get(c.scheme_id);
+      if (!schemeKey) continue;
+      const v = optionValueById.get(c.option_id);
+      if (typeof v !== "string") continue;
+      let inner = outer.get(schemeKey);
+      if (!inner) {
+        inner = new Map<string, string>();
+        outer.set(schemeKey, inner);
+      }
+      inner.set(c.idea_id, v);
+    }
+    return outer;
+  }, [classificationOptions, classifications, schemes]);
 
   const activeOptions = useMemo(
     () =>
@@ -194,25 +234,49 @@ export default function HorizonPage() {
 
   const validTabs = useMemo(() => new Set(columns.map((c) => groupKeyOf(c.key))), [columns]);
 
-  const valueById = useMemo(() => {
-    const map = new Map<string, string>();
-    if (!activeScheme) return map;
-    const valueByOptionId = new Map(
-      classificationOptions
-        .filter((o) => o.scheme_id === activeScheme.id)
-        .map((o) => [o.id, o.value]),
-    );
-    for (const c of classifications) {
-      if (c.scheme_id !== activeScheme.id) continue;
-      const v = valueByOptionId.get(c.option_id);
-      if (typeof v === "string") map.set(c.idea_id, v);
-    }
-    return map;
-  }, [classificationOptions, classifications, activeScheme]);
+  const valueById = useMemo(
+    () => valuesBySchemeKey.get(activeScheme?.key ?? "") ?? new Map<string, string>(),
+    [valuesBySchemeKey, activeScheme],
+  );
 
   const valueOf = useCallback(
     (ideaId: string): string | null => valueById.get(ideaId) ?? null,
     [valueById],
+  );
+
+  const secondaryKeyOf = useCallback(
+    (primaryValue: string | null): string | null => {
+      if (primaryValue == null || !activeScheme) return null;
+      const candidate = secondaryMap[activeScheme.key]?.[primaryValue] ?? null;
+      if (!candidate || candidate === activeScheme.key || !schemeByKey.has(candidate)) return null;
+      return candidate;
+    },
+    [secondaryMap, activeScheme, schemeByKey],
+  );
+
+  const secondaryValueOf = useCallback(
+    (secondaryKey: string | null) =>
+      (ideaId: string): string | null => {
+        if (!secondaryKey) return null;
+        return valuesBySchemeKey.get(secondaryKey)?.get(ideaId) ?? null;
+      },
+    [valuesBySchemeKey],
+  );
+
+  const handleSecondaryChange = useCallback(
+    (primaryValue: string | null, next: string | null) => {
+      if (primaryValue == null || !activeScheme) return;
+      if (next && (next === activeScheme.key || !schemeByKey.has(next))) return;
+      setSecondaryMap((prev) => {
+        const nextMap: SecondaryLensMap = {
+          ...prev,
+          [activeScheme.key]: { ...(prev[activeScheme.key] ?? {}), [primaryValue]: next },
+        };
+        writeSecondaryLensMap(STORAGE_KEYS.horizonSecondaryMap, nextMap);
+        return nextMap;
+      });
+    },
+    [activeScheme, schemeByKey],
   );
 
   useEffect(() => {
@@ -355,14 +419,29 @@ export default function HorizonPage() {
     });
   };
 
-  const handleAdd = (value: string | null) => {
-    return async (text: string, type?: IdeaType): Promise<void> => {
+  const handleSetSecondary = async (secondaryKey: string, id: string, value: string | null) => {
+    const previous = valuesBySchemeKey.get(secondaryKey)?.get(id) ?? null;
+    await setClassification(id, secondaryKey, value);
+    const lensLabel = schemeByKey.get(secondaryKey)?.label ?? secondaryKey;
+    registerUndo({
+      label: `${lensLabel} updated`,
+      run: async () => {
+        await setClassification(id, secondaryKey, previous);
+      },
+    });
+  };
+
+  const handleAdd = (value: string | null, secondaryKey: string | null = null) => {
+    return async (text: string, type?: IdeaType, secondaryValue?: string | null): Promise<void> => {
       const id = await createIdea(text, null, "bottom", {
         type: type ?? "task",
         status: "draft",
       });
       if (id && value) {
         await setClassification(id, lensKey, value);
+      }
+      if (id && secondaryKey && secondaryValue) {
+        await setClassification(id, secondaryKey, secondaryValue);
       }
     };
   };
@@ -466,13 +545,44 @@ export default function HorizonPage() {
   const renderColumn = (col: LensColumn) => {
     const nodes = filteredTreesByLens[groupKeyOf(col.key)] ?? [];
     const isCollapsedStrip = col.key === null && !unclassifiedExpanded;
+    const secondaryKey = secondaryKeyOf(col.key);
+    const secondaryScheme = secondaryKey ? (schemeByKey.get(secondaryKey) ?? null) : null;
+    const secondaryOptions = secondaryScheme
+      ? ((optionsBySchemeId.get(secondaryScheme.id) ?? []).map((o) => ({
+          key: o.value,
+          label: o.label,
+        })) as { key: string; label: string }[])
+      : [];
+    const secondaryChoices = [...schemes]
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .filter((s) => s.key !== lensKey);
     return (
       <div className="glass-card flex min-w-0 flex-1 flex-col rounded-2xl">
         {!isCollapsedStrip && (
-          <div className="flex items-center justify-between border-b border-black/5 px-4 py-3 dark:border-white/5">
+          <div className="flex items-center justify-between gap-2 border-b border-black/5 px-4 py-3 dark:border-white/5">
             <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{col.label}</span>
-            <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-[11px] font-semibold text-gray-400 dark:bg-white/[0.06] dark:text-gray-500">
-              {nodes.length}
+            <span className="flex items-center gap-2">
+              {col.key !== null && (
+                <label className="flex items-center gap-1 text-[11px] font-medium text-gray-400 dark:text-gray-500">
+                  <span className="hidden lg:inline">Split</span>
+                  <select
+                    aria-label={`Secondary classification for ${col.label}`}
+                    value={secondaryKey ?? ""}
+                    onChange={(e) => handleSecondaryChange(col.key, e.target.value || null)}
+                    className="max-w-[110px] cursor-pointer rounded-md border border-black/10 bg-transparent px-1 py-0.5 text-[11px] font-semibold text-gray-500 dark:border-white/10 dark:text-gray-400"
+                  >
+                    <option value="">None</option>
+                    {secondaryChoices.map((s) => (
+                      <option key={s.key} value={s.key}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-[11px] font-semibold text-gray-400 dark:bg-white/[0.06] dark:text-gray-500">
+                {nodes.length}
+              </span>
             </span>
           </div>
         )}
@@ -484,6 +594,18 @@ export default function HorizonPage() {
             lensKey={lensKey}
             groupValue={col.key}
             onSetValue={handleSetValue}
+            secondaryKey={secondaryKey}
+            secondaryOptions={secondaryOptions}
+            secondaryLabel={secondaryScheme?.label}
+            secondaryValueOf={secondaryValueOf(secondaryKey)}
+            onSetSecondary={
+              secondaryKey ? (id, value) => handleSetSecondary(secondaryKey, id, value) : undefined
+            }
+            onAddSecondary={
+              secondaryKey
+                ? (text, type, secVal) => handleAdd(col.key, secondaryKey)(text, type, secVal)
+                : undefined
+            }
             collapsed={isCollapsedStrip}
             onToggleCollapsed={toggleUnclassified}
             groupLabel={col.label}
@@ -512,7 +634,9 @@ export default function HorizonPage() {
           />
         </div>
 
-        {!isCollapsedStrip && <RootAddInput label={col.label} onAdd={handleAdd(col.key)} />}
+        {!isCollapsedStrip && !secondaryKey && (
+          <RootAddInput label={col.label} onAdd={handleAdd(col.key)} />
+        )}
       </div>
     );
   };
