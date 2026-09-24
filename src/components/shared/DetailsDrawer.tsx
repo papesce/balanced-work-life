@@ -140,7 +140,7 @@ export function DetailsDrawer({ ideaId, onClose }: { ideaId: string | null; onCl
                 {termValue && (
                   <button
                     onClick={() => {
-                      router.push(getRevealHref("horizon", idea, ideas, termValue));
+                      router.push(getRevealHref("horizon", idea, ideas, termValue, "term"));
                       onClose();
                     }}
                     className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs font-medium text-indigo-500 hover:bg-indigo-50/50 dark:hover:bg-indigo-500/10"

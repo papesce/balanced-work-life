@@ -19,7 +19,7 @@ import { QuickAddInput } from "@/components/timeline/QuickAddInput";
 import { HorizonTree } from "@/components/horizon/HorizonTree";
 import { TypePicker } from "@/components/brainstorm/TypePicker";
 import { TypeFilterPicker } from "@/components/shared/TypeFilterPicker";
-import { Idea, TermValue, IdeaNode, IdeaType } from "@/lib/types";
+import { Idea, IdeaNode, IdeaType } from "@/lib/types";
 import { TYPE_BADGE } from "@/lib/constants";
 import { useClassifications } from "@/hooks/useClassifications";
 import {
@@ -31,22 +31,18 @@ import {
   writeTreeOverrides,
 } from "@/lib/storage";
 
-const HORIZONS: { key: TermValue; label: string }[] = [
-  { key: "short", label: "Short term" },
-  { key: "medium", label: "Medium term" },
-  { key: "long", label: "Long term" },
-];
+/** Sentinel record key for the explicit unclassified group. */
+const UNCLASSIFIED = "unclassified";
 
-/** Grouping keys for the Horizon lens over the Term classification. */
-type TermGroupKey = TermValue | "unclassified";
+/** A lens column: an option value, or null for the unclassified group. */
+interface LensColumn {
+  key: string | null;
+  label: string;
+}
 
-const COLUMNS: { key: TermGroupKey; label: string }[] = [
-  ...HORIZONS,
-  { key: "unclassified", label: "Unclassified" },
-];
-
-function isTermValue(v: string | null | undefined): v is TermValue {
-  return v === "short" || v === "medium" || v === "long";
+/** Record key for a value: the option value, or the unclassified sentinel. */
+function groupKeyOf(value: string | null): string {
+  return value ?? UNCLASSIFIED;
 }
 
 const ACTIVE_STATUSES = new Set(["draft", "planned", "in_progress", "scheduled"]);
@@ -62,8 +58,9 @@ function buildFilteredTree(
   const childIds = new Set(
     pool.filter((i) => i.parent_id && poolIds.has(i.parent_id)).map((i) => i.id),
   );
-  // Every root is in scope: Term-classified roots group by value, the rest
-  // form the explicit unclassified group (never hidden, never defaulted).
+  // Every root is in scope: classified roots group by value under the
+  // active lens, the rest form the explicit unclassified group
+  // (never hidden, never defaulted).
   const rootIds = pool.filter((i) => !childIds.has(i.id)).map((i) => i.id);
   const rootSet = new Set(rootIds);
 
@@ -141,7 +138,7 @@ export default function HorizonPage() {
   const taskTagsHook = useTaskTags();
   const linksHook = useIdeaLinks();
   const { undoAction, registerUndo, clearUndo, handleUndo } = useUndoAction();
-  const [activeTab, setActiveTab] = useState<TermGroupKey>("short");
+  const [activeTab, setActiveTab] = useState<string>("short");
   const [overrides, setOverrides] = useState<Map<string, TreeOverrideState>>(() =>
     readTreeOverrides(STORAGE_KEYS.horizonTreeOverrides),
   );
@@ -151,6 +148,9 @@ export default function HorizonPage() {
   const [typePickerOpen, setTypePickerOpen] = useState(false);
   const [cardMode, setCardMode] = useState(
     () => readRawString(STORAGE_KEYS.brainstormCardMode) === "true",
+  );
+  const [unclassifiedExpanded, setUnclassifiedExpanded] = useState(
+    () => readRawString(STORAGE_KEYS.horizonUnclassifiedExpanded) === "true",
   );
   const {
     schemes,
@@ -162,28 +162,57 @@ export default function HorizonPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const highlightId = searchParams.get("highlight");
-  const horizonParam = searchParams.get("horizon") as TermGroupKey | null;
+  const horizonParam = searchParams.get("horizon");
+  const lensParam = searchParams.get("lens");
+  const [lensKey, setLensKey] = useState<string>(
+    () => lensParam ?? readRawString(STORAGE_KEYS.horizonLens) ?? "term",
+  );
 
-  const termById = useMemo(() => {
-    const termScheme = schemes.find((s) => s.key === "term");
-    const map = new Map<string, TermValue>();
-    if (!termScheme) return map;
+  /** Active lens scheme; unknown keys fall back to Term. */
+  const activeScheme = useMemo(
+    () => schemes.find((s) => s.key === lensKey) ?? schemes.find((s) => s.key === "term") ?? null,
+    [schemes, lensKey],
+  );
+
+  const activeOptions = useMemo(
+    () =>
+      activeScheme
+        ? classificationOptions
+            .filter((o) => o.scheme_id === activeScheme.id)
+            .sort((a, b) => a.sort_order - b.sort_order)
+        : [],
+    [classificationOptions, activeScheme],
+  );
+
+  const columns: LensColumn[] = useMemo(
+    () => [
+      ...activeOptions.map((o) => ({ key: o.value as string, label: o.label })),
+      { key: null, label: "Unclassified" },
+    ],
+    [activeOptions],
+  );
+
+  const validTabs = useMemo(() => new Set(columns.map((c) => groupKeyOf(c.key))), [columns]);
+
+  const valueById = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!activeScheme) return map;
     const valueByOptionId = new Map(
       classificationOptions
-        .filter((o) => o.scheme_id === termScheme.id)
+        .filter((o) => o.scheme_id === activeScheme.id)
         .map((o) => [o.id, o.value]),
     );
     for (const c of classifications) {
-      if (c.scheme_id !== termScheme.id) continue;
+      if (c.scheme_id !== activeScheme.id) continue;
       const v = valueByOptionId.get(c.option_id);
-      if (isTermValue(v)) map.set(c.idea_id, v);
+      if (typeof v === "string") map.set(c.idea_id, v);
     }
     return map;
-  }, [schemes, classificationOptions, classifications]);
+  }, [classificationOptions, classifications, activeScheme]);
 
-  const termOf = useCallback(
-    (ideaId: string): TermValue | null => termById.get(ideaId) ?? null,
-    [termById],
+  const valueOf = useCallback(
+    (ideaId: string): string | null => valueById.get(ideaId) ?? null,
+    [valueById],
   );
 
   useEffect(() => {
@@ -278,17 +307,13 @@ export default function HorizonPage() {
     [ideas, collapsedIds, hideClosed],
   );
 
-  const treesByHorizon = useMemo(() => {
-    const grouped: Record<TermGroupKey, IdeaNode[]> = {
-      short: [],
-      medium: [],
-      long: [],
-      unclassified: [],
-    };
+  const treesByLens = useMemo(() => {
+    const grouped: Record<string, IdeaNode[]> = {};
     for (const node of allTreeNodes) {
-      grouped[termOf(node.id) ?? "unclassified"].push(node);
+      const k = groupKeyOf(valueOf(node.id));
+      (grouped[k] ??= []).push(node);
     }
-    for (const key of Object.keys(grouped) as TermGroupKey[]) {
+    for (const key of Object.keys(grouped)) {
       grouped[key].sort((a, b) => {
         const aPriority = a.priority_order ?? Infinity;
         const bPriority = b.priority_order ?? Infinity;
@@ -297,75 +322,97 @@ export default function HorizonPage() {
       });
     }
     return grouped;
-  }, [allTreeNodes, termOf]);
+  }, [allTreeNodes, valueOf]);
 
-  const filteredTreesByHorizon = useMemo(() => {
-    let result = treesByHorizon;
+  const filteredTreesByLens = useMemo(() => {
+    let result = treesByLens;
     if (focusOnly) {
-      const focused: Record<TermGroupKey, IdeaNode[]> = {
-        short: [],
-        medium: [],
-        long: [],
-        unclassified: [],
-      };
-      for (const key of Object.keys(result) as TermGroupKey[]) {
+      const focused: Record<string, IdeaNode[]> = {};
+      for (const key of Object.keys(result)) {
         focused[key] = filterTreeByFocus(result[key], ideas);
       }
       result = focused;
     }
     if (typeFilter.length > 0) {
-      const typed: Record<TermGroupKey, IdeaNode[]> = {
-        short: [],
-        medium: [],
-        long: [],
-        unclassified: [],
-      };
-      for (const key of Object.keys(result) as TermGroupKey[]) {
+      const typed: Record<string, IdeaNode[]> = {};
+      for (const key of Object.keys(result)) {
         typed[key] = filterTreeByType(result[key], typeFilter);
       }
       result = typed;
     }
     return result;
-  }, [treesByHorizon, focusOnly, typeFilter, ideas]);
+  }, [treesByLens, focusOnly, typeFilter, ideas]);
 
-  const handleSetTerm = async (id: string, term: TermValue | null) => {
-    const previous = termOf(id);
-    await setClassification(id, "term", term);
+  const handleSetValue = async (id: string, value: string | null) => {
+    const previous = valueOf(id);
+    await setClassification(id, lensKey, value);
+    const lensLabel = activeScheme?.label ?? lensKey;
     registerUndo({
-      label: "Term updated",
+      label: `${lensLabel} updated`,
       run: async () => {
-        await setClassification(id, "term", previous);
+        await setClassification(id, lensKey, previous);
       },
     });
   };
 
-  const handleAdd = (term: TermValue | null) => {
+  const handleAdd = (value: string | null) => {
     return async (text: string, type?: IdeaType): Promise<void> => {
       const id = await createIdea(text, null, "bottom", {
         type: type ?? "task",
         status: "draft",
       });
-      if (id && term) {
-        await setClassification(id, "term", term);
+      if (id && value) {
+        await setClassification(id, lensKey, value);
       }
     };
   };
 
+  const toggleUnclassified = () => {
+    setUnclassifiedExpanded((v) => {
+      writeRawString(STORAGE_KEYS.horizonUnclassifiedExpanded, String(!v));
+      return !v;
+    });
+  };
+
+  const handleLensChange = (key: string) => {
+    if (key === lensKey) return;
+    setLensKey(key);
+    writeRawString(STORAGE_KEYS.horizonLens, key);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("lens", key);
+    params.delete("horizon");
+    router.replace(`/horizon?${params.toString()}`, { scroll: false });
+  };
+
+  // Sync lens from ?lens= (deep links, global search) when it names a real scheme.
   useEffect(() => {
-    if (
-      horizonParam &&
-      (["short", "medium", "long", "unclassified"] as TermGroupKey[]).includes(horizonParam)
-    ) {
+    if (lensParam && lensParam !== lensKey && schemes.some((s) => s.key === lensParam)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sync lens from URL param
+      setLensKey(lensParam);
+    }
+  }, [lensParam, lensKey, schemes]);
+
+  // Sync mobile tab from ?horizon=, and repair the tab whenever the columns
+  // change underneath it (lens switch, classifications loading).
+  useEffect(() => {
+    if (horizonParam && validTabs.has(horizonParam)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- sync tab from URL param
       setActiveTab(horizonParam);
+    } else if (!validTabs.has(activeTab)) {
+      setActiveTab(columns[0] ? groupKeyOf(columns[0].key) : UNCLASSIFIED);
     }
-  }, [horizonParam]);
+  }, [horizonParam, validTabs, columns, activeTab]);
 
   useEffect(() => {
     if (!highlightId || loading) return;
     const currentIdeas = ideasRef.current;
     const idea = currentIdeas.find((i) => i.id === highlightId);
-    if (idea) setActiveTab(termOf(idea.id) ?? "unclassified");
+    if (idea) setActiveTab(groupKeyOf(valueOf(idea.id)));
+    // Guarantee an unclassified highlight target is visible: expand the strip.
+    if (idea && valueOf(idea.id) == null) {
+      setUnclassifiedExpanded(true);
+      writeRawString(STORAGE_KEYS.horizonUnclassifiedExpanded, "true");
+    }
     // Guarantee the highlight target is visible: lift filters that could hide it.
     if (idea && !ACTIVE_STATUSES.has(idea.status)) {
       setHideClosed(false);
@@ -406,7 +453,7 @@ export default function HorizonPage() {
       router.replace(`/horizon?${params.toString()}`, { scroll: false });
     }, 400);
     return () => clearTimeout(timer);
-  }, [highlightId, loading, searchParams, router, termOf]);
+  }, [highlightId, loading, searchParams, router, valueOf]);
 
   if (loading || classificationsLoading) {
     return (
@@ -416,23 +463,30 @@ export default function HorizonPage() {
     );
   }
 
-  const renderColumn = (h: { key: TermGroupKey; label: string }) => {
-    const nodes = filteredTreesByHorizon[h.key];
+  const renderColumn = (col: LensColumn) => {
+    const nodes = filteredTreesByLens[groupKeyOf(col.key)] ?? [];
+    const isCollapsedStrip = col.key === null && !unclassifiedExpanded;
     return (
       <div className="glass-card flex min-w-0 flex-1 flex-col rounded-2xl">
-        <div className="flex items-center justify-between border-b border-black/5 px-4 py-3 dark:border-white/5">
-          <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{h.label}</span>
-          <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-[11px] font-semibold text-gray-400 dark:bg-white/[0.06] dark:text-gray-500">
-            {nodes.length}
-          </span>
-        </div>
+        {!isCollapsedStrip && (
+          <div className="flex items-center justify-between border-b border-black/5 px-4 py-3 dark:border-white/5">
+            <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{col.label}</span>
+            <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-[11px] font-semibold text-gray-400 dark:bg-white/[0.06] dark:text-gray-500">
+              {nodes.length}
+            </span>
+          </div>
+        )}
 
         <div className="max-h-[calc(100vh-220px)] min-h-[120px] flex-1 overflow-y-auto">
           <HorizonTree
             nodes={nodes}
             ideas={ideas}
-            termValue={h.key === "unclassified" ? null : h.key}
-            onSetTerm={handleSetTerm}
+            lensKey={lensKey}
+            groupValue={col.key}
+            onSetValue={handleSetValue}
+            collapsed={isCollapsedStrip}
+            onToggleCollapsed={toggleUnclassified}
+            groupLabel={col.label}
             cardMode={cardMode}
             allTags={tagsHook.tags}
             links={linksHook.links}
@@ -458,13 +512,37 @@ export default function HorizonPage() {
           />
         </div>
 
-        <RootAddInput label={h.label} onAdd={handleAdd(h.key === "unclassified" ? null : h.key)} />
+        {!isCollapsedStrip && <RootAddInput label={col.label} onAdd={handleAdd(col.key)} />}
       </div>
     );
   };
 
   const headerStartActions = (
     <>
+      <div
+        role="radiogroup"
+        aria-label="Classification lens"
+        className="flex gap-1 rounded-xl bg-black/[0.03] p-1 dark:bg-white/[0.04]"
+      >
+        {[...schemes]
+          .sort((a, b) => a.sort_order - b.sort_order)
+          .map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              role="radio"
+              aria-checked={s.key === lensKey}
+              onClick={() => handleLensChange(s.key)}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                s.key === lensKey
+                  ? "bg-violet-100/80 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
+                  : "text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+      </div>
       <button
         type="button"
         onClick={() => setHideClosed((v) => !v)}
@@ -532,37 +610,40 @@ export default function HorizonPage() {
   );
 
   return (
-    <AppShell title="Horizon" headerStartActions={headerStartActions}>
+    <AppShell
+      title={activeScheme ? `Horizon · ${activeScheme.label}` : "Horizon"}
+      headerStartActions={headerStartActions}
+    >
       <UndoBar undoAction={undoAction} onUndo={() => void handleUndo()} onDismiss={clearUndo} />
 
       {/* Mobile tab bar */}
-      <div className="sticky top-[53px] z-10 mb-4 flex gap-1 rounded-xl bg-black/[0.03] p-1 md:hidden dark:bg-white/[0.04]">
-        {COLUMNS.map((h) => (
+      <div className="sticky top-[53px] z-10 mb-4 flex gap-1 overflow-x-auto rounded-xl bg-black/[0.03] p-1 md:hidden dark:bg-white/[0.04]">
+        {columns.map((col) => (
           <button
-            key={h.key}
-            onClick={() => setActiveTab(h.key)}
-            className={`flex-1 rounded-lg py-2 text-xs font-semibold transition-all ${
-              activeTab === h.key
+            key={groupKeyOf(col.key)}
+            onClick={() => setActiveTab(groupKeyOf(col.key))}
+            className={`flex-1 rounded-lg px-2 py-2 text-xs font-semibold whitespace-nowrap transition-all ${
+              activeTab === groupKeyOf(col.key)
                 ? "bg-violet-100/80 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
                 : "text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
             }`}
           >
-            {h.label}
+            {col.label}
           </button>
         ))}
       </div>
 
       {/* Desktop: columns stacked vertically */}
       <div className="hidden gap-5 md:flex md:flex-col">
-        {COLUMNS.map((h, i) => (
+        {columns.map((col, i) => (
           <motion.div
-            key={h.key}
+            key={groupKeyOf(col.key)}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.08, duration: 0.35, ease: "easeOut" }}
             className="min-w-0"
           >
-            {renderColumn(h)}
+            {renderColumn(col)}
           </motion.div>
         ))}
       </div>
@@ -577,7 +658,7 @@ export default function HorizonPage() {
             exit={{ opacity: 0, x: -16 }}
             transition={{ duration: 0.2 }}
           >
-            {renderColumn(COLUMNS.find((h) => h.key === activeTab)!)}
+            {renderColumn(columns.find((c) => groupKeyOf(c.key) === activeTab) ?? columns[0])}
           </motion.div>
         </AnimatePresence>
       </div>

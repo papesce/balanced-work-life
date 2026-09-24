@@ -54,6 +54,7 @@ export function getRevealHref(
   idea: Idea,
   allIdeas?: Idea[],
   termValue?: string | null,
+  lensKey?: string | null,
 ): string {
   const date = idea.scheduled_date ?? getToday();
   const id = idea.id;
@@ -63,8 +64,9 @@ export function getRevealHref(
     case "timeline":
       return `/timeline?date=${date}&highlight=${id}`;
     case "horizon": {
+      const lens = lensKey ?? "term";
       const h = termValue ?? "short";
-      return `/horizon?horizon=${h}&highlight=${id}`;
+      return `/horizon?lens=${lens}&horizon=${h}&highlight=${id}`;
     }
     case "brainstorm":
       return `/brainstorm?highlight=${id}`;

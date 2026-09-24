@@ -136,9 +136,11 @@ export function GlobalSearchBar() {
         params.set("highlight", ideaId);
         router.push(`${pathname}?${params.toString()}`);
       } else {
-        // Context-aware: sets ?date= / ?horizon= / ?projectId= / ?goalId= so the
-        // target is actually rendered before the highlight effect runs.
-        router.push(getRevealHref(currentView, idea, ideas));
+        // Context-aware: sets ?date= / ?lens=&horizon= / ?projectId= / ?goalId=
+        // so the target is actually rendered before the highlight effect runs.
+        // From horizon, preserve the active lens.
+        const lens = currentView === "horizon" ? searchParams.get("lens") : null;
+        router.push(getRevealHref(currentView, idea, ideas, undefined, lens));
       }
     } else if (idea) {
       router.push(getRevealHref(getSmartRevealView(idea, ideas), idea, ideas));

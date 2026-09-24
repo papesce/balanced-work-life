@@ -2,14 +2,13 @@
 
 import { useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
-import { Star, Target } from "lucide-react";
+import { ChevronDown, Star, Target } from "lucide-react";
 import {
   Idea,
   IdeaLink,
   IdeaNode as IdeaNodeType,
   IdeaStatus,
   IdeaType,
-  TermValue,
   LifeArea,
   LinkType,
   Tag,
@@ -232,9 +231,11 @@ function ComposingTypePill({
 export interface HorizonTreeProps {
   nodes: TreeNode<Idea>[];
   ideas: Idea[];
-  /** Term group this column shows; null = the explicit unclassified group. */
-  termValue: TermValue | null;
-  onSetTerm: (id: string, value: TermValue | null) => Promise<void>;
+  /** Active classification lens key (e.g. "term", "nnl") for drag-and-drop grouping. */
+  lensKey: string;
+  /** Option value this column shows; null = the explicit unclassified group. */
+  groupValue: string | null;
+  onSetValue: (id: string, value: string | null) => Promise<void>;
   allTags: Tag[];
   links: IdeaLink[];
   getTagsForIdea: (ideaId: string) => Tag[];
@@ -258,13 +259,18 @@ export interface HorizonTreeProps {
   emptyMessage?: React.ReactNode;
   onToggleInFocus?: (id: string, until?: string | null) => Promise<void>;
   cardMode?: boolean;
+  /** Render as a collapsed strip (label + count); click expands. Drops still land. */
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
+  groupLabel?: string;
 }
 
 export function HorizonTree({
   nodes,
   ideas,
-  termValue,
-  onSetTerm,
+  lensKey,
+  groupValue,
+  onSetValue,
   allTags,
   links,
   getTagsForIdea,
@@ -283,6 +289,9 @@ export function HorizonTree({
   emptyMessage,
   onToggleInFocus,
   cardMode,
+  collapsed = false,
+  onToggleCollapsed,
+  groupLabel = "Unclassified",
 }: HorizonTreeProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -290,10 +299,10 @@ export function HorizonTree({
   const [revealTarget, setRevealTarget] = useState<Idea | null>(null);
   const [revealPos, setRevealPos] = useState<{ top: number; right: number } | null>(null);
   const { openNotes } = useNotes();
-  const { setNodeRef, isOver } = useDroppable({ id: `group:term:${termValue ?? "null"}` });
+  const { setNodeRef, isOver } = useDroppable({ id: `group:${lensKey}:${groupValue ?? "null"}` });
 
   const handleGroupDrop = (draggedId: string, value: string | null) => {
-    void onSetTerm(draggedId, value as TermValue | null);
+    void onSetValue(draggedId, value);
   };
 
   const treeOptions: import("@/components/tree").TreeOptions<Idea> = {
@@ -393,7 +402,7 @@ export function HorizonTree({
     setComposing,
   };
 
-  if (nodes.length === 0 && emptyMessage) {
+  if (!collapsed && nodes.length === 0 && emptyMessage) {
     return <div>{emptyMessage}</div>;
   }
 
@@ -432,7 +441,26 @@ export function HorizonTree({
             ref={setNodeRef}
             className={`min-h-[48px] ${isOver ? "bg-indigo-50/50 dark:bg-indigo-500/5" : ""}`}
           >
-            {renderContent()}
+            {collapsed ? (
+              <button
+                type="button"
+                onClick={onToggleCollapsed}
+                title={`Expand to show ${groupLabel.toLowerCase()} ideas (drop here to unclassify)`}
+                className="flex w-full cursor-pointer items-center justify-between px-4 py-2.5"
+              >
+                <span className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                    {groupLabel}
+                  </span>
+                  <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-[11px] font-semibold text-gray-400 dark:bg-white/[0.06] dark:text-gray-500">
+                    {nodes.length}
+                  </span>
+                </span>
+                <ChevronDown size={14} className="text-gray-400 dark:text-gray-500" />
+              </button>
+            ) : (
+              renderContent()
+            )}
           </div>
         </TreeProvider>
       </TreeDnd>
