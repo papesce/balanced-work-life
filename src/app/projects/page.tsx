@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, FolderKanban, Plus, Search } from "lucide-react";
+import { ArrowLeft, FolderKanban, Plus, Search, FileText } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { IdeaTree } from "@/components/brainstorm/IdeaTree";
 import { BrainstormBreadcrumb } from "@/components/brainstorm/BrainstormBreadcrumb";
+import { NotesIndicator } from "@/components/shared/NotesIndicator";
+import { useNotes } from "@/contexts/NotesContext";
 import { useIdeas, type CreateIdeaPosition } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useTags } from "@/hooks/useTags";
@@ -31,6 +33,7 @@ export default function ProjectsPage() {
   const linksHook = useIdeaLinks();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
+  const { openNotes } = useNotes();
 
   const [showType] = useState(true);
   const [showArea] = useState(true);
@@ -335,12 +338,32 @@ export default function ProjectsPage() {
           </button>
         }
         headerActions={
-          <button
-            onClick={handleAddTask}
-            className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-violet-700"
-          >
-            <Plus size={13} /> Add task
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => openNotes(selectedId)}
+              className="toolbar-btn flex items-center gap-1.5"
+              title={selectedProject.notes?.trim() ? "Edit project details" : "Add project details"}
+              aria-label={
+                selectedProject.notes?.trim() ? "Edit project details" : "Add project details"
+              }
+            >
+              <FileText
+                size={14}
+                strokeWidth={selectedProject.notes?.trim() ? 2 : 1.5}
+                className={selectedProject.notes?.trim() ? "text-indigo-500" : ""}
+              />
+              Details
+              {selectedProject.notes?.trim() ? (
+                <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" aria-hidden />
+              ) : null}
+            </button>
+            <button
+              onClick={handleAddTask}
+              className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-violet-700"
+            >
+              <Plus size={13} /> Add task
+            </button>
+          </div>
         }
       >
         {breadcrumbChain.length > 0 && (
@@ -480,9 +503,14 @@ export default function ProjectsPage() {
         ) : (
           <div className="space-y-2">
             {visibleProjects.map((p) => (
-              <button
+              <div
                 key={p.id}
                 onClick={() => handleSelect(p.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") handleSelect(p.id);
+                }}
+                role="button"
+                tabIndex={0}
                 className="glass-card flex w-full cursor-pointer items-center justify-between rounded-2xl border border-black/5 px-4 py-3 text-left transition hover:border-violet-200 dark:border-white/5 dark:hover:border-violet-800"
               >
                 <div className="flex min-w-0 items-center gap-3">
@@ -499,8 +527,11 @@ export default function ProjectsPage() {
                     </p>
                   </div>
                 </div>
-                <span className="shrink-0 text-xs font-semibold text-violet-600">Open →</span>
-              </button>
+                <div className="flex shrink-0 items-center gap-1">
+                  <NotesIndicator hasNotes={!!p.notes?.trim()} onClick={() => openNotes(p.id)} />
+                  <span className="text-xs font-semibold text-violet-600">Open →</span>
+                </div>
+              </div>
             ))}
           </div>
         )}
