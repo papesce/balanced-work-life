@@ -26,11 +26,12 @@ import { STATUS_LABELS, STATUS_STYLES } from "@/lib/constants";
 import { TYPE_COLORS } from "@/components/brainstorm/ideaNodeSlots";
 import {
   getRevealHref,
-  getRevealOptions,
+  getRevealOptionsIncludingCurrent,
   getSmartRevealView,
   getRevealLabel,
   type RevealView,
 } from "@/lib/reveal";
+import { useClassifications } from "@/hooks/useClassifications";
 
 const VIEW_ICON: Record<RevealView, React.ReactNode> = {
   planner: <LayoutDashboard size={12} strokeWidth={1.5} />,
@@ -53,6 +54,7 @@ function pathnameToView(pathname: string): RevealView | null {
 
 export function GlobalSearchBar() {
   const { ideas } = useIdeas({ scope: "all" });
+  const { schemes, options: classificationOptions, classifications } = useClassifications();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -121,6 +123,28 @@ export function GlobalSearchBar() {
 
   const currentView = pathnameToView(pathname);
 
+  /** Resolve the exact (lens, horizon-value) pair for an idea on Horizon. */
+  const resolveHorizonTarget = (ideaId: string): { lens: string; value: string } => {
+    const urlLens = searchParams.get("lens");
+    const lens =
+      currentView === "horizon" && urlLens && schemes.some((s) => s.key === urlLens)
+        ? urlLens
+        : "term";
+    const scheme = schemes.find((s) => s.key === lens);
+    if (!scheme) return { lens, value: "unclassified" };
+    const optionValueById = new Map(
+      classificationOptions.filter((o) => o.scheme_id === scheme.id).map((o) => [o.id, o.value]),
+    );
+    const schemeIdById = new Map(schemes.map((s) => [s.id, s.key]));
+    for (const c of classifications) {
+      if (c.idea_id !== ideaId) continue;
+      if (schemeIdById.get(c.scheme_id) !== lens) continue;
+      const v = optionValueById.get(c.option_id);
+      if (typeof v === "string") return { lens, value: v };
+    }
+    return { lens, value: "unclassified" };
+  };
+
   const openInCurrentView = (ideaId: string) => {
     const idea = ideas.find((i) => i.id === ideaId);
     if (idea && currentView) {
@@ -138,9 +162,14 @@ export function GlobalSearchBar() {
       } else {
         // Context-aware: sets ?date= / ?lens=&horizon= / ?projectId= / ?goalId=
         // so the target is actually rendered before the highlight effect runs.
-        // From horizon, preserve the active lens.
-        const lens = currentView === "horizon" ? searchParams.get("lens") : null;
-        router.push(getRevealHref(currentView, idea, ideas, undefined, lens));
+        // From horizon, preserve the active lens and land on the idea's
+        // actual column (not the "short" default).
+        if (currentView === "horizon") {
+          const target = resolveHorizonTarget(ideaId);
+          router.push(getRevealHref(currentView, idea, ideas, target.value, target.lens));
+        } else {
+          router.push(getRevealHref(currentView, idea, ideas));
+        }
       }
     } else if (idea) {
       router.push(getRevealHref(getSmartRevealView(idea, ideas), idea, ideas));
@@ -241,7 +270,16 @@ export function GlobalSearchBar() {
             const isActive = idx === activeIndex;
             const isExpanded = expandedId === idea.id;
             const smartView = getSmartRevealView(idea, ideas);
-            const revealOptions = currentView ? getRevealOptions(currentView, idea, ideas) : [];
+            const horizonTarget = currentView === "horizon" ? resolveHorizonTarget(idea.id) : null;
+            const revealOptions = currentView
+              ? getRevealOptionsIncludingCurrent(
+                  currentView,
+                  idea,
+                  ideas,
+                  horizonTarget?.value,
+                  horizonTarget?.lens,
+                )
+              : [];
             return (
               <div key={idea.id}>
                 <div
@@ -282,15 +320,15 @@ export function GlobalSearchBar() {
                   <span className="flex shrink-0 items-center gap-1 pt-0.5">
                     {currentView && (
                       <span
-                        title={`Reveal in ${getRevealLabel(smartView)}`}
+                        title={`Reveal in ${getRevealLabel(currentView)}`}
                         className="hidden rounded border border-black/5 px-1 py-px text-[10px] text-gray-400 lg:block dark:border-white/10"
                       >
-                        ⏎ {getRevealLabel(smartView).slice(0, 8)}
+                        ⏎ {getRevealLabel(currentView).slice(0, 8)}
                       </span>
                     )}
                     <button
                       aria-label={`Reveal options for ${idea.text || "idea"}`}
-                      title="Reveal in other views"
+                      title="Reveal in views"
                       onClick={(e) => {
                         e.stopPropagation();
                         setActiveIndex(idx);
@@ -317,19 +355,29 @@ export function GlobalSearchBar() {
                       <button
                         key={opt.view}
                         onClick={() => {
-                          router.push(opt.href);
-                          setOpen(false);
-                          setRawQuery("");
-                          setQuery("");
+                          if (opt.isCurrentView) {
+                            openInCurrentView(idea.id);
+                          } else {
+                            router.push(opt.href);
+                            setOpen(false);
+                            setRawQuery("");
+                            setQuery("");
+                          }
                         }}
                         className="flex w-full items-center gap-2 rounded px-1 py-1.5 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.04] dark:text-gray-300 dark:hover:bg-white/[0.05]"
                       >
                         {VIEW_ICON[opt.view]}
                         {opt.label}
-                        {opt.view === smartView && (
+                        {opt.isCurrentView ? (
                           <span className="rounded bg-violet-100 px-1 text-[10px] text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">
-                            best
+                            here
                           </span>
+                        ) : (
+                          opt.view === smartView && (
+                            <span className="rounded bg-violet-100 px-1 text-[10px] text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">
+                              best
+                            </span>
+                          )
                         )}
                       </button>
                     ))}

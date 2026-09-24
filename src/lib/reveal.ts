@@ -99,6 +99,36 @@ export function getRevealOptions(
     }));
 }
 
+export interface CurrentViewRevealOption extends RevealOption {
+  isCurrentView: boolean;
+}
+
+/**
+ * Search-menu variant: includes the current view first (labelled
+ * "… (this view)") so users on Horizon can reveal in place.
+ * Callers supply the resolved termValue/lensKey for an exact horizon URL.
+ */
+export function getRevealOptionsIncludingCurrent(
+  currentView: RevealView,
+  idea: Idea,
+  allIdeas?: Idea[],
+  termValue?: string | null,
+  lensKey?: string | null,
+): CurrentViewRevealOption[] {
+  const views: RevealView[] = ["planner", "timeline", "horizon", "brainstorm", "projects", "goals"];
+  const ordered: RevealView[] = [currentView, ...views.filter((v) => v !== currentView)];
+  return ordered.map((v) => ({
+    view: v,
+    label: v === currentView ? `${LABELS[v]} (this view)` : LABELS[v],
+    href:
+      v === currentView
+        ? getRevealHref(v, idea, allIdeas, termValue, lensKey)
+        : getRevealHref(v, idea, allIdeas),
+    icon: v,
+    isCurrentView: v === currentView,
+  }));
+}
+
 export function getRevealLabel(view: RevealView): string {
   return LABELS[view];
 }
