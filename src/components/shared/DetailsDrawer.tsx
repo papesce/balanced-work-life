@@ -3,27 +3,19 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { X, StickyNote, Telescope, ChevronDown, ChevronRight, Check } from "lucide-react";
+import { X, StickyNote, Telescope, ChevronDown, ChevronRight, Check, Layers } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
-import { useLaneConfigsContext } from "@/contexts/LaneConfigsContext";
+import { useClassifications } from "@/hooks/useClassifications";
 import { getRevealHref } from "@/lib/reveal";
-import { IdeaHorizon } from "@/lib/types";
-import { DEFAULT_UNASSIGNED_LABEL } from "@/lib/constants";
 import { DetailsEditor } from "./DetailsEditor";
-
-const HORIZON_LABELS: Record<IdeaHorizon, string> = {
-  short: "Short-term",
-  medium: "Medium-term",
-  long: "Long-term",
-};
 
 export function DetailsDrawer({ ideaId, onClose }: { ideaId: string | null; onClose: () => void }) {
   const { ideas, updateIdea } = useIdeas();
   const idea = ideaId ? (ideas.find((i) => i.id === ideaId) ?? null) : null;
   const [mounted, setMounted] = useState(false);
-  const [horizonOpen, setHorizonOpen] = useState(false);
+  const [classificationOpen, setClassificationOpen] = useState(false);
   const router = useRouter();
-  const { laneConfigs, getLanesForHorizon, getUnassignedLabel } = useLaneConfigsContext();
+  const { schemes, options, getOptionForIdea, setClassification } = useClassifications();
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -45,24 +37,12 @@ export function DetailsDrawer({ ideaId, onClose }: { ideaId: string | null; onCl
     await updateIdea(ideaId, { notes: next });
   };
 
-  const handleSetHorizon = async (h: IdeaHorizon | null) => {
-    await updateIdea(ideaId, { horizon: h });
-  };
+  const classificationSummary = schemes
+    .map((s) => getOptionForIdea(idea.id, s.key)?.label)
+    .filter(Boolean)
+    .join(" · ");
 
-  const handleSetLane = async (laneId: string | null) => {
-    await updateIdea(ideaId, { focus_lane: laneId });
-  };
-
-  const horizonLanes = idea.horizon ? getLanesForHorizon(idea.horizon) : [];
-  const unassignedLabel = idea.horizon
-    ? getUnassignedLabel(idea.horizon)
-    : DEFAULT_UNASSIGNED_LABEL;
-
-  const currentLaneLabel = idea.horizon
-    ? idea.focus_lane
-      ? (laneConfigs.find((l) => l.id === idea.focus_lane)?.label ?? "Unknown")
-      : unassignedLabel
-    : null;
+  const termValue = getOptionForIdea(idea.id, "term")?.value ?? null;
 
   return createPortal(
     <div className="fixed inset-0 z-[10000] flex justify-end">
@@ -93,29 +73,21 @@ export function DetailsDrawer({ ideaId, onClose }: { ideaId: string | null; onCl
             {idea.text || "Untitled"}
           </p>
 
-          {/* Horizon Section */}
+          {/* Classification Section */}
           <div className="mb-4 rounded-lg border border-black/5 dark:border-white/5">
             <button
-              onClick={() => setHorizonOpen(!horizonOpen)}
+              onClick={() => setClassificationOpen(!classificationOpen)}
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
             >
-              <Telescope size={14} className="text-indigo-500" />
-              <span className="flex-1">Horizon</span>
+              <Layers size={14} className="text-indigo-500" />
+              <span className="flex-1">Classification</span>
               <span className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500">
-                {idea.horizon ? (
-                  <>
-                    <span>{HORIZON_LABELS[idea.horizon]}</span>
-                    {currentLaneLabel && (
-                      <>
-                        <span className="text-gray-300 dark:text-gray-600">·</span>
-                        <span>{currentLaneLabel}</span>
-                      </>
-                    )}
-                  </>
+                {classificationSummary ? (
+                  <span className="max-w-[220px] truncate">{classificationSummary}</span>
                 ) : (
-                  <span className="italic">Not assigned</span>
+                  <span className="italic">Not classified</span>
                 )}
-                {horizonOpen ? (
+                {classificationOpen ? (
                   <ChevronDown size={12} strokeWidth={1.5} />
                 ) : (
                   <ChevronRight size={12} strokeWidth={1.5} />
@@ -123,89 +95,52 @@ export function DetailsDrawer({ ideaId, onClose }: { ideaId: string | null; onCl
               </span>
             </button>
 
-            {horizonOpen && (
+            {classificationOpen && (
               <div className="border-t border-black/5 px-3 py-2 dark:border-white/5">
-                {/* Horizon picker */}
-                <p className="mb-1 text-[10px] font-medium tracking-wide text-gray-400 uppercase">
-                  Horizon
-                </p>
-                <div className="mb-2">
-                  {(["short", "medium", "long"] as IdeaHorizon[]).map((h) => (
-                    <button
-                      key={h}
-                      onClick={() => handleSetHorizon(h)}
-                      className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-gray-600 hover:bg-black/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.04]"
-                    >
-                      <span className="w-4">
-                        {idea.horizon === h && (
-                          <Check size={12} strokeWidth={2} className="text-indigo-500" />
-                        )}
-                      </span>
-                      {HORIZON_LABELS[h]}
-                    </button>
-                  ))}
-                  {idea.horizon != null && (
-                    <>
-                      <div className="my-1 border-t border-black/5 dark:border-white/5" />
-                      <button
-                        onClick={() => handleSetHorizon(null)}
-                        className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-gray-600 hover:bg-black/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.04]"
-                      >
-                        <span className="w-4" />
-                        Remove from horizon
-                      </button>
-                    </>
-                  )}
-                </div>
-
-                {/* Lane picker - only shown when horizon is assigned */}
-                {idea.horizon && (
-                  <>
-                    <p className="mb-1 text-[10px] font-medium tracking-wide text-gray-400 uppercase">
-                      Lane
-                    </p>
-                    <div className="mb-2">
-                      {horizonLanes.length > 0 && (
+                {schemes.map((scheme) => {
+                  const schemeOptions = options.filter((o) => o.scheme_id === scheme.id);
+                  const current = getOptionForIdea(idea.id, scheme.key);
+                  return (
+                    <div key={scheme.id} className="mb-2 last:mb-0">
+                      <p className="mb-1 text-[10px] font-medium tracking-wide text-gray-400 uppercase">
+                        {scheme.label}
+                      </p>
+                      {schemeOptions.map((option) => (
                         <button
-                          onClick={() => handleSetLane(null)}
+                          key={option.id}
+                          onClick={() => setClassification(idea.id, scheme.key, option.value)}
                           className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-gray-600 hover:bg-black/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.04]"
                         >
                           <span className="w-4">
-                            {idea.focus_lane == null && (
+                            {current?.id === option.id && (
                               <Check size={12} strokeWidth={2} className="text-indigo-500" />
                             )}
                           </span>
-                          {unassignedLabel}
-                        </button>
-                      )}
-                      {horizonLanes.map((lane) => (
-                        <button
-                          key={lane.id}
-                          onClick={() => handleSetLane(lane.id)}
-                          className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-gray-600 hover:bg-black/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.04]"
-                        >
-                          <span className="w-4">
-                            {idea.focus_lane === lane.id && (
-                              <Check size={12} strokeWidth={2} className="text-indigo-500" />
-                            )}
-                          </span>
-                          {lane.label}
+                          {option.label}
                         </button>
                       ))}
-                      {horizonLanes.length === 0 && (
-                        <p className="px-2 py-1.5 text-xs text-gray-400 italic">
-                          No lanes configured
-                        </p>
+                      {current && (
+                        <>
+                          <div className="my-1 border-t border-black/5 dark:border-white/5" />
+                          <button
+                            onClick={() => setClassification(idea.id, scheme.key, null)}
+                            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-gray-600 hover:bg-black/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.04]"
+                          >
+                            <span className="w-4" />
+                            Clear
+                          </button>
+                        </>
                       )}
                     </div>
-                  </>
+                  );
+                })}
+                {schemes.length === 0 && (
+                  <p className="px-2 py-1.5 text-xs text-gray-400 italic">Loading frameworks…</p>
                 )}
-
-                {/* Reveal in Horizon */}
-                {idea.horizon && (
+                {termValue && (
                   <button
                     onClick={() => {
-                      router.push(getRevealHref("horizon", idea, ideas));
+                      router.push(getRevealHref("horizon", idea, ideas, termValue));
                       onClose();
                     }}
                     className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs font-medium text-indigo-500 hover:bg-indigo-50/50 dark:hover:bg-indigo-500/10"

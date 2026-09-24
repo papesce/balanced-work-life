@@ -31,8 +31,6 @@ export const IdeasTable = new Table(
     paused_at: column.text,
     attempt_dates: column.text,
     status_history: column.text,
-    horizon: column.text,
-    focus_lane: column.text,
     in_focus: column.integer,
     in_focus_until: column.text,
     productivity_signal: column.text,
@@ -75,26 +73,6 @@ export const TaskTagsTable = new Table(
   { indexes: {} },
 );
 
-export const LaneConfigsTable = new Table(
-  {
-    user_id: column.text,
-    horizon: column.text,
-    label: column.text,
-    sort_order: column.integer,
-    created_at: column.text,
-  },
-  { indexes: {} },
-);
-
-export const HorizonSettingsTable = new Table(
-  {
-    user_id: column.text,
-    horizon: column.text,
-    unassigned_label: column.text,
-  },
-  { indexes: {} },
-);
-
 export const QuickNotesTable = new Table(
   {
     user_id: column.text,
@@ -108,14 +86,48 @@ export const QuickNotesTable = new Table(
   { indexes: {} },
 );
 
+export const ClassificationSchemesTable = new Table(
+  {
+    user_id: column.text,
+    key: column.text,
+    label: column.text,
+    sort_order: column.integer,
+    created_at: column.text,
+  },
+  { indexes: {} },
+);
+
+export const ClassificationOptionsTable = new Table(
+  {
+    scheme_id: column.text,
+    value: column.text,
+    label: column.text,
+    sort_order: column.integer,
+    created_at: column.text,
+  },
+  { indexes: {} },
+);
+
+export const IdeaClassificationsTable = new Table(
+  {
+    idea_id: column.text,
+    scheme_id: column.text,
+    option_id: column.text,
+    user_id: column.text,
+    created_at: column.text,
+  },
+  { indexes: {} },
+);
+
 export const AppSchema = new Schema({
   ideas: IdeasTable,
   idea_links: IdeaLinksTable,
   tags: TagsTable,
   task_tags: TaskTagsTable,
-  lane_configs: LaneConfigsTable,
-  horizon_settings: HorizonSettingsTable,
   quick_notes: QuickNotesTable,
+  classification_schemes: ClassificationSchemesTable,
+  classification_options: ClassificationOptionsTable,
+  idea_classifications: IdeaClassificationsTable,
 });
 
 export class SupabaseConnector {
@@ -137,7 +149,7 @@ export class SupabaseConnector {
     for (const op of batch.crud) {
       const tag = `upload ${op.table} ${op.op} id=${op.id}`;
       try {
-        await this.uploadOp(op);
+        await this.uploadOp(op, database);
       } catch (err) {
         // Surface the failing op before rethrowing: PowerSync retries the
         // batch forever, so without this the root cause (missing table,
@@ -152,12 +164,15 @@ export class SupabaseConnector {
     await batch.complete();
   }
 
-  private async uploadOp(op: {
-    table: string;
-    op: string;
-    id: string;
-    opData?: Record<string, unknown> | null;
-  }): Promise<void> {
+  private async uploadOp(
+    op: {
+      table: string;
+      op: string;
+      id: string;
+      opData?: Record<string, unknown> | null;
+    },
+    database: AbstractPowerSyncDatabase,
+  ): Promise<void> {
     const throwIfSupabaseError = (
       error: { message: string; code?: string } | null,
       tag: string,
@@ -166,6 +181,25 @@ export class SupabaseConnector {
         throw new Error(`${tag}: ${error.message}${error.code ? ` (code ${error.code})` : ""}`);
       }
     };
+
+    if (
+      (op.table === "classification_schemes" ||
+        op.table === "classification_options" ||
+        op.table === "idea_classifications") &&
+      (op.op === "PUT" || op.op === "PATCH")
+    ) {
+      // The queue may hold a stale snapshot: seed rows that dedupe later
+      // merged or deleted. Uploading it would violate server UNIQUE / FK /
+      // RLS and wedge the whole queue behind a row that no longer matters.
+      // Upload current local state instead; skip rows deleted locally
+      // (their queued DELETE syncs the outcome).
+      const current = await database.getOptional<Record<string, unknown>>(
+        `SELECT * FROM ${op.table} WHERE id = ?`,
+        [op.id],
+      );
+      if (!current) return;
+      op = { ...op, opData: { ...current } };
+    }
 
     if (op.table === "task_tags") {
       switch (op.op) {
@@ -186,9 +220,39 @@ export class SupabaseConnector {
       }
       return;
     }
-    if (op.table === "horizon_settings" || op.table === "lane_configs") {
-      // Lane/horizon tables use standard upsert by id; client validates
-      // duplicate labels and 5-cap for instant UX, DB constraint is enforcement.
+    if (op.table === "classification_schemes") {
+      // Schemes are unique by (user_id, key), not just id: the SQL migration
+      // and/or another device may have seeded the same key under a different
+      // id. DO NOTHING on conflict (instead of erroring and wedging the whole
+      // upload queue) — the client's dedupe pass reconciles the duplicate ids.
+      switch (op.op) {
+        case "PUT": {
+          const { error } = await supabase.from(op.table).upsert(
+            { id: op.id, ...(op.opData as Record<string, unknown>) },
+            {
+              onConflict: "user_id,key",
+              ignoreDuplicates: true,
+            },
+          );
+          throwIfSupabaseError(error, `upsert ${op.table} id=${op.id}`);
+          break;
+        }
+        case "PATCH": {
+          const { error } = await supabase.from(op.table).update(op.opData!).eq("id", op.id);
+          throwIfSupabaseError(error, `update ${op.table} id=${op.id}`);
+          break;
+        }
+        case "DELETE": {
+          const { error } = await supabase.from(op.table).delete().eq("id", op.id);
+          throwIfSupabaseError(error, `delete ${op.table} id=${op.id}`);
+          break;
+        }
+      }
+      return;
+    }
+    if (op.table === "classification_options") {
+      // Options are unique by (scheme_id, value) but always written with
+      // deterministic ids, so upsert-by-id converges across devices.
       switch (op.op) {
         case "PUT": {
           const { error } = await supabase

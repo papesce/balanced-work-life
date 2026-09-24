@@ -10,7 +10,7 @@ export type IdeaStatus =
   | "cancelled"
   | "archived"
   | "deferred";
-export type IdeaHorizon = "short" | "medium" | "long";
+export type TermValue = "short" | "medium" | "long";
 
 export interface Tag {
   id: string;
@@ -58,8 +58,6 @@ export interface Idea {
   paused_at: string | null;
   attempt_dates: string[];
   status_history: { status: IdeaStatus; at: string }[] | null;
-  horizon: IdeaHorizon | null;
-  focus_lane: string | null;
   in_focus: boolean;
   in_focus_until: string | null;
   sort_order: number;
@@ -79,20 +77,31 @@ export interface IdeaLink {
   created_at: string;
 }
 
-export interface LaneConfig {
+export interface ClassificationScheme {
   id: string;
   user_id: string;
-  horizon: IdeaHorizon;
+  key: string;
   label: string;
   sort_order: number;
   created_at: string;
 }
 
-export interface HorizonSetting {
+export interface ClassificationOption {
   id: string;
+  scheme_id: string;
+  value: string;
+  label: string;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface IdeaClassification {
+  id: string;
+  idea_id: string;
+  scheme_id: string;
+  option_id: string;
   user_id: string;
-  horizon: IdeaHorizon;
-  unassigned_label: string;
+  created_at: string;
 }
 
 export interface IdeaNode extends Idea {

@@ -6,7 +6,6 @@ import { PowerSyncContext } from "@powersync/react";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { getPowerSync, SupabaseConnector } from "@/lib/powersync";
 import { qnLoggingEnabled } from "@/lib/quicknote/log";
-import { LaneConfigsProvider } from "@/contexts/LaneConfigsContext";
 import { NotesProvider } from "@/contexts/NotesContext";
 import { QuickNoteProvider } from "@/contexts/QuickNoteContext";
 import type { PowerSyncDatabase } from "@powersync/web";
@@ -88,11 +87,9 @@ function AuthGuard({ children }: { children: ReactNode }) {
   }
 
   return (
-    <LaneConfigsProvider>
-      <NotesProvider>
-        <QuickNoteProvider>{children}</QuickNoteProvider>
-      </NotesProvider>
-    </LaneConfigsProvider>
+    <NotesProvider>
+      <QuickNoteProvider>{children}</QuickNoteProvider>
+    </NotesProvider>
   );
 }
 

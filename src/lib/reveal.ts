@@ -1,7 +1,7 @@
 "use client";
 
 import { getToday } from "@/lib/dateUtils";
-import type { Idea, IdeaHorizon } from "@/lib/types";
+import type { Idea } from "@/lib/types";
 
 export type RevealView = "planner" | "timeline" | "horizon" | "brainstorm" | "projects" | "goals";
 
@@ -49,7 +49,12 @@ function getGoalAncestorId(idea: Idea, allIdeas?: Idea[]): string | null {
   return null;
 }
 
-export function getRevealHref(view: RevealView, idea: Idea, allIdeas?: Idea[]): string {
+export function getRevealHref(
+  view: RevealView,
+  idea: Idea,
+  allIdeas?: Idea[],
+  termValue?: string | null,
+): string {
   const date = idea.scheduled_date ?? getToday();
   const id = idea.id;
   switch (view) {
@@ -58,7 +63,7 @@ export function getRevealHref(view: RevealView, idea: Idea, allIdeas?: Idea[]): 
     case "timeline":
       return `/timeline?date=${date}&highlight=${id}`;
     case "horizon": {
-      const h: IdeaHorizon = idea.horizon ?? "short";
+      const h = termValue ?? "short";
       return `/horizon?horizon=${h}&highlight=${id}`;
     }
     case "brainstorm":

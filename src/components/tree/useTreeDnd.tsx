@@ -24,7 +24,7 @@ import { TreeDndStateProvider, type TreeDndState } from "./context";
 import type { DropTarget, DropZone, TreeItem } from "./types";
 
 export const ROW_PREFIX = "row:";
-export const LANE_PREFIX = "lane:";
+export const GROUP_PREFIX = "group:";
 
 // Tree drop zones are based on the pointer's third of a row. Prefer its exact
 // position over the dragged preview's rectangle, then fall back to the nearest
@@ -111,7 +111,7 @@ interface TreeDndProps<T extends TreeItem> {
   getLabel: (item: T) => string;
   children: ReactNode;
   indentSize?: number;
-  onLaneDrop?: (draggedId: string, lane: string | null) => void | Promise<void>;
+  onGroupDrop?: (draggedId: string, value: string | null) => void | Promise<void>;
 }
 
 /**
@@ -125,7 +125,7 @@ export function TreeDnd<T extends TreeItem>({
   getLabel,
   children,
   indentSize = 20,
-  onLaneDrop,
+  onGroupDrop,
 }: TreeDndProps<T>) {
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [over, setOver] = useState<{
@@ -192,16 +192,16 @@ export function TreeDnd<T extends TreeItem>({
   const handleDragEnd = (event: DragEndEvent) => {
     const draggedId = String(event.active.id);
     const rawOverId = event.over?.id ? String(event.over.id) : null;
-    // Lane drop takes precedence when dropping onto a lane container
-    if (rawOverId && rawOverId.startsWith(LANE_PREFIX)) {
-      if (onLaneDrop) {
-        const lanePart = rawOverId.slice(LANE_PREFIX.length);
-        // lane id is "horizon:uuid" or "horizon:null" for unassigned
-        const afterHorizon = lanePart.includes(":")
-          ? lanePart.slice(lanePart.indexOf(":") + 1)
-          : lanePart;
-        const laneValue = afterHorizon === "null" ? null : afterHorizon;
-        void onLaneDrop(draggedId, laneValue);
+    // Group drop takes precedence when dropping onto a group container
+    if (rawOverId && rawOverId.startsWith(GROUP_PREFIX)) {
+      if (onGroupDrop) {
+        const groupPart = rawOverId.slice(GROUP_PREFIX.length);
+        // group id is "namespace:value" or "namespace:null" for unclassified
+        const valuePart = groupPart.includes(":")
+          ? groupPart.slice(groupPart.indexOf(":") + 1)
+          : groupPart;
+        const value = valuePart === "null" ? null : valuePart;
+        void onGroupDrop(draggedId, value);
       }
       reset();
       return;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -17,13 +17,11 @@ import { AppShell } from "@/components/AppShell";
 import { UndoBar } from "@/components/shared/UndoBar";
 import { QuickAddInput } from "@/components/timeline/QuickAddInput";
 import { HorizonTree } from "@/components/horizon/HorizonTree";
-import { LaneConfigPanel } from "@/components/horizon/LaneConfigPanel";
 import { TypePicker } from "@/components/brainstorm/TypePicker";
 import { TypeFilterPicker } from "@/components/shared/TypeFilterPicker";
-import { Idea, IdeaHorizon, IdeaNode, IdeaType } from "@/lib/types";
+import { Idea, TermValue, IdeaNode, IdeaType } from "@/lib/types";
 import { TYPE_BADGE } from "@/lib/constants";
-import { useLaneConfigsContext } from "@/contexts/LaneConfigsContext";
-import { Settings2 } from "lucide-react";
+import { useClassifications } from "@/hooks/useClassifications";
 import {
   STORAGE_KEYS,
   TreeOverrideState,
@@ -33,11 +31,23 @@ import {
   writeTreeOverrides,
 } from "@/lib/storage";
 
-const HORIZONS: { key: IdeaHorizon; label: string }[] = [
+const HORIZONS: { key: TermValue; label: string }[] = [
   { key: "short", label: "Short term" },
   { key: "medium", label: "Medium term" },
   { key: "long", label: "Long term" },
 ];
+
+/** Grouping keys for the Horizon lens over the Term classification. */
+type TermGroupKey = TermValue | "unclassified";
+
+const COLUMNS: { key: TermGroupKey; label: string }[] = [
+  ...HORIZONS,
+  { key: "unclassified", label: "Unclassified" },
+];
+
+function isTermValue(v: string | null | undefined): v is TermValue {
+  return v === "short" || v === "medium" || v === "long";
+}
 
 const ACTIVE_STATUSES = new Set(["draft", "planned", "in_progress", "scheduled"]);
 
@@ -52,7 +62,9 @@ function buildFilteredTree(
   const childIds = new Set(
     pool.filter((i) => i.parent_id && poolIds.has(i.parent_id)).map((i) => i.id),
   );
-  const rootIds = pool.filter((i) => i.horizon != null && !childIds.has(i.id)).map((i) => i.id);
+  // Every root is in scope: Term-classified roots group by value, the rest
+  // form the explicit unclassified group (never hidden, never defaulted).
+  const rootIds = pool.filter((i) => !childIds.has(i.id)).map((i) => i.id);
   const rootSet = new Set(rootIds);
 
   const included = pool.filter((i) => {
@@ -76,10 +88,10 @@ function compareIdeasForTree(a: Idea, b: Idea): number {
 }
 
 function RootAddInput({
-  horizon,
+  label,
   onAdd,
 }: {
-  horizon: IdeaHorizon;
+  label: string;
   onAdd: (text: string, type?: IdeaType) => Promise<void>;
 }) {
   const [rootType, setRootType] = useState<IdeaType>("task");
@@ -108,7 +120,7 @@ function RootAddInput({
           )}
         </div>
         <QuickAddInput
-          placeholder={`+ Add to ${horizon}...`}
+          placeholder={`+ Add to ${label}...`}
           onAdd={async (text) => {
             await onAdd(text, rootType);
           }}
@@ -129,7 +141,7 @@ export default function HorizonPage() {
   const taskTagsHook = useTaskTags();
   const linksHook = useIdeaLinks();
   const { undoAction, registerUndo, clearUndo, handleUndo } = useUndoAction();
-  const [activeTab, setActiveTab] = useState<IdeaHorizon>("short");
+  const [activeTab, setActiveTab] = useState<TermGroupKey>("short");
   const [overrides, setOverrides] = useState<Map<string, TreeOverrideState>>(() =>
     readTreeOverrides(STORAGE_KEYS.horizonTreeOverrides),
   );
@@ -141,12 +153,39 @@ export default function HorizonPage() {
   const [cardMode, setCardMode] = useState(
     () => readRawString(STORAGE_KEYS.brainstormCardMode) === "true",
   );
-  const laneConfigsHook = useLaneConfigsContext();
-  const [laneDialogHorizon, setLaneDialogHorizon] = useState<IdeaHorizon | null>(null);
+  const {
+    schemes,
+    options: classificationOptions,
+    classifications,
+    setClassification,
+    isLoading: classificationsLoading,
+  } = useClassifications();
   const searchParams = useSearchParams();
   const router = useRouter();
   const highlightId = searchParams.get("highlight");
-  const horizonParam = searchParams.get("horizon") as IdeaHorizon | null;
+  const horizonParam = searchParams.get("horizon") as TermGroupKey | null;
+
+  const termById = useMemo(() => {
+    const termScheme = schemes.find((s) => s.key === "term");
+    const map = new Map<string, TermValue>();
+    if (!termScheme) return map;
+    const valueByOptionId = new Map(
+      classificationOptions
+        .filter((o) => o.scheme_id === termScheme.id)
+        .map((o) => [o.id, o.value]),
+    );
+    for (const c of classifications) {
+      if (c.scheme_id !== termScheme.id) continue;
+      const v = valueByOptionId.get(c.option_id);
+      if (isTermValue(v)) map.set(c.idea_id, v);
+    }
+    return map;
+  }, [schemes, classificationOptions, classifications]);
+
+  const termOf = useCallback(
+    (ideaId: string): TermValue | null => termById.get(ideaId) ?? null,
+    [termById],
+  );
 
   useEffect(() => {
     writeRawString(STORAGE_KEYS.brainstormCardMode, String(cardMode));
@@ -252,13 +291,16 @@ export default function HorizonPage() {
   );
 
   const treesByHorizon = useMemo(() => {
-    const grouped: Record<IdeaHorizon, IdeaNode[]> = { short: [], medium: [], long: [] };
+    const grouped: Record<TermGroupKey, IdeaNode[]> = {
+      short: [],
+      medium: [],
+      long: [],
+      unclassified: [],
+    };
     for (const node of allTreeNodes) {
-      if (node.horizon && grouped[node.horizon]) {
-        grouped[node.horizon].push(node);
-      }
+      grouped[termOf(node.id) ?? "unclassified"].push(node);
     }
-    for (const key of Object.keys(grouped) as IdeaHorizon[]) {
+    for (const key of Object.keys(grouped) as TermGroupKey[]) {
       grouped[key].sort((a, b) => {
         const aPriority = a.priority_order ?? Infinity;
         const bPriority = b.priority_order ?? Infinity;
@@ -267,11 +309,11 @@ export default function HorizonPage() {
       });
     }
     return grouped;
-  }, [allTreeNodes]);
+  }, [allTreeNodes, termOf]);
 
   const originalTreeLengths = useMemo(() => {
-    const lengths: Record<IdeaHorizon, number> = { short: 0, medium: 0, long: 0 };
-    for (const key of Object.keys(treesByHorizon) as IdeaHorizon[]) {
+    const lengths: Record<TermGroupKey, number> = { short: 0, medium: 0, long: 0, unclassified: 0 };
+    for (const key of Object.keys(treesByHorizon) as TermGroupKey[]) {
       lengths[key] = treesByHorizon[key].length;
     }
     return lengths;
@@ -280,22 +322,37 @@ export default function HorizonPage() {
   const filteredTreesByHorizon = useMemo(() => {
     let result = treesByHorizon;
     if (search.trim()) {
-      const filtered: Record<IdeaHorizon, IdeaNode[]> = { short: [], medium: [], long: [] };
-      for (const key of Object.keys(treesByHorizon) as IdeaHorizon[]) {
+      const filtered: Record<TermGroupKey, IdeaNode[]> = {
+        short: [],
+        medium: [],
+        long: [],
+        unclassified: [],
+      };
+      for (const key of Object.keys(treesByHorizon) as TermGroupKey[]) {
         filtered[key] = filterTreeBySearch(treesByHorizon[key], search);
       }
       result = filtered;
     }
     if (focusOnly) {
-      const focused: Record<IdeaHorizon, IdeaNode[]> = { short: [], medium: [], long: [] };
-      for (const key of Object.keys(result) as IdeaHorizon[]) {
+      const focused: Record<TermGroupKey, IdeaNode[]> = {
+        short: [],
+        medium: [],
+        long: [],
+        unclassified: [],
+      };
+      for (const key of Object.keys(result) as TermGroupKey[]) {
         focused[key] = filterTreeByFocus(result[key], ideas);
       }
       result = focused;
     }
     if (typeFilter.length > 0) {
-      const typed: Record<IdeaHorizon, IdeaNode[]> = { short: [], medium: [], long: [] };
-      for (const key of Object.keys(result) as IdeaHorizon[]) {
+      const typed: Record<TermGroupKey, IdeaNode[]> = {
+        short: [],
+        medium: [],
+        long: [],
+        unclassified: [],
+      };
+      for (const key of Object.keys(result) as TermGroupKey[]) {
         typed[key] = filterTreeByType(result[key], typeFilter);
       }
       result = typed;
@@ -303,18 +360,34 @@ export default function HorizonPage() {
     return result;
   }, [treesByHorizon, search, focusOnly, typeFilter, ideas]);
 
-  const handleAdd = (horizon: IdeaHorizon) => {
+  const handleSetTerm = async (id: string, term: TermValue | null) => {
+    const previous = termOf(id);
+    await setClassification(id, "term", term);
+    registerUndo({
+      label: "Term updated",
+      run: async () => {
+        await setClassification(id, "term", previous);
+      },
+    });
+  };
+
+  const handleAdd = (term: TermValue | null) => {
     return async (text: string, type?: IdeaType): Promise<void> => {
-      await createIdea(text, null, "bottom", {
+      const id = await createIdea(text, null, "bottom", {
         type: type ?? "task",
         status: "draft",
-        horizon,
       });
+      if (id && term) {
+        await setClassification(id, "term", term);
+      }
     };
   };
 
   useEffect(() => {
-    if (horizonParam && (["short", "medium", "long"] as IdeaHorizon[]).includes(horizonParam)) {
+    if (
+      horizonParam &&
+      (["short", "medium", "long", "unclassified"] as TermGroupKey[]).includes(horizonParam)
+    ) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- sync tab from URL param
       setActiveTab(horizonParam);
     }
@@ -324,7 +397,7 @@ export default function HorizonPage() {
     if (!highlightId || loading) return;
     const currentIdeas = ideasRef.current;
     const idea = currentIdeas.find((i) => i.id === highlightId);
-    if (idea?.horizon) setActiveTab(idea.horizon);
+    if (idea) setActiveTab(termOf(idea.id) ?? "unclassified");
     // Guarantee the highlight target is visible: lift filters that could hide it.
     if (idea && !ACTIVE_STATUSES.has(idea.status)) {
       setHideClosed(false);
@@ -365,9 +438,9 @@ export default function HorizonPage() {
       router.replace(`/horizon?${params.toString()}`, { scroll: false });
     }, 400);
     return () => clearTimeout(timer);
-  }, [highlightId, loading, searchParams, router]);
+  }, [highlightId, loading, searchParams, router, termOf]);
 
-  if (loading) {
+  if (loading || classificationsLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="animate-pulse text-gray-400 dark:text-gray-500">Loading horizon...</div>
@@ -375,36 +448,25 @@ export default function HorizonPage() {
     );
   }
 
-  const renderColumn = (h: { key: IdeaHorizon; label: string }) => {
+  const renderColumn = (h: { key: TermGroupKey; label: string }) => {
     const nodes = filteredTreesByHorizon[h.key];
     const wasOriginallyEmpty = originalTreeLengths[h.key] === 0;
     return (
       <div className="glass-card flex min-w-0 flex-1 flex-col rounded-2xl">
         <div className="flex items-center justify-between border-b border-black/5 px-4 py-3 dark:border-white/5">
           <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{h.label}</span>
-          <div className="flex items-center gap-2">
-            <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-[11px] font-semibold text-gray-400 dark:bg-white/[0.06] dark:text-gray-500">
-              {nodes.length}
-            </span>
-            <button
-              onClick={() => setLaneDialogHorizon(h.key)}
-              title="Configure lanes"
-              className="rounded p-1 text-gray-400 hover:bg-black/5 hover:text-gray-600 dark:hover:bg-white/5"
-            >
-              <Settings2 size={14} />
-            </button>
-          </div>
+          <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-[11px] font-semibold text-gray-400 dark:bg-white/[0.06] dark:text-gray-500">
+            {nodes.length}
+          </span>
         </div>
 
         <div className="max-h-[calc(100vh-220px)] min-h-[120px] flex-1 overflow-y-auto">
           <HorizonTree
             nodes={nodes}
             ideas={ideas}
-            horizon={h.key}
-            laneConfigs={laneConfigsHook.getLanesForHorizon(h.key)}
-            unassignedLabel={laneConfigsHook.getUnassignedLabel(h.key)}
+            termValue={h.key === "unclassified" ? null : h.key}
+            onSetTerm={handleSetTerm}
             cardMode={cardMode}
-            isLoading={laneConfigsHook.isLoading}
             allTags={tagsHook.tags}
             links={linksHook.links}
             getTagsForIdea={taskTagsHook.getTagsForIdea}
@@ -429,7 +491,7 @@ export default function HorizonPage() {
           />
         </div>
 
-        <RootAddInput horizon={h.key} onAdd={handleAdd(h.key)} />
+        <RootAddInput label={h.label} onAdd={handleAdd(h.key === "unclassified" ? null : h.key)} />
       </div>
     );
   };
@@ -515,7 +577,7 @@ export default function HorizonPage() {
 
       {/* Mobile tab bar */}
       <div className="sticky top-[53px] z-10 mb-4 flex gap-1 rounded-xl bg-black/[0.03] p-1 md:hidden dark:bg-white/[0.04]">
-        {HORIZONS.map((h) => (
+        {COLUMNS.map((h) => (
           <button
             key={h.key}
             onClick={() => setActiveTab(h.key)}
@@ -530,9 +592,9 @@ export default function HorizonPage() {
         ))}
       </div>
 
-      {/* Desktop: three columns stacked vertically */}
+      {/* Desktop: columns stacked vertically */}
       <div className="hidden gap-5 md:flex md:flex-col">
-        {HORIZONS.map((h, i) => (
+        {COLUMNS.map((h, i) => (
           <motion.div
             key={h.key}
             initial={{ opacity: 0, y: 12 }}
@@ -555,22 +617,10 @@ export default function HorizonPage() {
             exit={{ opacity: 0, x: -16 }}
             transition={{ duration: 0.2 }}
           >
-            {renderColumn(HORIZONS.find((h) => h.key === activeTab)!)}
+            {renderColumn(COLUMNS.find((h) => h.key === activeTab)!)}
           </motion.div>
         </AnimatePresence>
       </div>
-      {laneDialogHorizon && (
-        <LaneConfigPanel
-          key={laneDialogHorizon}
-          horizon={laneDialogHorizon}
-          onClose={() => setLaneDialogHorizon(null)}
-          ideasCountByLane={(laneId) =>
-            laneId === "unassigned"
-              ? ideas.filter((i) => i.focus_lane == null).length
-              : ideas.filter((i) => i.focus_lane === laneId).length
-          }
-        />
-      )}
     </AppShell>
   );
 }

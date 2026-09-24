@@ -8,16 +8,12 @@ import {
   Trash2,
   MoreHorizontal,
   Pencil,
-  Telescope,
-  Check,
   Target,
-  Layers,
   Eye,
   CornerDownRight,
 } from "lucide-react";
 import { createPortal } from "react-dom";
-import { Idea, IdeaLink, IdeaHorizon, LinkType, Tag, LaneConfig } from "@/lib/types";
-import { DEFAULT_UNASSIGNED_LABEL } from "@/lib/constants";
+import { Idea, IdeaLink, LinkType, Tag } from "@/lib/types";
 import { LinkPanel } from "@/components/brainstorm/LinkPanel";
 import { MoveIdeaPanel } from "@/components/brainstorm/MoveIdeaPanel";
 import { SchedulePicker } from "@/components/brainstorm/SchedulePicker";
@@ -28,8 +24,6 @@ interface IdeaActionMenuProps {
   idea: Idea;
   allIdeas: Idea[];
   links: IdeaLink[];
-  laneConfigs?: LaneConfig[];
-  unassignedLabel?: string;
   hasChildren: boolean;
   getTagsForIdea?: (ideaId: string) => Tag[];
   onEdit: () => void;
@@ -40,7 +34,7 @@ interface IdeaActionMenuProps {
   onDeleteLink: (id: string) => Promise<void>;
   onMove: (id: string, newParentId: string | null, newSortOrder: number) => Promise<void>;
   onMoved?: (parentIdToExpand: string | null) => void;
-  hiddenActions?: Array<"edit" | "link" | "move" | "attach" | "schedule" | "horizon" | "delete">;
+  hiddenActions?: Array<"edit" | "link" | "move" | "attach" | "schedule" | "delete">;
   onToggleInFocus?: (id: string, until?: string | null) => Promise<void>;
   currentView?: RevealView;
 }
@@ -49,8 +43,6 @@ export function IdeaActionMenu({
   idea,
   allIdeas,
   links,
-  laneConfigs,
-  unassignedLabel,
   hasChildren,
   getTagsForIdea,
   onEdit,
@@ -73,14 +65,10 @@ export function IdeaActionMenu({
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const [showDeleteWarning, setShowDeleteWarning] = useState(false);
   const [deletePos, setDeletePos] = useState<{ top: number; right: number } | null>(null);
-  const [showHorizonPicker, setShowHorizonPicker] = useState(false);
-  const [showLanePicker, setShowLanePicker] = useState(false);
   const [showRevealPicker, setShowRevealPicker] = useState(false);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const deleteConfirmRef = useRef<HTMLDivElement>(null);
-  const horizonPickerRef = useRef<HTMLDivElement>(null);
-  const lanePickerRef = useRef<HTMLDivElement>(null);
 
   const descendantCount = useMemo(() => {
     if (!hasChildren) return 0;
@@ -155,54 +143,6 @@ export function IdeaActionMenu({
     };
   }, [showDeleteWarning]);
 
-  useEffect(() => {
-    if (!showHorizonPicker) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        horizonPickerRef.current &&
-        !horizonPickerRef.current.contains(target) &&
-        menuTriggerRef.current &&
-        !menuTriggerRef.current.contains(target)
-      ) {
-        setShowHorizonPicker(false);
-      }
-    };
-    const keyHandler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setShowHorizonPicker(false);
-    };
-    document.addEventListener("mousedown", handler);
-    document.addEventListener("keydown", keyHandler);
-    return () => {
-      document.removeEventListener("mousedown", handler);
-      document.removeEventListener("keydown", keyHandler);
-    };
-  }, [showHorizonPicker]);
-
-  useEffect(() => {
-    if (!showLanePicker) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        lanePickerRef.current &&
-        !lanePickerRef.current.contains(target) &&
-        menuTriggerRef.current &&
-        !menuTriggerRef.current.contains(target)
-      ) {
-        setShowLanePicker(false);
-      }
-    };
-    const keyHandler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setShowLanePicker(false);
-    };
-    document.addEventListener("mousedown", handler);
-    document.addEventListener("keydown", keyHandler);
-    return () => {
-      document.removeEventListener("mousedown", handler);
-      document.removeEventListener("keydown", keyHandler);
-    };
-  }, [showLanePicker]);
-
   const closeAll = () => {
     setShowMenu(false);
     setShowLinkPanel(false);
@@ -210,8 +150,6 @@ export function IdeaActionMenu({
     setShowAttachPanel(false);
     setShowSchedulePicker(false);
     setShowDeleteWarning(false);
-    setShowHorizonPicker(false);
-    setShowLanePicker(false);
     setShowRevealPicker(false);
   };
 
@@ -242,16 +180,7 @@ export function IdeaActionMenu({
     showAttachPanel ||
     showSchedulePicker ||
     showDeleteWarning ||
-    showHorizonPicker ||
-    showLanePicker ||
     showRevealPicker;
-
-  const laneConfigsForIdea = useMemo(() => {
-    if (!idea.horizon || !laneConfigs) return [];
-    return laneConfigs.filter((l) => l.horizon === idea.horizon);
-  }, [laneConfigs, idea.horizon]);
-
-  const showLaneAction = !!idea.horizon && laneConfigs !== undefined;
 
   return (
     <div
@@ -353,30 +282,6 @@ export function IdeaActionMenu({
                 </button>
               </div>
             )}
-            {!hidden.includes("horizon") && (
-              <button
-                onClick={() => {
-                  setShowMenu(false);
-                  setShowHorizonPicker(true);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-              >
-                <Telescope size={12} strokeWidth={1.5} />
-                Assign Horizon…
-              </button>
-            )}
-            {showLaneAction && (
-              <button
-                onClick={() => {
-                  setShowMenu(false);
-                  setShowLanePicker(true);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-              >
-                <Layers size={12} strokeWidth={1.5} />
-                Move to lane
-              </button>
-            )}
             <button
               onClick={() => {
                 setShowMenu(false);
@@ -416,111 +321,6 @@ export function IdeaActionMenu({
                 >
                   <Trash2 size={12} strokeWidth={1.5} />
                   Delete
-                </button>
-              </>
-            )}
-          </div>,
-          document.body,
-        )}
-
-      {/* Lane picker flyout */}
-      {showLanePicker &&
-        menuPos &&
-        idea.horizon &&
-        createPortal(
-          <div
-            ref={lanePickerRef}
-            style={{
-              position: "fixed",
-              top: menuPos.top,
-              right: menuPos.right + 200,
-              zIndex: 9999,
-            }}
-            className="glass-card-strong min-w-[160px] rounded-xl py-1.5 shadow-lg"
-          >
-            <p className="px-3 py-1 text-[10px] font-medium tracking-wide text-gray-400 uppercase">
-              Move to lane
-            </p>
-            {laneConfigsForIdea.length > 0 && (
-              <button
-                onClick={() => {
-                  void onUpdate(idea.id, { focus_lane: null });
-                  setShowLanePicker(false);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-              >
-                <span className="w-3">
-                  {idea.focus_lane == null && <Check size={12} strokeWidth={2} />}
-                </span>
-                {unassignedLabel ?? DEFAULT_UNASSIGNED_LABEL}
-              </button>
-            )}
-            {laneConfigsForIdea.map((lane) => (
-              <button
-                key={lane.id}
-                onClick={() => {
-                  void onUpdate(idea.id, { focus_lane: lane.id });
-                  setShowLanePicker(false);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-              >
-                <span className="w-3">
-                  {idea.focus_lane === lane.id && <Check size={12} strokeWidth={2} />}
-                </span>
-                {lane.label}
-              </button>
-            ))}
-            {laneConfigsForIdea.length === 0 && (
-              <p className="px-3 py-2 text-xs text-gray-400 italic">No lanes yet</p>
-            )}
-          </div>,
-          document.body,
-        )}
-
-      {/* Horizon picker flyout */}
-      {showHorizonPicker &&
-        menuPos &&
-        createPortal(
-          <div
-            ref={horizonPickerRef}
-            style={{
-              position: "fixed",
-              top: menuPos.top,
-              right: menuPos.right + 200,
-              zIndex: 9999,
-            }}
-            className="glass-card-strong min-w-[160px] rounded-xl py-1.5 shadow-lg"
-          >
-            <p className="px-3 py-1 text-[10px] font-medium tracking-wide text-gray-400 uppercase">
-              Move to horizon
-            </p>
-            {(["short", "medium", "long"] as IdeaHorizon[]).map((h) => (
-              <button
-                key={h}
-                onClick={() => {
-                  onUpdate(idea.id, { horizon: h });
-                  setShowHorizonPicker(false);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-              >
-                <span className="w-3">
-                  {idea.horizon === h && <Check size={12} strokeWidth={2} />}
-                </span>
-                {h === "short" ? "Short-term" : h === "medium" ? "Medium-term" : "Long-term"}
-              </button>
-            ))}
-            {idea.horizon != null && (
-              <>
-                <div className="my-1 border-t border-black/5 dark:border-white/5" />
-                <button
-                  onClick={() => {
-                    onUpdate(idea.id, { horizon: null });
-                    setShowHorizonPicker(false);
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                >
-                  <span className="w-3" />
-                  Remove from horizon
                 </button>
               </>
             )}

@@ -219,8 +219,6 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
       paused_at: null,
       attempt_dates: [],
       status_history: null,
-      horizon: null,
-      focus_lane: null,
       in_focus: false,
       in_focus_until: null,
       productivity_signal: null,
@@ -254,8 +252,6 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
           paused_at: idea.paused_at,
           attempt_dates: idea.attempt_dates,
           status_history: idea.status_history,
-          horizon: idea.horizon,
-          focus_lane: idea.focus_lane,
           in_focus: idea.in_focus,
           in_focus_until: idea.in_focus_until,
           productivity_signal: idea.productivity_signal ?? null,
@@ -282,10 +278,6 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
     const finalUpdates = { ...updates } as Partial<Idea>;
     if (updates.status && previous && updates.status !== previous.status) {
       finalUpdates.status_history = appendStatusHistory(previous, updates.status);
-    }
-    // Reset focus_lane atomically when horizon changes
-    if (updates.horizon !== undefined && previous && updates.horizon !== previous.horizon) {
-      finalUpdates.focus_lane = null;
     }
 
     const fields = Object.keys(finalUpdates);
@@ -327,8 +319,8 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
           `INSERT OR REPLACE INTO ideas (id, user_id, parent_id, text, description, type, effort, impact, urgency,
             scheduled_date, scheduled_time, duration_minutes, is_priority, priority_order,
             status, notes, completed_at, cancelled_at, paused_at, attempt_dates, status_history,
-            horizon, focus_lane, in_focus, in_focus_until, productivity_signal, sort_order, created_at, updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            in_focus, in_focus_until, productivity_signal, sort_order, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
           [
             idea.id,
             idea.user_id,
@@ -351,8 +343,6 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
             idea.paused_at,
             JSON.stringify(idea.attempt_dates),
             idea.status_history ? JSON.stringify(idea.status_history) : null,
-            idea.horizon,
-            idea.focus_lane ?? null,
             idea.in_focus ? 1 : 0,
             idea.in_focus_until,
             idea.productivity_signal ?? null,
@@ -363,10 +353,6 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
         );
       }
     });
-  };
-
-  const setFocusLane = async (id: string, lane: string | null) => {
-    await updateIdea(id, { focus_lane: lane });
   };
 
   const toggleInFocus = async (id: string, until?: string | null) => {
@@ -556,7 +542,6 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
     markPaused,
     markCancelled,
     scheduleIdea,
-    setFocusLane,
     toggleInFocus,
     restoreIdeas,
     toggleCollapse,

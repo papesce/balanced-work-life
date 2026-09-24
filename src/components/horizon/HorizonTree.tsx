@@ -9,11 +9,10 @@ import {
   IdeaNode as IdeaNodeType,
   IdeaStatus,
   IdeaType,
-  IdeaHorizon,
+  TermValue,
   LifeArea,
   LinkType,
   Tag,
-  LaneConfig,
 } from "@/lib/types";
 import { computeStatusUpdates } from "@/lib/tasks/statusTransition";
 import { STATUS_LABELS, STATUS_STYLES, TYPE_BADGE } from "@/lib/constants";
@@ -230,43 +229,12 @@ function ComposingTypePill({
   );
 }
 
-function LaneSection({
-  laneId,
-  label,
-  children,
-  count,
-}: {
-  laneId: string;
-  label: string;
-  children: React.ReactNode;
-  count: number;
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id: laneId });
-  return (
-    <div
-      ref={setNodeRef}
-      className={`border-b border-black/[0.03] last:border-b-0 dark:border-white/[0.03] ${isOver ? "bg-indigo-50/50 dark:bg-indigo-500/5" : ""}`}
-    >
-      <div className="flex items-center justify-between bg-black/[0.02] px-3 py-1.5 dark:bg-white/[0.02]">
-        <span className="text-[11px] font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400">
-          {label}
-        </span>
-        <span className="rounded-full bg-white px-1.5 py-0 text-[10px] text-gray-400 dark:bg-gray-800 dark:text-gray-500">
-          {count}
-        </span>
-      </div>
-      <div className="min-h-[32px]">{children}</div>
-    </div>
-  );
-}
-
 export interface HorizonTreeProps {
   nodes: TreeNode<Idea>[];
   ideas: Idea[];
-  horizon: IdeaHorizon;
-  laneConfigs: LaneConfig[];
-  unassignedLabel: string;
-  isLoading?: boolean;
+  /** Term group this column shows; null = the explicit unclassified group. */
+  termValue: TermValue | null;
+  onSetTerm: (id: string, value: TermValue | null) => Promise<void>;
   allTags: Tag[];
   links: IdeaLink[];
   getTagsForIdea: (ideaId: string) => Tag[];
@@ -295,10 +263,8 @@ export interface HorizonTreeProps {
 export function HorizonTree({
   nodes,
   ideas,
-  horizon,
-  laneConfigs,
-  unassignedLabel,
-  isLoading,
+  termValue,
+  onSetTerm,
   allTags,
   links,
   getTagsForIdea,
@@ -324,20 +290,10 @@ export function HorizonTree({
   const [revealTarget, setRevealTarget] = useState<Idea | null>(null);
   const [revealPos, setRevealPos] = useState<{ top: number; right: number } | null>(null);
   const { openNotes } = useNotes();
+  const { setNodeRef, isOver } = useDroppable({ id: `group:term:${termValue ?? "null"}` });
 
-  const laneIds = new Set(laneConfigs.map((l) => l.id));
-
-  const unassignedNodes = nodes.filter((n) => n.focus_lane == null || !laneIds.has(n.focus_lane));
-  const laneGroups = new Map<string, TreeNode<Idea>[]>();
-  for (const lc of laneConfigs) laneGroups.set(lc.id, []);
-  for (const node of nodes) {
-    if (node.focus_lane && laneGroups.has(node.focus_lane)) {
-      laneGroups.get(node.focus_lane)!.push(node);
-    }
-  }
-
-  const handleLaneDrop = (draggedId: string, lane: string | null) => {
-    void onUpdate(draggedId, { focus_lane: lane });
+  const handleGroupDrop = (draggedId: string, value: string | null) => {
+    void onSetTerm(draggedId, value as TermValue | null);
   };
 
   const treeOptions: import("@/components/tree").TreeOptions<Idea> = {
@@ -381,8 +337,6 @@ export function HorizonTree({
           idea={node}
           allIdeas={ideas}
           links={links}
-          laneConfigs={laneConfigs}
-          unassignedLabel={unassignedLabel}
           hasChildren={node.children.length > 0}
           getTagsForIdea={getTagsForIdea}
           onEdit={() => setEditingId(node.id)}
@@ -423,7 +377,6 @@ export function HorizonTree({
       createIdea(text, parentId, position, {
         type: (meta as IdeaType) ?? "task",
         status: "draft",
-        horizon,
       }),
     onRename: (id: string, text: string) => onUpdate(id, { text }),
     onDelete,
@@ -440,22 +393,12 @@ export function HorizonTree({
     setComposing,
   };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-2 p-3">
-        <div className="h-6 animate-pulse rounded bg-black/5 dark:bg-white/5" />
-        <div className="h-10 animate-pulse rounded bg-black/[0.03] dark:bg-white/[0.03]" />
-        <div className="h-10 animate-pulse rounded bg-black/[0.03] dark:bg-white/[0.03]" />
-      </div>
-    );
-  }
-
   if (nodes.length === 0 && emptyMessage) {
     return <div>{emptyMessage}</div>;
   }
 
-  const renderLaneContent = (laneNodes: TreeNode<Idea>[]) => {
-    if (laneNodes.length === 0) {
+  const renderContent = () => {
+    if (nodes.length === 0) {
       return (
         <p className="px-4 py-2 text-center text-xs text-gray-400 italic dark:text-gray-500">
           Empty
@@ -464,44 +407,17 @@ export function HorizonTree({
     }
     return (
       <div>
-        {laneNodes.map((node, index) => (
+        {nodes.map((node, index) => (
           <TreeNodeRow
             key={node.id}
             node={node}
             depth={0}
-            isLastSibling={index === laneNodes.length - 1}
+            isLastSibling={index === nodes.length - 1}
           />
         ))}
       </div>
     );
   };
-
-  // 0 lanes => render flat list without lane chrome (unassigned hidden)
-  // When loading, skeleton already returned above, so this is genuine empty.
-  if (laneConfigs.length === 0) {
-    return (
-      <>
-        <TreeDnd
-          items={ideas}
-          onMove={onMove}
-          getLabel={(idea) => idea.text}
-          onLaneDrop={handleLaneDrop}
-        >
-          <TreeProvider value={{ controller, ui, options: treeOptions }}>
-            <div>{renderLaneContent(nodes)}</div>
-          </TreeProvider>
-        </TreeDnd>
-        {revealTarget && revealPos && (
-          <RevealInMenu
-            idea={revealTarget}
-            currentView="horizon"
-            position={revealPos}
-            onClose={() => setRevealTarget(null)}
-          />
-        )}
-      </>
-    );
-  }
 
   return (
     <>
@@ -509,27 +425,14 @@ export function HorizonTree({
         items={ideas}
         onMove={onMove}
         getLabel={(idea) => idea.text}
-        onLaneDrop={handleLaneDrop}
+        onGroupDrop={handleGroupDrop}
       >
         <TreeProvider value={{ controller, ui, options: treeOptions }}>
-          <div className="divide-y divide-black/[0.03] dark:divide-white/[0.03]">
-            <LaneSection
-              laneId={`lane:${horizon}:null`}
-              label={unassignedLabel}
-              count={unassignedNodes.length}
-            >
-              {renderLaneContent(unassignedNodes)}
-            </LaneSection>
-            {laneConfigs.map((lc) => (
-              <LaneSection
-                key={lc.id}
-                laneId={`lane:${horizon}:${lc.id}`}
-                label={lc.label}
-                count={laneGroups.get(lc.id)?.length ?? 0}
-              >
-                {renderLaneContent(laneGroups.get(lc.id) ?? [])}
-              </LaneSection>
-            ))}
+          <div
+            ref={setNodeRef}
+            className={`min-h-[48px] ${isOver ? "bg-indigo-50/50 dark:bg-indigo-500/5" : ""}`}
+          >
+            {renderContent()}
           </div>
         </TreeProvider>
       </TreeDnd>

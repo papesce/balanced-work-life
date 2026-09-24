@@ -13,6 +13,7 @@ streams:
       - SELECT * FROM tags WHERE user_id = auth.user_id()
       - SELECT * FROM idea_links WHERE user_id = auth.user_id()
       - "SELECT id, idea_id, tag_id, user_id FROM task_tags WHERE user_id = auth.user_id()"
-      - SELECT * FROM lane_configs WHERE user_id = auth.user_id()
-      - SELECT * FROM horizon_settings WHERE user_id = auth.user_id()
       - SELECT * FROM quick_notes WHERE user_id = auth.user_id()
+      - SELECT * FROM classification_schemes WHERE user_id = auth.user_id()
+      - SELECT * FROM classification_options WHERE scheme_id IN (SELECT id FROM classification_schemes WHERE user_id = auth.user_id())
+      - SELECT * FROM idea_classifications WHERE user_id = auth.user_id()
