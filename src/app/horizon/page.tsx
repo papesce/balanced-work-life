@@ -4,7 +4,7 @@ import { useMemo, useState, useRef, useCallback } from "react";
 import { useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { EyeOff, Target, Tag } from "lucide-react";
+import { ChevronUp, EyeOff, Target, Tag } from "lucide-react";
 import { useIdeas, type CreateIdeaPosition } from "@/hooks/useIdeas";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
@@ -373,9 +373,32 @@ export default function HorizonPage() {
 
   const treesByLens = useMemo(() => {
     const grouped: Record<string, IdeaNode[]> = {};
+
+    // Recursively lift classified descendants whose own column differs from
+    // the root column they are nested under. Returns the pruned node.
+    // Containment context lives in the Details drawer, never as tree rows.
+    const process = (node: IdeaNode, rootColumnKey: string): IdeaNode => {
+      const keptChildren: IdeaNode[] = [];
+      for (const child of node.children) {
+        const childValue = valueOf(child.id);
+        const childColumnKey = groupKeyOf(childValue);
+        // Promote only classified descendants; unclassified nodes always
+        // stay nested under their parent.
+        if (childValue != null && childColumnKey !== rootColumnKey) {
+          // Promote: child's own subtree (recursively processed against its
+          // own column) becomes a pseudo-root in its own column.
+          const promoted = process(child, childColumnKey);
+          (grouped[childColumnKey] ??= []).push(promoted);
+        } else {
+          keptChildren.push(process(child, rootColumnKey));
+        }
+      }
+      return { ...node, children: keptChildren };
+    };
+
     for (const node of allTreeNodes) {
       const k = groupKeyOf(valueOf(node.id));
-      (grouped[k] ??= []).push(node);
+      (grouped[k] ??= []).push(process(node, k));
     }
     for (const key of Object.keys(grouped)) {
       grouped[key].sort((a, b) => {
@@ -560,7 +583,22 @@ export default function HorizonPage() {
       <div className="glass-card flex min-w-0 flex-1 flex-col rounded-2xl">
         {!isCollapsedStrip && (
           <div className="flex items-center justify-between gap-2 border-b border-black/5 px-4 py-3 dark:border-white/5">
-            <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{col.label}</span>
+            <span className="flex items-center gap-1.5">
+              <span className="text-sm font-bold text-gray-800 dark:text-gray-200">
+                {col.label}
+              </span>
+              {col.key === null && (
+                <button
+                  type="button"
+                  onClick={toggleUnclassified}
+                  title="Collapse unclassified section"
+                  aria-label="Collapse unclassified section"
+                  className="rounded p-0.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                >
+                  <ChevronUp size={14} />
+                </button>
+              )}
+            </span>
             <span className="flex items-center gap-2">
               {col.key !== null && (
                 <label className="flex items-center gap-1 text-[11px] font-medium text-gray-400 dark:text-gray-500">

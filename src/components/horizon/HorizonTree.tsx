@@ -490,6 +490,7 @@ export function HorizonTree({
           onMove={onMove}
           hiddenActions={["move"]}
           onToggleInFocus={onToggleInFocus}
+          onShowDetails={() => openNotes(node.id, { section: "context" })}
           currentView="horizon"
         />
       </>

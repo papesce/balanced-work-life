@@ -37,6 +37,8 @@ interface IdeaActionMenuProps {
   hiddenActions?: Array<"edit" | "link" | "move" | "attach" | "schedule" | "delete">;
   onToggleInFocus?: (id: string, until?: string | null) => Promise<void>;
   currentView?: RevealView;
+  /** Opens the details drawer (context/notes). Rendered as a menu item when provided. */
+  onShowDetails?: () => void;
 }
 
 export function IdeaActionMenu({
@@ -56,6 +58,7 @@ export function IdeaActionMenu({
   hiddenActions,
   onToggleInFocus,
   currentView,
+  onShowDetails,
 }: IdeaActionMenuProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
@@ -217,6 +220,21 @@ export function IdeaActionMenu({
             style={{ position: "fixed", top: menuPos.top, right: menuPos.right, zIndex: 9999 }}
             className="glass-card-strong min-w-[160px] rounded-xl py-1.5 shadow-lg"
           >
+            {onShowDetails && (
+              <>
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    onShowDetails();
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                >
+                  <Eye size={12} strokeWidth={1.5} />
+                  Details…
+                </button>
+                <div className="my-1 border-t border-black/5 dark:border-white/5" />
+              </>
+            )}
             {!hidden.includes("edit") && (
               <>
                 <button
