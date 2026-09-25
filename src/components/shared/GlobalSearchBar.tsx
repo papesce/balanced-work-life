@@ -25,6 +25,7 @@ import {
 import { STATUS_LABELS, STATUS_STYLES } from "@/lib/constants";
 import { TYPE_COLORS } from "@/components/brainstorm/ideaNodeSlots";
 import {
+  canRevealInView,
   getRevealHref,
   getRevealOptionsIncludingCurrent,
   getSmartRevealView,
@@ -155,10 +156,10 @@ export function GlobalSearchBar() {
         (currentView === "planner" || currentView === "timeline") &&
         !idea.scheduled_date
       ) {
-        // Unscheduled: keep the user's current date, just highlight.
-        const params = new URLSearchParams(searchParams.toString());
-        params.set("highlight", ideaId);
-        router.push(`${pathname}?${params.toString()}`);
+        // Unscheduled ideas never render as date occurrences, so a
+        // highlight-only navigation would appear to do nothing. Send to the
+        // smart view (projects/goals/brainstorm) where the node exists.
+        router.push(getRevealHref(getSmartRevealView(idea, ideas), idea, ideas));
       } else {
         // Context-aware: sets ?date= / ?lens=&horizon= / ?projectId= / ?goalId=
         // so the target is actually rendered before the highlight effect runs.
@@ -248,7 +249,17 @@ export function GlobalSearchBar() {
           <div className="flex items-center justify-between border-b border-black/5 px-3 py-1.5 dark:border-white/5">
             <span className="text-[10px] font-medium tracking-wide text-gray-400 uppercase">
               {results.length > 0
-                ? `${results.length} result${results.length > 1 ? "s" : ""} · Enter opens here`
+                ? (() => {
+                    const active = results[activeIndex];
+                    const opensHere =
+                      currentView && active && canRevealInView(currentView, active, ideas);
+                    const smart = active ? getSmartRevealView(active, ideas) : null;
+                    const suffix =
+                      opensHere || !currentView || !smart
+                        ? "Enter opens here"
+                        : `Enter opens in ${getRevealLabel(smart)}`;
+                    return `${results.length} result${results.length > 1 ? "s" : ""} · ${suffix}`;
+                  })()
                 : "No matching ideas"}
             </span>
             <label className="flex cursor-pointer items-center gap-1 text-[10px] text-gray-400">
@@ -288,7 +299,13 @@ export function GlobalSearchBar() {
                 >
                   <button
                     onClick={() => openInCurrentView(idea.id)}
-                    title={currentView ? "Open in current view" : "Open"}
+                    title={
+                      currentView
+                        ? canRevealInView(currentView, idea, ideas)
+                          ? "Open in current view"
+                          : `Open in ${getRevealLabel(smartView)}`
+                        : "Open"
+                    }
                     className="min-w-0 flex-1 text-left"
                   >
                     <p className="line-clamp-2 text-sm leading-snug break-words text-gray-800 dark:text-gray-200">
@@ -318,7 +335,7 @@ export function GlobalSearchBar() {
                     </span>
                   </button>
                   <span className="flex shrink-0 items-center gap-1 pt-0.5">
-                    {currentView && (
+                    {currentView && canRevealInView(currentView, idea, ideas) && (
                       <span
                         title={`Reveal in ${getRevealLabel(currentView)}`}
                         className="hidden rounded border border-black/5 px-1 py-px text-[10px] text-gray-400 lg:block dark:border-white/10"

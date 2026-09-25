@@ -186,7 +186,20 @@ export function IdeaTree({
       for (const id of focusIds) {
         if (treeIds.has(id)) visibleFocusIds.add(id);
       }
-      filtered = pruneTreeToIds(filtered, visibleFocusIds);
+      // Re-root at the focused node: pruneTreeToIds drops nested subtrees
+      // when ancestors aren't in the set, so locate the node and return it.
+      const findNode = (nodes: IdeaNodeType[]): IdeaNodeType | null => {
+        for (const node of nodes) {
+          if (node.id === focusedId) return node;
+          const found = findNode(node.children);
+          if (found) return found;
+        }
+        return null;
+      };
+      const focusedNode = visibleFocusIds.has(focusedId) ? findNode(filtered) : null;
+      filtered = focusedNode
+        ? [pruneTreeToIds([focusedNode], visibleFocusIds)[0] ?? focusedNode]
+        : [];
     }
 
     return filtered;

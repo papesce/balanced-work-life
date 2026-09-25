@@ -41,6 +41,7 @@ export function RevealInMenu({
   const router = useRouter();
   if (!position) return null;
   const options = getRevealOptions(currentView, idea, allIdeas);
+  if (options.length === 0) return null;
   return createPortal(
     <div
       style={{

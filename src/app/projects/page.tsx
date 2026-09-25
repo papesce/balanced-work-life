@@ -132,6 +132,15 @@ export default function ProjectsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ideasHook.ideas, ideasHook.loading]);
 
+  // Ensure the selected project is expanded so its tasks render even when it
+  // sits nested (default collapse depth would otherwise hide its children).
+  useEffect(() => {
+    if (selectedId && !ideasHook.loading) {
+      ideasHook.expandIdea(selectedId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, ideasHook.loading]);
+
   const projects = useMemo(
     () => ideasHook.ideas.filter((i) => i.type === "project"),
     [ideasHook.ideas],

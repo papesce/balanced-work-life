@@ -128,6 +128,15 @@ export default function GoalsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ideasHook.ideas, ideasHook.loading]);
 
+  // Ensure the selected goal is expanded so its tasks render even when it
+  // sits nested (default collapse depth would otherwise hide its children).
+  useEffect(() => {
+    if (selectedId && !ideasHook.loading) {
+      ideasHook.expandIdea(selectedId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, ideasHook.loading]);
+
   const goals = useMemo(
     () => ideasHook.ideas.filter((i) => i.type === "objective"),
     [ideasHook.ideas],
