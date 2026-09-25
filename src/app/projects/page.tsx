@@ -2,7 +2,21 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, FolderKanban, Plus, Search, FileText } from "lucide-react";
+import { ArrowLeft, ChevronUp, FolderKanban, Plus, Search, FileText, Star } from "lucide-react";
+import { useClassifications } from "@/hooks/useClassifications";
+import {
+  AREA_DOT_COLORS,
+  AREA_ICONS,
+  AREA_LABELS,
+  AREA_ORDER,
+  STATUS_LABELS,
+  STATUS_STYLES,
+} from "@/lib/constants";
+import { StatusPicker } from "@/components/brainstorm/StatusPicker";
+import { TagPicker } from "@/components/shared/TagPicker";
+import { areaColors } from "@/styles/tokens";
+import { useLens, LensTabs, ColumnShell, groupKeyOf } from "@/components/lens";
+import { STORAGE_KEYS, readRawString, writeRawString } from "@/lib/storage";
 import { AppShell } from "@/components/AppShell";
 import { IdeaTree } from "@/components/brainstorm/IdeaTree";
 import { BrainstormBreadcrumb } from "@/components/brainstorm/BrainstormBreadcrumb";
@@ -12,7 +26,7 @@ import { useIdeas, type CreateIdeaPosition } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
-import { Idea, LinkType } from "@/lib/types";
+import { Idea, IdeaStatus, LinkType, Tag } from "@/lib/types";
 import { getAncestorChain, getChildCount, getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
 import { getCompletionEffects, hasAnyEffects, CompletionEffects } from "@/lib/linkEffects";
 import { LinkedEffectsReveal } from "@/components/shared/LinkedEffectsReveal";
@@ -28,12 +42,26 @@ export default function ProjectsPage() {
   const [hideCompleted, setHideCompleted] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"all" | "active">("active");
   const [selectedId, setSelectedId] = useState<string | null>(initialProjectId);
+  const [lensKey, setLensKey] = useState<string>(
+    () => readRawString(STORAGE_KEYS.projectsLens) ?? "term",
+  );
+  const [unclassifiedExpanded, setUnclassifiedExpanded] = useState(
+    () => readRawString(STORAGE_KEYS.projectsUnclassifiedExpanded) !== "false",
+  );
+  const [statusPickerId, setStatusPickerId] = useState<string | null>(null);
+  const [areaPickerId, setAreaPickerId] = useState<string | null>(null);
 
   const ideasHook = useIdeas({ scope: "all", searchQuery: search });
   const linksHook = useIdeaLinks();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
   const { openNotes } = useNotes();
+  const {
+    schemes,
+    options: classificationOptions,
+    classifications,
+    setClassification,
+  } = useClassifications();
 
   const [showType] = useState(true);
   const [showArea] = useState(true);
@@ -146,6 +174,35 @@ export default function ProjectsPage() {
     [ideasHook.ideas],
   );
 
+  // Computed lenses: area from first tag, priority flag. Classification
+  // lenses (term/nnl/moscow) come from the shared useLens hook.
+  const customs = useMemo(
+    () => ({
+      area: {
+        options: AREA_ORDER.map((a) => ({ value: a, label: AREA_LABELS[a] })),
+        valueOf: (ideaId: string) => taskTagsHook.getTagsForIdea(ideaId)[0]?.area ?? null,
+      },
+      priority: {
+        options: [
+          { value: "priority", label: "Priority" },
+          { value: "rest", label: "Rest" },
+        ],
+        valueOf: (ideaId: string) =>
+          ideasHook.ideas.find((i) => i.id === ideaId)?.is_priority ? "priority" : null,
+      },
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [taskTagsHook.tagsByIdea, ideasHook.ideas],
+  );
+
+  const { columns, valueOf } = useLens({
+    schemes,
+    classificationOptions,
+    classifications,
+    lensKey,
+    customs,
+  });
+
   const visibleProjects = useMemo(() => {
     let list = projects;
     const q = search.trim().toLowerCase();
@@ -160,8 +217,92 @@ export default function ProjectsPage() {
     if (hideCompleted) {
       list = list.filter((p) => p.status !== "completed");
     }
-    return [...list].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+    return [...list].sort((a, b) => {
+      if (a.is_priority !== b.is_priority) return a.is_priority ? -1 : 1;
+      return b.updated_at.localeCompare(a.updated_at);
+    });
   }, [projects, search, statusFilter, hideCompleted]);
+
+  const groupedProjects = useMemo(() => {
+    const grouped = new Map<string | null, Idea[]>();
+    for (const p of visibleProjects) {
+      const v = valueOf(p.id);
+      // Priority lens: unprioritised projects land in "rest", not "unclassified".
+      const key = v ?? (lensKey === "priority" ? "rest" : null);
+      const list = grouped.get(key) ?? [];
+      list.push(p);
+      grouped.set(key, list);
+    }
+    return grouped;
+  }, [visibleProjects, valueOf, lensKey]);
+
+  const progressOf = (projectId: string): { done: number; total: number } => {
+    const ids = getFocusedSubtreeIds(projectId, ideasHook.ideas);
+    ids.delete(projectId);
+    const descendants = ideasHook.ideas.filter((i) => ids.has(i.id));
+    const total = descendants.length;
+    const done = descendants.filter((i) => i.status === "completed").length;
+    return { done, total };
+  };
+
+  const handleLensChange = (key: string) => {
+    if (key === lensKey) return;
+    setLensKey(key);
+    writeRawString(STORAGE_KEYS.projectsLens, key);
+  };
+
+  const handleSetClassification = async (id: string, value: string | null) => {
+    if (lensKey === "area" || lensKey === "priority") return;
+    const prev = valueOf(id);
+    await setClassification(id, lensKey, value);
+    registerUndo({
+      label: "Project grouping updated",
+      run: async () => {
+        await setClassification(id, lensKey, prev);
+      },
+    });
+  };
+
+  const handleReplaceAreaTag = async (projectId: string, tag: Tag) => {
+    const current = taskTagsHook.getTagsForIdea(projectId)[0] ?? null;
+    if (current?.id === tag.id) {
+      setAreaPickerId(null);
+      return;
+    }
+    if (current) await taskTagsHook.removeTagFromTask(projectId, current.id);
+    await taskTagsHook.addTagToTask(projectId, tag);
+    setAreaPickerId(null);
+    registerUndo({
+      label: "Project area updated",
+      run: async () => {
+        await taskTagsHook.removeTagFromTask(projectId, tag.id);
+        if (current) await taskTagsHook.addTagToTask(projectId, current);
+      },
+    });
+  };
+
+  const handleAddProjectInGroup = async (groupValue: string | null) => {
+    const id = await createIdea("", null, "bottom", { type: "project", status: "planned" });
+    if (id) {
+      if (groupValue && lensKey !== "area" && lensKey !== "priority") {
+        await setClassification(id, lensKey, groupValue);
+      }
+      if (lensKey === "priority" && groupValue === "priority") {
+        await ideasHook.updateIdea(id, { is_priority: true });
+      }
+      handleSelect(id);
+      setSelectedTreeId(id);
+      setEditingId(id);
+    }
+  };
+
+  const lensTabs = useMemo(() => {
+    const tabs: { key: string; label: string }[] = schemes
+      .filter((s) => ["term", "nnl", "moscow"].includes(s.key))
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((s) => ({ key: s.key, label: s.key === "term" ? "Horizon" : s.label }));
+    return [...tabs, { key: "priority", label: "Priority" }, { key: "area", label: "Area" }];
+  }, [schemes]);
 
   const selectedProject = useMemo(
     () => (selectedId ? (ideasHook.ideas.find((i) => i.id === selectedId) ?? null) : null),
@@ -445,7 +586,220 @@ export default function ProjectsPage() {
     );
   }
 
-  // List view — all projects
+  // List view — lens-board of projects (subset type=project)
+
+  const renderProjectCard = (p: Idea) => {
+    const { done, total } = progressOf(p.id);
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    const area = taskTagsHook.getTagsForIdea(p.id)[0]?.area ?? null;
+    const AreaIcon = area ? AREA_ICONS[area as keyof typeof AREA_ICONS] : null;
+    return (
+      <div
+        key={p.id}
+        onClick={() => handleSelect(p.id)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") handleSelect(p.id);
+        }}
+        role="button"
+        tabIndex={0}
+        className={`glass-card flex w-full cursor-pointer flex-col gap-2 rounded-2xl border px-4 py-3 text-left transition hover:border-violet-200 dark:hover:border-violet-800 ${
+          p.is_priority
+            ? "border-violet-300 shadow-[0_0_0_1px_rgba(139,92,246,0.35),0_8px_24px_rgba(139,92,246,0.12)] dark:border-violet-700"
+            : "border-black/5 dark:border-white/5"
+        }`}
+      >
+        <div className="flex w-full items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30">
+              <FolderKanban size={16} />
+              {area && (
+                <span
+                  title={AREA_LABELS[area as keyof typeof AREA_LABELS] ?? area}
+                  className={`absolute -right-1 -bottom-1 h-3 w-3 rounded-full border-2 border-white ${AREA_DOT_COLORS[area as keyof typeof AREA_DOT_COLORS] ?? "bg-gray-400"} dark:border-gray-900`}
+                />
+              )}
+            </span>
+            <div className="min-w-0">
+              <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-gray-800 dark:text-gray-100">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void updateIdea(p.id, { is_priority: !p.is_priority });
+                  }}
+                  title={p.is_priority ? "Remove priority" : "Set priority"}
+                  aria-label={p.is_priority ? "Remove priority" : "Set priority"}
+                  aria-pressed={p.is_priority}
+                  className="shrink-0 rounded p-0.5 transition hover:scale-110"
+                >
+                  <Star
+                    size={12}
+                    className={
+                      p.is_priority
+                        ? "fill-violet-500 text-violet-500"
+                        : "text-gray-300 hover:text-violet-400 dark:text-gray-600"
+                    }
+                  />
+                </button>
+                {AreaIcon && (
+                  <AreaIcon
+                    size={12}
+                    className="shrink-0"
+                    style={{ color: area ? areaColors[area]?.dot : undefined }}
+                  />
+                )}
+                {p.text || "Untitled project"}
+              </p>
+              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-gray-400">
+                <span className="relative" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => setStatusPickerId(statusPickerId === p.id ? null : p.id)}
+                    className={`rounded-full border px-1.5 py-0 text-[10px] font-semibold transition hover:opacity-80 ${STATUS_STYLES[p.status]}`}
+                  >
+                    {STATUS_LABELS[p.status] ?? p.status}
+                  </button>
+                  {statusPickerId === p.id && (
+                    <StatusPicker
+                      current={p.status}
+                      onSelect={(s: IdeaStatus) => {
+                        setStatusPickerId(null);
+                        void updateIdea(p.id, { status: s });
+                      }}
+                      onClose={() => setStatusPickerId(null)}
+                    />
+                  )}
+                </span>
+                <span>
+                  {done}/{total} done
+                  {p.scheduled_date ? ` · ${p.scheduled_date}` : ""}
+                </span>
+                {lensKey !== "area" && lensKey !== "priority" && (
+                  <span onClick={(e) => e.stopPropagation()}>
+                    <select
+                      aria-label={`Change ${lensTabs.find((t) => t.key === lensKey)?.label ?? "group"} for ${p.text || "untitled project"}`}
+                      value={valueOf(p.id) ?? ""}
+                      onChange={(e) => void handleSetClassification(p.id, e.target.value || null)}
+                      className="max-w-[110px] cursor-pointer rounded-md border border-black/10 bg-transparent px-1 py-0 text-[10px] font-semibold text-gray-500 dark:border-white/10 dark:text-gray-400"
+                    >
+                      <option value="">—</option>
+                      {columns
+                        .filter((c) => c.key !== null)
+                        .map((o) => (
+                          <option key={o.key} value={o.key ?? ""}>
+                            {o.label}
+                          </option>
+                        ))}
+                    </select>
+                  </span>
+                )}
+                {lensKey === "area" && (
+                  <span className="relative" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => setAreaPickerId(areaPickerId === p.id ? null : p.id)}
+                      className="cursor-pointer rounded-md border border-black/10 px-1 py-0 text-[10px] font-semibold text-gray-500 dark:border-white/10 dark:text-gray-400"
+                    >
+                      {area ? (AREA_LABELS[area as keyof typeof AREA_LABELS] ?? area) : "Set area"}
+                    </button>
+                    {areaPickerId === p.id && (
+                      <span className="absolute top-full left-0 z-50 mt-1">
+                        <TagPicker
+                          allTags={tagsHook.tags}
+                          selectedTags={taskTagsHook.getTagsForIdea(p.id)}
+                          onAdd={(tag) => void handleReplaceAreaTag(p.id, tag)}
+                          onRemove={(tagId) => {
+                            void taskTagsHook.removeTagFromTask(p.id, tagId);
+                          }}
+                          onCreateTag={tagsHook.createTag}
+                          onClose={() => setAreaPickerId(null)}
+                          singleSelect
+                        />
+                      </span>
+                    )}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <NotesIndicator hasNotes={!!p.notes?.trim()} onClick={() => openNotes(p.id)} />
+            <span className="text-xs font-semibold text-violet-600">Open →</span>
+          </div>
+        </div>
+        {total > 0 && (
+          <div
+            className="h-1 overflow-hidden rounded-full bg-black/[0.06] dark:bg-white/10"
+            role="progressbar"
+            aria-valuenow={pct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`Progress for ${p.text || "untitled project"}`}
+          >
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-violet-500 to-emerald-400 transition-all"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderColumn = (value: string | null, label: string) => {
+    const key = value ?? (lensKey === "priority" ? "rest" : null);
+    const list = groupedProjects.get(key) ?? [];
+    const isUnclassified = value === null && lensKey !== "priority";
+    if (isUnclassified && !unclassifiedExpanded) {
+      return (
+        <div key="unclassified-collapsed" className="glass-card rounded-2xl">
+          <button
+            onClick={() => {
+              setUnclassifiedExpanded(true);
+              writeRawString(STORAGE_KEYS.projectsUnclassifiedExpanded, "true");
+            }}
+            className="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold text-gray-500"
+          >
+            <span>Unclassified · {list.length} for triage</span>
+            <ChevronUp size={14} className="rotate-180" />
+          </button>
+        </div>
+      );
+    }
+    const collapseControl = isUnclassified ? (
+      <button
+        onClick={() => {
+          setUnclassifiedExpanded(false);
+          writeRawString(STORAGE_KEYS.projectsUnclassifiedExpanded, "false");
+        }}
+        title="Collapse unclassified section"
+        aria-label="Collapse unclassified section"
+        className="rounded p-0.5 text-gray-400 hover:text-gray-600"
+      >
+        <ChevronUp size={14} />
+      </button>
+    ) : undefined;
+    return (
+      <ColumnShell
+        key={groupKeyOf(value)}
+        label={label}
+        count={list.length}
+        collapseControl={collapseControl}
+      >
+        <div className="space-y-2 p-3">
+          {list.length === 0 ? (
+            <p className="px-2 py-4 text-center text-xs text-gray-400 italic">No projects</p>
+          ) : (
+            list.map(renderProjectCard)
+          )}
+          <button
+            onClick={() => void handleAddProjectInGroup(value)}
+            className="w-full rounded-xl border border-dashed border-black/10 px-3 py-2 text-xs font-semibold text-gray-400 transition hover:border-violet-300 hover:text-violet-600 dark:border-white/10"
+          >
+            + Add to {label}
+          </button>
+        </div>
+      </ColumnShell>
+    );
+  };
+
   return (
     <AppShell
       title="Projects"
@@ -459,6 +813,13 @@ export default function ProjectsPage() {
       }
     >
       <div className="mx-auto max-w-2xl space-y-4">
+        <LensTabs
+          tabs={lensTabs}
+          activeKey={lensKey}
+          onChange={handleLensChange}
+          label="Group by:"
+          ariaLabel="Group projects by"
+        />
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[180px] flex-1">
             <Search
@@ -510,38 +871,9 @@ export default function ProjectsPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {visibleProjects.map((p) => (
-              <div
-                key={p.id}
-                onClick={() => handleSelect(p.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") handleSelect(p.id);
-                }}
-                role="button"
-                tabIndex={0}
-                className="glass-card flex w-full cursor-pointer items-center justify-between rounded-2xl border border-black/5 px-4 py-3 text-left transition hover:border-violet-200 dark:border-white/5 dark:hover:border-violet-800"
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30">
-                    <FolderKanban size={16} />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-gray-800 dark:text-gray-100">
-                      {p.text || "Untitled project"}
-                    </p>
-                    <p className="text-[11px] text-gray-400">
-                      {p.status.replace("_", " ")} · {getChildCount(p.id, ideasHook.ideas)} tasks
-                      {p.scheduled_date ? ` · ${p.scheduled_date}` : ""}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <NotesIndicator hasNotes={!!p.notes?.trim()} onClick={() => openNotes(p.id)} />
-                  <span className="text-xs font-semibold text-violet-600">Open →</span>
-                </div>
-              </div>
-            ))}
+          <div className="space-y-4">
+            {columns.map((col) => renderColumn(col.key, col.label))}
+            {lensKey === "area" && renderColumn(null, "Unclassified")}
           </div>
         )}
 

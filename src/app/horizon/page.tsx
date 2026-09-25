@@ -34,19 +34,14 @@ import {
   writeTreeOverrides,
 } from "@/lib/storage";
 
-/** Sentinel record key for the explicit unclassified group. */
-const UNCLASSIFIED = "unclassified";
-
-/** A lens column: an option value, or null for the unclassified group. */
-interface LensColumn {
-  key: string | null;
-  label: string;
-}
-
-/** Record key for a value: the option value, or the unclassified sentinel. */
-function groupKeyOf(value: string | null): string {
-  return value ?? UNCLASSIFIED;
-}
+import {
+  useLens,
+  LensTabs,
+  ColumnShell,
+  UNCLASSIFIED,
+  groupKeyOf,
+  type LensColumn,
+} from "@/components/lens";
 
 const ACTIVE_STATUSES = new Set(["draft", "planned", "in_progress", "scheduled"]);
 
@@ -176,72 +171,17 @@ export default function HorizonPage() {
   );
 
   /** Active lens scheme; unknown keys fall back to Term. */
-  const activeScheme = useMemo(
-    () => schemes.find((s) => s.key === lensKey) ?? schemes.find((s) => s.key === "term") ?? null,
-    [schemes, lensKey],
-  );
-
-  const schemeByKey = useMemo(() => new Map(schemes.map((s) => [s.key, s])), [schemes]);
-
-  const optionsBySchemeId = useMemo(() => {
-    const map = new Map<string, { value: string; label: string }[]>();
-    for (const o of classificationOptions) {
-      const list = map.get(o.scheme_id) ?? [];
-      list.push({ value: o.value, label: o.label });
-      map.set(o.scheme_id, list);
-    }
-    // classificationOptions arrive ordered by sort_order from the hook query.
-    return map;
-  }, [classificationOptions]);
-
-  /** Generic ideaId -> value map for any scheme key. */
-  const valuesBySchemeKey = useMemo(() => {
-    const outer = new Map<string, Map<string, string>>();
-    const optionValueById = new Map(classificationOptions.map((o) => [o.id, o.value]));
-    const schemeIdById = new Map(schemes.map((s) => [s.id, s.key]));
-    for (const c of classifications) {
-      const schemeKey = schemeIdById.get(c.scheme_id);
-      if (!schemeKey) continue;
-      const v = optionValueById.get(c.option_id);
-      if (typeof v !== "string") continue;
-      let inner = outer.get(schemeKey);
-      if (!inner) {
-        inner = new Map<string, string>();
-        outer.set(schemeKey, inner);
-      }
-      inner.set(c.idea_id, v);
-    }
-    return outer;
-  }, [classificationOptions, classifications, schemes]);
-
-  const activeOptions = useMemo(
-    () =>
-      activeScheme
-        ? classificationOptions
-            .filter((o) => o.scheme_id === activeScheme.id)
-            .sort((a, b) => a.sort_order - b.sort_order)
-        : [],
-    [classificationOptions, activeScheme],
-  );
-
-  const columns: LensColumn[] = useMemo(
-    () => [
-      ...activeOptions.map((o) => ({ key: o.value as string, label: o.label })),
-      { key: null, label: "Unclassified" },
-    ],
-    [activeOptions],
-  );
+  const { valuesBySchemeKey, schemeByKey, activeScheme, optionsBySchemeId, columns, valueOf } =
+    useLens({ schemes, classificationOptions, classifications, lensKey });
 
   const validTabs = useMemo(() => new Set(columns.map((c) => groupKeyOf(c.key))), [columns]);
 
-  const valueById = useMemo(
-    () => valuesBySchemeKey.get(activeScheme?.key ?? "") ?? new Map<string, string>(),
-    [valuesBySchemeKey, activeScheme],
-  );
-
-  const valueOf = useCallback(
-    (ideaId: string): string | null => valueById.get(ideaId) ?? null,
-    [valueById],
+  const lensTabItems = useMemo(
+    () =>
+      [...schemes]
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((s) => ({ key: s.key, label: s.label })),
+    [schemes],
   );
 
   const secondaryKeyOf = useCallback(
@@ -579,132 +519,104 @@ export default function HorizonPage() {
     const secondaryChoices = [...schemes]
       .sort((a, b) => a.sort_order - b.sort_order)
       .filter((s) => s.key !== lensKey);
-    return (
-      <div className="glass-card flex min-w-0 flex-1 flex-col rounded-2xl">
-        {!isCollapsedStrip && (
-          <div className="flex items-center justify-between gap-2 border-b border-black/5 px-4 py-3 dark:border-white/5">
-            <span className="flex items-center gap-1.5">
-              <span className="text-sm font-bold text-gray-800 dark:text-gray-200">
-                {col.label}
-              </span>
-              {col.key === null && (
-                <button
-                  type="button"
-                  onClick={toggleUnclassified}
-                  title="Collapse unclassified section"
-                  aria-label="Collapse unclassified section"
-                  className="rounded p-0.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                >
-                  <ChevronUp size={14} />
-                </button>
-              )}
-            </span>
-            <span className="flex items-center gap-2">
-              {col.key !== null && (
-                <label className="flex items-center gap-1 text-[11px] font-medium text-gray-400 dark:text-gray-500">
-                  <span className="hidden lg:inline">Split</span>
-                  <select
-                    aria-label={`Secondary classification for ${col.label}`}
-                    value={secondaryKey ?? ""}
-                    onChange={(e) => handleSecondaryChange(col.key, e.target.value || null)}
-                    className="max-w-[110px] cursor-pointer rounded-md border border-black/10 bg-transparent px-1 py-0.5 text-[11px] font-semibold text-gray-500 dark:border-white/10 dark:text-gray-400"
-                  >
-                    <option value="">None</option>
-                    {secondaryChoices.map((s) => (
-                      <option key={s.key} value={s.key}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-[11px] font-semibold text-gray-400 dark:bg-white/[0.06] dark:text-gray-500">
-                {nodes.length}
-              </span>
-            </span>
-          </div>
-        )}
-
-        <div className="max-h-[calc(100vh-220px)] min-h-[120px] flex-1 overflow-y-auto">
-          <HorizonTree
-            nodes={nodes}
-            ideas={ideas}
-            lensKey={lensKey}
-            groupValue={col.key}
-            onSetValue={handleSetValue}
-            secondaryKey={secondaryKey}
-            secondaryOptions={secondaryOptions}
-            secondaryLabel={secondaryScheme?.label}
-            secondaryValueOf={secondaryValueOf(secondaryKey)}
-            onSetSecondary={
-              secondaryKey ? (id, value) => handleSetSecondary(secondaryKey, id, value) : undefined
-            }
-            onAddSecondary={
-              secondaryKey
-                ? (text, type, secVal) => handleAdd(col.key, secondaryKey)(text, type, secVal)
-                : undefined
-            }
-            collapsed={isCollapsedStrip}
-            onToggleCollapsed={toggleUnclassified}
-            groupLabel={col.label}
-            cardMode={cardMode}
-            allTags={tagsHook.tags}
-            links={linksHook.links}
-            getTagsForIdea={taskTagsHook.getTagsForIdea}
-            onUpdate={updateIdea}
-            onDelete={deleteIdea}
-            onSchedule={scheduleIdea}
-            onMove={moveIdea}
-            onCreateLink={linksHook.createLink}
-            onDeleteLink={linksHook.deleteLink}
-            onAddTag={taskTagsHook.addTagToTask}
-            onRemoveTag={taskTagsHook.removeTagFromTask}
-            onCreateTag={tagsHook.createTag}
-            createIdea={createIdea}
-            onToggleCollapse={onToggleCollapse}
-            onExpand={onExpandIdea}
-            onToggleInFocus={ideasHook.toggleInFocus}
-            emptyMessage={
-              <p className="px-4 py-6 text-center text-xs text-gray-400 italic dark:text-gray-500">
-                No items yet
-              </p>
-            }
-          />
-        </div>
-
-        {!isCollapsedStrip && !secondaryKey && (
-          <RootAddInput label={col.label} onAdd={handleAdd(col.key)} />
-        )}
+    const collapseControl =
+      col.key === null ? (
+        <button
+          type="button"
+          onClick={toggleUnclassified}
+          title="Collapse unclassified section"
+          aria-label="Collapse unclassified section"
+          className="rounded p-0.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+        >
+          <ChevronUp size={14} />
+        </button>
+      ) : undefined;
+    const headerActions =
+      col.key !== null ? (
+        <label className="flex items-center gap-1 text-[11px] font-medium text-gray-400 dark:text-gray-500">
+          <span className="hidden lg:inline">Split</span>
+          <select
+            aria-label={`Secondary classification for ${col.label}`}
+            value={secondaryKey ?? ""}
+            onChange={(e) => handleSecondaryChange(col.key, e.target.value || null)}
+            className="max-w-[110px] cursor-pointer rounded-md border border-black/10 bg-transparent px-1 py-0.5 text-[11px] font-semibold text-gray-500 dark:border-white/10 dark:text-gray-400"
+          >
+            <option value="">None</option>
+            {secondaryChoices.map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : undefined;
+    const body = (
+      <div className="max-h-[calc(100vh-220px)] min-h-[120px] flex-1 overflow-y-auto">
+        <HorizonTree
+          nodes={nodes}
+          ideas={ideas}
+          lensKey={lensKey}
+          groupValue={col.key}
+          onSetValue={handleSetValue}
+          secondaryKey={secondaryKey}
+          secondaryOptions={secondaryOptions}
+          secondaryLabel={secondaryScheme?.label}
+          secondaryValueOf={secondaryValueOf(secondaryKey)}
+          onSetSecondary={
+            secondaryKey ? (id, value) => handleSetSecondary(secondaryKey, id, value) : undefined
+          }
+          onAddSecondary={
+            secondaryKey
+              ? (text, type, secVal) => handleAdd(col.key, secondaryKey)(text, type, secVal)
+              : undefined
+          }
+          collapsed={isCollapsedStrip}
+          onToggleCollapsed={toggleUnclassified}
+          groupLabel={col.label}
+          cardMode={cardMode}
+          allTags={tagsHook.tags}
+          links={linksHook.links}
+          getTagsForIdea={taskTagsHook.getTagsForIdea}
+          onUpdate={updateIdea}
+          onDelete={deleteIdea}
+          onSchedule={scheduleIdea}
+          onMove={moveIdea}
+          onCreateLink={linksHook.createLink}
+          onDeleteLink={linksHook.deleteLink}
+          onAddTag={taskTagsHook.addTagToTask}
+          onRemoveTag={taskTagsHook.removeTagFromTask}
+          onCreateTag={tagsHook.createTag}
+          createIdea={createIdea}
+          onToggleCollapse={onToggleCollapse}
+          onExpand={onExpandIdea}
+          onToggleInFocus={ideasHook.toggleInFocus}
+          emptyMessage={
+            <p className="px-4 py-6 text-center text-xs text-gray-400 italic dark:text-gray-500">
+              No items yet
+            </p>
+          }
+        />
       </div>
+    );
+    if (isCollapsedStrip) return body;
+    return (
+      <ColumnShell
+        label={col.label}
+        count={nodes.length}
+        collapseControl={collapseControl}
+        headerActions={headerActions}
+        footer={
+          !secondaryKey ? <RootAddInput label={col.label} onAdd={handleAdd(col.key)} /> : undefined
+        }
+      >
+        {body}
+      </ColumnShell>
     );
   };
 
   const headerStartActions = (
     <>
-      <div
-        role="radiogroup"
-        aria-label="Classification lens"
-        className="flex gap-1 rounded-xl bg-black/[0.03] p-1 dark:bg-white/[0.04]"
-      >
-        {[...schemes]
-          .sort((a, b) => a.sort_order - b.sort_order)
-          .map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              role="radio"
-              aria-checked={s.key === lensKey}
-              onClick={() => handleLensChange(s.key)}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
-                s.key === lensKey
-                  ? "bg-violet-100/80 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
-                  : "text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-      </div>
+      <LensTabs tabs={lensTabItems} activeKey={lensKey} onChange={handleLensChange} />
       <button
         type="button"
         onClick={() => setHideClosed((v) => !v)}
