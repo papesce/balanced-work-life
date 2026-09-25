@@ -70,6 +70,8 @@ interface IdeaTreeProps {
   hideClosed: boolean;
   hideCompleted: boolean;
   hideDeferred: boolean;
+  /** Ids already triaged into Horizon — hidden, ancestors kept. */
+  hideInHorizonIds?: Set<string>;
   typeFilter?: IdeaType[];
   focusedId: string | null;
   onFocus: (id: string | null) => void;
@@ -145,6 +147,7 @@ export function IdeaTree({
   hideClosed,
   hideCompleted,
   hideDeferred,
+  hideInHorizonIds,
   typeFilter,
   focusedId,
   onFocus,
@@ -161,6 +164,7 @@ export function IdeaTree({
       hideClosed,
       hideCompleted,
       hideDeferred,
+      hideInHorizonIds,
       typeFilter,
     });
 
@@ -210,6 +214,7 @@ export function IdeaTree({
     hideClosed,
     hideCompleted,
     hideDeferred,
+    hideInHorizonIds,
     typeFilter,
     showToday,
     focusedId,
@@ -345,6 +350,7 @@ export function IdeaTree({
           currentView="brainstorm"
           position={revealPos}
           onClose={() => setRevealTarget(null)}
+          allIdeas={ideas}
         />
       )}
     </div>

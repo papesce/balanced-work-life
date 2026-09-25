@@ -33,6 +33,8 @@ export interface BrainstormToolbarProps {
   setHideCompleted: (v: boolean) => void;
   hideDeferred: boolean;
   setHideDeferred: (v: boolean) => void;
+  hideInHorizon: boolean;
+  setHideInHorizon: (v: boolean) => void;
   typeFilter: IdeaType[];
   setTypeFilter: React.Dispatch<React.SetStateAction<IdeaType[]>>;
   onAddRoot: () => void;
@@ -64,6 +66,8 @@ export function BrainstormToolbar({
   setHideCompleted,
   hideDeferred,
   setHideDeferred,
+  hideInHorizon,
+  setHideInHorizon,
   typeFilter,
   setTypeFilter,
   onAddRoot,
@@ -134,6 +138,7 @@ export function BrainstormToolbar({
     (hideClosed ? 1 : 0) +
     (hideCompleted ? 1 : 0) +
     (hideDeferred ? 1 : 0) +
+    (hideInHorizon ? 1 : 0) +
     (typeFilter.length > 0 ? 1 : 0) +
     (!showType ? 1 : 0) +
     (!showArea ? 1 : 0);
@@ -270,6 +275,16 @@ export function BrainstormToolbar({
               >
                 <span>Hide deferred</span>
                 <span className={pillClass(hideDeferred)}>On</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => setHideInHorizon(!hideInHorizon)}
+                title="Hide ideas already triaged into Horizon (have a Term, NNL, MoSCoW or When value)"
+                className={`flex w-full cursor-pointer items-center justify-between rounded-lg px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-black/[0.03] dark:text-gray-200 dark:hover:bg-white/[0.04]`}
+              >
+                <span>Hide in Horizon</span>
+                <span className={pillClass(hideInHorizon)}>On</span>
               </button>
             </motion.div>
           )}

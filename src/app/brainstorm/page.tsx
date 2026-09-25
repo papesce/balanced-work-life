@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useIdeas, type CreateIdeaPosition } from "@/hooks/useIdeas";
+import { useClassifications } from "@/hooks/useClassifications";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
@@ -65,7 +66,15 @@ export default function BrainstormPage() {
   const [hideClosed, setHideClosed] = useState(false);
   const [hideCompleted, setHideCompleted] = useState(false);
   const [hideDeferred, setHideDeferred] = useState(false);
+  const [hideInHorizon, setHideInHorizon] = useState(
+    () => readRawString(STORAGE_KEYS.brainstormHideInHorizon) === "true",
+  );
   const [typeFilter, setTypeFilter] = useState<IdeaType[]>([]);
+  const { classifications } = useClassifications();
+  const classifiedIds = useMemo(
+    () => new Set(classifications.map((c) => c.idea_id)),
+    [classifications],
+  );
 
   const [focusedId, setFocusedId] = useState<string | null>(() => {
     const saved = readRawString(STORAGE_KEYS.brainstormFocusId);
@@ -79,6 +88,10 @@ export default function BrainstormPage() {
   useEffect(() => {
     writeRawString(STORAGE_KEYS.brainstormCardMode, String(cardMode));
   }, [cardMode]);
+
+  useEffect(() => {
+    writeRawString(STORAGE_KEYS.brainstormHideInHorizon, String(hideInHorizon));
+  }, [hideInHorizon]);
 
   useEffect(() => {
     if (cardMode && editMode !== "view") {
@@ -298,6 +311,7 @@ export default function BrainstormPage() {
     }
     if (hideCompleted && idea.status === "completed") setHideCompleted(false);
     if (hideDeferred && idea.status === "deferred") setHideDeferred(false);
+    if (hideInHorizon && classifiedIds.has(highlightId)) setHideInHorizon(false);
     /* eslint-enable react-hooks/set-state-in-effect */
     const timer = setTimeout(() => {
       const el = document.getElementById(`idea-${highlightId}`);
@@ -341,6 +355,8 @@ export default function BrainstormPage() {
       setHideCompleted={setHideCompleted}
       hideDeferred={hideDeferred}
       setHideDeferred={setHideDeferred}
+      hideInHorizon={hideInHorizon}
+      setHideInHorizon={setHideInHorizon}
       typeFilter={typeFilter}
       setTypeFilter={setTypeFilter}
       onAddRoot={handleAddRoot}
@@ -496,6 +512,7 @@ export default function BrainstormPage() {
           hideClosed={hideClosed}
           hideCompleted={hideCompleted}
           hideDeferred={hideDeferred}
+          hideInHorizonIds={hideInHorizon ? classifiedIds : undefined}
           typeFilter={typeFilter}
           focusedId={effectiveFocusId}
           onFocus={handleFocus}

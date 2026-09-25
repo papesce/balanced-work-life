@@ -52,6 +52,8 @@ export function filterIdeaTree(
     hideCompleted?: boolean;
     hideDeferred?: boolean;
     typeFilter?: IdeaType[];
+    /** Ids already triaged into Horizon (have ≥1 classification). Hidden, but their ancestors are kept so unclassified descendants stay reachable. */
+    hideInHorizonIds?: Set<string>;
   } = {},
 ): IdeaNode[] {
   const {
@@ -60,14 +62,24 @@ export function filterIdeaTree(
     hideCompleted = false,
     hideDeferred = false,
     typeFilter,
+    hideInHorizonIds,
   } = options;
 
   const hasTypeFilter = typeFilter && typeFilter.length > 0;
+  const hasHorizonFilter = !!hideInHorizonIds && hideInHorizonIds.size > 0;
 
-  if (!search.trim() && !hideClosed && !hideCompleted && !hideDeferred && !hasTypeFilter)
+  if (
+    !search.trim() &&
+    !hideClosed &&
+    !hideCompleted &&
+    !hideDeferred &&
+    !hasTypeFilter &&
+    !hasHorizonFilter
+  )
     return tree;
 
-  const hasHideFilters = hideClosed || hideCompleted || hideDeferred;
+  const hasHideFilters = hideClosed || hideCompleted || hideDeferred || hasHorizonFilter;
+  const ideaMap = new Map(ideas.map((i) => [i.id, i]));
 
   const hidePassedIds = new Set<string>();
   if (hasHideFilters) {
@@ -77,6 +89,23 @@ export function filterIdeaTree(
       if (hideCompleted && idea.status === "completed") passes = false;
       if (hideDeferred && idea.status === "deferred") passes = false;
       if (passes) hidePassedIds.add(idea.id);
+    }
+    if (hasHorizonFilter) {
+      const statusPassedIds = new Set(hidePassedIds);
+      for (const id of statusPassedIds) {
+        if (hideInHorizonIds!.has(id)) hidePassedIds.delete(id);
+      }
+      // Keep ancestors of visible ideas so classified parents don't orphan
+      // their unclassified descendants. Only ancestors that pass the status
+      // filters are kept, preserving the existing drop-subtree semantics.
+      for (const id of [...hidePassedIds]) {
+        let cur = ideaMap.get(id);
+        while (cur?.parent_id) {
+          if (!statusPassedIds.has(cur.parent_id)) break;
+          hidePassedIds.add(cur.parent_id);
+          cur = ideaMap.get(cur.parent_id);
+        }
+      }
     }
   }
 
@@ -97,7 +126,6 @@ export function filterIdeaTree(
   }
 
   const visibleSearchIds = new Set(matchedIds);
-  const ideaMap = new Map(ideas.map((i) => [i.id, i]));
   for (const id of matchedIds) {
     let cur = ideaMap.get(id);
     while (cur?.parent_id) {
