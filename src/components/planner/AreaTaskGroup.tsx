@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { UndoAction } from "@/lib/tasks/undo";
 import { areaColors } from "@/styles/tokens";
@@ -8,6 +7,7 @@ import { Idea, LifeArea, Tag } from "@/lib/types";
 import { AREA_ICONS, AREA_LABELS } from "@/lib/constants";
 import { RescheduleAction } from "@/lib/tasks/rescheduleTask";
 import { PendingTaskList } from "./PendingTaskList";
+import { TaskComposer } from "@/components/shared/TaskComposer";
 import { plannerLaneId, usePlannerDnd } from "./PlannerDnd";
 
 interface AreaTaskGroupProps {
@@ -51,7 +51,6 @@ export function AreaTaskGroup({
   onAttach,
   allIdeas,
 }: AreaTaskGroupProps) {
-  const [areaInputValue, setAreaInputValue] = useState("");
   const Icon = AREA_ICONS[area];
   const color = areaColors[area]?.dot;
   const { setNodeRef, isOver } = useDroppable({ id: plannerLaneId(area) });
@@ -135,21 +134,12 @@ export function AreaTaskGroup({
       </div>
 
       <div className="rounded-b-2xl border-t border-black/[0.02] bg-black/[0.01] px-4 py-2 dark:border-white/[0.02] dark:bg-white/[0.01]">
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={areaInputValue}
-            onChange={(e) => setAreaInputValue(e.target.value)}
-            placeholder={`+ Add to ${AREA_LABELS[area]}...`}
-            className="w-full border-none bg-transparent py-1.5 text-xs font-medium text-gray-700 outline-none placeholder:text-gray-400 focus:ring-0 dark:text-gray-300 dark:placeholder:text-gray-600"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && areaInputValue.trim()) {
-                void onAddTask(areaInputValue.trim(), area);
-                setAreaInputValue("");
-              }
-            }}
-          />
-        </div>
+        <TaskComposer
+          variant="plain"
+          placeholder={`+ Add to ${AREA_LABELS[area]}...`}
+          inputClassName="w-full border-none bg-transparent py-1.5 text-xs font-medium text-gray-700 outline-none placeholder:text-gray-400 focus:ring-0 dark:text-gray-300 dark:placeholder:text-gray-600"
+          onCreate={(text) => onAddTask(text, area)}
+        />
       </div>
     </div>
   );

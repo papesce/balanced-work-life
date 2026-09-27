@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { getToday, getTomorrow } from "@/lib/dateUtils";
+import { TaskComposer } from "@/components/shared/TaskComposer";
 
 type WhenOption = "today" | "tomorrow" | "custom" | "none";
 
@@ -11,7 +12,6 @@ interface QuickAddButtonProps {
 
 export function QuickAddButton({ onAdd }: QuickAddButtonProps) {
   const [open, setOpen] = useState(false);
-  const [text, setText] = useState("");
   const [when, setWhen] = useState<WhenOption>("today");
   const [customDate, setCustomDate] = useState("");
 
@@ -22,14 +22,15 @@ export function QuickAddButton({ onAdd }: QuickAddButtonProps) {
     return null;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!text.trim()) return;
-    await onAdd(text.trim(), getScheduledDate());
-    setText("");
+  const close = () => {
     setWhen("today");
     setCustomDate("");
     setOpen(false);
+  };
+
+  const handleCreate = async (trimmed: string) => {
+    await onAdd(trimmed, getScheduledDate());
+    close();
   };
 
   if (!open) {
@@ -46,18 +47,15 @@ export function QuickAddButton({ onAdd }: QuickAddButtonProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-4 backdrop-blur-sm sm:items-center dark:bg-black/60">
-      <form
-        onSubmit={handleSubmit}
-        className="glass-card-strong w-full max-w-md space-y-4 rounded-[24px] p-6"
-      >
+      <div className="glass-card-strong w-full max-w-md space-y-4 rounded-[24px] p-6">
         <h2 className="text-base font-bold text-gray-800 dark:text-gray-200">Quick Add</h2>
-        <input
-          type="text"
-          placeholder="What needs to be done?"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
+        <TaskComposer
+          variant="plain"
           autoFocus
-          className="w-full rounded-xl border border-black/10 bg-white/60 px-4 py-2.5 text-sm text-gray-800 transition-all placeholder:text-gray-300 focus:ring-2 focus:ring-violet-500/30 focus:outline-none dark:border-white/10 dark:bg-gray-800/60 dark:text-gray-200 dark:placeholder:text-gray-500"
+          placeholder="What needs to be done?"
+          inputClassName="w-full rounded-xl border border-black/10 bg-white/60 px-4 py-2.5 text-sm text-gray-800 transition-all placeholder:text-gray-300 focus:ring-2 focus:ring-violet-500/30 focus:outline-none dark:border-white/10 dark:bg-gray-800/60 dark:text-gray-200 dark:placeholder:text-gray-500"
+          onCreate={handleCreate}
+          onDismiss={close}
         />
 
         <div>
@@ -105,19 +103,16 @@ export function QuickAddButton({ onAdd }: QuickAddButtonProps) {
         <div className="flex gap-3 pt-1">
           <button
             type="button"
-            onClick={() => setOpen(false)}
+            onClick={close}
             className="flex-1 rounded-xl border border-black/10 py-2.5 text-sm text-gray-500 transition-all hover:bg-white/60 dark:border-white/10 dark:text-gray-400 dark:hover:bg-gray-800/60"
           >
             Cancel
           </button>
-          <button
-            type="submit"
-            className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-violet-700"
-          >
-            Add
-          </button>
+          <p className="flex flex-1 items-center justify-center text-xs text-gray-400">
+            Enter to add · Esc to close
+          </p>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

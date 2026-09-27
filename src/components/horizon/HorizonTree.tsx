@@ -25,6 +25,7 @@ import { TypePicker } from "@/components/brainstorm/TypePicker";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";
 import { NotesIndicator } from "@/components/shared/NotesIndicator";
+import { TaskComposer } from "@/components/shared/TaskComposer";
 import { useNotes } from "@/contexts/NotesContext";
 
 function PriorityStarSlot({
@@ -316,24 +317,14 @@ function QuickAddInline({
   draftType: IdeaType;
   onAdd: (text: string, type: IdeaType, secondaryValue: string | null) => Promise<void>;
 }) {
-  const [text, setText] = useState("");
   return (
-    <form
-      className="flex flex-1 items-center gap-1.5"
-      onSubmit={(e) => {
-        e.preventDefault();
-        const trimmed = text.trim();
-        if (!trimmed) return;
-        void onAdd(trimmed, draftType, secondaryValue).then(() => setText(""));
-      }}
-    >
-      <input
-        value={text}
-        onChange={(e) => setText(e.target.value)}
+    <div className="flex flex-1 items-center gap-1.5">
+      <TaskComposer
+        variant="plain"
         placeholder="+ Add..."
-        className="min-w-0 flex-1 bg-transparent text-xs text-gray-700 outline-none placeholder:text-gray-400 dark:text-gray-200 dark:placeholder:text-gray-500"
+        onCreate={(trimmed) => onAdd(trimmed, draftType, secondaryValue)}
       />
-    </form>
+    </div>
   );
 }
 
