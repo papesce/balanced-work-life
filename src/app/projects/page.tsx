@@ -440,7 +440,10 @@ export default function ProjectsPage() {
     registerUndo({
       label: date ? "Idea scheduled" : "Schedule cleared",
       run: async () => {
-        await ideasHook.updateIdea(id, { scheduled_date: prev.scheduled_date });
+        await ideasHook.updateIdea(id, {
+          scheduled_date: prev.scheduled_date,
+          attempt_dates: prev.attempt_dates,
+        });
       },
     });
   };

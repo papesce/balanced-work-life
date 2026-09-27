@@ -286,7 +286,10 @@ export default function BrainstormPage() {
     registerUndo({
       label: date ? "Idea scheduled" : "Schedule cleared",
       run: async () => {
-        await ideasHook.updateIdea(id, { scheduled_date: previous.scheduled_date });
+        await ideasHook.updateIdea(id, {
+          scheduled_date: previous.scheduled_date,
+          attempt_dates: previous.attempt_dates,
+        });
       },
     });
   };

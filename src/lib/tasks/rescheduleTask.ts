@@ -33,9 +33,19 @@ export type RescheduleAction =
 
 export function computeReschedulePatch(idea: Idea, action: RescheduleAction): Partial<Idea> {
   const previousDate = idea.scheduled_date;
-  const updatedAttemptDates = previousDate
-    ? [...idea.attempt_dates, previousDate]
-    : idea.attempt_dates;
+  // The date this action moves the task TO (null for defer/clear paths).
+  const nextDate =
+    action.type === "reschedule" || action.type === "move"
+      ? action.newDate
+      : action.type === "retry_today" || action.type === "try_now"
+        ? getToday()
+        : null;
+  // Record the old date as an attempt — but not when there was no date, or
+  // when the "new" date is the same (avoids duplicate entries).
+  const updatedAttemptDates =
+    previousDate && previousDate !== nextDate
+      ? [...idea.attempt_dates, previousDate]
+      : idea.attempt_dates;
 
   switch (action.type) {
     case "retry_today":
@@ -61,6 +71,7 @@ export function computeReschedulePatch(idea: Idea, action: RescheduleAction): Pa
       return {
         scheduled_date: action.newDate,
         status: "scheduled",
+        attempt_dates: updatedAttemptDates,
       };
     case "defer":
       return {
@@ -69,6 +80,18 @@ export function computeReschedulePatch(idea: Idea, action: RescheduleAction): Pa
         attempt_dates: updatedAttemptDates,
       };
   }
+}
+
+/** Clearing the date keeps the status but records the old date as an attempt. */
+export function computeClearDatePatch(idea: Idea): Partial<Idea> {
+  const previousDate = idea.scheduled_date;
+  return {
+    scheduled_date: null,
+    attempt_dates:
+      previousDate && !idea.attempt_dates.includes(previousDate)
+        ? [...idea.attempt_dates, previousDate]
+        : idea.attempt_dates,
+  };
 }
 
 /** Convenience action builders for the triage queue. */

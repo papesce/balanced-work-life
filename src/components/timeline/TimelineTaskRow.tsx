@@ -11,7 +11,7 @@ import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { SchedulePicker } from "@/components/brainstorm/SchedulePicker";
 import { MoveIdeaPanel } from "@/components/brainstorm/MoveIdeaPanel";
 import { LinkPanel } from "@/components/brainstorm/LinkPanel";
-import { RescheduleAction } from "@/lib/tasks/rescheduleTask";
+import { RescheduleAction, computeClearDatePatch } from "@/lib/tasks/rescheduleTask";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";
 import { NotesIndicator } from "@/components/shared/NotesIndicator";
 import { useNotes } from "@/contexts/NotesContext";
@@ -531,7 +531,7 @@ export function TimelineTaskRow({
                       setShowMenu(false);
                     }}
                     onClear={() => {
-                      onUpdate(task.id, { scheduled_date: null });
+                      onUpdate(task.id, computeClearDatePatch(task));
                       setShowDatePicker(false);
                       setShowMenu(false);
                     }}
