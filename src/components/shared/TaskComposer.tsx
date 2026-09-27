@@ -2,8 +2,10 @@
 
 import { KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { searchIdeas } from "@/lib/ideaSearch";
 import { formatScheduleLabel, getTypeLabel } from "@/lib/ideaSearch";
+import { STATUS_LABELS, STATUS_STYLES } from "@/lib/constants";
 import type { Idea } from "@/lib/types";
 
 export type TaskComposerVariant = "tree" | "plain" | "underline";
@@ -87,6 +89,10 @@ export function TaskComposer({
   const [activeIndex, setActiveIndex] = useState(0);
   const submittingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const rowRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  // Fixed position of the portalled dropdown, measured from the input row.
+  const [listPos, setListPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const listId = useId();
   const styles = VARIANT_STYLES[variant];
   const plus = showPlus ?? variant === "tree";
@@ -107,17 +113,45 @@ export function TaskComposer({
   const listOpen = suggestions.length > 0 && dismissedQuery !== debounced;
   const active = Math.min(activeIndex, Math.max(suggestions.length - 1, 0));
 
-  // Close the suggestion list on outside click.
+  // Close the suggestion list on outside click (the portalled list counts
+  // as inside — its buttons dismiss via mousedown-prevention + click).
   useEffect(() => {
     if (!listOpen) return;
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setDismissedQuery(debounced);
-      }
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target) || listRef.current?.contains(target)) return;
+      setDismissedQuery(debounced);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [listOpen, debounced]);
+
+  // Measure the input row so the portalled dropdown can anchor to it.
+  // Re-measure on scroll/resize/suggestion change: the page scrolls under a
+  // fixed-position list. State updates happen in async callbacks only.
+  useEffect(() => {
+    if (!listOpen) return;
+    const measure = () => {
+      const rect = rowRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const width = Math.min(rect.width, window.innerWidth - 16);
+      const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
+      const estHeight = 220;
+      const top =
+        rect.bottom + estHeight > window.innerHeight && rect.top - estHeight - 4 > 0
+          ? rect.top - estHeight - 4
+          : rect.bottom + 4;
+      setListPos({ top, left, width });
+    };
+    const raf = requestAnimationFrame(measure);
+    window.addEventListener("scroll", measure, true);
+    window.addEventListener("resize", measure);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", measure, true);
+      window.removeEventListener("resize", measure);
+    };
+  }, [listOpen, suggestions]);
 
   const normalizedQuery = debounced.trim().toLowerCase();
   const hasExactMatch = suggestions.some(
@@ -176,8 +210,8 @@ export function TaskComposer({
   };
 
   const inner = (
-    <div ref={containerRef} className="relative min-w-0 flex-1">
-      <div className={className ?? styles.wrap} onClick={(e) => e.stopPropagation()}>
+    <div ref={containerRef} className="min-w-0 flex-1">
+      <div ref={rowRef} className={className ?? styles.wrap} onClick={(e) => e.stopPropagation()}>
         {variant === "tree" && <span className="h-5 w-5 flex-shrink-0" />}
         {leading}
         {plus && (
@@ -203,58 +237,75 @@ export function TaskComposer({
         />
         {trailing}
       </div>
-      {listOpen && suggestions.length > 0 && (
-        <div
-          id={listId}
-          role="listbox"
-          aria-label="Possible duplicates"
-          className="absolute top-full right-0 left-0 z-50 mt-1 overflow-hidden rounded-xl border border-amber-200/70 bg-white shadow-lg dark:border-amber-500/20 dark:bg-gray-900"
-        >
-          <p
-            className={`px-3 pt-2 text-[10px] font-semibold tracking-wide uppercase ${
-              hasExactMatch
-                ? "text-amber-600 dark:text-amber-400"
-                : "text-gray-400 dark:text-gray-500"
-            }`}
+      {listOpen &&
+        suggestions.length > 0 &&
+        listPos &&
+        createPortal(
+          <div
+            ref={listRef}
+            id={listId}
+            role="listbox"
+            aria-label="Possible duplicates"
+            style={{
+              position: "fixed",
+              top: listPos.top,
+              left: listPos.left,
+              width: listPos.width,
+              zIndex: 10000,
+            }}
+            className="overflow-hidden rounded-xl border border-amber-200/70 bg-white shadow-lg dark:border-amber-500/20 dark:bg-gray-900"
           >
-            {hasExactMatch ? "Already exists — Tab to open" : "Similar open tasks — Tab to open"}
-          </p>
-          <ul className="max-h-48 overflow-y-auto py-1">
-            {suggestions.map((s, i) => {
-              const schedule = formatScheduleLabel(s);
-              return (
-                <li key={s.id}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={i === active}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => pick(s)}
-                    onMouseEnter={() => setActiveIndex(i)}
-                    className={`flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left text-xs ${
-                      i === active
-                        ? "bg-amber-50 dark:bg-amber-500/10"
-                        : "bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
-                    }`}
-                  >
-                    <span className="min-w-0 flex-1 truncate text-gray-700 dark:text-gray-200">
-                      {s.text || "Untitled"}
-                    </span>
-                    <span className="flex-shrink-0 rounded-full bg-black/[0.05] px-1.5 py-px text-[10px] font-medium text-gray-500 dark:bg-white/[0.08] dark:text-gray-400">
-                      {getTypeLabel(s.type)}
-                    </span>
-                    {schedule && (
-                      <span className="flex-shrink-0 text-[10px] text-gray-400 dark:text-gray-500">
-                        {schedule}
+            <p
+              className={`px-3 pt-2 text-[10px] font-semibold tracking-wide uppercase ${
+                hasExactMatch
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-gray-400 dark:text-gray-500"
+              }`}
+            >
+              {hasExactMatch ? "Already exists — Tab to open" : "Similar open tasks — Tab to open"}
+            </p>
+            <ul className="max-h-48 overflow-y-auto py-1">
+              {suggestions.map((s, i) => {
+                const schedule = formatScheduleLabel(s);
+                return (
+                  <li key={s.id}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={i === active}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => pick(s)}
+                      onMouseEnter={() => setActiveIndex(i)}
+                      className={`flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left text-xs ${
+                        i === active
+                          ? "bg-amber-50 dark:bg-amber-500/10"
+                          : "bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
+                      }`}
+                    >
+                      <span className="min-w-0 flex-1 truncate text-gray-700 dark:text-gray-200">
+                        {s.text || "Untitled"}
                       </span>
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
+                      <span className="flex-shrink-0 rounded-full bg-black/[0.05] px-1.5 py-px text-[10px] font-medium text-gray-500 dark:bg-white/[0.08] dark:text-gray-400">
+                        {getTypeLabel(s.type)}
+                      </span>
+                      <span
+                        className={`flex-shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium ${STATUS_STYLES[s.status]}`}
+                      >
+                        {STATUS_LABELS[s.status]}
+                      </span>
+                      {schedule && (
+                        <span className="flex-shrink-0 text-[10px] text-gray-400 dark:text-gray-500">
+                          {schedule}
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 
