@@ -3,10 +3,22 @@
 import { KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { searchIdeas } from "@/lib/ideaSearch";
 import { formatScheduleLabel, getTypeLabel } from "@/lib/ideaSearch";
 import { STATUS_LABELS, STATUS_STYLES } from "@/lib/constants";
+import { canRevealInView, getRevealHref, getSmartRevealView, type RevealView } from "@/lib/reveal";
 import type { Idea } from "@/lib/types";
+
+function pathnameToView(pathname: string): RevealView | null {
+  if (pathname === "/") return "planner";
+  if (pathname === "/timeline") return "timeline";
+  if (pathname === "/horizon") return "horizon";
+  if (pathname === "/brainstorm") return "brainstorm";
+  if (pathname === "/projects") return "projects";
+  if (pathname === "/goals") return "goals";
+  return null;
+}
 
 export type TaskComposerVariant = "tree" | "plain" | "underline";
 
@@ -32,11 +44,15 @@ interface TaskComposerProps {
   /**
    * Opt-in duplicate warning: when provided, typing (min 2 chars, debounced)
    * shows matching OPEN ideas below the input. Enter still creates;
-   * picking a match calls `onPickExisting` (default: discard the draft).
+   * picking a match (click / Tab) calls `onPickExisting` when provided,
+   * otherwise navigates to the existing task (current view when it can
+   * reveal it, else the smart reveal view) via `?highlight=`.
    */
   suggestFrom?: Idea[];
   suggestLimit?: number;
   onPickExisting?: (idea: Idea) => void;
+  /** Override auto-detected current view (from pathname) for reveal routing. */
+  currentView?: RevealView | null;
 }
 
 const VARIANT_STYLES: Record<TaskComposerVariant, { wrap: string; input: string }> = {
@@ -80,7 +96,12 @@ export function TaskComposer({
   suggestFrom,
   suggestLimit = 5,
   onPickExisting,
+  currentView: currentViewProp,
 }: TaskComposerProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentView = currentViewProp !== undefined ? currentViewProp : pathnameToView(pathname);
   const [text, setText] = useState("");
   const [debounced, setDebounced] = useState("");
   // Query for which the user explicitly closed the list (Escape / outside
@@ -161,7 +182,35 @@ export function TaskComposer({
   const pick = (idea: Idea) => {
     setText("");
     setDebounced("");
-    onPickExisting?.(idea);
+    if (onPickExisting) {
+      onPickExisting(idea);
+      return;
+    }
+    // Default: navigate to the existing task so users don't create dupes.
+    // Prefer staying in the current view when it can render the idea;
+    // otherwise fall back to the smart reveal view. Horizon keeps the
+    // active lens params (the page auto-switches to the idea's column).
+    const allIdeas = suggestFrom;
+    let href: string;
+    if (currentView && canRevealInView(currentView, idea, allIdeas)) {
+      if (currentView === "horizon") {
+        const lens = searchParams.get("lens") ?? "term";
+        const horizon = searchParams.get("horizon");
+        href = horizon
+          ? getRevealHref(currentView, idea, allIdeas, horizon, lens)
+          : getRevealHref(currentView, idea, allIdeas);
+        // Preserve a non-default lens when the default href would reset it.
+        if (!horizon && lens !== "term") {
+          href = getRevealHref(currentView, idea, allIdeas, undefined, lens);
+        }
+      } else {
+        href = getRevealHref(currentView, idea, allIdeas);
+      }
+    } else {
+      href = getRevealHref(getSmartRevealView(idea, allIdeas), idea, allIdeas);
+    }
+    onDismiss?.();
+    router.push(href);
   };
 
   const submit = async () => {
