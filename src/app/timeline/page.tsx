@@ -871,6 +871,7 @@ function TimelineInner() {
                           area={quickAddArea}
                           onAreaChange={setQuickAddArea}
                           onAdd={(text) => handleQuickAdd(text, date, quickAddArea)}
+                          suggestFrom={ideas}
                         />
                       </div>
                     ) : null}

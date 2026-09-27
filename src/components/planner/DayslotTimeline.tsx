@@ -224,10 +224,11 @@ export function DayslotTimeline({
           defaultArea={selectedArea}
           tags={tags}
           onCreateTag={onCreateTag}
+          suggestFrom={allTasks}
         />
       );
     },
-    [wrappedOnCreateTask, selectedArea, tags, onCreateTag],
+    [wrappedOnCreateTask, selectedArea, tags, onCreateTag, allTasks],
   );
 
   const renderEventContent = useCallback(

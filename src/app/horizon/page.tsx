@@ -85,9 +85,11 @@ function compareIdeasForTree(a: Idea, b: Idea): number {
 function RootAddInput({
   label,
   onAdd,
+  suggestFrom,
 }: {
   label: string;
   onAdd: (text: string, type?: IdeaType) => Promise<void>;
+  suggestFrom?: Idea[];
 }) {
   const [rootType, setRootType] = useState<IdeaType>("task");
   const [showTypePicker, setShowTypePicker] = useState(false);
@@ -119,6 +121,7 @@ function RootAddInput({
           onAdd={async (text) => {
             await onAdd(text, rootType);
           }}
+          suggestFrom={suggestFrom}
         />
       </div>
     </div>
@@ -606,7 +609,9 @@ export default function HorizonPage() {
         collapseControl={collapseControl}
         headerActions={headerActions}
         footer={
-          !secondaryKey ? <RootAddInput label={col.label} onAdd={handleAdd(col.key)} /> : undefined
+          !secondaryKey ? (
+            <RootAddInput label={col.label} onAdd={handleAdd(col.key)} suggestFrom={ideas} />
+          ) : undefined
         }
       >
         {body}

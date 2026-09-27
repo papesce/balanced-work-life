@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { LifeArea, Tag } from "@/lib/types";
+import { Idea, LifeArea, Tag } from "@/lib/types";
 import { AREA_LABELS } from "@/lib/constants";
 import { minutesToTimeString } from "./dayslotAdapter";
 import { TagPicker } from "@/components/shared/TagPicker";
@@ -15,6 +15,7 @@ export function SlotForm({
   defaultArea,
   tags,
   onCreateTag,
+  suggestFrom,
 }: {
   startMinute: number;
   close: () => void;
@@ -22,6 +23,7 @@ export function SlotForm({
   defaultArea: LifeArea | null;
   tags: Tag[];
   onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
+  suggestFrom?: Idea[];
 }) {
   const [selectedArea, setSelectedArea] = useState<LifeArea | null>(defaultArea);
   const [selectedTag, setSelectedTag] = useState<Tag | null>(null);
@@ -57,6 +59,7 @@ export function SlotForm({
         inputClassName="w-full rounded-lg border border-black/10 bg-white/80 px-2 py-1 text-xs text-gray-800 focus:ring-1 focus:ring-violet-500 focus:outline-none dark:border-white/20 dark:bg-gray-800 dark:text-gray-200"
         onCreate={handleAdd}
         onDismiss={close}
+        suggestFrom={suggestFrom}
       />
       <div className="flex items-center justify-between gap-2">
         <button

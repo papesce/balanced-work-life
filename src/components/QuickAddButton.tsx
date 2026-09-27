@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { getToday, getTomorrow } from "@/lib/dateUtils";
 import { TaskComposer } from "@/components/shared/TaskComposer";
+import { useIdeas } from "@/hooks/useIdeas";
 
 type WhenOption = "today" | "tomorrow" | "custom" | "none";
 
@@ -14,6 +15,9 @@ export function QuickAddButton({ onAdd }: QuickAddButtonProps) {
   const [open, setOpen] = useState(false);
   const [when, setWhen] = useState<WhenOption>("today");
   const [customDate, setCustomDate] = useState("");
+  // Local subscription: AppShell (which mounts this button) has no ideas in
+  // scope, but the duplicate warning needs the full open list.
+  const { ideas } = useIdeas();
 
   const getScheduledDate = (): string | null => {
     if (when === "today") return getToday();
@@ -56,6 +60,7 @@ export function QuickAddButton({ onAdd }: QuickAddButtonProps) {
           inputClassName="w-full rounded-xl border border-black/10 bg-white/60 px-4 py-2.5 text-sm text-gray-800 transition-all placeholder:text-gray-300 focus:ring-2 focus:ring-violet-500/30 focus:outline-none dark:border-white/10 dark:bg-gray-800/60 dark:text-gray-200 dark:placeholder:text-gray-500"
           onCreate={handleCreate}
           onDismiss={close}
+          suggestFrom={ideas}
         />
 
         <div>

@@ -139,6 +139,7 @@ export function AreaTaskGroup({
           placeholder={`+ Add to ${AREA_LABELS[area]}...`}
           inputClassName="w-full border-none bg-transparent py-1.5 text-xs font-medium text-gray-700 outline-none placeholder:text-gray-400 focus:ring-0 dark:text-gray-300 dark:placeholder:text-gray-600"
           onCreate={(text) => onAddTask(text, area)}
+          suggestFrom={allIdeas}
         />
       </div>
     </div>

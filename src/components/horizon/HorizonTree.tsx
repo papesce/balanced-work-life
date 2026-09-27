@@ -238,6 +238,7 @@ function SecondarySubGroup({
   nodes,
   renderRows,
   onAddSecondary,
+  suggestFrom,
   muted = false,
 }: {
   lensKey: string;
@@ -248,6 +249,7 @@ function SecondarySubGroup({
   nodes: TreeNode<Idea>[];
   renderRows: (rows: TreeNode<Idea>[]) => React.ReactNode;
   onAddSecondary?: (text: string, type: IdeaType, secondaryValue: string | null) => Promise<void>;
+  suggestFrom?: Idea[];
   muted?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({
@@ -301,6 +303,7 @@ function SecondarySubGroup({
             secondaryValue={secondaryValue}
             draftType={draftType}
             onAdd={onAddSecondary}
+            suggestFrom={suggestFrom}
           />
         </div>
       )}
@@ -312,10 +315,12 @@ function QuickAddInline({
   secondaryValue,
   draftType,
   onAdd,
+  suggestFrom,
 }: {
   secondaryValue: string | null;
   draftType: IdeaType;
   onAdd: (text: string, type: IdeaType, secondaryValue: string | null) => Promise<void>;
+  suggestFrom?: Idea[];
 }) {
   return (
     <div className="flex flex-1 items-center gap-1.5">
@@ -323,6 +328,7 @@ function QuickAddInline({
         variant="plain"
         placeholder="+ Add..."
         onCreate={(trimmed) => onAdd(trimmed, draftType, secondaryValue)}
+        suggestFrom={suggestFrom}
       />
     </div>
   );
@@ -573,6 +579,7 @@ export function HorizonTree({
             nodes={grouped.get(opt.key) ?? []}
             renderRows={renderRows}
             onAddSecondary={onAddSecondary}
+            suggestFrom={ideas}
           />
         ))}
         <SecondarySubGroup
@@ -584,6 +591,7 @@ export function HorizonTree({
           nodes={grouped.get(null) ?? []}
           renderRows={renderRows}
           onAddSecondary={onAddSecondary}
+          suggestFrom={ideas}
           muted
         />
       </div>

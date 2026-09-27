@@ -1,6 +1,6 @@
 "use client";
 
-import { LifeArea } from "@/lib/types";
+import { Idea, LifeArea } from "@/lib/types";
 import { AREA_LABELS, AREA_ORDER } from "@/lib/constants";
 import { areaColors } from "@/styles/tokens";
 import { TaskComposer } from "@/components/shared/TaskComposer";
@@ -11,14 +11,23 @@ interface QuickAddInputProps {
   /** When set, renders an inline area chip row; selection is single and can be cleared by clicking the active chip. */
   area?: LifeArea | null;
   onAreaChange?: (area: LifeArea | null) => void;
+  /** Opt-in duplicate warning: open ideas to suggest while typing. */
+  suggestFrom?: Idea[];
 }
 
-export function QuickAddInput({ placeholder, onAdd, area, onAreaChange }: QuickAddInputProps) {
+export function QuickAddInput({
+  placeholder,
+  onAdd,
+  area,
+  onAreaChange,
+  suggestFrom,
+}: QuickAddInputProps) {
   return (
     <TaskComposer
       variant="underline"
       placeholder={placeholder}
       onCreate={onAdd}
+      suggestFrom={suggestFrom}
       trailing={
         onAreaChange ? (
           <div
