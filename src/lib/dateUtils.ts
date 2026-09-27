@@ -17,6 +17,16 @@ export function getTomorrow(): string {
   return toLocalDateString(d);
 }
 
+/** Current local time as "HH:MM", floored to `snapMinutes` (default 15). */
+export function getCurrentTimeRounded(snapMinutes = 15): string {
+  const now = new Date();
+  const total = now.getHours() * 60 + now.getMinutes();
+  const snapped = Math.floor(total / snapMinutes) * snapMinutes;
+  const h = Math.floor(snapped / 60);
+  const m = snapped % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
 export function getEndOfWeek(): string {
   const d = new Date();
   const day = d.getDay();

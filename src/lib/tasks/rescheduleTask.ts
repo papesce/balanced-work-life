@@ -1,5 +1,5 @@
 import { Idea } from "@/lib/types";
-import { getToday, addDays } from "@/lib/dateUtils";
+import { getToday, addDays, getCurrentTimeRounded } from "@/lib/dateUtils";
 
 export function computeCompletePatch(): Partial<Idea> {
   return {
@@ -26,6 +26,7 @@ export function getContextDate(idea: Idea): string {
 
 export type RescheduleAction =
   | { type: "retry_today" }
+  | { type: "try_now" }
   | { type: "reschedule"; newDate: string }
   | { type: "move"; newDate: string }
   | { type: "defer" };
@@ -40,6 +41,13 @@ export function computeReschedulePatch(idea: Idea, action: RescheduleAction): Pa
     case "retry_today":
       return {
         scheduled_date: getToday(),
+        status: "scheduled",
+        attempt_dates: updatedAttemptDates,
+      };
+    case "try_now":
+      return {
+        scheduled_date: getToday(),
+        scheduled_time: getCurrentTimeRounded(15),
         status: "scheduled",
         attempt_dates: updatedAttemptDates,
       };
@@ -64,6 +72,10 @@ export function computeReschedulePatch(idea: Idea, action: RescheduleAction): Pa
 }
 
 /** Convenience action builders for the triage queue. */
+export function tryNowAction(): RescheduleAction {
+  return { type: "try_now" };
+}
+
 export function tomorrowAction(): RescheduleAction {
   return { type: "reschedule", newDate: addDays(getToday(), 1) };
 }

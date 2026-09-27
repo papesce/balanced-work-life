@@ -500,6 +500,15 @@ export function TimelineTaskRow({
                   {dateActionLabel} to Today
                 </button>
               )}
+              <button
+                onClick={() => {
+                  void onReschedule(task.id, { type: "try_now" });
+                  setShowMenu(false);
+                }}
+                className="flex w-full px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+              >
+                ⚡ Try now
+              </button>
               <div className="relative">
                 <button
                   onClick={() => setShowDatePicker((v) => !v)}

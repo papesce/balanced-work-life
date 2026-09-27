@@ -20,6 +20,7 @@ export function EventCard({
   isCancelled,
   scrollElement,
   onUpdateTask,
+  onTryNow,
   onAddTag,
   onRemoveTag,
   onCreateTag,
@@ -34,6 +35,7 @@ export function EventCard({
   isCancelled: boolean;
   scrollElement: HTMLDivElement | null;
   onUpdateTask: (id: string, updates: Partial<Idea>) => void;
+  onTryNow?: (id: string) => void;
   onAddTag?: (ideaId: string, tag: Tag) => Promise<void>;
   onRemoveTag?: (ideaId: string, tagId: string) => Promise<void>;
   onCreateTag?: (name: string, area: LifeArea) => Promise<Tag | null>;
@@ -249,6 +251,18 @@ export function EventCard({
               Change Area...
             </button>
             <div className="my-1 border-t border-black/5 dark:border-white/5" />
+            {onTryNow && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTryNow(idea.id);
+                  setShowMenu(false);
+                }}
+                className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+              >
+                ⚡ Try now
+              </button>
+            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();

@@ -7,6 +7,7 @@ import type { TimelineEvent, DailyTimelineHandle } from "@papesce/dayslot";
 import "@papesce/dayslot/style.css";
 import { Idea, LifeArea, getAreasForIdea, Tag } from "@/lib/types";
 import { AREA_LABELS } from "@/lib/constants";
+import { computeReschedulePatch } from "@/lib/tasks/rescheduleTask";
 import { minutesToTimeString, parseTimeToMinutes } from "./dayslotAdapter";
 import { SlotForm } from "./SlotForm";
 import { EventCard } from "./TimelineEventCard";
@@ -182,6 +183,15 @@ export function DayslotTimeline({
     [onUpdateTask],
   );
 
+  const handleTryNow = useCallback(
+    (id: string) => {
+      const idea = taskMap.get(id) ?? allTasks.find((t) => t.id === id);
+      if (!idea) return;
+      onUpdateTask(id, computeReschedulePatch(idea, { type: "try_now" }));
+    },
+    [taskMap, allTasks, onUpdateTask],
+  );
+
   const wrappedOnCreateTask = useCallback(
     async (
       text: string,
@@ -260,13 +270,24 @@ export function DayslotTimeline({
           isCancelled={isCancelled}
           scrollElement={scrollEl}
           onUpdateTask={onUpdateTask}
+          onTryNow={handleTryNow}
           onAddTag={onAddTag}
           onRemoveTag={onRemoveTag}
           onCreateTag={onCreateTag}
         />
       );
     },
-    [taskMap, getTagsForIdea, tags, scrollEl, onUpdateTask, onAddTag, onRemoveTag, onCreateTag],
+    [
+      taskMap,
+      getTagsForIdea,
+      tags,
+      scrollEl,
+      onUpdateTask,
+      handleTryNow,
+      onAddTag,
+      onRemoveTag,
+      onCreateTag,
+    ],
   );
 
   return (

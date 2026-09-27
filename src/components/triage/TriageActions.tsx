@@ -3,7 +3,12 @@
 import { useState } from "react";
 import { Check, X } from "lucide-react";
 import { Idea } from "@/lib/types";
-import { RescheduleAction, tomorrowAction, nextWeekAction } from "@/lib/tasks/rescheduleTask";
+import {
+  RescheduleAction,
+  tomorrowAction,
+  nextWeekAction,
+  tryNowAction,
+} from "@/lib/tasks/rescheduleTask";
 
 interface TriageActionsProps {
   task: Idea;
@@ -38,6 +43,13 @@ export function TriageActions({
         className={`${base} text-violet-600`}
       >
         Today
+      </button>
+      <button
+        onClick={() => void onReschedule(task.id, tryNowAction())}
+        className={`${base} text-violet-600`}
+        title="Move to today at the current time"
+      >
+        ⚡ Now
       </button>
       <button
         onClick={() => void onReschedule(task.id, tomorrowAction())}
