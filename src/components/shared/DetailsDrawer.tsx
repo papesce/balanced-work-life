@@ -21,6 +21,7 @@ import { useClassifications } from "@/hooks/useClassifications";
 import { getRevealHref } from "@/lib/reveal";
 import type { Idea, IdeaLink } from "@/lib/types";
 import { DetailsEditor } from "./DetailsEditor";
+import { ScheduleAttempts } from "./ScheduleAttempts";
 
 export type DetailsSection = "notes" | "context";
 
@@ -363,6 +364,7 @@ export function DetailsDrawer({
           </div>
 
           {/* Notes Section */}
+          <ScheduleAttempts idea={idea} />
           <DetailsEditor value={idea.notes} onSave={handleSave} />
           <p className="mt-2 text-[10px] text-gray-400 dark:text-gray-500">
             ⌘+Enter to save · Esc to close

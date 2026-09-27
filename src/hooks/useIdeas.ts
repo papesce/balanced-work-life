@@ -103,12 +103,23 @@ function sortIdeasForInsert(ideas: Idea[]): Idea[] {
 }
 
 /** PowerSync stores JSON columns as text — deserialize them back to the expected JS types. */
+function parseStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((v): v is string => typeof v === "string");
+  if (typeof value !== "string" || value.length === 0) return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 function deserializeIdea(row: Record<string, unknown>): Idea {
   return {
     ...row,
     is_priority: Boolean(row.is_priority),
     in_focus: Boolean(row.in_focus),
-    attempt_dates: row.attempt_dates ? (JSON.parse(row.attempt_dates as string) as string[]) : [],
+    attempt_dates: parseStringArray(row.attempt_dates),
     status_history: row.status_history
       ? (JSON.parse(row.status_history as string) as { status: Idea["status"]; at: string }[])
       : null,
