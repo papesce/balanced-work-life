@@ -107,10 +107,38 @@ function parseStringArray(value: unknown): string[] {
   if (Array.isArray(value)) return value.filter((v): v is string => typeof v === "string");
   if (typeof value !== "string" || value.length === 0) return [];
   try {
-    const parsed: unknown = JSON.parse(value);
+    let parsed: unknown = JSON.parse(value);
+    // Unwrap double-encoding from legacy uploads that stored a JSON string
+    // ('"[\\"2026-..\\"]"') instead of an array in the server jsonb column.
+    if (typeof parsed === "string") {
+      try {
+        parsed = JSON.parse(parsed);
+      } catch {
+        return [];
+      }
+    }
     return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
   } catch {
     return [];
+  }
+}
+
+function parseStatusHistory(value: unknown): { status: Idea["status"]; at: string }[] | null {
+  if (value == null || value === "") return null;
+  if (Array.isArray(value)) return value as { status: Idea["status"]; at: string }[];
+  if (typeof value !== "string") return null;
+  try {
+    let parsed: unknown = JSON.parse(value);
+    if (typeof parsed === "string") {
+      try {
+        parsed = JSON.parse(parsed);
+      } catch {
+        return null;
+      }
+    }
+    return Array.isArray(parsed) ? (parsed as { status: Idea["status"]; at: string }[]) : null;
+  } catch {
+    return null;
   }
 }
 
@@ -120,9 +148,7 @@ function deserializeIdea(row: Record<string, unknown>): Idea {
     is_priority: Boolean(row.is_priority),
     in_focus: Boolean(row.in_focus),
     attempt_dates: parseStringArray(row.attempt_dates),
-    status_history: row.status_history
-      ? (JSON.parse(row.status_history as string) as { status: Idea["status"]; at: string }[])
-      : null,
+    status_history: parseStatusHistory(row.status_history),
   } as unknown as Idea;
 }
 

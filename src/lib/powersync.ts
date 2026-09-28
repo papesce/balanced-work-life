@@ -182,6 +182,15 @@ export class SupabaseConnector {
       }
     };
 
+    // Local PowerSync stores JSON columns (attempt_dates, status_history) as
+    // TEXT via JSON.stringify, but Supabase expects jsonb arrays/objects.
+    // Sending the raw string would persist a JSON *string* ("[\"2026-..\"\"]")
+    // instead of an array, which then deserializes to [] on download and
+    // silently drops history (e.g. reschedule vanishes from original date).
+    if (op.table === "ideas" && op.opData && (op.op === "PUT" || op.op === "PATCH")) {
+      op = { ...op, opData: normalizeIdeasPayload(op.opData) };
+    }
+
     if (
       (op.table === "classification_schemes" ||
         op.table === "classification_options" ||
@@ -480,6 +489,45 @@ export class SupabaseConnector {
 }
 
 let powerSyncInstance: PowerSyncDatabase | null = null;
+
+/**
+ * Convert locally-stringified JSON columns back to real JSON values for Supabase.
+ * Handles single- and double-encoded strings so already-corrupt queue entries
+ * also self-heal on next upload.
+ */
+export function normalizeIdeasPayload(data: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...data };
+  if ("attempt_dates" in out) {
+    out.attempt_dates = parseJsonColumn(out.attempt_dates, []);
+  }
+  if ("status_history" in out) {
+    const v = out.status_history;
+    out.status_history = v == null || v === "" ? null : parseJsonColumn(v, null);
+  }
+  return out;
+}
+
+function parseJsonColumn(value: unknown, fallback: unknown): unknown {
+  if (value == null) return fallback;
+  if (Array.isArray(value) || typeof value === "object") return value;
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  if (trimmed === "") return fallback;
+  try {
+    let parsed: unknown = JSON.parse(trimmed);
+    // Unwrap double-encoding: '"[\"2026-..\"]"' -> '["2026-.."]' -> [...]
+    if (typeof parsed === "string") {
+      try {
+        parsed = JSON.parse(parsed);
+      } catch {
+        return fallback;
+      }
+    }
+    return parsed ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export function getPowerSync(): PowerSyncDatabase {
   if (powerSyncInstance) return powerSyncInstance;
