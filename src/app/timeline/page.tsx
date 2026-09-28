@@ -804,6 +804,10 @@ function TimelineInner() {
             occurrencesByDate={occurrencesByDate}
             showQuickAdd={(date) => effectiveFilter === "all" || isPlanDate(date)}
             onAnchorChange={handleAnchorChange}
+            onOpenDay={(d) => {
+              setView("agenda");
+              setAnchorParam(d);
+            }}
             onReorder={handleReorderDate}
             onDone={handleDone}
             onUndone={markUndone}

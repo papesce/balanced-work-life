@@ -2,13 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import {
-  DndContext,
-  useDraggable,
-  useDroppable,
-  type DragEndEvent,
-  type DragStartEvent,
-} from "@dnd-kit/core";
+import { DndContext, useDroppable, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Idea, IdeaLink, LinkType, Tag, LifeArea } from "@/lib/types";
 import { DayOccurrence, RescheduleAction } from "@/lib/tasks/rescheduleTask";
@@ -17,20 +11,10 @@ import { DayTaskList } from "./DayTaskList";
 import { QuickAddInput } from "./QuickAddInput";
 import { MiniBalanceBar } from "@/components/MiniBalanceBar";
 import { formatTimelineDate } from "./timelineUtils";
+import { TaskChip } from "./TaskChip";
 
 const DAY_HEADERS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MAX_CHIPS = 3;
-
-const STATUS_DOT: Record<string, string> = {
-  completed: "bg-violet-500",
-  cancelled: "bg-red-400",
-  in_progress: "bg-amber-500",
-  paused: "bg-orange-400",
-  scheduled: "bg-sky-500",
-  planned: "bg-gray-300 dark:bg-gray-600",
-  deferred: "bg-gray-300 dark:bg-gray-600",
-  archived: "bg-gray-300 dark:bg-gray-600",
-};
 
 interface MonthGridViewProps {
   gridDates: string[];
@@ -59,49 +43,6 @@ interface MonthGridViewProps {
   quickAddArea: LifeArea | null;
   onQuickAddAreaChange: (area: LifeArea | null) => void;
   onQuickAdd: (text: string, date: string) => Promise<void>;
-}
-
-function TaskChip({
-  task,
-  date,
-  onOpen,
-  justDraggedRef,
-}: {
-  task: Idea;
-  date: string;
-  onOpen: () => void;
-  justDraggedRef: React.MutableRefObject<number>;
-}) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `month-chip-${task.id}-${date}`,
-    data: { taskId: task.id, fromDate: date },
-  });
-  const done = task.status === "completed" || task.status === "cancelled";
-  return (
-    <button
-      ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      onClick={() => {
-        if (Date.now() - justDraggedRef.current < 300) return;
-        onOpen();
-      }}
-      title={task.scheduled_time ? `${task.text} · ${task.scheduled_time.slice(0, 5)}` : task.text}
-      className={`flex w-full cursor-grab items-center gap-1 truncate rounded-md px-1 py-px text-left text-[10px] font-medium transition-colors hover:bg-black/[0.06] active:cursor-grabbing dark:hover:bg-white/[0.08] ${
-        done ? "text-gray-400 line-through dark:text-gray-500" : "text-gray-700 dark:text-gray-200"
-      } ${isDragging ? "opacity-40" : ""}`}
-    >
-      <span
-        className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${STATUS_DOT[task.status] ?? STATUS_DOT.planned}`}
-      />
-      {task.scheduled_time && (
-        <span className="flex-shrink-0 font-semibold text-violet-600 tabular-nums dark:text-violet-400">
-          {task.scheduled_time.slice(0, 5)}
-        </span>
-      )}
-      <span className="truncate">{task.text || "Untitled"}</span>
-    </button>
-  );
 }
 
 function DayCell({
@@ -164,6 +105,7 @@ function DayCell({
             key={o.task.id}
             task={o.task}
             date={date}
+            idPrefix="month"
             onOpen={onOpen}
             justDraggedRef={justDraggedRef}
           />
