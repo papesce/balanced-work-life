@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { Idea, IdeaLink, LinkType, Tag } from "@/lib/types";
-import { LinkPanel } from "@/components/brainstorm/LinkPanel";
+import { LinkPanel } from "@/components/shared/LinkPanel";
 import { MoveIdeaPanel } from "@/components/brainstorm/MoveIdeaPanel";
 import { SchedulePicker } from "@/components/brainstorm/SchedulePicker";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";

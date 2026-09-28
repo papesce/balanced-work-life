@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
@@ -22,6 +22,7 @@ import { getRevealHref } from "@/lib/reveal";
 import type { Idea, IdeaLink } from "@/lib/types";
 import { DetailsEditor } from "./DetailsEditor";
 import { ScheduleAttempts } from "./ScheduleAttempts";
+import { LinkPanel } from "./LinkPanel";
 
 export type DetailsSection = "notes" | "context";
 
@@ -71,7 +72,10 @@ export function DetailsDrawer({
   const [contextOpen, setContextOpen] = useState(initialSection === "context");
   const router = useRouter();
   const { schemes, options, getOptionForIdea, setClassification } = useClassifications();
-  const { links } = useIdeaLinks();
+  const { links, createLink, deleteLink } = useIdeaLinks();
+  const [showLinkPanel, setShowLinkPanel] = useState(false);
+  const linkButtonRef = useRef<HTMLButtonElement>(null);
+  const [linkPanelPos, setLinkPanelPos] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -81,6 +85,7 @@ export function DetailsDrawer({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setContextOpen(initialSection === "context");
+    setShowLinkPanel(false);
   }, [ideaId, initialSection]);
 
   useEffect(() => {
@@ -245,14 +250,47 @@ export function DetailsDrawer({
                   </div>
                 )}
 
-                <p className="mb-1 text-[10px] font-medium tracking-wide text-gray-400 uppercase">
-                  Related
-                </p>
-                {linkedGroups.length === 0 ? (
-                  <p className="px-2 py-1 text-xs text-gray-400 italic">
-                    No links yet — create one from the … → Link… menu.
+                <div className="mb-1 flex items-center justify-between">
+                  <p className="text-[10px] font-medium tracking-wide text-gray-400 uppercase">
+                    Related
                   </p>
-                ) : (
+                  <button
+                    ref={linkButtonRef}
+                    onClick={() => {
+                      if (showLinkPanel) {
+                        setShowLinkPanel(false);
+                        return;
+                      }
+                      const rect = linkButtonRef.current?.getBoundingClientRect();
+                      if (rect)
+                        setLinkPanelPos({
+                          top: rect.bottom + 4,
+                          left: Math.max(8, rect.right - 440),
+                        });
+                      setShowLinkPanel(true);
+                    }}
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold text-indigo-500 hover:bg-indigo-50/50 dark:hover:bg-indigo-500/10"
+                  >
+                    <Link2 size={10} strokeWidth={1.5} />
+                    Link…
+                  </button>
+                </div>
+                {showLinkPanel && idea && linkPanelPos && (
+                  <LinkPanel
+                    ideaId={idea.id}
+                    ideas={ideas}
+                    links={links}
+                    onCreateLink={createLink}
+                    onDeleteLink={deleteLink}
+                    onClose={() => setShowLinkPanel(false)}
+                    fixedPosition={linkPanelPos}
+                  />
+                )}
+                {linkedGroups.length === 0 && !showLinkPanel ? (
+                  <p className="px-2 py-1 text-xs text-gray-400 italic">
+                    No links yet — use Link… above to create one.
+                  </p>
+                ) : linkedGroups.length === 0 ? null : (
                   linkedGroups.map(([label, rows]) => (
                     <div key={label} className="mb-2 last:mb-0">
                       <p className="mb-1 px-2 text-[10px] font-medium text-gray-400">{label}</p>

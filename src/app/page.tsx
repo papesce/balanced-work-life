@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useCallback, useRef, Suspense } from "rea
 import { useSearchParams, useRouter } from "next/navigation";
 import { Sparkles, Layers, Clock, BarChart3, EyeOff, Eye } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
+import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { AppShell } from "@/components/AppShell";
@@ -56,6 +57,7 @@ function DailyPlannerInner() {
   } = useIdeas();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
+  const linksHook = useIdeaLinks();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [activeDate, setActiveDate] = useState<string>(
@@ -567,6 +569,9 @@ function DailyPlannerInner() {
                     onUndoAction={registerUndo}
                     onAttach={handleAttach}
                     allIdeas={ideas}
+                    links={linksHook.links}
+                    onCreateLink={linksHook.createLink}
+                    onDeleteLink={linksHook.deleteLink}
                   />
                 );
               })}

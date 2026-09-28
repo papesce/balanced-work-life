@@ -4,10 +4,10 @@ import { useState, useEffect, useRef, useMemo, KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Star, MoreHorizontal, GripVertical, Clock, CornerDownRight } from "lucide-react";
+import { Star, MoreHorizontal, GripVertical, Clock, CornerDownRight, Link2 } from "lucide-react";
 import { UndoAction } from "@/lib/tasks/undo";
 import { areaColors } from "@/styles/tokens";
-import { Idea, IdeaStatus, LifeArea, Tag } from "@/lib/types";
+import { Idea, IdeaStatus, IdeaLink, LinkType, LifeArea, Tag } from "@/lib/types";
 import { STATUS_CONFIG, PRODUCTIVITY_SIGNALS } from "@/lib/constants";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { formatTime } from "./plannerUtils";
@@ -16,6 +16,7 @@ import { MoveIdeaPanel } from "@/components/brainstorm/MoveIdeaPanel";
 import { RescheduleAction } from "@/lib/tasks/rescheduleTask";
 import { getToday } from "@/lib/dateUtils";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";
+import { LinkPanel } from "@/components/shared/LinkPanel";
 import { NotesIndicator } from "@/components/shared/NotesIndicator";
 import { useNotes } from "@/contexts/NotesContext";
 import { Eye } from "lucide-react";
@@ -38,6 +39,9 @@ interface PendingTaskListProps {
   onUndoAction?: (action: UndoAction) => void;
   onAttach?: (taskId: string, parentId: string) => Promise<void>;
   allIdeas?: Idea[];
+  links?: IdeaLink[];
+  onCreateLink?: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
+  onDeleteLink?: (id: string) => Promise<void>;
 }
 
 export function PendingTaskList({
@@ -57,6 +61,9 @@ export function PendingTaskList({
   onUndoAction,
   onAttach,
   allIdeas,
+  links,
+  onCreateLink,
+  onDeleteLink,
 }: PendingTaskListProps) {
   // Sortable ids derive directly from props — dnd-kit handles drag
   // transforms internally, so no local reorder state is needed.
@@ -83,6 +90,9 @@ export function PendingTaskList({
           onUndoAction={onUndoAction}
           onAttach={onAttach}
           allIdeas={allIdeas}
+          links={links}
+          onCreateLink={onCreateLink}
+          onDeleteLink={onDeleteLink}
         />
       ))}
     </SortableContext>
@@ -106,6 +116,9 @@ function SortableItemWrapper({
   onUndoAction,
   onAttach,
   allIdeas,
+  links,
+  onCreateLink,
+  onDeleteLink,
 }: {
   task: Idea;
   area: LifeArea;
@@ -123,6 +136,9 @@ function SortableItemWrapper({
   onUndoAction?: (action: UndoAction) => void;
   onAttach?: (taskId: string, parentId: string) => Promise<void>;
   allIdeas?: Idea[];
+  links?: IdeaLink[];
+  onCreateLink?: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
+  onDeleteLink?: (id: string) => Promise<void>;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
@@ -161,6 +177,9 @@ function SortableItemWrapper({
         onUndoAction={onUndoAction}
         onAttach={onAttach}
         allIdeas={allIdeas}
+        links={links}
+        onCreateLink={onCreateLink}
+        onDeleteLink={onDeleteLink}
       />
     </div>
   );
@@ -186,6 +205,9 @@ function TaskRow({
   onUndoAction,
   onAttach,
   allIdeas,
+  links,
+  onCreateLink,
+  onDeleteLink,
 }: {
   task: Idea;
   area: LifeArea;
@@ -209,6 +231,9 @@ function TaskRow({
   onUndoAction?: (action: UndoAction) => void;
   onAttach?: (taskId: string, parentId: string) => Promise<void>;
   allIdeas?: Idea[];
+  links?: IdeaLink[];
+  onCreateLink?: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
+  onDeleteLink?: (id: string) => Promise<void>;
 }) {
   const isCompleted = task.status === "completed";
   const isCancelled = task.status === "cancelled";
@@ -251,6 +276,9 @@ function TaskRow({
   const dateActionLabel = isReschedule ? "Reschedule" : "Move";
   const [revealPos, setRevealPos] = useState<{ top: number; right: number } | null>(null);
   const [showReveal, setShowReveal] = useState(false);
+  const [showLinkPanel, setShowLinkPanel] = useState(false);
+  const [linkPanelPos, setLinkPanelPos] = useState<{ top: number; left: number } | null>(null);
+  const linkBadgeRef = useRef<HTMLButtonElement>(null);
   const { openNotes } = useNotes();
 
   useEffect(() => {
@@ -705,6 +733,32 @@ function TaskRow({
           );
         })()}
 
+      {(() => {
+        const count =
+          links?.filter((l) => l.source_id === task.id || l.target_id === task.id).length ?? 0;
+        if (count === 0) return null;
+        return (
+          <button
+            ref={linkBadgeRef}
+            aria-label={`View links (${count})`}
+            title="View links"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (showLinkPanel) {
+                setShowLinkPanel(false);
+                return;
+              }
+              const rect = linkBadgeRef.current?.getBoundingClientRect();
+              if (rect) setLinkPanelPos({ top: rect.bottom + 4, left: rect.left });
+              setShowMenu(false);
+              setShowLinkPanel(true);
+            }}
+            className="flex flex-shrink-0 cursor-pointer items-center gap-0.5 rounded-full bg-indigo-50 px-1.5 py-0.5 text-[9px] font-bold text-indigo-600 transition-colors hover:bg-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-400 dark:hover:bg-indigo-900/30"
+          >
+            <Link2 size={10} /> {count}
+          </button>
+        );
+      })()}
       <NotesIndicator hasNotes={!!task.notes?.trim()} onClick={() => openNotes(task.id)} />
       <div className="flex flex-shrink-0 items-center gap-1 transition-opacity md:opacity-0 md:group-hover:opacity-100">
         <button
@@ -765,6 +819,24 @@ function TaskRow({
                       Attach to…
                     </button>
                   </div>
+                )}
+                {onCreateLink && onDeleteLink && allIdeas && links && (
+                  <button
+                    onClick={() => {
+                      const rect = menuTriggerRef.current?.getBoundingClientRect();
+                      if (rect)
+                        setLinkPanelPos({
+                          top: rect.bottom + 6,
+                          left: Math.max(8, rect.left - 360),
+                        });
+                      setShowMenu(false);
+                      setShowLinkPanel(true);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                  >
+                    <Link2 size={11} strokeWidth={1.5} />
+                    Link…
+                  </button>
                 )}
                 <div className="my-1 border-t border-black/5 dark:border-white/5" />
                 <button
@@ -929,6 +1001,18 @@ function TaskRow({
               currentView="planner"
               position={revealPos}
               onClose={() => setShowReveal(false)}
+            />
+          )}
+          {showLinkPanel && linkPanelPos && onCreateLink && onDeleteLink && allIdeas && links && (
+            <LinkPanel
+              ideaId={task.id}
+              ideas={allIdeas}
+              links={links}
+              getTagsForIdea={getTagsForIdea}
+              onCreateLink={onCreateLink}
+              onDeleteLink={onDeleteLink}
+              onClose={() => setShowLinkPanel(false)}
+              fixedPosition={linkPanelPos}
             />
           )}
           {showAttachPanel && allIdeas && (

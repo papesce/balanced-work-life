@@ -10,7 +10,7 @@ import { AREA_DOT_COLORS, STATUS_CONFIG, PRODUCTIVITY_SIGNALS } from "@/lib/cons
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { SchedulePicker } from "@/components/brainstorm/SchedulePicker";
 import { MoveIdeaPanel } from "@/components/brainstorm/MoveIdeaPanel";
-import { LinkPanel } from "@/components/brainstorm/LinkPanel";
+import { LinkPanel } from "@/components/shared/LinkPanel";
 import { RescheduleAction, computeClearDatePatch } from "@/lib/tasks/rescheduleTask";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";
 import { NotesIndicator } from "@/components/shared/NotesIndicator";

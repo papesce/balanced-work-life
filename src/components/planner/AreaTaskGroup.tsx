@@ -3,7 +3,7 @@
 import { useDroppable } from "@dnd-kit/core";
 import { UndoAction } from "@/lib/tasks/undo";
 import { areaColors } from "@/styles/tokens";
-import { Idea, LifeArea, Tag } from "@/lib/types";
+import { Idea, IdeaLink, LinkType, LifeArea, Tag } from "@/lib/types";
 import { AREA_ICONS, AREA_LABELS } from "@/lib/constants";
 import { RescheduleAction } from "@/lib/tasks/rescheduleTask";
 import { PendingTaskList } from "./PendingTaskList";
@@ -29,6 +29,9 @@ interface AreaTaskGroupProps {
   onUndoAction?: (action: UndoAction) => void;
   onAttach?: (taskId: string, parentId: string) => Promise<void>;
   allIdeas?: Idea[];
+  links?: IdeaLink[];
+  onCreateLink?: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
+  onDeleteLink?: (id: string) => Promise<void>;
 }
 
 export function AreaTaskGroup({
@@ -50,6 +53,9 @@ export function AreaTaskGroup({
   onUndoAction,
   onAttach,
   allIdeas,
+  links,
+  onCreateLink,
+  onDeleteLink,
 }: AreaTaskGroupProps) {
   const Icon = AREA_ICONS[area];
   const color = areaColors[area]?.dot;
@@ -103,6 +109,9 @@ export function AreaTaskGroup({
             onUndoAction={onUndoAction}
             onAttach={onAttach}
             allIdeas={allIdeas}
+            links={links}
+            onCreateLink={onCreateLink}
+            onDeleteLink={onDeleteLink}
           />
         )}
         {doneTasks.map((task) => (
@@ -124,6 +133,9 @@ export function AreaTaskGroup({
             onUndoAction={onUndoAction}
             onAttach={onAttach}
             allIdeas={allIdeas}
+            links={links}
+            onCreateLink={onCreateLink}
+            onDeleteLink={onDeleteLink}
           />
         ))}
         {pendingTasks.length === 0 && doneTasks.length === 0 && (
