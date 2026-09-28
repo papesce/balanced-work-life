@@ -45,7 +45,7 @@ import { STORAGE_KEYS, readJson, writeJson } from "@/lib/storage";
 import { useUndoAction } from "@/lib/tasks/undo";
 import { DayTaskList } from "@/components/timeline/DayTaskList";
 import { MonthGridView } from "@/components/timeline/MonthGridView";
-import { WeekStripView } from "@/components/timeline/WeekStripView";
+import { WeekStripView, type WeekCardPreview } from "@/components/timeline/WeekStripView";
 import { QuickAddInput } from "@/components/timeline/QuickAddInput";
 import { UndoBar } from "@/components/shared/UndoBar";
 import { DateNav } from "@/components/planner/DateNav";
@@ -154,9 +154,12 @@ interface TimelinePrefs {
   filter: "all" | "deferred";
   preset: TimelinePresetId;
   view: TimelineView;
+  weekCardPreview?: WeekCardPreview;
   pastRange?: string;
   futureRange?: string;
 }
+
+const WEEK_CARD_PREVIEW_IDS: WeekCardPreview[] = ["top", "times", "status", "priority"];
 
 function loadPrefs(): TimelinePrefs {
   const stored = readJson<Partial<TimelinePrefs>>(STORAGE_KEYS.timelinePrefs) ?? {};
@@ -180,6 +183,9 @@ function loadPrefs(): TimelinePrefs {
       ? (legacyPreset as TimelinePresetId)
       : (migratedPreset ?? DEFAULT_PRESET),
     view: stored.view === "week" || stored.view === "month" ? stored.view : "agenda",
+    weekCardPreview: WEEK_CARD_PREVIEW_IDS.includes(stored.weekCardPreview as WeekCardPreview)
+      ? (stored.weekCardPreview as WeekCardPreview)
+      : "top",
   };
 }
 
@@ -297,6 +303,9 @@ function TimelineInner() {
   const [filter, setFilter] = useState<"all" | "deferred">(() => loadPrefs().filter);
   const [preset, setPreset] = useState<TimelinePresetId>(() => loadPrefs().preset);
   const [view, setView] = useState<TimelineView>(() => loadPrefs().view);
+  const [weekCardPreview, setWeekCardPreview] = useState<WeekCardPreview>(
+    () => loadPrefs().weekCardPreview ?? "top",
+  );
   const [quickAddArea, setQuickAddArea] = useState<LifeArea | null>(null);
   const [anchorVisible, setAnchorVisible] = useState(true);
   const [scrollRequest, setScrollRequest] = useState(0);
@@ -447,8 +456,8 @@ function TimelineInner() {
   };
 
   useEffect(() => {
-    writeJson(STORAGE_KEYS.timelinePrefs, { filter, preset, view });
-  }, [filter, preset, view]);
+    writeJson(STORAGE_KEYS.timelinePrefs, { filter, preset, view, weekCardPreview });
+  }, [filter, preset, view, weekCardPreview]);
 
   useEffect(() => {
     if (!windowMenuOpen) return;
@@ -656,15 +665,16 @@ function TimelineInner() {
     );
   }
 
-  const headerActions = (
-    <DateNav
-      activeDate={anchor}
-      today={today}
-      showDateInput={showDateInput}
-      onShowDateInput={setShowDateInput}
-      onChangeDate={handleAnchorChange}
-    />
-  );
+  const headerActions =
+    view === "agenda" ? (
+      <DateNav
+        activeDate={anchor}
+        today={today}
+        showDateInput={showDateInput}
+        onShowDateInput={setShowDateInput}
+        onChangeDate={handleAnchorChange}
+      />
+    ) : undefined;
 
   const headerStartActions = (
     <>
@@ -753,6 +763,7 @@ function TimelineInner() {
       title="Timeline"
       headerActions={headerActions}
       headerStartActions={headerStartActions}
+      fullWidth={view !== "agenda"}
     >
       <div className={`space-y-4 pb-24 ${rangeFlash ? "timeline-range-updated" : ""}`}>
         <UndoBar undoAction={undoAction} onUndo={() => void handleUndo()} onDismiss={clearUndo} />
@@ -781,6 +792,7 @@ function TimelineInner() {
             onUpdate={handleUpdate}
             onReschedule={handleReschedule}
             onMove={handleMove}
+            onSmartSort={(dayTasks) => smartSortTasks(dayTasks)}
             ideas={ideas}
             links={linksHook.links}
             onCreateLink={handleCreateLink}
@@ -794,6 +806,7 @@ function TimelineInner() {
             quickAddArea={quickAddArea}
             onQuickAddAreaChange={setQuickAddArea}
             onQuickAdd={(text, date) => handleQuickAdd(text, date, quickAddArea)}
+            showQuickAdd={(date) => effectiveFilter === "all" || isPlanDate(date)}
           />
         ) : view === "week" ? (
           <WeekStripView
@@ -814,6 +827,7 @@ function TimelineInner() {
             onUpdate={handleUpdate}
             onReschedule={handleReschedule}
             onMove={handleMove}
+            onSmartSort={(dayTasks) => smartSortTasks(dayTasks)}
             ideas={ideas}
             links={linksHook.links}
             onCreateLink={handleCreateLink}
@@ -828,6 +842,8 @@ function TimelineInner() {
             onQuickAddAreaChange={setQuickAddArea}
             onQuickAdd={(text, date) => handleQuickAdd(text, date, quickAddArea)}
             suggestFrom={ideas}
+            cardPreview={weekCardPreview}
+            onCardPreviewChange={setWeekCardPreview}
           />
         ) : noDeferredActivity ? (
           <div className="glass-card rounded-2xl border border-dashed border-black/5 py-20 text-center text-gray-400 dark:border-white/5 dark:text-gray-500">

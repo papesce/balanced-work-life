@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { useDragControls } from "framer-motion";
-import { Star, MoreHorizontal, Link2, GripVertical } from "lucide-react";
+import { useDraggable } from "@dnd-kit/core";
+import { Star, MoreHorizontal, Link2, GripVertical, CalendarDays } from "lucide-react";
 import { Idea, IdeaStatus, IdeaLink, LinkType, Tag, LifeArea } from "@/lib/types";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { AREA_DOT_COLORS, STATUS_CONFIG, PRODUCTIVITY_SIGNALS } from "@/lib/constants";
@@ -41,6 +42,35 @@ interface TimelineTaskRowProps {
   onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
   isHistorical?: boolean;
   onGoToDate?: (date: string, taskId: string) => void;
+  /** When set, renders a dnd-kit handle to drag this row onto a week/month day cell. */
+  rescheduleDrag?: { taskId: string; fromDate: string; idPrefix: string };
+}
+
+export function RescheduleDragHandle({
+  taskId,
+  fromDate,
+  idPrefix,
+}: {
+  taskId: string;
+  fromDate: string;
+  idPrefix: string;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `${idPrefix}-detail-${taskId}-${fromDate}`,
+    data: { taskId, fromDate },
+  });
+  return (
+    <button
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      title="Drag onto a day to reschedule"
+      aria-label="Drag to reschedule to another day"
+      className={`flex-shrink-0 cursor-grab touch-none text-gray-300 transition-colors hover:text-violet-500 active:cursor-grabbing dark:text-gray-600 dark:hover:text-violet-400 ${isDragging ? "opacity-40" : "opacity-0 group-hover:opacity-100"}`}
+    >
+      <CalendarDays size={13} />
+    </button>
+  );
 }
 
 export function TimelineTaskRow({
@@ -64,6 +94,7 @@ export function TimelineTaskRow({
   onCreateTag,
   isHistorical = false,
   onGoToDate,
+  rescheduleDrag,
 }: TimelineTaskRowProps) {
   const isCompleted = task.status === "completed";
   const isCancelled = task.status === "cancelled";
@@ -236,6 +267,13 @@ export function TimelineTaskRow({
       >
         <GripVertical size={12} />
       </button>
+      {rescheduleDrag && !isHistorical && (
+        <RescheduleDragHandle
+          taskId={rescheduleDrag.taskId}
+          fromDate={rescheduleDrag.fromDate}
+          idPrefix={rescheduleDrag.idPrefix}
+        />
+      )}
 
       {statusConfig.icon && (
         <statusConfig.icon

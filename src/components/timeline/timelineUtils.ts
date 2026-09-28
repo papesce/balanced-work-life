@@ -9,5 +9,5 @@ export function formatTimelineDate(date: string): string {
 export function getTimelineKicker(date: string, today: string, tomorrow: string): string {
   if (date === today) return "Today";
   if (date === tomorrow) return "Tomorrow";
-  return date < today ? "Past" : "Upcoming";
+  return date < today ? "" : "Upcoming";
 }

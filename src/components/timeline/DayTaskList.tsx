@@ -25,6 +25,8 @@ interface DayTaskListProps {
   onAddTag: (ideaId: string, tag: Tag) => Promise<void>;
   onRemoveTag: (ideaId: string, tagId: string) => Promise<void>;
   onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
+  /** When set, each row gets a dnd-kit handle to drag onto week/month cells. */
+  rescheduleDragPrefix?: string;
 }
 
 function HistoricalOccurrenceRow({
@@ -115,6 +117,7 @@ function DayTaskItem({
   onAddTag,
   onRemoveTag,
   onCreateTag,
+  rescheduleDragPrefix,
 }: {
   task: Idea;
   occurrenceDate?: string;
@@ -134,6 +137,7 @@ function DayTaskItem({
   onAddTag: (ideaId: string, tag: Tag) => Promise<void>;
   onRemoveTag: (ideaId: string, tagId: string) => Promise<void>;
   onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
+  rescheduleDragPrefix?: string;
 }) {
   const controls = useDragControls();
   return (
@@ -157,6 +161,11 @@ function DayTaskItem({
         onAddTag={onAddTag}
         onRemoveTag={onRemoveTag}
         onCreateTag={onCreateTag}
+        rescheduleDrag={
+          rescheduleDragPrefix && occurrenceDate
+            ? { taskId: task.id, fromDate: occurrenceDate, idPrefix: rescheduleDragPrefix }
+            : undefined
+        }
       />
     </Reorder.Item>
   );
@@ -181,6 +190,7 @@ export function DayTaskList({
   onAddTag,
   onRemoveTag,
   onCreateTag,
+  rescheduleDragPrefix,
 }: DayTaskListProps) {
   const currentTasks = useMemo(
     () => occurrences.filter((o) => !o.isHistorical).map((o) => o.task),
@@ -229,6 +239,7 @@ export function DayTaskList({
             onAddTag={onAddTag}
             onRemoveTag={onRemoveTag}
             onCreateTag={onCreateTag}
+            rescheduleDragPrefix={rescheduleDragPrefix}
           />
         ))}
       </Reorder.Group>

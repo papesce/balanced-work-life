@@ -1,9 +1,8 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { DndContext, useDroppable, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { Idea, IdeaLink, LinkType, Tag, LifeArea } from "@/lib/types";
 import { DayOccurrence, RescheduleAction } from "@/lib/tasks/rescheduleTask";
 import { addMonths, getToday } from "@/lib/dateUtils";
@@ -30,6 +29,7 @@ interface MonthGridViewProps {
   onUpdate: (id: string, updates: Partial<Idea>) => void;
   onReschedule: (id: string, action: RescheduleAction) => Promise<void>;
   onMove?: (id: string, newParentId: string | null, newSortOrder: number) => Promise<void>;
+  onSmartSort?: (tasks: Idea[]) => void;
   ideas: Idea[];
   links: IdeaLink[];
   onCreateLink: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
@@ -43,23 +43,24 @@ interface MonthGridViewProps {
   quickAddArea: LifeArea | null;
   onQuickAddAreaChange: (area: LifeArea | null) => void;
   onQuickAdd: (text: string, date: string) => Promise<void>;
+  showQuickAdd?: (date: string) => boolean;
 }
 
 function DayCell({
   date,
-  anchor,
+  selected,
   today,
   isCurrentMonth,
   occurrences,
-  onOpen,
+  onSelect,
   justDraggedRef,
 }: {
   date: string;
-  anchor: string;
+  selected: boolean;
   today: string;
   isCurrentMonth: boolean;
   occurrences: DayOccurrence[];
-  onOpen: () => void;
+  onSelect: () => void;
   justDraggedRef: React.MutableRefObject<number>;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `month-day-${date}`, data: { date } });
@@ -67,26 +68,30 @@ function DayCell({
   const visible = current.slice(0, MAX_CHIPS);
   const overflow = current.length - visible.length;
   const dayNum = Number(date.slice(8, 10));
-  const isAnchor = date === anchor;
   const isToday = date === today;
   return (
-    <div
+    <button
       ref={setNodeRef}
-      onClick={onOpen}
-      className={`min-h-[88px] cursor-pointer rounded-xl border p-1 transition-colors sm:min-h-[104px] ${
+      onClick={() => {
+        if (Date.now() - justDraggedRef.current < 300) return;
+        onSelect();
+      }}
+      aria-pressed={selected}
+      aria-label={`${formatTimelineDate(date)}: ${current.length} tasks. Select to view.`}
+      className={`min-h-[88px] w-full cursor-pointer rounded-xl border p-1 text-left transition-colors sm:min-h-[104px] ${
         isOver
           ? "border-violet-400 bg-violet-50 ring-2 ring-violet-500/40 dark:border-violet-500 dark:bg-violet-950/20"
-          : isAnchor
+          : selected
             ? "glass-card-anchor"
             : "glass-card hover:bg-black/[0.02] dark:hover:bg-white/[0.03]"
       } ${isCurrentMonth ? "" : "opacity-45"}`}
     >
-      <div className="flex items-center justify-between px-0.5">
+      <span className="flex items-center justify-between px-0.5">
         <span
           className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
             isToday
               ? "bg-violet-600 text-white"
-              : isAnchor
+              : selected
                 ? "text-violet-600 dark:text-violet-400"
                 : "text-gray-500 dark:text-gray-400"
           }`}
@@ -98,35 +103,33 @@ function DayCell({
             {current.length}
           </span>
         )}
-      </div>
-      <div className="mt-0.5 space-y-px" onClick={(e) => e.stopPropagation()}>
+      </span>
+      <span className="mt-0.5 block space-y-px" onClick={(e) => e.stopPropagation()}>
         {visible.map((o) => (
           <TaskChip
             key={o.task.id}
             task={o.task}
             date={date}
             idPrefix="month"
-            onOpen={onOpen}
+            onOpen={onSelect}
             justDraggedRef={justDraggedRef}
           />
         ))}
         {overflow > 0 && (
-          <button
-            onClick={onOpen}
-            className="w-full truncate rounded-md px-1 py-px text-left text-[9px] font-bold text-violet-500 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/20"
+          <span
+            onClick={onSelect}
+            className="block w-full truncate rounded-md px-1 py-px text-left text-[9px] font-bold text-violet-500 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/20"
           >
             +{overflow} more
-          </button>
+          </span>
         )}
-      </div>
-    </div>
+      </span>
+    </button>
   );
 }
 
 export function MonthGridView(props: MonthGridViewProps) {
-  const { gridDates, anchor, today, occurrencesByDate, onAnchorChange, onOpenDay, onReschedule } =
-    props;
-  const [openDate, setOpenDate] = useState<string | null>(null);
+  const { gridDates, anchor, today, occurrencesByDate, onAnchorChange, onReschedule } = props;
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const justDraggedRef = useRef(0);
 
@@ -152,16 +155,18 @@ export function MonthGridView(props: MonthGridViewProps) {
     if (!taskId || !toDate || toDate === fromDate) return;
     justDraggedRef.current = Date.now();
     void onReschedule(taskId, { type: "move", newDate: toDate });
+    if (toDate !== anchor) onAnchorChange(toDate);
   };
 
-  const openOccurrences = useMemo(
-    () => (openDate ? (props.occurrencesByDate[openDate] ?? []) : []),
-    [props.occurrencesByDate, openDate],
+  const selectedOccurrences = useMemo(
+    () => props.occurrencesByDate[anchor] ?? [],
+    [props.occurrencesByDate, anchor],
   );
-  const openDayTasks = useMemo(
-    () => openOccurrences.filter((o) => !o.isHistorical).map((o) => o.task),
-    [openOccurrences],
+  const selectedDayTasks = useMemo(
+    () => selectedOccurrences.filter((o) => !o.isHistorical).map((o) => o.task),
+    [selectedOccurrences],
   );
+  const canQuickAdd = props.showQuickAdd ? props.showQuickAdd(anchor) : true;
 
   return (
     <DndContext
@@ -169,133 +174,137 @@ export function MonthGridView(props: MonthGridViewProps) {
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveTaskId(null)}
     >
-      <div className="glass-card rounded-[20px] px-4 py-4 sm:px-5">
-        <div className="mb-3 flex items-center justify-between">
-          <button
-            onClick={() => onAnchorChange(addMonths(anchor, -1))}
-            aria-label="Previous month"
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:hover:bg-white/5 dark:hover:text-gray-200"
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <button
-            onClick={() => onAnchorChange(getToday())}
-            title="Jump to today"
-            className="text-base font-bold text-gray-900 hover:text-violet-600 dark:text-gray-100 dark:hover:text-violet-400"
-          >
-            {monthLabel}
-          </button>
-          <button
-            onClick={() => onAnchorChange(addMonths(anchor, 1))}
-            aria-label="Next month"
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:hover:bg-white/5 dark:hover:text-gray-200"
-          >
-            <ChevronRight size={16} />
-          </button>
-        </div>
-
-        <div className="mb-1 grid grid-cols-7 gap-1.5 sm:gap-2">
-          {DAY_HEADERS.map((d) => (
-            <div
-              key={d}
-              className="py-1 text-center text-[10px] font-bold tracking-wider text-gray-400 uppercase dark:text-gray-500"
+      <div className="space-y-4">
+        <div className="glass-card rounded-[20px] px-4 py-4 sm:px-5">
+          <div className="mb-3 flex items-center justify-between">
+            <button
+              onClick={() => onAnchorChange(addMonths(anchor, -1))}
+              aria-label="Previous month"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:hover:bg-white/5 dark:hover:text-gray-200"
             >
-              {d}
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
-          {gridDates.map((date) => (
-            <DayCell
-              key={date}
-              date={date}
-              anchor={anchor}
-              today={today}
-              isCurrentMonth={date.slice(0, 7) === anchorMonth}
-              occurrences={occurrencesByDate[date] ?? []}
-              onOpen={() => setOpenDate(date)}
-              justDraggedRef={justDraggedRef}
-            />
-          ))}
-        </div>
-        {activeTaskId && (
-          <p className="mt-2 text-center text-[10px] font-semibold text-violet-500">
-            Drop on a day to move the task there
-          </p>
-        )}
-      </div>
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              onClick={() => onAnchorChange(getToday())}
+              title="Jump to today"
+              className="text-base font-bold text-gray-900 hover:text-violet-600 dark:text-gray-100 dark:hover:text-violet-400"
+            >
+              {monthLabel}
+            </button>
+            <button
+              onClick={() => onAnchorChange(addMonths(anchor, 1))}
+              aria-label="Next month"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:hover:bg-white/5 dark:hover:text-gray-200"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
 
-      {openDate &&
-        createPortal(
-          <div className="fixed inset-0 z-[10000] flex items-end justify-center sm:items-center">
-            <div
-              className="absolute inset-0 bg-black/20 backdrop-blur-[1px]"
-              onClick={() => setOpenDate(null)}
-              aria-hidden
-            />
-            <div className="relative flex max-h-[80vh] w-full flex-col rounded-t-2xl bg-white shadow-xl sm:mx-4 sm:max-w-lg sm:rounded-2xl dark:bg-gray-900">
-              <div className="flex items-center justify-between border-b border-black/5 px-4 py-3 dark:border-white/5">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                    {formatTimelineDate(openDate)}
-                  </span>
-                  <MiniBalanceBar
-                    tasks={openDayTasks}
-                    getTagsForIdea={props.getTagsForIdea}
-                    date={openDate}
-                  />
-                </div>
-                <button
-                  onClick={() => {
-                    setOpenDate(null);
-                    onOpenDay(openDate);
-                  }}
-                  className="rounded-lg px-2 py-1 text-[11px] font-semibold text-violet-500 transition-colors hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/20"
-                >
-                  Open day →
-                </button>
+          <div className="mb-1 grid grid-cols-7 gap-1.5 sm:gap-2">
+            {DAY_HEADERS.map((d) => (
+              <div
+                key={d}
+                className="py-1 text-center text-[10px] font-bold tracking-wider text-gray-400 uppercase dark:text-gray-500"
+              >
+                {d}
               </div>
-              <div className="flex-1 overflow-y-auto px-4 py-2">
-                {openOccurrences.length === 0 ? (
-                  <p className="py-2 text-xs text-gray-400 italic dark:text-gray-500">
-                    No tasks planned
-                  </p>
-                ) : (
-                  <DayTaskList
-                    occurrences={openOccurrences}
-                    onReorder={props.onReorder}
-                    onDone={props.onDone}
-                    onUndone={props.onUndone}
-                    onUpdate={props.onUpdate}
-                    onReschedule={props.onReschedule}
-                    onMove={props.onMove}
-                    ideas={props.ideas}
-                    links={props.links}
-                    onCreateLink={props.onCreateLink}
-                    onDeleteLink={props.onDeleteLink}
-                    today={props.today}
-                    onGoToDate={props.onGoToDate}
-                    allTags={props.allTags}
-                    getTagsForIdea={props.getTagsForIdea}
-                    onAddTag={props.onAddTag}
-                    onRemoveTag={props.onRemoveTag}
-                    onCreateTag={props.onCreateTag}
-                  />
-                )}
-              </div>
-              <div className="border-t border-black/5 px-4 py-2 dark:border-white/5">
-                <QuickAddInput
-                  placeholder={`+ Add task for ${formatTimelineDate(openDate)}...`}
-                  area={props.quickAddArea}
-                  onAreaChange={props.onQuickAddAreaChange}
-                  onAdd={(text) => props.onQuickAdd(text, openDate)}
-                  suggestFrom={props.ideas}
-                />
-              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+            {gridDates.map((date) => (
+              <DayCell
+                key={date}
+                date={date}
+                selected={date === anchor}
+                today={today}
+                isCurrentMonth={date.slice(0, 7) === anchorMonth}
+                occurrences={occurrencesByDate[date] ?? []}
+                onSelect={() => {
+                  if (date !== anchor) onAnchorChange(date);
+                }}
+                justDraggedRef={justDraggedRef}
+              />
+            ))}
+          </div>
+          {activeTaskId && (
+            <p className="mt-2 text-center text-[10px] font-semibold text-violet-500">
+              Drop on a day to move the task there
+            </p>
+          )}
+        </div>
+
+        <div className="glass-card scroll-mt-24 rounded-[20px] px-5 pt-4 pb-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-3">
+            <div className="flex items-center gap-3">
+              <span className="text-[22px] leading-tight font-bold text-gray-900 dark:text-gray-100">
+                {formatTimelineDate(anchor)}
+              </span>
+              <MiniBalanceBar
+                tasks={selectedDayTasks}
+                getTagsForIdea={props.getTagsForIdea}
+                date={anchor}
+              />
             </div>
-          </div>,
-          document.body,
-        )}
+            <div className="flex items-center gap-1">
+              {selectedDayTasks.length > 0 && props.onSmartSort && (
+                <button
+                  onClick={() => props.onSmartSort?.(selectedDayTasks)}
+                  className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-violet-500 transition-all hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/20"
+                  title="Sort tasks by priority score (effort × impact × urgency)"
+                >
+                  <Sparkles size={12} />
+                  <span className="hidden sm:inline">Smart Sort</span>
+                </button>
+              )}
+              <button
+                onClick={() => props.onOpenDay(anchor)}
+                className="rounded-lg px-2 py-1 text-[11px] font-semibold text-violet-500 transition-colors hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/20"
+              >
+                Open day →
+              </button>
+            </div>
+          </div>
+          <div className="pb-2">
+            {selectedOccurrences.length === 0 ? (
+              <p className="py-2 text-xs text-gray-400 italic dark:text-gray-500">
+                No tasks planned
+              </p>
+            ) : (
+              <DayTaskList
+                occurrences={selectedOccurrences}
+                onReorder={props.onReorder}
+                onDone={props.onDone}
+                onUndone={props.onUndone}
+                onUpdate={props.onUpdate}
+                onReschedule={props.onReschedule}
+                onMove={props.onMove}
+                ideas={props.ideas}
+                links={props.links}
+                onCreateLink={props.onCreateLink}
+                onDeleteLink={props.onDeleteLink}
+                today={props.today}
+                onGoToDate={props.onGoToDate}
+                allTags={props.allTags}
+                getTagsForIdea={props.getTagsForIdea}
+                onAddTag={props.onAddTag}
+                onRemoveTag={props.onRemoveTag}
+                onCreateTag={props.onCreateTag}
+                rescheduleDragPrefix="month"
+              />
+            )}
+          </div>
+          {canQuickAdd && (
+            <div className="pt-1">
+              <QuickAddInput
+                placeholder={`+ Add task for ${formatTimelineDate(anchor)}...`}
+                area={props.quickAddArea}
+                onAreaChange={props.onQuickAddAreaChange}
+                onAdd={(text) => props.onQuickAdd(text, anchor)}
+              />
+            </div>
+          )}
+        </div>
+      </div>
     </DndContext>
   );
 }
