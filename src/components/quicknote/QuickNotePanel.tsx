@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useDeferredValue } from "react";
 import { createPortal } from "react-dom";
 import {
   X,
@@ -13,6 +13,7 @@ import {
   Plus,
 } from "lucide-react";
 import { useQuickNoteContext, type QuickNotePanelMode } from "@/contexts/QuickNoteContext";
+import { useCalmedSaveStatus } from "@/lib/quicknote/useCalmedSaveStatus";
 import { QuickNoteCapture } from "./QuickNoteCapture";
 import { QuickNoteProcess } from "./QuickNoteProcess";
 import { QuickNoteList } from "./QuickNoteList";
@@ -53,7 +54,7 @@ export function QuickNotePanel() {
     isSelectedNoteLive,
     requestedMode,
     consumeRequestedMode,
-    hasUnsaved,
+    saveStatus,
   } = useQuickNoteContext();
   const [mode, setMode] = useState<QuickNotePanelMode>(readStoredMode);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -125,6 +126,14 @@ export function QuickNotePanel() {
       .finally(() => setCreating(false));
   }, [creating, createNote, persistMode]);
 
+  // Calmed write state (shared with the footer indicator): the header dot
+  // only appears for edits unsaved beyond the grace period, not on every
+  // keystroke. Errors surface immediately via the calmed status.
+  const calmedSaveStatus = useCalmedSaveStatus(saveStatus);
+  // Deferred so the Process button label/enabled state doesn't tick
+  // mid-word while typing; it settles once input pauses.
+  const deferredUnreadCount = useDeferredValue(unreadCount);
+
   const selectedIndex = selectedNote ? openNotes.findIndex((n) => n.id === selectedNote.id) : -1;
   // Displayed numbers are chronological (oldest = 1, newest = N) while
   // openNotes is sorted newest-first, so "previous" (‹, lower number) moves
@@ -143,7 +152,7 @@ export function QuickNotePanel() {
 
   if (!panelOpen) return null;
 
-  const canProcess = note && unreadCount > 0 && isSelectedNoteLive;
+  const canProcess = note && deferredUnreadCount > 0 && isSelectedNoteLive;
   const positionLabel =
     selectedIndex >= 0 ? `Note ${openNotes.length - selectedIndex} of ${openNotes.length}` : null;
   const timestampLabel = selectedNote ? formatTimestamp(selectedNote.created_at) : null;
@@ -189,13 +198,22 @@ export function QuickNotePanel() {
                 <span className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
                   {isSelectedNoteLive ? "Quick Note" : "Archived Note"}
                 </span>
-                {hasUnsaved && isSelectedNoteLive && (
-                  <span
-                    className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400"
-                    title="Unsaved changes"
-                    aria-label="Unsaved changes"
-                  />
-                )}
+                {(calmedSaveStatus === "editing" || calmedSaveStatus === "error") &&
+                  isSelectedNoteLive && (
+                    <span
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${calmedSaveStatus === "error" ? "bg-red-500" : "bg-amber-400"}`}
+                      title={
+                        calmedSaveStatus === "error"
+                          ? "Save failed — will retry"
+                          : "Unsaved changes"
+                      }
+                      aria-label={
+                        calmedSaveStatus === "error"
+                          ? "Save failed — will retry"
+                          : "Unsaved changes"
+                      }
+                    />
+                  )}
                 {effectiveMode === "capture" && openNotes.length > 1 && selectedIndex >= 0 && (
                   <span className="flex shrink-0 items-center">
                     <button
@@ -238,11 +256,11 @@ export function QuickNotePanel() {
                 className="cursor-pointer rounded-lg px-2.5 py-1.5 text-xs font-semibold text-violet-600 transition-colors hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-violet-400 dark:hover:bg-violet-950/20"
                 title={
                   canProcess
-                    ? `Process ${unreadCount} unresolved line${unreadCount === 1 ? "" : "s"}`
+                    ? `Process ${deferredUnreadCount} unresolved line${deferredUnreadCount === 1 ? "" : "s"}`
                     : "No unresolved lines to process"
                 }
               >
-                Process{unreadCount > 0 ? ` · ${unreadCount}` : ""}
+                Process{deferredUnreadCount > 0 ? ` · ${deferredUnreadCount}` : ""}
               </button>
             )}
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuickNoteContext } from "@/contexts/QuickNoteContext";
+import { useCalmedSaveStatus } from "@/lib/quicknote/useCalmedSaveStatus";
 
 function formatSavedTime(iso: string): string {
   const d = new Date(iso);
@@ -11,32 +12,37 @@ function formatSavedTime(iso: string): string {
 /**
  * Small autosave feedback indicator ("Saving…", "Unsaved changes", "Saved 14:32").
  * Rendered in the capture footer and the panel header.
+ *
+ * Display timing comes from useCalmedSaveStatus (shared with the panel header
+ * dot): steady "Saved …" while typing, amber only for lingering unsaved
+ * edits, pulse only for slow saves, errors immediately.
  */
 export function QuickNoteSaveIndicator({ compact = false }: { compact?: boolean }) {
   const { saveStatus, lastSavedAt, note } = useQuickNoteContext();
+  const displayStatus = useCalmedSaveStatus(saveStatus);
 
   // Before any edit this session, fall back to the persisted updated_at.
   const fallbackAt = !lastSavedAt ? note?.updated_at : undefined;
   const effectiveSavedAt = lastSavedAt ?? fallbackAt ?? null;
-  if (saveStatus === "idle" && !effectiveSavedAt) return null;
+  if (displayStatus === "idle" && !effectiveSavedAt) return null;
 
   let dotClass = "bg-gray-300 dark:bg-gray-600";
   let textClass = "text-gray-400 dark:text-gray-500";
   let label = "";
 
-  if (saveStatus === "editing") {
+  if (displayStatus === "editing") {
     dotClass = "bg-amber-400";
     textClass = "text-amber-600 dark:text-amber-400";
     label = "Unsaved changes";
-  } else if (saveStatus === "saving") {
+  } else if (displayStatus === "saving") {
     dotClass = "animate-pulse bg-violet-500";
     textClass = "text-violet-500 dark:text-violet-400";
     label = "Saving…";
-  } else if (saveStatus === "error") {
+  } else if (displayStatus === "error") {
     dotClass = "bg-red-500";
     textClass = "text-red-600 dark:text-red-400";
     label = "Save failed — will retry";
-  } else if (saveStatus === "saved" || saveStatus === "idle") {
+  } else if (displayStatus === "saved" || displayStatus === "idle") {
     dotClass = "bg-emerald-500";
     const time = effectiveSavedAt ? formatSavedTime(effectiveSavedAt) : "";
     label = time ? `Saved ${time}` : "Saved";
