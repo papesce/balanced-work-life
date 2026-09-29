@@ -18,6 +18,8 @@ export interface QuickNoteOperations {
   createNote: () => Promise<string | null>;
   resolveLine: (index: number, action: ResolveAction) => Promise<void>;
   discardNote: () => Promise<void>;
+  /** Flip an archived note back to open. No-op when the selected note isn't archived. */
+  reopenNote: () => Promise<void>;
 }
 
 interface OperationsDeps {
@@ -349,6 +351,27 @@ export function useQuickNoteOperations({
     [notes, db, userId, draft, registerUndo],
   );
 
+  const reopenNote = useCallback(async () => {
+    const selected = notes.selectedNote;
+    if (!selected || selected.status !== "archived") return;
+    const capturedNoteId = selected.id;
+    const now = new Date().toISOString();
+    await db.execute(
+      "UPDATE quick_notes SET status = 'open', archived_at = NULL, updated_at = ? WHERE id = ?",
+      [now, capturedNoteId],
+    );
+    registerUndo({
+      label: "Note reopened",
+      run: async () => {
+        const at = new Date().toISOString();
+        await db.execute(
+          "UPDATE quick_notes SET status = 'archived', archived_at = ?, updated_at = ? WHERE id = ?",
+          [at, at, capturedNoteId],
+        );
+      },
+    });
+  }, [db, notes, registerUndo]);
+
   const discardNote = useCallback(async () => {
     persistence.cancelAutosave();
     const existing = notes.noteRef.current;
@@ -389,5 +412,5 @@ export function useQuickNoteOperations({
     });
   }, [db, notes, draft, persistence, registerUndo]);
 
-  return { selectNote, createNote, resolveLine, discardNote };
+  return { selectNote, createNote, resolveLine, discardNote, reopenNote };
 }

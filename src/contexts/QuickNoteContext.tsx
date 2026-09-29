@@ -70,6 +70,8 @@ interface QuickNoteContextValue {
   resolveLine: (index: number, action: ResolveAction) => Promise<void>;
   /** Soft-delete the entire note. */
   discardNote: () => Promise<void>;
+  /** Reopen the selected archived note. No-op unless it is archived. */
+  reopenNote: () => Promise<void>;
   /** Number of unresolved non-empty lines in the active note. */
   unreadCount: number;
   /** Total unresolved lines across all open notes. */
@@ -240,6 +242,7 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
       updateLineText: persistence.updateLineText,
       resolveLine: ops.resolveLine,
       discardNote: ops.discardNote,
+      reopenNote: ops.reopenNote,
       unreadCount,
       totalUnreadCount,
       pendingNotesCount,

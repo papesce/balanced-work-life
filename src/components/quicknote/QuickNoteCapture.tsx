@@ -10,8 +10,16 @@ import { QuickNoteSaveIndicator } from "./QuickNoteSaveIndicator";
  * When viewing an archived note, the textarea is read-only.
  */
 export function QuickNoteCapture() {
-  const { note, draft, updateText, flushNow, isSelectedNoteLive, saveStatus, lastSavedAt } =
-    useQuickNoteContext();
+  const {
+    note,
+    draft,
+    updateText,
+    flushNow,
+    isSelectedNoteLive,
+    saveStatus,
+    lastSavedAt,
+    reopenNote,
+  } = useQuickNoteContext();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const readonly = !isSelectedNoteLive;
   const debugEnabled =
@@ -52,9 +60,17 @@ export function QuickNoteCapture() {
   return (
     <div className="flex flex-col p-4">
       {readonly && (
-        <p className="mb-2 text-[10px] font-bold tracking-wider text-gray-400 uppercase dark:text-gray-500">
-          Read-only
-        </p>
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-[10px] font-bold tracking-wider text-gray-400 uppercase dark:text-gray-500">
+            Read-only
+          </p>
+          <button
+            onClick={() => void reopenNote()}
+            className="rounded-lg bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-600 transition-colors hover:bg-violet-100 dark:bg-violet-950/20 dark:text-violet-400 dark:hover:bg-violet-900/30"
+          >
+            Reopen note
+          </button>
+        </div>
       )}
       <textarea
         ref={textareaRef}
