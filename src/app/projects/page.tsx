@@ -2,7 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ChevronUp, FolderKanban, Plus, Search, FileText, Star } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronUp,
+  FolderKanban,
+  Plus,
+  Search,
+  FileText,
+  Star,
+  Pencil,
+  Check,
+  X,
+  ListTree,
+} from "lucide-react";
 import { useClassifications } from "@/hooks/useClassifications";
 import {
   AREA_DOT_COLORS,
@@ -50,6 +63,18 @@ export default function ProjectsPage() {
   );
   const [statusPickerId, setStatusPickerId] = useState<string | null>(null);
   const [areaPickerId, setAreaPickerId] = useState<string | null>(null);
+  // Detail focus is local-only (subtree re-root); selectedId stays the project in URL.
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+  // Expandable cards: which projects show inline tasks in list view.
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  // Inline rename (card title + detail header).
+  const [renamingCardId, setRenamingCardId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [titleEditing, setTitleEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const [cardMenuId, setCardMenuId] = useState<string | null>(null);
+  // Detail-local filters (list filters don't leak into detail).
+  const [detailHideCompleted, setDetailHideCompleted] = useState(false);
 
   const ideasHook = useIdeas({ scope: "all", searchQuery: search });
   const linksHook = useIdeaLinks();
@@ -81,6 +106,9 @@ export default function ProjectsPage() {
 
   const handleSelect = (id: string | null) => {
     setSelectedId(id);
+    // Project navigation resets local focus + detail filters.
+    setFocusedId(null);
+    setTitleEditing(false);
     const params = new URLSearchParams(searchParams.toString());
     if (id) params.set("projectId", id);
     else params.delete("projectId");
@@ -467,6 +495,43 @@ export default function ProjectsPage() {
     }
   };
 
+  const toggleCard = (id: string) => {
+    setExpandedCards((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const commitCardRename = async (id: string) => {
+    const trimmed = renameDraft.trim();
+    if (trimmed) await updateIdea(id, { text: trimmed });
+    setRenamingCardId(null);
+  };
+
+  const quickAddTaskToProject = async (projectId: string) => {
+    const id = await createIdea("", projectId, "bottom", { type: "task", status: "draft" });
+    if (id) {
+      ideasHook.expandIdea(projectId);
+      if (!expandedCards.has(projectId)) toggleCard(projectId);
+      setSelectedTreeId(id);
+      setEditingId(id);
+    }
+  };
+
+  const directChildrenOf = (projectId: string): Idea[] =>
+    ideasHook.ideas
+      .filter((i) => i.parent_id === projectId)
+      .sort((a, b) => a.sort_order - b.sort_order);
+
+  const commitTitleRename = async () => {
+    if (!selectedId) return;
+    const trimmed = titleDraft.trim();
+    if (trimmed) await updateIdea(selectedId, { text: trimmed });
+    setTitleEditing(false);
+  };
+
   if (ideasHook.loading) {
     return (
       <AppShell title="Projects">
@@ -523,16 +588,116 @@ export default function ProjectsPage() {
           <div className="mb-3">
             <BrainstormBreadcrumb
               chain={breadcrumbChain}
-              focused={selectedProject}
-              onSelect={(id) => handleSelect(id)}
+              focused={
+                focusedId
+                  ? (ideasHook.ideas.find((i) => i.id === focusedId) ?? selectedProject)
+                  : selectedProject
+              }
+              onSelect={(id) => setFocusedId(id === selectedId ? null : id)}
             />
           </div>
         )}
 
-        <div className="mb-4 flex items-center gap-2 text-xs text-gray-500">
+        {/* Editable project title — click to rename without leaving the view */}
+        <div className="mb-2 flex items-center gap-2">
+          {titleEditing ? (
+            <span className="flex min-w-0 flex-1 items-center gap-1.5">
+              <input
+                autoFocus
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void commitTitleRename();
+                  if (e.key === "Escape") setTitleEditing(false);
+                }}
+                onBlur={() => void commitTitleRename()}
+                aria-label="Rename project"
+                className="min-w-0 flex-1 rounded-lg border border-violet-300 bg-white px-2 py-1 text-lg font-bold focus:ring-2 focus:ring-violet-500/30 focus:outline-none dark:border-violet-700 dark:bg-gray-800"
+              />
+              <button
+                onClick={() => void commitTitleRename()}
+                aria-label="Save project name"
+                className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50"
+              >
+                <Check size={15} />
+              </button>
+              <button
+                onClick={() => setTitleEditing(false)}
+                aria-label="Cancel rename"
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-black/5"
+              >
+                <X size={15} />
+              </button>
+            </span>
+          ) : (
+            <>
+              <h2 className="min-w-0 flex-1 truncate text-lg font-bold text-gray-900 dark:text-gray-100">
+                {selectedProject.text || "Untitled project"}
+              </h2>
+              <button
+                onClick={() => {
+                  setTitleDraft(selectedProject.text);
+                  setTitleEditing(true);
+                }}
+                title="Rename project"
+                aria-label="Rename project"
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-black/5 hover:text-violet-600"
+              >
+                <Pencil size={14} />
+              </button>
+            </>
+          )}
+        </div>
+
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">
           <span className="capitalize">{selectedProject.status.replace("_", " ")}</span>
           <span>·</span>
           <span>{getChildCount(selectedProject.id, ideasHook.ideas)} tasks</span>
+          {(() => {
+            const { done, total } = progressOf(selectedProject.id);
+            const next = ideasHook.ideas.find(
+              (i) =>
+                getFocusedSubtreeIds(selectedProject.id, ideasHook.ideas).has(i.id) &&
+                i.id !== selectedProject.id &&
+                (i.status === "draft" || i.status === "planned" || i.status === "in_progress"),
+            );
+            return (
+              <>
+                <span>·</span>
+                <span>
+                  {done}/{total} done
+                </span>
+                {next && (
+                  <>
+                    <span>·</span>
+                    <span className="truncate font-semibold text-violet-600">
+                      Next: {next.text || "Untitled"}
+                    </span>
+                  </>
+                )}
+              </>
+            );
+          })()}
+          {focusedId && (
+            <button
+              onClick={() => setFocusedId(null)}
+              className="toolbar-btn flex items-center gap-1"
+            >
+              <ListTree size={12} /> Back to project root
+            </button>
+          )}
+        </div>
+
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-gray-400">
+            <input
+              type="checkbox"
+              checked={detailHideCompleted}
+              onChange={(e) => setDetailHideCompleted(e.target.checked)}
+              className="rounded"
+            />
+            Hide completed
+          </label>
         </div>
 
         <IdeaTree
@@ -559,7 +724,7 @@ export default function ProjectsPage() {
           search=""
           showType={showType}
           showArea={showArea}
-          editMode="view"
+          editMode="edit"
           editingId={editingId}
           setEditingId={setEditingId}
           selectedId={selectedTreeId}
@@ -568,10 +733,10 @@ export default function ProjectsPage() {
           setComposing={setComposing}
           showToday={false}
           hideClosed={false}
-          hideCompleted={false}
+          hideCompleted={detailHideCompleted}
           hideDeferred={false}
-          focusedId={selectedId}
-          onFocus={(id) => handleSelect(id)}
+          focusedId={focusedId ?? selectedId}
+          onFocus={(id) => setFocusedId(id === selectedId ? null : id)}
           cardMode={false}
         />
         {completionEffects && hasAnyEffects(completionEffects.effects) && (
@@ -601,7 +766,16 @@ export default function ProjectsPage() {
         key={p.id}
         onClick={() => handleSelect(p.id)}
         onKeyDown={(e) => {
+          if (renamingCardId === p.id) return;
           if (e.key === "Enter" || e.key === " ") handleSelect(p.id);
+          else if (e.key === "e" || e.key === "F2") {
+            e.preventDefault();
+            setRenamingCardId(p.id);
+            setRenameDraft(p.text);
+          } else if (e.key === "a") {
+            e.preventDefault();
+            void quickAddTaskToProject(p.id);
+          }
         }}
         role="button"
         tabIndex={0}
@@ -623,35 +797,71 @@ export default function ProjectsPage() {
               )}
             </span>
             <div className="min-w-0">
-              <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-gray-800 dark:text-gray-100">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void updateIdea(p.id, { is_priority: !p.is_priority });
-                  }}
-                  title={p.is_priority ? "Remove priority" : "Set priority"}
-                  aria-label={p.is_priority ? "Remove priority" : "Set priority"}
-                  aria-pressed={p.is_priority}
-                  className="shrink-0 rounded p-0.5 transition hover:scale-110"
+              {renamingCardId === p.id ? (
+                <span
+                  className="flex items-center gap-1"
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
                 >
-                  <Star
-                    size={12}
-                    className={
-                      p.is_priority
-                        ? "fill-violet-500 text-violet-500"
-                        : "text-gray-300 hover:text-violet-400 dark:text-gray-600"
-                    }
+                  <input
+                    autoFocus
+                    value={renameDraft}
+                    onChange={(e) => setRenameDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void commitCardRename(p.id);
+                      if (e.key === "Escape") setRenamingCardId(null);
+                    }}
+                    onBlur={() => void commitCardRename(p.id)}
+                    aria-label={`Rename ${p.text || "untitled project"}`}
+                    className="w-full min-w-0 rounded-md border border-violet-300 px-1.5 py-0.5 text-sm font-semibold focus:ring-2 focus:ring-violet-500/30 focus:outline-none dark:border-violet-700 dark:bg-gray-800"
                   />
-                </button>
-                {AreaIcon && (
-                  <AreaIcon
-                    size={12}
-                    className="shrink-0"
-                    style={{ color: area ? areaColors[area]?.dot : undefined }}
-                  />
-                )}
-                {p.text || "Untitled project"}
-              </p>
+                  <button
+                    onClick={() => void commitCardRename(p.id)}
+                    aria-label="Save name"
+                    className="rounded p-1 text-emerald-600 hover:bg-emerald-50"
+                  >
+                    <Check size={13} />
+                  </button>
+                </span>
+              ) : (
+                <p
+                  className="flex items-center gap-1.5 truncate text-sm font-semibold text-gray-800 dark:text-gray-100"
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    setRenamingCardId(p.id);
+                    setRenameDraft(p.text);
+                  }}
+                  title="Double-click to rename"
+                >
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void updateIdea(p.id, { is_priority: !p.is_priority });
+                    }}
+                    title={p.is_priority ? "Remove priority" : "Set priority"}
+                    aria-label={p.is_priority ? "Remove priority" : "Set priority"}
+                    aria-pressed={p.is_priority}
+                    className="shrink-0 rounded p-0.5 transition hover:scale-110"
+                  >
+                    <Star
+                      size={12}
+                      className={
+                        p.is_priority
+                          ? "fill-violet-500 text-violet-500"
+                          : "text-gray-300 hover:text-violet-400 dark:text-gray-600"
+                      }
+                    />
+                  </button>
+                  {AreaIcon && (
+                    <AreaIcon
+                      size={12}
+                      className="shrink-0"
+                      style={{ color: area ? areaColors[area]?.dot : undefined }}
+                    />
+                  )}
+                  {p.text || "Untitled project"}
+                </p>
+              )}
               <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-gray-400">
                 <span className="relative" onClick={(e) => e.stopPropagation()}>
                   <button
@@ -722,9 +932,102 @@ export default function ProjectsPage() {
               </div>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => toggleCard(p.id)}
+              title={expandedCards.has(p.id) ? "Collapse tasks" : "Expand tasks"}
+              aria-label={expandedCards.has(p.id) ? "Collapse tasks" : "Expand tasks"}
+              aria-expanded={expandedCards.has(p.id)}
+              className="rounded-lg p-1.5 text-gray-400 hover:bg-black/5 hover:text-violet-600"
+            >
+              <ChevronDown
+                size={14}
+                className={`transition-transform ${expandedCards.has(p.id) ? "rotate-180" : ""}`}
+              />
+            </button>
+            <div className="relative">
+              <button
+                onClick={() => setCardMenuId(cardMenuId === p.id ? null : p.id)}
+                aria-label={`Actions for ${p.text || "untitled project"}`}
+                aria-haspopup="menu"
+                aria-expanded={cardMenuId === p.id}
+                className="rounded-lg px-1.5 py-1 text-sm font-bold text-gray-400 hover:bg-black/5 hover:text-gray-700"
+              >
+                …
+              </button>
+              {cardMenuId === p.id && (
+                <>
+                  <span
+                    className="fixed inset-0 z-40"
+                    onClick={() => setCardMenuId(null)}
+                    aria-hidden
+                  />
+                  <span
+                    role="menu"
+                    className="absolute top-full right-0 z-50 mt-1 w-44 overflow-hidden rounded-xl border border-black/10 bg-white shadow-lg dark:border-white/10 dark:bg-gray-800"
+                  >
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setCardMenuId(null);
+                        handleSelect(p.id);
+                      }}
+                      className="block w-full px-3 py-2 text-left text-xs hover:bg-violet-50"
+                    >
+                      Open
+                    </button>
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setCardMenuId(null);
+                        setRenamingCardId(p.id);
+                        setRenameDraft(p.text);
+                      }}
+                      className="block w-full px-3 py-2 text-left text-xs hover:bg-violet-50"
+                    >
+                      Rename
+                    </button>
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setCardMenuId(null);
+                        void quickAddTaskToProject(p.id);
+                      }}
+                      className="block w-full px-3 py-2 text-left text-xs hover:bg-violet-50"
+                    >
+                      Add task
+                    </button>
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setCardMenuId(null);
+                        openNotes(p.id);
+                      }}
+                      className="block w-full px-3 py-2 text-left text-xs hover:bg-violet-50"
+                    >
+                      Details
+                    </button>
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setCardMenuId(null);
+                        void deleteIdea(p.id);
+                      }}
+                      className="block w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50"
+                    >
+                      Delete
+                    </button>
+                  </span>
+                </>
+              )}
+            </div>
             <NotesIndicator hasNotes={!!p.notes?.trim()} onClick={() => openNotes(p.id)} />
-            <span className="text-xs font-semibold text-violet-600">Open →</span>
+            <button
+              onClick={() => handleSelect(p.id)}
+              className="text-xs font-semibold text-violet-600 hover:underline"
+            >
+              Open →
+            </button>
           </div>
         </div>
         {total > 0 && (
@@ -742,6 +1045,69 @@ export default function ProjectsPage() {
             />
           </div>
         )}
+        {(() => {
+          const expanded = expandedCards.has(p.id);
+          if (!expanded) return null;
+          const kids = directChildrenOf(p.id);
+          const visible = hideCompleted ? kids.filter((k) => k.status !== "completed") : kids;
+          const preview = visible.slice(0, 5);
+          return (
+            <div
+              className="mt-1 space-y-1 border-t border-black/5 pt-2 dark:border-white/5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {preview.length === 0 && (
+                <p className="px-1 text-[11px] text-gray-400 italic">No tasks yet</p>
+              )}
+              {preview.map((t) => (
+                <div key={t.id} className="flex items-center gap-2 px-1 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={t.status === "completed"}
+                    onChange={() =>
+                      void (t.status === "completed" ? markUndone(t.id) : markDone(t.id))
+                    }
+                    aria-label={`Toggle ${t.text || "untitled task"}`}
+                    className="h-3.5 w-3.5 rounded accent-violet-600"
+                  />
+                  <button
+                    onClick={() => handleSelect(p.id)}
+                    title="Open in project"
+                    className={`min-w-0 flex-1 truncate text-left hover:text-violet-600 ${
+                      t.status === "completed"
+                        ? "text-gray-400 line-through"
+                        : "text-gray-700 dark:text-gray-200"
+                    }`}
+                  >
+                    {t.text || "Untitled"}
+                  </button>
+                  <span className="shrink-0 text-[10px] text-gray-400 capitalize">
+                    {t.status.replace("_", " ")}
+                  </span>
+                </div>
+              ))}
+              {visible.length > preview.length && (
+                <p className="px-1 text-[11px] text-gray-400">
+                  +{visible.length - preview.length} more
+                </p>
+              )}
+              <div className="flex gap-2 px-1 pt-1">
+                <button
+                  onClick={() => void quickAddTaskToProject(p.id)}
+                  className="rounded-lg border border-dashed border-black/10 px-2 py-1 text-[11px] font-semibold text-gray-500 hover:border-violet-300 hover:text-violet-600 dark:border-white/10"
+                >
+                  + Add task
+                </button>
+                <button
+                  onClick={() => handleSelect(p.id)}
+                  className="rounded-lg px-2 py-1 text-[11px] font-semibold text-violet-600 hover:bg-violet-50"
+                >
+                  Open →
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     );
   };
