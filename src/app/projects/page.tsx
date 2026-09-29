@@ -349,7 +349,7 @@ export default function ProjectsPage() {
 
   const lensTabs = useMemo(() => {
     const tabs: { key: string; label: string }[] = schemes
-      .filter((s) => ["term", "nnl", "moscow", "priority"].includes(s.key))
+      .filter((s) => ["term", "nnl", "moscow", "priority", "attention"].includes(s.key))
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((s) => ({ key: s.key, label: s.key === "term" ? "Horizon" : s.label }));
     return [...tabs, { key: "area", label: "Area" }];

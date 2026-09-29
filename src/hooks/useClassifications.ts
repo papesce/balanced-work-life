@@ -47,6 +47,15 @@ const SEED_SCHEMES: SeedScheme[] = [
     ],
   },
   {
+    key: "attention",
+    label: "Attention",
+    options: [
+      { value: "ready_to_complete", label: "Ready to complete" },
+      { value: "about_to_start", label: "About to start" },
+      { value: "dont_forget_about", label: "Don't forget about" },
+    ],
+  },
+  {
     key: "moscow",
     label: "MoSCoW",
     options: [
