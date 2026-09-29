@@ -171,32 +171,6 @@ export function parseNoteLines(text: string): NoteLine[] {
 }
 
 /**
- * Mark a line as resolved by prepending '✓ ' (idempotent).
- * If matchedIdeaId is provided, encodes it as '[matched:<id>] ' after the checkmark.
- * Returns the updated full text.
- */
-export function markLineResolved(text: string, index: number, matchedIdeaId?: string): string {
-  const lines = text.split("\n");
-  const line = lines[index];
-  if (line === undefined) return text;
-  if (line.startsWith(RESOLVED_PREFIX)) return text;
-  const tag = matchedIdeaId ? `[matched:${matchedIdeaId}] ` : "";
-  lines[index] = RESOLVED_PREFIX + tag + line;
-  return lines.join("\n");
-}
-
-/**
- * Replace the content of a line at the given index.
- * Returns the updated full text.
- */
-export function replaceLine(text: string, index: number, newText: string): string {
-  const lines = text.split("\n");
-  if (index < 0 || index >= lines.length) return text;
-  lines[index] = newText;
-  return lines.join("\n");
-}
-
-/**
  * Count the number of actionable (`- `), non-blank, unresolved lines.
  * Plain non-dash lines are free-form context and never count.
  */

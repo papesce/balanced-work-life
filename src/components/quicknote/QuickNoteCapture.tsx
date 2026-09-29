@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 import { useQuickNoteContext } from "@/contexts/QuickNoteContext";
 import { QuickNoteSaveIndicator } from "./QuickNoteSaveIndicator";
+import { QuickNoteSelectionActions } from "./QuickNoteSelectionActions";
 
 /**
  * Capture mode: a plain textarea. Enter inserts a newline and nothing else.
@@ -22,9 +23,19 @@ export function QuickNoteCapture() {
   } = useQuickNoteContext();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const readonly = !isSelectedNoteLive;
+  const [selection, setSelection] = useState<string | null>(null);
+  const [selectionOpen, setSelectionOpen] = useState(false);
   const debugEnabled =
     typeof window !== "undefined" && window.localStorage?.getItem("quicknote-debug") === "1";
 
+  // Drop stale selection state when switching notes. Reconciled during
+  // render (no effect) so it runs exactly once per note id.
+  const prevNoteIdRef = useRef(note?.id);
+  if (note?.id !== prevNoteIdRef.current) {
+    prevNoteIdRef.current = note?.id;
+    setSelection(null);
+    setSelectionOpen(false);
+  }
   // Autofocus with caret at end (only for editable notes)
   useEffect(() => {
     if (readonly) return;
@@ -37,6 +48,8 @@ export function QuickNoteCapture() {
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       if (readonly) return;
+      setSelection(null);
+      setSelectionOpen(false);
       updateText(e.target.value);
     },
     [updateText, readonly],
@@ -45,6 +58,31 @@ export function QuickNoteCapture() {
   const handlePaste = useCallback(() => {
     // Let the default paste happen; onChange persists it via updateText.
     // (Previously this handler only logged to the console.)
+  }, []);
+
+  const handleSelect = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const { selectionStart, selectionEnd, value } = el;
+    if (selectionStart !== selectionEnd) {
+      const text = value.slice(selectionStart, selectionEnd);
+      if (text.trim()) {
+        setSelection(text);
+        return;
+      }
+    }
+    setSelection(null);
+    setSelectionOpen(false);
+  }, []);
+
+  const handleSelectionDone = useCallback(() => {
+    setSelection(null);
+    setSelectionOpen(false);
+    const el = textareaRef.current;
+    if (el) {
+      const pos = el.selectionEnd;
+      el.setSelectionRange(pos, pos);
+    }
   }, []);
 
   // NOTE: previously the textarea was bound to `draft` with internal
@@ -77,6 +115,7 @@ export function QuickNoteCapture() {
         value={draft}
         onChange={handleChange}
         onPaste={handlePaste}
+        onSelect={handleSelect}
         onBlur={handleBlur}
         readOnly={readonly}
         placeholder={
@@ -90,6 +129,21 @@ export function QuickNoteCapture() {
       {!readonly && (
         <div className="mt-2 flex items-center justify-end border-t border-black/5 pt-2 dark:border-white/5">
           <QuickNoteSaveIndicator />
+        </div>
+      )}
+      {selection && !selectionOpen && (
+        <div className="mt-2 flex items-center justify-end">
+          <button
+            onClick={() => setSelectionOpen(true)}
+            className="rounded-lg bg-violet-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-violet-700"
+          >
+            Process selection
+          </button>
+        </div>
+      )}
+      {selection && selectionOpen && (
+        <div className="mt-2">
+          <QuickNoteSelectionActions selection={selection} onDone={handleSelectionDone} />
         </div>
       )}
       {debugEnabled && (

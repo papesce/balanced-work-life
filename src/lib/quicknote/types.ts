@@ -1,12 +1,6 @@
 "use client";
 
-export type ResolveAction =
-  | { type: "create"; expectedText: string; text: string }
-  | { type: "create_under"; expectedText: string; parentId: string; text: string }
-  | { type: "match"; expectedText: string; ideaId: string }
-  | { type: "discard"; expectedText: string };
-
-export type QuickNotePanelMode = "capture" | "process" | "list";
+export type QuickNotePanelMode = "capture" | "list";
 
 /** Autosave feedback state for the quick-note editor. */
 export type QuickNoteSaveStatus = "idle" | "editing" | "saving" | "saved" | "error";
@@ -18,7 +12,7 @@ export type QuickNoteFlushOrigin =
   | "close"
   | "select"
   | "create"
-  | "resolve"
+  | "selection"
   | "visibility:hidden"
   | "pagehide"
   | "unmount"

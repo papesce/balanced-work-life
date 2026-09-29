@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useDeferredValue } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import {
   X,
@@ -15,11 +15,12 @@ import {
 import { useQuickNoteContext, type QuickNotePanelMode } from "@/contexts/QuickNoteContext";
 import { useCalmedSaveStatus } from "@/lib/quicknote/useCalmedSaveStatus";
 import { QuickNoteCapture } from "./QuickNoteCapture";
-import { QuickNoteProcess } from "./QuickNoteProcess";
 import { QuickNoteList } from "./QuickNoteList";
 
 const MODE_STORAGE_KEY = "quicknote-panel-mode";
-const VALID_MODES: QuickNotePanelMode[] = ["capture", "process", "list"];
+// "process" was removed (selection-based flow); stale stored values fall
+// back to "capture" via the VALID_MODES check in readStoredMode.
+const VALID_MODES: QuickNotePanelMode[] = ["capture", "list"];
 
 function readStoredMode(): QuickNotePanelMode {
   try {
@@ -42,7 +43,6 @@ function formatTimestamp(iso: string): string {
 
 export function QuickNotePanel() {
   const {
-    note,
     openNotes,
     selectedNote,
     selectNote,
@@ -50,7 +50,6 @@ export function QuickNotePanel() {
     panelOpen,
     closePanel,
     discardNote,
-    unreadCount,
     isSelectedNoteLive,
     requestedMode,
     consumeRequestedMode,
@@ -130,9 +129,6 @@ export function QuickNotePanel() {
   // only appears for edits unsaved beyond the grace period, not on every
   // keystroke. Errors surface immediately via the calmed status.
   const calmedSaveStatus = useCalmedSaveStatus(saveStatus);
-  // Deferred so the Process button label/enabled state doesn't tick
-  // mid-word while typing; it settles once input pauses.
-  const deferredUnreadCount = useDeferredValue(unreadCount);
 
   const selectedIndex = selectedNote ? openNotes.findIndex((n) => n.id === selectedNote.id) : -1;
   // Displayed numbers are chronological (oldest = 1, newest = N) while
@@ -152,7 +148,6 @@ export function QuickNotePanel() {
 
   if (!panelOpen) return null;
 
-  const canProcess = note && deferredUnreadCount > 0 && isSelectedNoteLive;
   const positionLabel =
     selectedIndex >= 0 ? `Note ${openNotes.length - selectedIndex} of ${openNotes.length}` : null;
   const timestampLabel = selectedNote ? formatTimestamp(selectedNote.created_at) : null;
@@ -185,11 +180,7 @@ export function QuickNotePanel() {
                   <span>Back</span>
                 </button>
                 <span className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
-                  {effectiveMode === "list"
-                    ? "All notes"
-                    : isSelectedNoteLive
-                      ? "Process note"
-                      : "Archived note"}
+                  All notes
                 </span>
               </div>
             ) : (
@@ -249,21 +240,6 @@ export function QuickNotePanel() {
           </div>
 
           <div className="flex shrink-0 items-center gap-1">
-            {effectiveMode === "capture" && isSelectedNoteLive && (
-              <button
-                onClick={() => canProcess && persistMode("process")}
-                disabled={!canProcess}
-                className="cursor-pointer rounded-lg px-2.5 py-1.5 text-xs font-semibold text-violet-600 transition-colors hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-violet-400 dark:hover:bg-violet-950/20"
-                title={
-                  canProcess
-                    ? `Process ${deferredUnreadCount} unresolved line${deferredUnreadCount === 1 ? "" : "s"}`
-                    : "No unresolved lines to process"
-                }
-              >
-                Process{deferredUnreadCount > 0 ? ` · ${deferredUnreadCount}` : ""}
-              </button>
-            )}
-
             {effectiveMode !== "list" && (
               <button
                 onClick={() => persistMode("list")}
@@ -345,10 +321,8 @@ export function QuickNotePanel() {
         <div className="flex-1 overflow-y-auto">
           {effectiveMode === "list" ? (
             <QuickNoteList onNavigate={persistMode} />
-          ) : effectiveMode === "capture" ? (
-            <QuickNoteCapture />
           ) : (
-            <QuickNoteProcess />
+            <QuickNoteCapture />
           )}
         </div>
       </div>

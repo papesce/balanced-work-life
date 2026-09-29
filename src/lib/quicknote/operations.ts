@@ -3,11 +3,8 @@
 import { useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
 import type { AbstractPowerSyncDatabase } from "@powersync/web";
-import { parseNoteLines, markLineResolved, unresolvedNonEmptyCount } from "@/lib/quickNotes";
 import { parseTaskAll, stripTaskPrefix, isTaskLine } from "@/lib/quickNotes";
-import type { QuickNote } from "@/lib/types";
 import { ideaInsertSql, ideaInsertParams } from "@/lib/ideaInsert";
-import type { ResolveAction } from "./types";
 import type { QuickNoteDraftApi } from "./draft";
 import type { QuickNoteNotes } from "./notes";
 import type { QuickNotePersistence } from "./persistence";
@@ -16,7 +13,8 @@ import { qnDebug, qnLogQuery, qnInfo, qnWarn } from "./log";
 export interface QuickNoteOperations {
   selectNote: (id: string) => Promise<void>;
   createNote: () => Promise<string | null>;
-  resolveLine: (index: number, action: ResolveAction) => Promise<void>;
+  /** Create an idea from arbitrary selected text. Never mutates note text. */
+  createSelectionIdea: (text: string, parentId?: string | null) => Promise<string | null>;
   discardNote: () => Promise<void>;
   /** Flip an archived note back to open. No-op when the selected note isn't archived. */
   reopenNote: () => Promise<void>;
@@ -169,186 +167,56 @@ export function useQuickNoteOperations({
     return id;
   }, [db, userId, flushBeforeSwitch, notes, draft, persistence]);
 
-  const resolveLine = useCallback(
-    async (index: number, action: ResolveAction) => {
-      const note: QuickNote | null = notes.note;
-      if (!note) return;
+  /**
+   * Create an idea from arbitrary selected text. Multi-line selections use
+   * the first line as title (with `[title](notes)` + trailing `#type`
+   * honored) and the rest as notes detail. Never mutates note text, so no
+   * line resolution or archiving happens here.
+   */
+  const createSelectionIdea = useCallback(
+    async (text: string, parentId: string | null = null): Promise<string | null> => {
+      if (!userId) return null;
+      const rawTask = isTaskLine(text) ? stripTaskPrefix(text) : text;
+      const taskLines = rawTask
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
+      if (taskLines.length === 0) return null;
+      const { title, detail, kind } = parseTaskAll(taskLines[0]);
+      const rest = taskLines.slice(1).join("\n");
+      const cleanTitle = title.trim();
+      if (!cleanTitle) return null;
+      const combinedNotes = [detail, rest].filter(Boolean).join("\n") || null;
 
-      // Validate BEFORE flushing: a missing/already-resolved line must not
-      // touch dirty state (previously the flush ran first, then a silent
-      // no-op left save state inconsistent).
-      const preLines = parseNoteLines(draft.draftRef.current);
-      const preTarget = preLines.find((l) => l.index === index);
-      if (!preTarget || preTarget.resolved || !preTarget.actionable) return;
-
-      let resultText: string | null = null;
-      let didArchive = false;
-      let ideaIdToDelete: string | null = null;
-
+      let createdId: string | null = null;
       await db.writeTransaction(async (tx) => {
-        // 1. Flush the draft into the note as the first statement.
-        // (In-transaction by necessity — atomic with the resolve. This is the
-        // only write not going through persistDraft, because that helper
-        // cannot run inside a caller-owned transaction.)
-        if (draft.dirtyRef.current) {
-          const now = new Date().toISOString();
-          const params = [draft.draftRef.current, now, note.id];
-          qnLogQuery(
-            "start",
-            `resolveLine: flush draft id=${note.id} len=${draft.draftRef.current.length}`,
-            "UPDATE quick_notes SET text = ?, updated_at = ? WHERE id = ?",
-            params,
-          );
-          await tx.execute("UPDATE quick_notes SET text = ?, updated_at = ? WHERE id = ?", params);
-          qnLogQuery("ok", "resolveLine: flush draft", "", []);
-          draft.setDirty(false);
-        }
-
-        // 2. Use the current draft directly (avoids stale read from DB)
-        const currentText = draft.draftRef.current;
-
-        const lines = parseNoteLines(currentText);
-        const target = lines.find((l) => l.index === index);
-
-        // 3. Guard: line missing or already resolved (re-checked post-flush
-        // to cover races with concurrent edits).
-        // NOTE: the old strict `target.text !== expectedText` check caused
-        // silent no-ops (notably on the last line) when the row's prop was
-        // stale vs. the flushed draft. The draft is authoritative — proceed
-        // with the current text and only warn on mismatch.
-        if (!target || target.resolved || !target.actionable) return;
-        if (target.text !== action.expectedText) {
-          qnWarn(
-            `resolveLine text mismatch — proceeding with current draft (index=${index}, expected=${JSON.stringify(action.expectedText)?.slice(0, 100)}, actual=${JSON.stringify(target.text)?.slice(0, 100)})`,
-          );
-        }
-
-        // 4. Side effects
-        if (action.type === "create" || action.type === "create_under") {
-          const parentId = action.type === "create_under" ? action.parentId : null;
-          const maxRow = await tx.getAll<{ max_order: number | null }>(
-            "SELECT MAX(sort_order) AS max_order FROM ideas WHERE user_id = ? AND parent_id IS ?",
-            [userId, parentId],
-          );
-          const sortOrder = (maxRow[0]?.max_order ?? -1) + 1;
-          const now = new Date().toISOString();
-          // The edited text may still carry the `- ` prefix, `[title](notes)`
-          // syntax, and/or a trailing `#type` hashtag — normalize to title +
-          // notes + type so the idea row holds clean values.
-          const rawTask = isTaskLine(action.text) ? stripTaskPrefix(action.text) : action.text;
-          const { title, detail, kind } = parseTaskAll(rawTask);
-          const id = await insertQuickNoteIdea(tx, {
-            userId,
-            parentId,
-            text: title.trim(),
-            notes: detail,
-            type: kind ?? "idea",
-            sortOrder,
-            now,
-          });
-          ideaIdToDelete = id;
-        }
-
-        // 5. Mark line resolved
-        const matchedId = action.type === "match" ? action.ideaId : undefined;
-        const newText = markLineResolved(currentText, index, matchedId);
+        const maxRow = await tx.getAll<{ max_order: number | null }>(
+          "SELECT MAX(sort_order) AS max_order FROM ideas WHERE user_id = ? AND parent_id IS ?",
+          [userId, parentId],
+        );
         const now = new Date().toISOString();
-
-        // 6. Check if any unresolved non-empty lines remain
-        const remaining = unresolvedNonEmptyCount(newText);
-        const hasResolved = parseNoteLines(newText).some((l) => l.resolved);
-
-        if (remaining === 0 && hasResolved) {
-          didArchive = true;
-          const params = [newText, now, now, note.id];
-          qnLogQuery(
-            "start",
-            `resolveLine: ARCHIVE note id=${note.id}`,
-            "UPDATE quick_notes SET text = ?, status = 'archived', archived_at = ?, updated_at = ? WHERE id = ?",
-            params,
-          );
-          await tx.execute(
-            "UPDATE quick_notes SET text = ?, status = 'archived', archived_at = ?, updated_at = ? WHERE id = ?",
-            params,
-          );
-          qnLogQuery("ok", "resolveLine: ARCHIVE note", "", []);
-        } else {
-          const params = [newText, now, note.id];
-          qnLogQuery(
-            "start",
-            `resolveLine: mark line ${index} resolved id=${note.id} action=${action.type}`,
-            "UPDATE quick_notes SET text = ?, updated_at = ? WHERE id = ?",
-            params,
-          );
-          await tx.execute("UPDATE quick_notes SET text = ?, updated_at = ? WHERE id = ?", params);
-          qnLogQuery("ok", "resolveLine: mark line resolved", "", []);
-        }
-
-        resultText = newText;
+        createdId = await insertQuickNoteIdea(tx, {
+          userId,
+          parentId,
+          text: cleanTitle,
+          notes: combinedNotes,
+          type: kind ?? "idea",
+          sortOrder: (maxRow[0]?.max_order ?? -1) + 1,
+          now,
+        });
       });
-
-      // 7. Only update draft if the transaction succeeded.
-      // load() clears dirty and refreshes provenance atomically.
-      if (resultText !== null) {
-        draft.load(note.id, resultText);
-
-        // 8. Register undo — ONE writeTransaction
-        const capturedNoteId = note.id;
-        const capturedIdeaId = ideaIdToDelete;
-        const capturedIndex = index;
-        const capturedDidArchive = didArchive;
-        const undoLabel = didArchive
-          ? "Note archived"
-          : action.type === "create" || action.type === "create_under"
-            ? "Idea created"
-            : action.type === "match"
-              ? "Idea matched"
-              : "Line discarded";
-
+      if (createdId) {
+        const capturedId: string = createdId;
         registerUndo({
-          label: undoLabel,
+          label: "Idea created",
           run: async () => {
-            await db.writeTransaction(async (uTx) => {
-              const uRows = await uTx.getAll<{ text: string; status: string }>(
-                "SELECT text, status FROM quick_notes WHERE id = ?",
-                [capturedNoteId],
-              );
-              if (uRows.length === 0) return;
-              const uText = uRows[0].text;
-              const uLines = uText.split("\n");
-              const uLine = uLines[capturedIndex];
-              // Only remove prefix if the line still starts with it
-              // Handles both "✓ text" and "✓ [matched:id] text"
-              if (uLine && uLine.startsWith("✓ ")) {
-                const afterCheck = uLine.slice(2);
-                const tagMatch = afterCheck.match(/^\[matched:[^\]]+\]\s*/);
-                uLines[capturedIndex] = tagMatch
-                  ? afterCheck.slice(tagMatch[0].length)
-                  : afterCheck;
-              }
-              const now = new Date().toISOString();
-              if (capturedDidArchive) {
-                await uTx.execute(
-                  "UPDATE quick_notes SET text = ?, status = 'open', archived_at = NULL, updated_at = ? WHERE id = ?",
-                  [uLines.join("\n"), now, capturedNoteId],
-                );
-              } else {
-                await uTx.execute("UPDATE quick_notes SET text = ?, updated_at = ? WHERE id = ?", [
-                  uLines.join("\n"),
-                  now,
-                  capturedNoteId,
-                ]);
-              }
-            });
-            // Delete created idea (outside transaction)
-            if (capturedIdeaId) {
-              await db.execute("DELETE FROM ideas WHERE id = ?", [capturedIdeaId]);
-            }
+            await db.execute("DELETE FROM ideas WHERE id = ?", [capturedId]);
           },
         });
       }
+      return createdId;
     },
-    [notes, db, userId, draft, registerUndo],
+    [db, userId, registerUndo],
   );
 
   const reopenNote = useCallback(async () => {
@@ -412,5 +280,5 @@ export function useQuickNoteOperations({
     });
   }, [db, notes, draft, persistence, registerUndo]);
 
-  return { selectNote, createNote, resolveLine, discardNote, reopenNote };
+  return { selectNote, createNote, createSelectionIdea, discardNote, reopenNote };
 }

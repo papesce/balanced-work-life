@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
 import type { AbstractPowerSyncDatabase } from "@powersync/web";
-import { replaceLine } from "@/lib/quickNotes";
 import type { QuickNote } from "@/lib/types";
 import type { QuickNoteFlushOrigin, QuickNoteSaveStatus } from "./types";
 import type { QuickNoteDraftApi } from "./draft";
@@ -25,7 +24,6 @@ export interface QuickNotePersistence {
   markIdle: (savedAt: string | null) => void;
   markError: () => void;
   updateText: (text: string) => void;
-  updateLineText: (index: number, newText: string) => void;
 }
 
 interface PersistenceDeps {
@@ -336,19 +334,6 @@ export function useQuickNotePersistence({
     [draft, activeNoteRef, userId, scheduleAutosave],
   );
 
-  const updateLineText = useCallback(
-    (index: number, newText: string) => {
-      const nextText = replaceLine(draft.draftRef.current, index, newText);
-      const isDirty = draft.edit(`updateLineText line ${index}`, nextText);
-      setSaveStatus((s) => {
-        if (isDirty) return "editing";
-        return s === "editing" ? "saved" : s;
-      });
-      scheduleAutosave();
-    },
-    [draft, scheduleAutosave],
-  );
-
   const hasUnsaved = saveStatus === "editing" || saveStatus === "saving" || saveStatus === "error";
 
   return {
@@ -366,6 +351,5 @@ export function useQuickNotePersistence({
     markIdle,
     markError,
     updateText,
-    updateLineText,
   };
 }

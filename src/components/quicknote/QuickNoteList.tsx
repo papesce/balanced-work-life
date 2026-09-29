@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FileText, Archive, Plus } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import { useQuickNoteContext, type QuickNotePanelMode } from "@/contexts/QuickNoteContext";
 import { parseNoteLines, formatAge } from "@/lib/quickNotes";
 import { QuickNote } from "@/lib/types";
@@ -26,13 +26,11 @@ function formatTimestamp(iso: string): string {
 function NoteRow({
   note,
   isSelected,
-  isLive,
   label,
   onSelect,
 }: {
   note: QuickNote;
   isSelected: boolean;
-  isLive: boolean;
   label: string;
   onSelect: () => void;
 }) {
@@ -55,11 +53,7 @@ function NoteRow({
       }`}
     >
       <div className="flex items-center gap-2">
-        {isLive ? (
-          <FileText size={12} className="shrink-0 text-violet-500" />
-        ) : (
-          <Archive size={12} className="shrink-0 text-gray-400 dark:text-gray-500" />
-        )}
+        <FileText size={12} className="shrink-0 text-violet-500" />
         <span className="flex-1 truncate text-xs font-medium text-gray-700 dark:text-gray-300">
           {label} · {timestamp}
         </span>
@@ -76,14 +70,14 @@ function NoteRow({
 }
 
 /**
- * List view: renders all quick notes grouped by status within the panel.
+ * List view: renders all open quick notes within the panel.
  * Each note is identified by its creation timestamp + first-line preview.
+ * (Archiving was removed with batch process mode; pre-existing archived
+ * notes stay in the DB and backups but are no longer listed.)
  */
 export function QuickNoteList({ onNavigate }: { onNavigate?: (mode: QuickNotePanelMode) => void }) {
-  const { allNotes, openNotes, selectedNote, selectNote, createNote, note } = useQuickNoteContext();
+  const { openNotes, selectedNote, selectNote, createNote } = useQuickNoteContext();
   const [creating, setCreating] = useState(false);
-
-  const archivedNotes = useMemo(() => allNotes.filter((n) => n.status === "archived"), [allNotes]);
 
   const handleSelect = (id: string) => {
     void selectNote(id).then(() => onNavigate?.("capture"));
@@ -97,7 +91,7 @@ export function QuickNoteList({ onNavigate }: { onNavigate?: (mode: QuickNotePan
       .finally(() => setCreating(false));
   };
 
-  if (allNotes.length === 0) {
+  if (openNotes.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <FileText size={24} className="mb-2 text-gray-300 dark:text-gray-600" />
@@ -136,26 +130,7 @@ export function QuickNoteList({ onNavigate }: { onNavigate?: (mode: QuickNotePan
               key={n.id}
               note={n}
               isSelected={selectedNote?.id === n.id}
-              isLive={n.id === note?.id}
               label={`Note ${openNotes.length - i}`}
-              onSelect={() => handleSelect(n.id)}
-            />
-          ))}
-        </div>
-      )}
-
-      {archivedNotes.length > 0 && (
-        <div>
-          <p className="mb-1 px-3 pt-3 text-[10px] font-bold tracking-wider text-gray-400 uppercase dark:text-gray-500">
-            Archived
-          </p>
-          {archivedNotes.map((n) => (
-            <NoteRow
-              key={n.id}
-              note={n}
-              isSelected={selectedNote?.id === n.id}
-              isLive={n.id === note?.id}
-              label="Archived"
               onSelect={() => handleSelect(n.id)}
             />
           ))}

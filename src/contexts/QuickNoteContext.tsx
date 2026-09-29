@@ -43,7 +43,6 @@ import type {
   QuickNotePanelMode,
   QuickNoteSaveStatus,
   QuickNoteFlushOrigin,
-  ResolveAction,
 } from "@/lib/quicknote/types";
 import { qnDebug, qnInfo } from "@/lib/quicknote/log";
 
@@ -64,10 +63,8 @@ interface QuickNoteContextValue {
   hasUnsaved: boolean;
   /** Update the full note text (capture mode). Creates the note lazily on first non-whitespace input. */
   updateText: (text: string) => void;
-  /** Replace a single line's text and update the full draft. */
-  updateLineText: (index: number, newText: string) => void;
-  /** Resolve a single line. Runs in one writeTransaction. */
-  resolveLine: (index: number, action: ResolveAction) => Promise<void>;
+  /** Create an idea from selected text. Never mutates note text. */
+  createSelectionIdea: (text: string, parentId?: string | null) => Promise<string | null>;
   /** Soft-delete the entire note. */
   discardNote: () => Promise<void>;
   /** Reopen the selected archived note. No-op unless it is archived. */
@@ -239,8 +236,7 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
       flushNow: persistence.flushAutosave,
       hasUnsaved: persistence.hasUnsaved,
       updateText: persistence.updateText,
-      updateLineText: persistence.updateLineText,
-      resolveLine: ops.resolveLine,
+      createSelectionIdea: ops.createSelectionIdea,
       discardNote: ops.discardNote,
       reopenNote: ops.reopenNote,
       unreadCount,
