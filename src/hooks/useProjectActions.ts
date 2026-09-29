@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Idea, LinkType } from "@/lib/types";
+import { Idea, IdeaType, LinkType } from "@/lib/types";
 import { getCompletionEffects, hasAnyEffects, CompletionEffects } from "@/lib/linkEffects";
 import { getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
 import { useUndoAction } from "@/lib/tasks/undo";
@@ -175,6 +175,23 @@ export function useProjectActions({ ideasHook, linksHook, onDeleteIds }: UseProj
     );
   };
 
+  const createParentAndMove = async (
+    id: string,
+    text: string,
+    type: IdeaType,
+  ): Promise<string | null> => {
+    const prev = ideasHook.ideas.find((i) => i.id === id);
+    const parentId = await ideasHook.createParentAndMove(id, text, type);
+    if (!parentId) return null;
+    if (prev) {
+      withUndo(registerUndo, "Parent created", async () => {
+        await ideasHook.moveIdea(id, prev.parent_id, prev.sort_order);
+        await ideasHook.deleteIdea(parentId);
+      });
+    }
+    return parentId;
+  };
+
   const createLink = async (s: string, t: string, type: LinkType): Promise<string> => {
     const id = await linksHook.createLink(s, t, type);
     if (id) withUndo(registerUndo, "Link created", () => linksHook.deleteLink(id));
@@ -244,6 +261,7 @@ export function useProjectActions({ ideasHook, linksHook, onDeleteIds }: UseProj
     updateIdea,
     deleteIdea,
     moveIdea,
+    createParentAndMove,
     createLink,
     deleteLink,
     markDone,

@@ -2,8 +2,9 @@
 
 import { useEffect, useRef } from "react";
 import { ArrowDown, CornerDownRight } from "lucide-react";
-import { Idea, Tag } from "@/lib/types";
+import { Idea, IdeaType, Tag } from "@/lib/types";
 import { IdeaSearchPicker } from "./IdeaSearchPicker";
+import { getDefaultParentType } from "@/lib/ideaParentType";
 
 interface MoveIdeaPanelProps {
   idea: Idea;
@@ -15,6 +16,12 @@ interface MoveIdeaPanelProps {
   variant?: "move" | "attach";
   className?: string;
   onAttach?: (parentId: string) => Promise<void>;
+  /**
+   * When provided, the picker shows a "Create "<query>" as <type>" row
+   * that creates a new root parent and moves this idea under it.
+   * Should resolve to the new parent id.
+   */
+  onCreateParent?: (text: string, type: IdeaType) => Promise<string | null>;
 }
 
 function getDescendantIds(ideaId: string, ideas: Idea[]) {
@@ -39,6 +46,7 @@ export function MoveIdeaPanel({
   variant = "move",
   className,
   onAttach,
+  onCreateParent,
 }: MoveIdeaPanelProps) {
   const ref = useRef<HTMLDivElement>(null);
   const excludedIds = getDescendantIds(idea.id, ideas);
@@ -71,6 +79,15 @@ export function MoveIdeaPanel({
   const verb = variant === "attach" ? "Attach" : "Move";
   const typeLabel = idea.type ?? "idea";
 
+  const handleCreateParent = async (text: string, type: IdeaType) => {
+    if (!onCreateParent) return;
+    const newParentId = await onCreateParent(text, type);
+    if (newParentId) {
+      onMoved(newParentId);
+      onClose();
+    }
+  };
+
   return (
     <div
       ref={ref}
@@ -87,6 +104,9 @@ export function MoveIdeaPanel({
         excludeIds={excludedIds}
         getTagsForIdea={getTagsForIdea}
         emptyLabel="No valid ideas"
+        showCreateOption={!!onCreateParent}
+        defaultCreateType={getDefaultParentType(idea.type)}
+        onCreateNew={onCreateParent ? handleCreateParent : undefined}
         renderActions={(target) => (
           <>
             <button

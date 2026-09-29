@@ -211,6 +211,26 @@ export default function BrainstormPage() {
     });
   };
 
+  const createParentAndMove = async (
+    id: string,
+    text: string,
+    type: IdeaType,
+  ): Promise<string | null> => {
+    const previous = ideasHook.ideas.find((idea) => idea.id === id);
+    const parentId = await ideasHook.createParentAndMove(id, text, type);
+    if (!parentId) return null;
+    if (previous) {
+      registerUndo({
+        label: "Parent created",
+        run: async () => {
+          await ideasHook.moveIdea(id, previous.parent_id, previous.sort_order);
+          await ideasHook.deleteIdea(parentId);
+        },
+      });
+    }
+    return parentId;
+  };
+
   const createLink = async (
     sourceId: string,
     targetId: string,
@@ -490,6 +510,7 @@ export default function BrainstormPage() {
           updateIdea={updateIdea}
           deleteIdea={deleteIdea}
           moveIdea={moveIdea}
+          onCreateParent={createParentAndMove}
           toggleCollapse={ideasHook.toggleCollapse}
           expandIdea={ideasHook.expandIdea}
           onCreateLink={createLink}

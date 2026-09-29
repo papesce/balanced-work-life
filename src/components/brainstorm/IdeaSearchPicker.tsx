@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { Plus } from "lucide-react";
 import { Idea, IdeaType, Tag } from "@/lib/types";
 import { AREA_DOT_COLORS, STATUS_LABELS, STATUS_STYLES } from "@/lib/constants";
 import { TYPE_COLORS } from "./ideaNodeSlots";
+import { PARENT_TYPE_OPTIONS, hasExactMatch } from "@/lib/ideaParentType";
 
 interface IdeaSearchPickerProps {
   ideas: Idea[];
@@ -17,6 +19,12 @@ interface IdeaSearchPickerProps {
   initialQuery?: string;
   /** When true, match when every whitespace-separated word is contained in idea text (not just substring). */
   matchAllWords?: boolean;
+  /** Show a trailing "Create "<query>" as <type>" row when there's no exact match. */
+  showCreateOption?: boolean;
+  /** Pre-selected type for the create-row dropdown. */
+  defaultCreateType?: IdeaType;
+  /** Called with the trimmed query + chosen type when the create row is confirmed. */
+  onCreateNew?: (text: string, type: IdeaType) => Promise<void>;
 }
 
 function getTypeLabel(type: IdeaType) {
@@ -55,8 +63,13 @@ export function IdeaSearchPicker({
   excludeDone = false,
   initialQuery,
   matchAllWords = false,
+  showCreateOption = false,
+  defaultCreateType = "project",
+  onCreateNew,
 }: IdeaSearchPickerProps) {
   const [search, setSearch] = useState(initialQuery ?? "");
+  const [createType, setCreateType] = useState<IdeaType>(defaultCreateType);
+  const [creating, setCreating] = useState(false);
   const ideasById = new Map(ideas.map((idea) => [idea.id, idea]));
   const query = search.trim().toLowerCase();
   const searchResults = query
@@ -74,6 +87,20 @@ export function IdeaSearchPicker({
         .slice(0, 8)
     : [];
 
+  const trimmed = search.trim();
+  const showCreateRow =
+    showCreateOption && !!onCreateNew && trimmed.length > 0 && !hasExactMatch(ideas, trimmed);
+
+  const handleCreate = async () => {
+    if (!onCreateNew || !trimmed || creating) return;
+    setCreating(true);
+    try {
+      await onCreateNew(trimmed, createType);
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <>
       <input
@@ -81,6 +108,9 @@ export function IdeaSearchPicker({
         placeholder={placeholder}
         value={search}
         onChange={(e) => setSearch(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && showCreateRow) void handleCreate();
+        }}
         className="mb-2 w-full rounded-lg border border-black/10 bg-white/60 px-2 py-1.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:ring-1 focus:ring-violet-500/40 dark:border-white/10 dark:bg-gray-800/60 dark:text-gray-200 dark:placeholder:text-gray-500"
         autoFocus
       />
@@ -145,8 +175,37 @@ export function IdeaSearchPicker({
         </div>
       )}
 
-      {search.trim() && searchResults.length === 0 && (
+      {search.trim() && searchResults.length === 0 && !showCreateRow && (
         <p className="mb-2 text-xs text-gray-400 italic dark:text-gray-500">{emptyLabel}</p>
+      )}
+
+      {showCreateRow && (
+        <button
+          onClick={() => void handleCreate()}
+          disabled={creating}
+          className="mb-2 flex w-full flex-wrap items-center gap-2 rounded-lg border border-dashed border-indigo-300 bg-indigo-50/50 px-2.5 py-2 text-left text-sm text-gray-800 hover:bg-indigo-50 disabled:opacity-50 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-gray-200 dark:hover:bg-indigo-500/15"
+        >
+          <Plus size={14} className="shrink-0 text-indigo-600 dark:text-indigo-400" />
+          <span className="min-w-0 flex-1 leading-snug break-words">
+            Create &ldquo;{trimmed}&rdquo; as{" "}
+            <span onClick={(e) => e.stopPropagation()} className="inline-flex">
+              <select
+                value={createType}
+                onChange={(e) => setCreateType(e.target.value as IdeaType)}
+                onClick={(e) => e.stopPropagation()}
+                aria-label="New parent type"
+                className="rounded-md border border-black/10 bg-white px-1 py-0.5 text-xs font-medium text-gray-700 outline-none dark:border-white/10 dark:bg-gray-800 dark:text-gray-200"
+              >
+                {PARENT_TYPE_OPTIONS.map((t) => (
+                  <option key={t} value={t}>
+                    {getTypeLabel(t)}
+                  </option>
+                ))}
+              </select>
+            </span>
+          </span>
+          {creating && <span className="text-xs text-gray-400">…</span>}
+        </button>
       )}
     </>
   );

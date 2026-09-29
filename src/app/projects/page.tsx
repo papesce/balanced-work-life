@@ -101,6 +101,7 @@ export default function ProjectsPage() {
     updateIdea,
     deleteIdea,
     moveIdea,
+    createParentAndMove,
     createLink,
     deleteLink,
     markDone,
@@ -590,6 +591,7 @@ export default function ProjectsPage() {
           updateIdea={updateIdea}
           deleteIdea={deleteIdea}
           moveIdea={moveIdea}
+          onCreateParent={createParentAndMove}
           toggleCollapse={ideasHook.toggleCollapse}
           expandIdea={ideasHook.expandIdea}
           onCreateLink={createLink}
@@ -837,6 +839,7 @@ export default function ProjectsPage() {
               onCreateLink={createLink}
               onDeleteLink={deleteLink}
               onMove={moveIdea}
+              onCreateParent={createParentAndMove}
               onMoved={(id) => {
                 if (id) ideasHook.expandIdea(id);
               }}

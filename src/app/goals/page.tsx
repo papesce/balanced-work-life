@@ -10,7 +10,7 @@ import { useIdeas, type CreateIdeaPosition } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
-import { Idea, LinkType } from "@/lib/types";
+import { Idea, IdeaType, LinkType } from "@/lib/types";
 import { getAncestorChain, getChildCount, getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
 import { getCompletionEffects, hasAnyEffects, CompletionEffects } from "@/lib/linkEffects";
 import { LinkedEffectsReveal } from "@/components/shared/LinkedEffectsReveal";
@@ -243,6 +243,26 @@ export default function GoalsPage() {
     });
   };
 
+  const createParentAndMove = async (
+    id: string,
+    text: string,
+    type: IdeaType,
+  ): Promise<string | null> => {
+    const prev = ideasHook.ideas.find((i) => i.id === id);
+    const parentId = await ideasHook.createParentAndMove(id, text, type);
+    if (!parentId) return null;
+    if (prev) {
+      registerUndo({
+        label: "Parent created",
+        run: async () => {
+          await ideasHook.moveIdea(id, prev.parent_id, prev.sort_order);
+          await ideasHook.deleteIdea(parentId);
+        },
+      });
+    }
+    return parentId;
+  };
+
   const createLink = async (s: string, t: string, type: LinkType): Promise<string> => {
     const id = await linksHook.createLink(s, t, type);
     if (id)
@@ -371,6 +391,7 @@ export default function GoalsPage() {
           updateIdea={updateIdea}
           deleteIdea={deleteIdea}
           moveIdea={moveIdea}
+          onCreateParent={createParentAndMove}
           toggleCollapse={ideasHook.toggleCollapse}
           expandIdea={ideasHook.expandIdea}
           onCreateLink={createLink}

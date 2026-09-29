@@ -43,6 +43,7 @@ interface IdeaTreeProps {
   updateIdea: (id: string, updates: Partial<Idea>) => Promise<void>;
   deleteIdea: (id: string) => Promise<void>;
   moveIdea: (id: string, newParentId: string | null, newSortOrder: number) => Promise<void>;
+  onCreateParent?: (id: string, text: string, type: IdeaType) => Promise<string | null>;
   toggleCollapse: (id: string) => void;
   expandIdea: (id: string) => void;
   onCreateLink: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
@@ -121,6 +122,7 @@ export function IdeaTree({
   updateIdea,
   deleteIdea,
   moveIdea,
+  onCreateParent,
   toggleCollapse,
   expandIdea,
   onCreateLink,
@@ -325,6 +327,7 @@ export function IdeaTree({
               onCreateLink={onCreateLink}
               onDeleteLink={onDeleteLink}
               onMove={moveIdea}
+              onCreateParent={onCreateParent}
               onMoved={(id) => {
                 if (id) expandIdea(id);
               }}

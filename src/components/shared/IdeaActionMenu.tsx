@@ -13,7 +13,7 @@ import {
   CornerDownRight,
 } from "lucide-react";
 import { createPortal } from "react-dom";
-import { Idea, IdeaLink, LinkType, Tag } from "@/lib/types";
+import { Idea, IdeaLink, IdeaType, LinkType, Tag } from "@/lib/types";
 import { LinkPanel } from "@/components/shared/LinkPanel";
 import { MoveIdeaPanel } from "@/components/brainstorm/MoveIdeaPanel";
 import { SchedulePicker } from "@/components/brainstorm/SchedulePicker";
@@ -34,6 +34,8 @@ interface IdeaActionMenuProps {
   onDeleteLink: (id: string) => Promise<void>;
   onMove: (id: string, newParentId: string | null, newSortOrder: number) => Promise<void>;
   onMoved?: (parentIdToExpand: string | null) => void;
+  /** Create a new parent for `id` and move it under it. Resolves to the new parent id. */
+  onCreateParent?: (id: string, text: string, type: IdeaType) => Promise<string | null>;
   hiddenActions?: Array<"edit" | "link" | "move" | "attach" | "schedule" | "delete">;
   onToggleInFocus?: (id: string, until?: string | null) => Promise<void>;
   currentView?: RevealView;
@@ -55,6 +57,7 @@ export function IdeaActionMenu({
   onDeleteLink,
   onMove,
   onMoved,
+  onCreateParent,
   hiddenActions,
   onToggleInFocus,
   currentView,
@@ -376,6 +379,9 @@ export function IdeaActionMenu({
           onMove={handleMove}
           onMoved={handleMoved}
           onClose={() => setShowMovePanel(false)}
+          onCreateParent={
+            onCreateParent ? (text, type) => onCreateParent(idea.id, text, type) : undefined
+          }
         />
       )}
       {showAttachPanel && (

@@ -466,6 +466,67 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
     });
   };
 
+  /**
+   * Create a new root parent and move `movedId` under it in a single
+   * write transaction, so a partial state (parent created, child not
+   * moved) can't sync. Reuses the shared idea-insert column list.
+   * Returns the new parent id ("" when there's no user).
+   */
+  const createParentAndMove = async (
+    movedId: string,
+    parentText: string,
+    parentType: Idea["type"],
+  ): Promise<string> => {
+    if (!user) return "";
+    const text = parentText.trim();
+    if (!text) return "";
+    const now = new Date().toISOString();
+    const parentId = uuidv4();
+    const rootSiblings = ideas.filter((i) => i.parent_id === null);
+    const maxOrder =
+      rootSiblings.length > 0 ? Math.max(...rootSiblings.map((s) => s.sort_order)) : -1;
+
+    await db.writeTransaction(async (tx) => {
+      await tx.execute(
+        ideaInsertSql(),
+        ideaInsertParams({
+          id: parentId,
+          user_id: user.id,
+          parent_id: null,
+          text,
+          description: null,
+          type: parentType,
+          effort: null,
+          impact: null,
+          urgency: null,
+          scheduled_date: null,
+          scheduled_time: null,
+          duration_minutes: null,
+          is_priority: false,
+          priority_order: null,
+          status: "draft",
+          notes: null,
+          completed_at: null,
+          cancelled_at: null,
+          paused_at: null,
+          attempt_dates: [],
+          status_history: null,
+          in_focus: false,
+          in_focus_until: null,
+          productivity_signal: null,
+          sort_order: maxOrder + 1,
+          created_at: now,
+          updated_at: now,
+        }),
+      );
+      await tx.execute(
+        `UPDATE ideas SET parent_id = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
+        [parentId, 0, now, movedId],
+      );
+    });
+    return parentId;
+  };
+
   const markDone = async (id: string) => {
     const now = new Date().toISOString();
     await updateIdea(id, { status: "completed", completed_at: now });
@@ -571,6 +632,7 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
     updateIdea,
     deleteIdea,
     moveIdea,
+    createParentAndMove,
     reorderTasks,
     smartSortTasks,
     markDone,
