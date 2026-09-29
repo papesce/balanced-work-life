@@ -183,7 +183,7 @@ function WeekDayCell({
         },
         {
           key: "in_progress",
-          label: "Active",
+          label: "In Progress",
           count: current.filter(
             (o) =>
               o.task.status === "in_progress" ||

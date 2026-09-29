@@ -181,7 +181,7 @@ export function StatusPillSlot({
     <div className="relative w-20 flex-shrink-0 text-center" onClick={(e) => e.stopPropagation()}>
       <button
         onClick={() => setShowPicker(!showPicker)}
-        className={`cursor-pointer rounded-full border px-2 py-0.5 text-xs ${STATUS_STYLES[node.status]}`}
+        className={`cursor-pointer rounded-full border px-2 py-0.5 text-xs whitespace-nowrap ${STATUS_STYLES[node.status]}`}
       >
         {STATUS_LABELS[node.status]}
       </button>

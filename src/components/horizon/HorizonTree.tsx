@@ -178,7 +178,7 @@ function StatusChipSlot({
     <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
       <button
         onClick={() => setShowPicker(!showPicker)}
-        className={`cursor-pointer rounded-full border px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLES[node.status]}`}
+        className={`cursor-pointer rounded-full border px-2 py-0.5 text-[10px] font-medium whitespace-nowrap ${STATUS_STYLES[node.status]}`}
       >
         {STATUS_LABELS[node.status]}
       </button>

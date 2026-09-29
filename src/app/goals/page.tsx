@@ -16,6 +16,7 @@ import { getCompletionEffects, hasAnyEffects, CompletionEffects } from "@/lib/li
 import { LinkedEffectsReveal } from "@/components/shared/LinkedEffectsReveal";
 import { useUndoAction } from "@/lib/tasks/undo";
 import { UndoBar } from "@/components/shared/UndoBar";
+import { TERMINAL_STATUSES } from "@/lib/constants";
 
 export default function GoalsPage() {
   const searchParams = useSearchParams();
@@ -24,7 +25,7 @@ export default function GoalsPage() {
 
   const [search, setSearch] = useState("");
   const [hideCompleted, setHideCompleted] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<"all" | "active">("active");
+  const [statusFilter, setStatusFilter] = useState<"all" | "open">("open");
   const [selectedId, setSelectedId] = useState<string | null>(initialGoalId);
 
   const ideasHook = useIdeas({ scope: "all", searchQuery: search });
@@ -74,7 +75,7 @@ export default function GoalsPage() {
     const idea = ideasHook.ideas.find((i) => i.id === highlightId);
     if (!idea) return;
     // Guarantee the highlight target stays visible in the goal list.
-    if (["completed", "cancelled", "archived"].includes(idea.status)) {
+    if ((TERMINAL_STATUSES as readonly string[]).includes(idea.status)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- highlight deep-link syncs selection + lifts hiding filters
       setHideCompleted(false);
       setStatusFilter("all");
@@ -150,8 +151,8 @@ export default function GoalsPage() {
         (p) => p.text.toLowerCase().includes(q) || (p.notes?.toLowerCase().includes(q) ?? false),
       );
     }
-    if (statusFilter === "active") {
-      list = list.filter((p) => !["completed", "cancelled", "archived"].includes(p.status));
+    if (statusFilter === "open") {
+      list = list.filter((p) => !(TERMINAL_STATUSES as readonly string[]).includes(p.status));
     }
     if (hideCompleted) {
       list = list.filter((p) => p.status !== "completed");
@@ -434,10 +435,10 @@ export default function GoalsPage() {
           </div>
           <div className="flex gap-1">
             <button
-              onClick={() => setStatusFilter("active")}
-              className={`toolbar-btn ${statusFilter === "active" ? "toolbar-btn--accent" : ""}`}
+              onClick={() => setStatusFilter("open")}
+              className={`toolbar-btn ${statusFilter === "open" ? "toolbar-btn--accent" : ""}`}
             >
-              Active
+              Open
             </button>
             <button
               onClick={() => setStatusFilter("all")}

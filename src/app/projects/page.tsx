@@ -24,6 +24,7 @@ import {
   AREA_ORDER,
   STATUS_LABELS,
   STATUS_STYLES,
+  TERMINAL_STATUSES,
 } from "@/lib/constants";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { TagPicker } from "@/components/shared/TagPicker";
@@ -54,7 +55,7 @@ export default function ProjectsPage() {
 
   const [search, setSearch] = useState("");
   const [hideCompleted, setHideCompleted] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<"all" | "active">("active");
+  const [statusFilter, setStatusFilter] = useState<"all" | "open">("open");
   const [selectedId, setSelectedId] = useState<string | null>(initialProjectId);
   const [lensKey, setLensKey] = useState<string>(
     () => readRawString(STORAGE_KEYS.projectsLens) ?? "term",
@@ -158,7 +159,7 @@ export default function ProjectsPage() {
     const idea = ideasHook.ideas.find((i) => i.id === highlightId);
     if (!idea) return;
     // Guarantee the highlight target stays visible in the project list.
-    if (["completed", "cancelled", "archived"].includes(idea.status)) {
+    if ((TERMINAL_STATUSES as readonly string[]).includes(idea.status)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- highlight deep-link syncs selection + lifts hiding filters
       setHideCompleted(false);
       setStatusFilter("all");
@@ -264,8 +265,8 @@ export default function ProjectsPage() {
         (p) => p.text.toLowerCase().includes(q) || (p.notes?.toLowerCase().includes(q) ?? false),
       );
     }
-    if (statusFilter === "active") {
-      list = list.filter((p) => !["completed", "cancelled", "archived"].includes(p.status));
+    if (statusFilter === "open") {
+      list = list.filter((p) => !(TERMINAL_STATUSES as readonly string[]).includes(p.status));
     }
     if (hideCompleted) {
       list = list.filter((p) => p.status !== "completed");
@@ -744,7 +745,7 @@ export default function ProjectsPage() {
                 <span className="relative" onClick={(e) => e.stopPropagation()}>
                   <button
                     onClick={() => setStatusPickerId(statusPickerId === p.id ? null : p.id)}
-                    className={`rounded-full border px-1.5 py-0 text-[10px] font-semibold transition hover:opacity-80 ${STATUS_STYLES[p.status]}`}
+                    className={`rounded-full border px-1.5 py-0 text-[10px] font-semibold whitespace-nowrap transition hover:opacity-80 ${STATUS_STYLES[p.status]}`}
                   >
                     {STATUS_LABELS[p.status] ?? p.status}
                   </button>
@@ -1025,10 +1026,10 @@ export default function ProjectsPage() {
           </div>
           <div className="flex gap-1">
             <button
-              onClick={() => setStatusFilter("active")}
-              className={`toolbar-btn ${statusFilter === "active" ? "toolbar-btn--accent" : ""}`}
+              onClick={() => setStatusFilter("open")}
+              className={`toolbar-btn ${statusFilter === "open" ? "toolbar-btn--accent" : ""}`}
             >
-              Active
+              Open
             </button>
             <button
               onClick={() => setStatusFilter("all")}

@@ -146,17 +146,12 @@ export const STATUS_STYLES: Record<IdeaStatus, string> = {
     "border-amber-200 dark:border-amber-700/30 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300",
 };
 
-export const STATUS_LABELS: Record<IdeaStatus, string> = {
-  draft: "Draft",
-  planned: "Planned",
-  scheduled: "Scheduled",
-  in_progress: "Active",
-  paused: "Paused",
-  completed: "Done",
-  cancelled: "Cancelled",
-  archived: "Archived",
-  deferred: "Deferred",
-};
+/** Statuses that close an item. Everything else counts as open. */
+export const TERMINAL_STATUSES: readonly IdeaStatus[] = ["completed", "cancelled", "archived"];
+
+export const STATUS_LABELS: Record<IdeaStatus, string> = Object.fromEntries(
+  Object.entries(STATUS_CONFIG).map(([k, v]) => [k, v.label]),
+) as Record<IdeaStatus, string>;
 
 export const PRODUCTIVITY_SIGNALS = {
   productive: {

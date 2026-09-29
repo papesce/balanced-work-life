@@ -1,62 +1,46 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Play, Pause, Check, X } from "lucide-react";
+import { STATUS_CONFIG } from "@/lib/constants";
 import { IdeaStatus } from "@/lib/types";
 
 const STATUS_OPTIONS: {
   value: IdeaStatus;
-  label: string;
-  icon: React.ElementType | null;
   color: string;
   bg: string;
 }[] = [
   {
     value: "completed",
-    label: "Completed",
-    icon: Check,
     color: "text-violet-600 dark:text-violet-400",
     bg: "bg-violet-50 dark:bg-violet-950/20",
   },
   {
     value: "in_progress",
-    label: "In Progress",
-    icon: Play,
     color: "text-amber-600 dark:text-amber-400",
     bg: "bg-amber-50 dark:bg-amber-950/20",
   },
   {
     value: "planned",
-    label: "Planned",
-    icon: null,
     color: "text-sky-600 dark:text-sky-400",
     bg: "bg-sky-50 dark:bg-sky-950/20",
   },
   {
     value: "scheduled",
-    label: "Scheduled",
-    icon: null,
     color: "text-blue-600 dark:text-blue-400",
     bg: "bg-blue-50 dark:bg-blue-950/20",
   },
   {
     value: "paused",
-    label: "Paused",
-    icon: Pause,
     color: "text-orange-600 dark:text-orange-400",
     bg: "bg-orange-50 dark:bg-orange-950/20",
   },
   {
     value: "deferred",
-    label: "Deferred",
-    icon: null,
     color: "text-amber-700 dark:text-amber-300",
     bg: "bg-amber-50 dark:bg-amber-950/20",
   },
   {
     value: "cancelled",
-    label: "Cancelled",
-    icon: X,
     color: "text-red-600 dark:text-red-400",
     bg: "bg-red-50 dark:bg-red-950/20",
   },
@@ -84,8 +68,9 @@ export function StatusPicker({ current, onSelect, onClose }: StatusPickerProps) 
       ref={ref}
       className="glass-card-strong absolute top-full left-0 z-50 mt-1 min-w-[160px] rounded-xl border border-black/5 py-1 shadow-lg dark:border-white/5"
     >
-      {STATUS_OPTIONS.map(({ value, label, icon: Icon, color, bg }) => {
+      {STATUS_OPTIONS.map(({ value, color, bg }) => {
         const isActive = current === value;
+        const { label, icon: Icon } = STATUS_CONFIG[value];
         return (
           <button
             key={value}
