@@ -12,6 +12,8 @@ import { QuickAddInput } from "./QuickAddInput";
 import { MiniBalanceBar } from "@/components/MiniBalanceBar";
 import { formatTimelineDate, getTimelineKicker } from "./timelineUtils";
 import { TASK_STATUS_DOT } from "./TaskChip";
+import { useClassifications } from "@/hooks/useClassifications";
+import { priorityRank, type PriorityValue } from "@/components/shared/PriorityChip";
 
 export type WeekCardPreview = "top" | "times" | "status" | "priority";
 
@@ -66,6 +68,7 @@ function WeekDayCell({
   onSelect,
   getTagsForIdea,
   preview,
+  priorityOf,
 }: {
   date: string;
   selected: boolean;
@@ -75,6 +78,7 @@ function WeekDayCell({
   onSelect: () => void;
   getTagsForIdea: (ideaId: string) => import("@/lib/types").Tag[];
   preview: WeekCardPreview;
+  priorityOf: (ideaId: string) => PriorityValue;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `week-day-${date}`, data: { date } });
   const current = useMemo(() => occurrences.filter((o) => !o.isHistorical), [occurrences]);
@@ -97,9 +101,8 @@ function WeekDayCell({
         const at = a.task.scheduled_time ?? "99";
         const bt = b.task.scheduled_time ?? "99";
         if (at !== bt) return at < bt ? -1 : 1;
-        const ap = a.task.is_priority ? 0 : 1;
-        const bp = b.task.is_priority ? 0 : 1;
-        if (ap !== bp) return ap - bp;
+        const rankDiff = priorityRank(priorityOf(a.task.id)) - priorityRank(priorityOf(b.task.id));
+        if (rankDiff !== 0) return rankDiff;
         const ad = a.task.status === "completed" || a.task.status === "cancelled" ? 1 : 0;
         const bd = b.task.status === "completed" || b.task.status === "cancelled" ? 1 : 0;
         return ad - bd;
@@ -129,7 +132,7 @@ function WeekDayCell({
                   </span>
                 )}
                 <span className="truncate">{o.task.text || "Untitled"}</span>
-                {o.task.is_priority && (
+                {priorityOf(o.task.id) === "high" && (
                   <span className="flex-shrink-0 text-[9px] text-amber-400">★</span>
                 )}
               </span>
@@ -215,25 +218,25 @@ function WeekDayCell({
       );
     }
     // priority
-    const starred = current.filter(
-      (o) => o.task.is_priority && o.task.status !== "completed" && o.task.status !== "cancelled",
-    );
-    const open = current.filter(
-      (o) => o.task.status !== "completed" && o.task.status !== "cancelled",
-    );
-    const topStarred = starred.slice(0, 2);
+    const isOpen = (o: (typeof current)[number]) =>
+      o.task.status !== "completed" && o.task.status !== "cancelled";
+    const ranked = current
+      .filter((o) => isOpen(o) && priorityOf(o.task.id) !== null)
+      .sort((a, b) => priorityRank(priorityOf(a.task.id)) - priorityRank(priorityOf(b.task.id)));
+    const open = current.filter(isOpen);
+    const topRanked = ranked.slice(0, 2);
     return (
       <span className="block min-h-[44px] space-y-0.5 px-0.5">
         <span className="flex items-center gap-1 text-[10px] font-bold text-gray-700 dark:text-gray-200">
           <span className="text-amber-400">★</span>
-          <span className="tabular-nums">{starred.length}</span> priority
+          <span className="tabular-nums">{ranked.length}</span> priority
           {unresolvedCount > 0 && (
             <span className="rounded-full bg-red-100/80 px-1 py-px text-[9px] font-semibold text-red-600 dark:bg-red-900/30 dark:text-red-400">
               {unresolvedCount} overdue
             </span>
           )}
         </span>
-        {topStarred.map((o) => (
+        {topRanked.map((o) => (
           <span
             key={o.task.id}
             className="block truncate text-[10px] text-gray-500"
@@ -243,14 +246,14 @@ function WeekDayCell({
             {o.task.text || "Untitled"}
           </span>
         ))}
-        {topStarred.length === 0 && (
+        {topRanked.length === 0 && (
           <span className="block text-[10px] text-gray-400">
-            {open.length > 0 ? `${open.length} open, none starred` : "All clear"}
+            {open.length > 0 ? `${open.length} open, none ranked` : "All clear"}
           </span>
         )}
       </span>
     );
-  }, [current, preview, unresolvedCount]);
+  }, [current, preview, unresolvedCount, priorityOf]);
 
   return (
     <button
@@ -326,6 +329,9 @@ export function WeekStripView(props: WeekStripViewProps) {
       ? today
       : weekDates[0];
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const { getOptionForIdea } = useClassifications();
+  const priorityOf = (ideaId: string): PriorityValue =>
+    (getOptionForIdea(ideaId, "priority")?.value ?? null) as PriorityValue;
 
   const weekLabel = (() => {
     const first = new Date(weekDates[0] + "T00:00:00");
@@ -472,6 +478,7 @@ export function WeekStripView(props: WeekStripViewProps) {
                 }}
                 getTagsForIdea={props.getTagsForIdea}
                 preview={cardPreview}
+                priorityOf={priorityOf}
               />
             </div>
           ))}

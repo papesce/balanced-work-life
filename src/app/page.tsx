@@ -5,6 +5,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Sparkles, Layers, Clock, BarChart3, EyeOff, Eye } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
+import { useClassifications } from "@/hooks/useClassifications";
+import { priorityRank } from "@/components/shared/PriorityChip";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { AppShell } from "@/components/AppShell";
@@ -58,6 +60,14 @@ function DailyPlannerInner() {
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
   const linksHook = useIdeaLinks();
+  const { getOptionForIdea } = useClassifications();
+  const priorityRankOf = useCallback(
+    (ideaId: string) =>
+      priorityRank(
+        (getOptionForIdea(ideaId, "priority")?.value ?? null) as "high" | "medium" | "low" | null,
+      ),
+    [getOptionForIdea],
+  );
   const searchParams = useSearchParams();
   const router = useRouter();
   const [activeDate, setActiveDate] = useState<string>(
@@ -511,7 +521,7 @@ function DailyPlannerInner() {
                 </button>
                 {pendingOnDate.length > 0 && (
                   <button
-                    onClick={() => smartSortTasks(pendingOnDate)}
+                    onClick={() => smartSortTasks(pendingOnDate, priorityRankOf)}
                     className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-violet-50 px-3 py-1.5 text-[11px] font-bold text-violet-600 transition-all hover:bg-violet-100 dark:bg-violet-950/20 dark:text-violet-400 dark:hover:bg-violet-900/30"
                     title="Prioritize tasks by priority score"
                   >

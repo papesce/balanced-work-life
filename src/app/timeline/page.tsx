@@ -17,6 +17,8 @@ import { motion } from "framer-motion";
 import { Sparkles, Clock, CalendarRange, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
+import { useClassifications } from "@/hooks/useClassifications";
+import { priorityRank } from "@/components/shared/PriorityChip";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { AppShell } from "@/components/AppShell";
@@ -293,6 +295,14 @@ function TimelineInner() {
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
   const linksHook = useIdeaLinks();
+  const { getOptionForIdea } = useClassifications();
+  const priorityRankOf = useCallback(
+    (ideaId: string) =>
+      priorityRank(
+        (getOptionForIdea(ideaId, "priority")?.value ?? null) as "high" | "medium" | "low" | null,
+      ),
+    [getOptionForIdea],
+  );
   const windowMenuRef = useRef<HTMLDivElement>(null);
   const scrolledAnchorRef = useRef<string | null>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -792,7 +802,7 @@ function TimelineInner() {
             onUpdate={handleUpdate}
             onReschedule={handleReschedule}
             onMove={handleMove}
-            onSmartSort={(dayTasks) => smartSortTasks(dayTasks)}
+            onSmartSort={(dayTasks) => smartSortTasks(dayTasks, priorityRankOf)}
             ideas={ideas}
             links={linksHook.links}
             onCreateLink={handleCreateLink}
@@ -827,7 +837,7 @@ function TimelineInner() {
             onUpdate={handleUpdate}
             onReschedule={handleReschedule}
             onMove={handleMove}
-            onSmartSort={(dayTasks) => smartSortTasks(dayTasks)}
+            onSmartSort={(dayTasks) => smartSortTasks(dayTasks, priorityRankOf)}
             ideas={ideas}
             links={linksHook.links}
             onCreateLink={handleCreateLink}
@@ -936,7 +946,7 @@ function TimelineInner() {
                         />
                         {dayTasks.length > 0 && (
                           <button
-                            onClick={() => smartSortTasks(dayTasks)}
+                            onClick={() => smartSortTasks(dayTasks, priorityRankOf)}
                             className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-violet-500 transition-all hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/20"
                             title="Sort tasks by priority score (effort × impact × urgency)"
                           >

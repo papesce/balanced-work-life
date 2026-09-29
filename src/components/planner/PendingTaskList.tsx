@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo, KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Star, MoreHorizontal, GripVertical, Clock, CornerDownRight, Link2 } from "lucide-react";
+import { MoreHorizontal, GripVertical, Clock, CornerDownRight, Link2 } from "lucide-react";
 import { UndoAction } from "@/lib/tasks/undo";
 import { areaColors } from "@/styles/tokens";
 import { Idea, IdeaStatus, IdeaLink, LinkType, LifeArea, Tag } from "@/lib/types";
@@ -16,6 +16,7 @@ import { MoveIdeaPanel } from "@/components/brainstorm/MoveIdeaPanel";
 import { RescheduleAction } from "@/lib/tasks/rescheduleTask";
 import { getToday } from "@/lib/dateUtils";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";
+import { PriorityChipField } from "@/components/shared/PriorityChip";
 import { LinkPanel } from "@/components/shared/LinkPanel";
 import { NotesIndicator } from "@/components/shared/NotesIndicator";
 import { useNotes } from "@/contexts/NotesContext";
@@ -761,12 +762,7 @@ function TaskRow({
       })()}
       <NotesIndicator hasNotes={!!task.notes?.trim()} onClick={() => openNotes(task.id)} />
       <div className="flex flex-shrink-0 items-center gap-1 transition-opacity md:opacity-0 md:group-hover:opacity-100">
-        <button
-          onClick={() => onUpdate(task.id, { is_priority: !task.is_priority })}
-          className={`cursor-pointer ${task.is_priority ? "text-amber-400" : "text-gray-300 hover:text-gray-400 dark:text-gray-600"}`}
-        >
-          <Star size={12} className={task.is_priority ? "fill-amber-400 text-amber-400" : ""} />
-        </button>
+        <PriorityChipField ideaId={task.id} />
 
         <div className="relative">
           <button

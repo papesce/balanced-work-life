@@ -419,12 +419,13 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
   );
 
   const smartSortTasks = useCallback(
-    async (tasksInGroup: Idea[]) => {
+    async (tasksInGroup: Idea[], priorityRankOf?: (ideaId: string) => number) => {
       const computeScore = (t: Idea): number => {
         const urgency = t.urgency ?? 3;
         const impact = t.impact ?? 3;
         const effort = t.effort ?? 3;
-        const priorityBoost = t.is_priority ? 2 : 1;
+        const rank = priorityRankOf?.(t.id) ?? 3;
+        const priorityBoost = rank === 0 ? 2.5 : rank === 1 ? 1.75 : rank === 2 ? 1.25 : 1;
         return (priorityBoost * (urgency * impact)) / Math.max(effort, 1);
       };
 

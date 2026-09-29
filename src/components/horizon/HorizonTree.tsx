@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
-import { ChevronDown, Star, Target } from "lucide-react";
+import { ChevronDown, Target } from "lucide-react";
 import {
   Idea,
   IdeaLink,
@@ -23,36 +23,28 @@ import { IdeaActionMenu } from "@/components/shared/IdeaActionMenu";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { TypePicker } from "@/components/brainstorm/TypePicker";
 import { TagPicker } from "@/components/shared/TagPicker";
+import { PriorityChip, type PriorityValue } from "@/components/shared/PriorityChip";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";
 import { NotesIndicator } from "@/components/shared/NotesIndicator";
 import { TaskComposer } from "@/components/shared/TaskComposer";
 import { useNotes } from "@/contexts/NotesContext";
 
-function PriorityStarSlot({
+function PriorityChipSlot({
   node,
-  onUpdate,
+  priorityValueOf,
+  onSetPriority,
 }: {
   node: IdeaNodeType;
-  onUpdate: (id: string, updates: Partial<Idea>) => Promise<void>;
+  priorityValueOf: (ideaId: string) => PriorityValue;
+  onSetPriority: (ideaId: string, value: string | null) => Promise<void>;
 }) {
   return (
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-        void onUpdate(node.id, { is_priority: !node.is_priority });
-      }}
-      className="flex h-5 w-5 flex-shrink-0 items-center justify-center"
-      title={node.is_priority ? "Remove priority" : "Set priority"}
-    >
-      <Star
-        size={13}
-        className={
-          node.is_priority
-            ? "fill-amber-400 text-amber-400"
-            : "text-gray-300 group-hover:text-gray-400 dark:text-gray-600 dark:group-hover:text-gray-500"
-        }
+    <span onClick={(e) => e.stopPropagation()} className="flex flex-shrink-0 items-center">
+      <PriorityChip
+        value={priorityValueOf(node.id)}
+        onSelect={(v) => void onSetPriority(node.id, v)}
       />
-    </button>
+    </span>
   );
 }
 
@@ -374,6 +366,9 @@ export interface HorizonTreeProps {
   ) => Promise<string>;
   onToggleCollapse: (id: string) => void;
   onExpand: (id: string) => void;
+  /** Priority scheme value lookup + setter (chip works regardless of active lens). */
+  priorityValueOf: (ideaId: string) => PriorityValue;
+  onSetPriority: (ideaId: string, value: string | null) => Promise<void>;
   emptyMessage?: React.ReactNode;
   onToggleInFocus?: (id: string, until?: string | null) => Promise<void>;
   cardMode?: boolean;
@@ -404,6 +399,8 @@ export function HorizonTree({
   createIdea,
   onToggleCollapse,
   onExpand,
+  priorityValueOf,
+  onSetPriority,
   emptyMessage,
   onToggleInFocus,
   cardMode,
@@ -445,7 +442,13 @@ export function HorizonTree({
       setRevealTarget(node as Idea);
       setRevealPos({ top: e.clientY + 4, right: window.innerWidth - e.clientX - 4 });
     },
-    renderLeading: (node: IdeaNodeType) => <PriorityStarSlot node={node} onUpdate={onUpdate} />,
+    renderLeading: (node: IdeaNodeType) => (
+      <PriorityChipSlot
+        node={node}
+        priorityValueOf={priorityValueOf}
+        onSetPriority={onSetPriority}
+      />
+    ),
     renderTrailing: (node: IdeaNodeType) => (
       <>
         <NotesIndicator hasNotes={!!node.notes?.trim()} onClick={() => openNotes(node.id)} />

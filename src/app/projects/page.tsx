@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -10,7 +10,6 @@ import {
   Plus,
   Search,
   FileText,
-  Star,
   Pencil,
   Check,
   X,
@@ -27,6 +26,7 @@ import {
   TERMINAL_STATUSES,
 } from "@/lib/constants";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
+import { PriorityChip, priorityRank, type PriorityValue } from "@/components/shared/PriorityChip";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { areaColors } from "@/styles/tokens";
 import { useLens, LensTabs, ColumnShell, groupKeyOf } from "@/components/lens";
@@ -229,34 +229,32 @@ export default function ProjectsPage() {
     [ideasHook.ideas],
   );
 
-  // Computed lenses: area from first tag, priority flag. Classification
-  // lenses (term/nnl/moscow) come from the shared useLens hook.
+  // Computed lens: area from first tag. Classification lenses
+  // (term/nnl/moscow/priority) come from the shared useLens hook.
   const customs = useMemo(
     () => ({
       area: {
         options: AREA_ORDER.map((a) => ({ value: a, label: AREA_LABELS[a] })),
         valueOf: (ideaId: string) => taskTagsHook.getTagsForIdea(ideaId)[0]?.area ?? null,
       },
-      priority: {
-        options: [
-          { value: "priority", label: "Priority" },
-          { value: "rest", label: "Rest" },
-        ],
-        valueOf: (ideaId: string) =>
-          ideasHook.ideas.find((i) => i.id === ideaId)?.is_priority ? "priority" : null,
-      },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [taskTagsHook.tagsByIdea, ideasHook.ideas],
+    [taskTagsHook.tagsByIdea],
   );
 
-  const { columns, valueOf } = useLens({
+  const { columns, valueOf, valuesBySchemeKey } = useLens({
     schemes,
     classificationOptions,
     classifications,
     lensKey,
     customs,
   });
+
+  const priorityOf = useCallback(
+    (ideaId: string): PriorityValue =>
+      (valuesBySchemeKey.get("priority")?.get(ideaId) ?? null) as PriorityValue,
+    [valuesBySchemeKey],
+  );
 
   const visibleProjects = useMemo(() => {
     let list = projects;
@@ -273,23 +271,22 @@ export default function ProjectsPage() {
       list = list.filter((p) => p.status !== "completed");
     }
     return [...list].sort((a, b) => {
-      if (a.is_priority !== b.is_priority) return a.is_priority ? -1 : 1;
+      const rankDiff = priorityRank(priorityOf(a.id)) - priorityRank(priorityOf(b.id));
+      if (rankDiff !== 0) return rankDiff;
       return b.updated_at.localeCompare(a.updated_at);
     });
-  }, [projects, search, statusFilter, hideCompleted]);
+  }, [projects, search, statusFilter, hideCompleted, priorityOf]);
 
   const groupedProjects = useMemo(() => {
     const grouped = new Map<string | null, Idea[]>();
     for (const p of visibleProjects) {
-      const v = valueOf(p.id);
-      // Priority lens: unprioritised projects land in "rest", not "unclassified".
-      const key = v ?? (lensKey === "priority" ? "rest" : null);
+      const key = valueOf(p.id);
       const list = grouped.get(key) ?? [];
       list.push(p);
       grouped.set(key, list);
     }
     return grouped;
-  }, [visibleProjects, valueOf, lensKey]);
+  }, [visibleProjects, valueOf]);
 
   const handleLensChange = (key: string) => {
     if (key === lensKey) return;
@@ -298,13 +295,24 @@ export default function ProjectsPage() {
   };
 
   const handleSetClassification = async (id: string, value: string | null) => {
-    if (lensKey === "area" || lensKey === "priority") return;
+    if (lensKey === "area") return;
     const prev = valueOf(id);
     await setClassification(id, lensKey, value);
     registerUndo({
       label: "Project grouping updated",
       run: async () => {
         await setClassification(id, lensKey, prev);
+      },
+    });
+  };
+
+  const handleSetPriority = async (id: string, value: string | null) => {
+    const prev = priorityOf(id);
+    await setClassification(id, "priority", value);
+    registerUndo({
+      label: "Priority updated",
+      run: async () => {
+        await setClassification(id, "priority", prev);
       },
     });
   };
@@ -330,11 +338,8 @@ export default function ProjectsPage() {
   const handleAddProjectInGroup = async (groupValue: string | null) => {
     const id = await actions.addProject();
     if (id) {
-      if (groupValue && lensKey !== "area" && lensKey !== "priority") {
+      if (groupValue && lensKey !== "area") {
         await setClassification(id, lensKey, groupValue);
-      }
-      if (lensKey === "priority" && groupValue === "priority") {
-        await ideasHook.updateIdea(id, { is_priority: true });
       }
       handleSelect(id);
       setSelectedTreeId(id);
@@ -344,10 +349,10 @@ export default function ProjectsPage() {
 
   const lensTabs = useMemo(() => {
     const tabs: { key: string; label: string }[] = schemes
-      .filter((s) => ["term", "nnl", "moscow"].includes(s.key))
+      .filter((s) => ["term", "nnl", "moscow", "priority"].includes(s.key))
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((s) => ({ key: s.key, label: s.key === "term" ? "Horizon" : s.label }));
-    return [...tabs, { key: "priority", label: "Priority" }, { key: "area", label: "Area" }];
+    return [...tabs, { key: "area", label: "Area" }];
   }, [schemes]);
 
   const selectedProject = useMemo(
@@ -662,7 +667,7 @@ export default function ProjectsPage() {
         role="button"
         tabIndex={0}
         className={`glass-card group flex w-full cursor-pointer flex-col gap-2 rounded-2xl border px-4 py-3 text-left transition hover:border-violet-200 dark:hover:border-violet-800 ${
-          p.is_priority
+          priorityOf(p.id) === "high"
             ? "border-violet-300 shadow-[0_0_0_1px_rgba(139,92,246,0.35),0_8px_24px_rgba(139,92,246,0.12)] dark:border-violet-700"
             : "border-black/5 dark:border-white/5"
         }`}
@@ -714,25 +719,10 @@ export default function ProjectsPage() {
                   }}
                   title="Double-click to rename"
                 >
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void updateIdea(p.id, { is_priority: !p.is_priority });
-                    }}
-                    title={p.is_priority ? "Remove priority" : "Set priority"}
-                    aria-label={p.is_priority ? "Remove priority" : "Set priority"}
-                    aria-pressed={p.is_priority}
-                    className="shrink-0 rounded p-0.5 transition hover:scale-110"
-                  >
-                    <Star
-                      size={12}
-                      className={
-                        p.is_priority
-                          ? "fill-violet-500 text-violet-500"
-                          : "text-gray-300 hover:text-violet-400 dark:text-gray-600"
-                      }
-                    />
-                  </button>
+                  <PriorityChip
+                    value={priorityOf(p.id)}
+                    onSelect={(v) => void handleSetPriority(p.id, v)}
+                  />
                   {AreaIcon && (
                     <AreaIcon
                       size={12}
@@ -766,7 +756,7 @@ export default function ProjectsPage() {
                   {done}/{total} done
                   {p.scheduled_date ? ` · ${p.scheduled_date}` : ""}
                 </span>
-                {lensKey !== "area" && lensKey !== "priority" && (
+                {lensKey !== "area" && (
                   <span onClick={(e) => e.stopPropagation()}>
                     <select
                       aria-label={`Change ${lensTabs.find((t) => t.key === lensKey)?.label ?? "group"} for ${p.text || "untitled project"}`}
@@ -938,9 +928,8 @@ export default function ProjectsPage() {
   };
 
   const renderColumn = (value: string | null, label: string) => {
-    const key = value ?? (lensKey === "priority" ? "rest" : null);
-    const list = groupedProjects.get(key) ?? [];
-    const isUnclassified = value === null && lensKey !== "priority";
+    const list = groupedProjects.get(value) ?? [];
+    const isUnclassified = value === null;
     if (isUnclassified && !unclassifiedExpanded) {
       return (
         <div key="unclassified-collapsed" className="glass-card rounded-2xl">

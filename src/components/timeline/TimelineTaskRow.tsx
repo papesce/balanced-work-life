@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { useDragControls } from "framer-motion";
 import { useDraggable } from "@dnd-kit/core";
-import { Star, MoreHorizontal, Link2, GripVertical, CalendarDays } from "lucide-react";
+import { MoreHorizontal, Link2, GripVertical, CalendarDays } from "lucide-react";
 import { Idea, IdeaStatus, IdeaLink, LinkType, Tag, LifeArea } from "@/lib/types";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { AREA_DOT_COLORS, STATUS_CONFIG, PRODUCTIVITY_SIGNALS } from "@/lib/constants";
@@ -14,6 +14,7 @@ import { MoveIdeaPanel } from "@/components/brainstorm/MoveIdeaPanel";
 import { LinkPanel } from "@/components/shared/LinkPanel";
 import { RescheduleAction, computeClearDatePatch } from "@/lib/tasks/rescheduleTask";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";
+import { PriorityChipField } from "@/components/shared/PriorityChip";
 import { NotesIndicator } from "@/components/shared/NotesIndicator";
 import { useNotes } from "@/contexts/NotesContext";
 import { Eye } from "lucide-react";
@@ -470,12 +471,7 @@ export function TimelineTaskRow({
       </div>
 
       <NotesIndicator hasNotes={!!task.notes?.trim()} onClick={() => openNotes(task.id)} />
-      <button
-        onClick={() => onUpdate(task.id, { is_priority: !task.is_priority })}
-        className={`flex-shrink-0 transition-colors ${task.is_priority ? "text-amber-400" : "text-gray-200 hover:text-gray-400 dark:text-gray-600"}`}
-      >
-        <Star size={14} strokeWidth={1.5} className={task.is_priority ? "fill-amber-400" : ""} />
-      </button>
+      <PriorityChipField ideaId={task.id} />
 
       {signalCfg && (
         <span

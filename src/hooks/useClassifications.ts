@@ -38,6 +38,15 @@ const SEED_SCHEMES: SeedScheme[] = [
     ],
   },
   {
+    key: "priority",
+    label: "Priority",
+    options: [
+      { value: "high", label: "High" },
+      { value: "medium", label: "Medium" },
+      { value: "low", label: "Low" },
+    ],
+  },
+  {
     key: "moscow",
     label: "MoSCoW",
     options: [

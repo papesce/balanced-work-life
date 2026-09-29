@@ -17,6 +17,7 @@ import { AppShell } from "@/components/AppShell";
 import { UndoBar } from "@/components/shared/UndoBar";
 import { QuickAddInput } from "@/components/timeline/QuickAddInput";
 import { HorizonTree } from "@/components/horizon/HorizonTree";
+import { priorityRank, type PriorityValue } from "@/components/shared/PriorityChip";
 import { TypePicker } from "@/components/brainstorm/TypePicker";
 import { TypeFilterPicker } from "@/components/shared/TypeFilterPicker";
 import { Idea, IdeaNode, IdeaType } from "@/lib/types";
@@ -314,6 +315,12 @@ export default function HorizonPage() {
     [ideas, collapsedIds, hideClosed],
   );
 
+  const priorityOf = useCallback(
+    (ideaId: string): PriorityValue =>
+      (valuesBySchemeKey.get("priority")?.get(ideaId) ?? null) as PriorityValue,
+    [valuesBySchemeKey],
+  );
+
   const treesByLens = useMemo(() => {
     const grouped: Record<string, IdeaNode[]> = {};
 
@@ -345,14 +352,13 @@ export default function HorizonPage() {
     }
     for (const key of Object.keys(grouped)) {
       grouped[key].sort((a, b) => {
-        const aPriority = a.priority_order ?? Infinity;
-        const bPriority = b.priority_order ?? Infinity;
-        if (aPriority !== bPriority) return aPriority - bPriority;
+        const rankDiff = priorityRank(priorityOf(a.id)) - priorityRank(priorityOf(b.id));
+        if (rankDiff !== 0) return rankDiff;
         return a.sort_order - b.sort_order;
       });
     }
     return grouped;
-  }, [allTreeNodes, valueOf]);
+  }, [allTreeNodes, valueOf, priorityOf]);
 
   const filteredTreesByLens = useMemo(() => {
     let result = treesByLens;
@@ -381,6 +387,17 @@ export default function HorizonPage() {
       label: `${lensLabel} updated`,
       run: async () => {
         await setClassification(id, lensKey, previous);
+      },
+    });
+  };
+
+  const handleSetPriority = async (id: string, value: string | null) => {
+    const previous = valuesBySchemeKey.get("priority")?.get(id) ?? null;
+    await setClassification(id, "priority", value);
+    registerUndo({
+      label: "Priority updated",
+      run: async () => {
+        await setClassification(id, "priority", previous);
       },
     });
   };
@@ -592,6 +609,8 @@ export default function HorizonPage() {
           createIdea={createIdea}
           onToggleCollapse={onToggleCollapse}
           onExpand={onExpandIdea}
+          priorityValueOf={priorityOf}
+          onSetPriority={handleSetPriority}
           onToggleInFocus={ideasHook.toggleInFocus}
           emptyMessage={
             <p className="px-4 py-6 text-center text-xs text-gray-400 italic dark:text-gray-500">
