@@ -35,16 +35,17 @@ import { IdeaTree } from "@/components/brainstorm/IdeaTree";
 import { BrainstormBreadcrumb } from "@/components/brainstorm/BrainstormBreadcrumb";
 import { NotesIndicator } from "@/components/shared/NotesIndicator";
 import { useNotes } from "@/contexts/NotesContext";
-import { useIdeas, type CreateIdeaPosition } from "@/hooks/useIdeas";
+import { useIdeas } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
-import { Idea, IdeaStatus, LinkType, Tag } from "@/lib/types";
-import { getAncestorChain, getChildCount, getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
-import { getCompletionEffects, hasAnyEffects, CompletionEffects } from "@/lib/linkEffects";
+import { buildProjectTree, useProjectActions } from "@/hooks/useProjectActions";
+import { Idea, IdeaStatus, Tag } from "@/lib/types";
+import { getAncestorChain } from "@/lib/ideaTreeFocus";
+import { hasAnyEffects } from "@/lib/linkEffects";
 import { LinkedEffectsReveal } from "@/components/shared/LinkedEffectsReveal";
-import { useUndoAction } from "@/lib/tasks/undo";
 import { UndoBar } from "@/components/shared/UndoBar";
+import { IdeaActionMenu } from "@/components/shared/IdeaActionMenu";
 
 export default function ProjectsPage() {
   const searchParams = useSearchParams();
@@ -72,7 +73,6 @@ export default function ProjectsPage() {
   const [renameDraft, setRenameDraft] = useState("");
   const [titleEditing, setTitleEditing] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
-  const [cardMenuId, setCardMenuId] = useState<string | null>(null);
   // Detail-local filters (list filters don't leak into detail).
   const [detailHideCompleted, setDetailHideCompleted] = useState(false);
 
@@ -88,6 +88,36 @@ export default function ProjectsPage() {
     setClassification,
   } = useClassifications();
 
+  const actions = useProjectActions({
+    ideasHook,
+    linksHook,
+    onDeleteIds: (deletedIds) => {
+      if (selectedId && deletedIds.has(selectedId)) handleSelect(null);
+    },
+  });
+  const {
+    createIdea,
+    updateIdea,
+    deleteIdea,
+    moveIdea,
+    createLink,
+    deleteLink,
+    markDone,
+    markUndone,
+    scheduleIdea,
+    undoAction,
+    clearUndo,
+    handleUndo,
+    registerUndo,
+    completionEffects,
+    setCompletionEffects,
+  } = actions;
+
+  // Memoized per-node subtree stats + sorted children (one O(N) pass per ideas change).
+  const projectTree = useMemo(() => buildProjectTree(ideasHook.ideas), [ideasHook.ideas]);
+  const statOf = (id: string) =>
+    projectTree.stats.get(id) ?? { done: 0, total: 0, direct: 0, nextId: null };
+
   const [showType] = useState(true);
   const [showArea] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -97,11 +127,6 @@ export default function ProjectsPage() {
     parentId: string | null;
     position: "child" | "top" | "bottom";
     depth: number;
-  } | null>(null);
-  const { undoAction, registerUndo, clearUndo, handleUndo } = useUndoAction();
-  const [completionEffects, setCompletionEffects] = useState<{
-    effects: CompletionEffects;
-    completedText: string;
   } | null>(null);
 
   const handleSelect = (id: string | null) => {
@@ -264,15 +289,6 @@ export default function ProjectsPage() {
     return grouped;
   }, [visibleProjects, valueOf, lensKey]);
 
-  const progressOf = (projectId: string): { done: number; total: number } => {
-    const ids = getFocusedSubtreeIds(projectId, ideasHook.ideas);
-    ids.delete(projectId);
-    const descendants = ideasHook.ideas.filter((i) => ids.has(i.id));
-    const total = descendants.length;
-    const done = descendants.filter((i) => i.status === "completed").length;
-    return { done, total };
-  };
-
   const handleLensChange = (key: string) => {
     if (key === lensKey) return;
     setLensKey(key);
@@ -310,7 +326,7 @@ export default function ProjectsPage() {
   };
 
   const handleAddProjectInGroup = async (groupValue: string | null) => {
-    const id = await createIdea("", null, "bottom", { type: "project", status: "planned" });
+    const id = await actions.addProject();
     if (id) {
       if (groupValue && lensKey !== "area" && lensKey !== "priority") {
         await setClassification(id, lensKey, groupValue);
@@ -342,156 +358,24 @@ export default function ProjectsPage() {
     [selectedId, ideasHook.ideas],
   );
 
-  const createIdea = async (
-    text: string,
-    parentId?: string | null,
-    position?: CreateIdeaPosition,
-    initialUpdates?: Partial<Idea>,
-  ): Promise<string> => {
-    const id = await ideasHook.createIdea(text, parentId, position, initialUpdates);
-    if (id)
-      registerUndo({
-        label: "Idea created",
-        run: async () => {
-          await ideasHook.deleteIdea(id);
-        },
-      });
-    return id;
-  };
-
-  const updateIdea = async (id: string, updates: Partial<Idea>) => {
-    const prev = ideasHook.ideas.find((i) => i.id === id);
-    if (updates.status === "completed" && prev && prev.status !== "completed") {
-      const effects = getCompletionEffects(id, ideasHook.ideas, linksHook.links);
-      await ideasHook.updateIdea(id, updates);
-      const restore: Partial<Idea> = {};
-      for (const k of Object.keys(updates) as Array<keyof Idea>) restore[k] = prev[k] as never;
-      registerUndo({
-        label: "Idea updated",
-        run: async () => {
-          await ideasHook.updateIdea(id, restore);
-        },
-      });
-      if (hasAnyEffects(effects)) setCompletionEffects({ effects, completedText: prev.text });
-      return;
-    }
-    await ideasHook.updateIdea(id, updates);
-    if (!prev) return;
-    const restore: Partial<Idea> = {};
-    for (const k of Object.keys(updates) as Array<keyof Idea>) restore[k] = prev[k] as never;
-    registerUndo({
-      label: "Idea updated",
-      run: async () => {
-        await ideasHook.updateIdea(id, restore);
-      },
-    });
-  };
-
-  const deleteIdea = async (id: string) => {
-    const deletedIds = getFocusedSubtreeIds(id, ideasHook.ideas);
-    const deletedIdeas = ideasHook.ideas.filter((i) => deletedIds.has(i.id));
-    const deletedLinks = linksHook.removeLinksForIdeaIds(deletedIds);
-    await ideasHook.deleteIdea(id);
-    if (deletedIdeas.length === 0) return;
-    registerUndo({
-      label: deletedIdeas.length > 1 ? "Ideas deleted" : "Idea deleted",
-      run: async () => {
-        await ideasHook.restoreIdeas(deletedIdeas);
-        await linksHook.restoreLinks(deletedLinks);
-      },
-    });
-    if (selectedId && deletedIds.has(selectedId)) handleSelect(null);
-  };
-
-  const moveIdea = async (id: string, newParentId: string | null, newSortOrder: number) => {
-    const prev = ideasHook.ideas.find((i) => i.id === id);
-    await ideasHook.moveIdea(id, newParentId, newSortOrder);
-    if (!prev) return;
-    registerUndo({
-      label: "Idea moved",
-      run: async () => {
-        await ideasHook.moveIdea(id, prev.parent_id, prev.sort_order);
-      },
-    });
-  };
-
-  const createLink = async (s: string, t: string, type: LinkType): Promise<string> => {
-    const id = await linksHook.createLink(s, t, type);
-    if (id)
-      registerUndo({
-        label: "Link created",
-        run: async () => {
-          await linksHook.deleteLink(id);
-        },
-      });
-    return id;
-  };
-  const deleteLink = async (id: string) => {
-    const del = linksHook.links.find((l) => l.id === id);
-    await linksHook.deleteLink(id);
-    if (!del) return;
-    registerUndo({
-      label: "Link deleted",
-      run: async () => {
-        await linksHook.restoreLinks([del]);
-      },
-    });
-  };
-  const markDone = async (id: string) => {
-    const prev = ideasHook.ideas.find((i) => i.id === id);
-    const effects = getCompletionEffects(id, ideasHook.ideas, linksHook.links);
-    await ideasHook.markDone(id);
-    if (!prev) return;
-    registerUndo({
-      label: "Idea completed",
-      run: async () => {
-        await ideasHook.updateIdea(id, { status: prev.status, completed_at: prev.completed_at });
-      },
-    });
-    if (hasAnyEffects(effects)) setCompletionEffects({ effects, completedText: prev.text });
-  };
-  const markUndone = async (id: string) => {
-    const prev = ideasHook.ideas.find((i) => i.id === id);
-    await ideasHook.markUndone(id);
-    if (!prev) return;
-    registerUndo({
-      label: "Idea reopened",
-      run: async () => {
-        await ideasHook.updateIdea(id, { status: prev.status, completed_at: prev.completed_at });
-      },
-    });
-  };
-  const scheduleIdea = async (id: string, date: string | null) => {
-    const prev = ideasHook.ideas.find((i) => i.id === id);
-    await ideasHook.scheduleIdea(id, date);
-    if (!prev) return;
-    registerUndo({
-      label: date ? "Idea scheduled" : "Schedule cleared",
-      run: async () => {
-        await ideasHook.updateIdea(id, {
-          scheduled_date: prev.scheduled_date,
-          attempt_dates: prev.attempt_dates,
-        });
-      },
-    });
+  /** Single UI entry for "new editable row": expand parent, select + edit the draft. */
+  const spawnEditable = (id: string, parentId: string | null) => {
+    if (parentId) ideasHook.expandIdea(parentId);
+    setSelectedTreeId(id);
+    setEditingId(id);
   };
 
   const handleAddTask = async () => {
     if (!selectedId) return;
-    const id = await createIdea("", selectedId, "bottom", { type: "task", status: "draft" });
-    if (id) {
-      ideasHook.expandIdea(selectedId);
-      setSelectedTreeId(id);
-      setEditingId(id);
-    }
+    const id = await actions.addTask(selectedId);
+    if (id) spawnEditable(id, selectedId);
   };
 
   const handleAddProject = async () => {
-    const id = await createIdea("", null, "bottom", { type: "project", status: "planned" });
+    const id = await actions.addProject();
     if (id) {
       handleSelect(id);
-      setSelectedTreeId(id);
-      setEditingId(id);
+      spawnEditable(id, null);
     }
   };
 
@@ -505,30 +389,29 @@ export default function ProjectsPage() {
   };
 
   const commitCardRename = async (id: string) => {
-    const trimmed = renameDraft.trim();
-    if (trimmed) await updateIdea(id, { text: trimmed });
+    await actions.commitRename(id, renameDraft);
     setRenamingCardId(null);
   };
 
+  const startCardRename = (p: Idea) => {
+    setRenamingCardId(p.id);
+    setRenameDraft(p.text);
+  };
+
   const quickAddTaskToProject = async (projectId: string) => {
-    const id = await createIdea("", projectId, "bottom", { type: "task", status: "draft" });
+    const id = await actions.addTask(projectId);
     if (id) {
-      ideasHook.expandIdea(projectId);
       if (!expandedCards.has(projectId)) toggleCard(projectId);
-      setSelectedTreeId(id);
-      setEditingId(id);
+      spawnEditable(id, projectId);
     }
   };
 
   const directChildrenOf = (projectId: string): Idea[] =>
-    ideasHook.ideas
-      .filter((i) => i.parent_id === projectId)
-      .sort((a, b) => a.sort_order - b.sort_order);
+    projectTree.childrenById.get(projectId) ?? [];
 
   const commitTitleRename = async () => {
     if (!selectedId) return;
-    const trimmed = titleDraft.trim();
-    if (trimmed) await updateIdea(selectedId, { text: trimmed });
+    await actions.commitRename(selectedId, titleDraft);
     setTitleEditing(false);
   };
 
@@ -652,20 +535,17 @@ export default function ProjectsPage() {
         <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">
           <span className="capitalize">{selectedProject.status.replace("_", " ")}</span>
           <span>·</span>
-          <span>{getChildCount(selectedProject.id, ideasHook.ideas)} tasks</span>
+          <span>{statOf(selectedProject.id).direct} tasks</span>
           {(() => {
-            const { done, total } = progressOf(selectedProject.id);
-            const next = ideasHook.ideas.find(
-              (i) =>
-                getFocusedSubtreeIds(selectedProject.id, ideasHook.ideas).has(i.id) &&
-                i.id !== selectedProject.id &&
-                (i.status === "draft" || i.status === "planned" || i.status === "in_progress"),
-            );
+            const stat = statOf(selectedProject.id);
+            const next = stat.nextId
+              ? (ideasHook.ideas.find((i) => i.id === stat.nextId) ?? null)
+              : null;
             return (
               <>
                 <span>·</span>
                 <span>
-                  {done}/{total} done
+                  {stat.done}/{stat.total} done
                 </span>
                 {next && (
                   <>
@@ -757,7 +637,7 @@ export default function ProjectsPage() {
   // List view — lens-board of projects (subset type=project)
 
   const renderProjectCard = (p: Idea) => {
-    const { done, total } = progressOf(p.id);
+    const { done, total } = statOf(p.id);
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
     const area = taskTagsHook.getTagsForIdea(p.id)[0]?.area ?? null;
     const AreaIcon = area ? AREA_ICONS[area as keyof typeof AREA_ICONS] : null;
@@ -770,8 +650,7 @@ export default function ProjectsPage() {
           if (e.key === "Enter" || e.key === " ") handleSelect(p.id);
           else if (e.key === "e" || e.key === "F2") {
             e.preventDefault();
-            setRenamingCardId(p.id);
-            setRenameDraft(p.text);
+            startCardRename(p);
           } else if (e.key === "a") {
             e.preventDefault();
             void quickAddTaskToProject(p.id);
@@ -779,7 +658,7 @@ export default function ProjectsPage() {
         }}
         role="button"
         tabIndex={0}
-        className={`glass-card flex w-full cursor-pointer flex-col gap-2 rounded-2xl border px-4 py-3 text-left transition hover:border-violet-200 dark:hover:border-violet-800 ${
+        className={`glass-card group flex w-full cursor-pointer flex-col gap-2 rounded-2xl border px-4 py-3 text-left transition hover:border-violet-200 dark:hover:border-violet-800 ${
           p.is_priority
             ? "border-violet-300 shadow-[0_0_0_1px_rgba(139,92,246,0.35),0_8px_24px_rgba(139,92,246,0.12)] dark:border-violet-700"
             : "border-black/5 dark:border-white/5"
@@ -828,8 +707,7 @@ export default function ProjectsPage() {
                   className="flex items-center gap-1.5 truncate text-sm font-semibold text-gray-800 dark:text-gray-100"
                   onDoubleClick={(e) => {
                     e.stopPropagation();
-                    setRenamingCardId(p.id);
-                    setRenameDraft(p.text);
+                    startCardRename(p);
                   }}
                   title="Double-click to rename"
                 >
@@ -945,82 +823,25 @@ export default function ProjectsPage() {
                 className={`transition-transform ${expandedCards.has(p.id) ? "rotate-180" : ""}`}
               />
             </button>
-            <div className="relative">
-              <button
-                onClick={() => setCardMenuId(cardMenuId === p.id ? null : p.id)}
-                aria-label={`Actions for ${p.text || "untitled project"}`}
-                aria-haspopup="menu"
-                aria-expanded={cardMenuId === p.id}
-                className="rounded-lg px-1.5 py-1 text-sm font-bold text-gray-400 hover:bg-black/5 hover:text-gray-700"
-              >
-                …
-              </button>
-              {cardMenuId === p.id && (
-                <>
-                  <span
-                    className="fixed inset-0 z-40"
-                    onClick={() => setCardMenuId(null)}
-                    aria-hidden
-                  />
-                  <span
-                    role="menu"
-                    className="absolute top-full right-0 z-50 mt-1 w-44 overflow-hidden rounded-xl border border-black/10 bg-white shadow-lg dark:border-white/10 dark:bg-gray-800"
-                  >
-                    <button
-                      role="menuitem"
-                      onClick={() => {
-                        setCardMenuId(null);
-                        handleSelect(p.id);
-                      }}
-                      className="block w-full px-3 py-2 text-left text-xs hover:bg-violet-50"
-                    >
-                      Open
-                    </button>
-                    <button
-                      role="menuitem"
-                      onClick={() => {
-                        setCardMenuId(null);
-                        setRenamingCardId(p.id);
-                        setRenameDraft(p.text);
-                      }}
-                      className="block w-full px-3 py-2 text-left text-xs hover:bg-violet-50"
-                    >
-                      Rename
-                    </button>
-                    <button
-                      role="menuitem"
-                      onClick={() => {
-                        setCardMenuId(null);
-                        void quickAddTaskToProject(p.id);
-                      }}
-                      className="block w-full px-3 py-2 text-left text-xs hover:bg-violet-50"
-                    >
-                      Add task
-                    </button>
-                    <button
-                      role="menuitem"
-                      onClick={() => {
-                        setCardMenuId(null);
-                        openNotes(p.id);
-                      }}
-                      className="block w-full px-3 py-2 text-left text-xs hover:bg-violet-50"
-                    >
-                      Details
-                    </button>
-                    <button
-                      role="menuitem"
-                      onClick={() => {
-                        setCardMenuId(null);
-                        void deleteIdea(p.id);
-                      }}
-                      className="block w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50"
-                    >
-                      Delete
-                    </button>
-                  </span>
-                </>
-              )}
-            </div>
+            <IdeaActionMenu
+              idea={p}
+              allIdeas={ideasHook.ideas}
+              links={linksHook.links}
+              hasChildren={directChildrenOf(p.id).length > 0}
+              getTagsForIdea={taskTagsHook.getTagsForIdea}
+              onEdit={() => startCardRename(p)}
+              onUpdate={updateIdea}
+              onDelete={deleteIdea}
+              onSchedule={scheduleIdea}
+              onCreateLink={createLink}
+              onDeleteLink={deleteLink}
+              onMove={moveIdea}
+              onMoved={(id) => {
+                if (id) ideasHook.expandIdea(id);
+              }}
+              onShowDetails={() => openNotes(p.id)}
+              currentView="projects"
+            />
             <NotesIndicator hasNotes={!!p.notes?.trim()} onClick={() => openNotes(p.id)} />
             <button
               onClick={() => handleSelect(p.id)}
