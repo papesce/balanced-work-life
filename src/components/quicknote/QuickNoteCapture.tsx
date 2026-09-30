@@ -1,9 +1,11 @@
 "use client";
 
 import { useRef, useEffect, useCallback, useState } from "react";
+import { Search } from "lucide-react";
 import { useQuickNoteContext } from "@/contexts/QuickNoteContext";
 import { QuickNoteSaveIndicator } from "./QuickNoteSaveIndicator";
 import { QuickNoteSelectionActions } from "./QuickNoteSelectionActions";
+import { requestGlobalSearch } from "@/lib/globalSearchBus";
 
 /**
  * Capture mode: a plain textarea. Enter inserts a newline and nothing else.
@@ -16,6 +18,7 @@ export function QuickNoteCapture() {
     draft,
     updateText,
     flushNow,
+    closePanel,
     isSelectedNoteLive,
     saveStatus,
     lastSavedAt,
@@ -23,7 +26,9 @@ export function QuickNoteCapture() {
   } = useQuickNoteContext();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const readonly = !isSelectedNoteLive;
-  const [selection, setSelection] = useState<string | null>(null);
+  const [selection, setSelection] = useState<{ start: number; end: number; text: string } | null>(
+    null,
+  );
   const [selectionOpen, setSelectionOpen] = useState(false);
   const debugEnabled =
     typeof window !== "undefined" && window.localStorage?.getItem("quicknote-debug") === "1";
@@ -67,7 +72,7 @@ export function QuickNoteCapture() {
     if (selectionStart !== selectionEnd) {
       const text = value.slice(selectionStart, selectionEnd);
       if (text.trim()) {
-        setSelection(text);
+        setSelection({ start: selectionStart, end: selectionEnd, text });
         return;
       }
     }
@@ -85,11 +90,43 @@ export function QuickNoteCapture() {
     }
   }, []);
 
+  // Send the selection to the global search bar and close the panel
+  // (the backdrop would otherwise cover the results dropdown). No mark,
+  // no DB writes — pure navigation via existing search behavior.
+  const handleSearchSelection = useCallback(async () => {
+    if (!selection || !selection.text.trim()) return;
+    const query = selection.text;
+    handleSelectionDone();
+    await closePanel();
+    requestGlobalSearch(query);
+  }, [selection, handleSelectionDone, closePanel]);
+
+  // Insert a "✓ " mark at the selection start after successful processing.
+  // Skipped for archived notes so their text stays pristine. Offsets are
+  // safe: typing clears selection state, so the actions UI only exists
+  // while the offsets are intact.
+  const handleSelectionMarked = useCallback(() => {
+    if (readonly || !selection) {
+      handleSelectionDone();
+      return;
+    }
+    const marked = draft.slice(0, selection.start) + "✓ " + draft.slice(selection.start);
+    updateText(marked);
+    setSelection(null);
+    setSelectionOpen(false);
+    const el = textareaRef.current;
+    if (el) {
+      const pos = selection.start + 2;
+      // Defer so it runs after the controlled value re-renders.
+      requestAnimationFrame(() => el.setSelectionRange(pos, pos));
+    }
+  }, [readonly, selection, draft, updateText, handleSelectionDone]);
+
   // NOTE: previously the textarea was bound to `draft` with internal
   // `[matched:<id>]` tags stripped for display. The next keystroke then fed
   // the stripped text back through updateText, permanently deleting the
   // match metadata (breaking undo/match linkage). The draft is now bound
-  // verbatim — tags stay intact; Process mode renders the pretty view.
+  // verbatim — tags stay intact.
   const handleBlur = useCallback(() => {
     if (readonly) return;
     void flushNow("blur");
@@ -132,7 +169,15 @@ export function QuickNoteCapture() {
         </div>
       )}
       {selection && !selectionOpen && (
-        <div className="mt-2 flex items-center justify-end">
+        <div className="mt-2 flex items-center justify-end gap-1.5">
+          <button
+            onClick={() => void handleSearchSelection()}
+            title="Search ideas for the selected text"
+            className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-500 transition-colors hover:bg-black/5 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"
+          >
+            <Search size={13} />
+            Search ideas
+          </button>
           <button
             onClick={() => setSelectionOpen(true)}
             className="rounded-lg bg-violet-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-violet-700"
@@ -143,7 +188,11 @@ export function QuickNoteCapture() {
       )}
       {selection && selectionOpen && (
         <div className="mt-2">
-          <QuickNoteSelectionActions selection={selection} onDone={handleSelectionDone} />
+          <QuickNoteSelectionActions
+            selection={selection.text}
+            onMarked={handleSelectionMarked}
+            onDone={handleSelectionDone}
+          />
         </div>
       )}
       {debugEnabled && (

@@ -53,14 +53,17 @@ type PickerMode = null | "create_under" | "match";
  */
 export function QuickNoteSelectionActions({
   selection,
+  onMarked,
   onDone,
 }: {
   selection: string;
+  /** Insert the ✓ mark at the selection start (no-op for archived notes). */
+  onMarked: () => void;
   onDone: () => void;
 }) {
   const router = useRouter();
   const { user } = useAuth();
-  const { createSelectionIdea, closePanel } = useQuickNoteContext();
+  const { createSelectionIdea, closePanel, flushNow } = useQuickNoteContext();
   const [saving, setSaving] = useState(false);
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
   const [overflowOpen, setOverflowOpen] = useState(false);
@@ -90,6 +93,8 @@ export function QuickNoteSelectionActions({
   );
   const hasMatch = !!suggestedMatch && suggestedMatch.score >= 0.6;
   const smartView = hasMatch ? getSmartRevealView(suggestedMatch!.idea, allIdeas) : null;
+  // Selections starting with the processed mark can't be created again.
+  const hasMarked = selection.trimStart().startsWith("✓");
 
   useEffect(() => {
     if (!overflowOpen) return;
@@ -107,24 +112,30 @@ export function QuickNoteSelectionActions({
     async (parentId?: string) => {
       setSaving(true);
       try {
-        await createSelectionIdea(selection, parentId ?? null);
+        const id = await createSelectionIdea(selection, parentId ?? null);
+        if (id) onMarked();
         onDone();
       } finally {
         setSaving(false);
       }
     },
-    [createSelectionIdea, selection, onDone],
+    [createSelectionIdea, selection, onMarked, onDone],
   );
 
   const handleNavigate = useCallback(
-    (ideaId: string, view?: RevealView) => {
+    async (ideaId: string, view?: RevealView) => {
       const idea = allIdeas.find((i) => i.id === ideaId);
       if (!idea) return;
       const target = view ?? getSmartRevealView(idea, allIdeas);
+      onMarked();
+      // Persist the mark before leaving: the debounced autosave may not
+      // have landed yet when the route changes.
+      await flushNow("selection");
+      onDone();
       closePanel();
       router.push(getRevealHref(target, idea, allIdeas));
     },
-    [allIdeas, closePanel, router],
+    [allIdeas, closePanel, flushNow, onMarked, onDone, router],
   );
 
   const preview = selection.length > 120 ? selection.slice(0, 120).trimEnd() + "…" : selection;
@@ -196,7 +207,8 @@ export function QuickNoteSelectionActions({
             </button>
             <button
               onClick={() => void handleCreate()}
-              disabled={saving}
+              disabled={saving || hasMarked}
+              title={hasMarked ? "Already processed" : undefined}
               className="flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-medium text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
             >
               <Plus size={11} />
@@ -207,7 +219,8 @@ export function QuickNoteSelectionActions({
           <>
             <button
               onClick={() => void handleCreate()}
-              disabled={saving}
+              disabled={saving || hasMarked}
+              title={hasMarked ? "Already processed" : undefined}
               className="flex cursor-pointer items-center gap-1 rounded-lg bg-violet-600 px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Plus size={11} />
@@ -297,7 +310,8 @@ export function QuickNoteSelectionActions({
                       setOverflowOpen(false);
                       setPickerMode("create_under");
                     }}
-                    disabled={saving}
+                    disabled={saving || hasMarked}
+                    title={hasMarked ? "Already processed" : undefined}
                     className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
                   >
                     <GitBranch size={12} />

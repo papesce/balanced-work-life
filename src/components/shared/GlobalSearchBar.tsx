@@ -33,6 +33,7 @@ import {
   type RevealView,
 } from "@/lib/reveal";
 import { useClassifications } from "@/hooks/useClassifications";
+import { subscribeGlobalSearch } from "@/lib/globalSearchBus";
 
 const VIEW_ICON: Record<RevealView, React.ReactNode> = {
   planner: <LayoutDashboard size={12} strokeWidth={1.5} />,
@@ -77,6 +78,18 @@ export function GlobalSearchBar() {
     }, 150);
     return () => clearTimeout(t);
   }, [rawQuery]);
+
+  // External search requests (e.g. quick-note "Search ideas"): populate,
+  // open, and focus so existing navigation takes over.
+  useEffect(() => {
+    return subscribeGlobalSearch((text) => {
+      const query = text.trim().slice(0, 200);
+      if (!query) return;
+      setRawQuery(query);
+      setOpen(true);
+      inputRef.current?.focus();
+    });
+  }, []);
 
   // ⌘K / Ctrl+K + "/" to focus
   useEffect(() => {
