@@ -7,7 +7,6 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   Plus,
   GitBranch,
-  Search,
   Check,
   MoreHorizontal,
   Eye,
@@ -44,7 +43,7 @@ export function KindPill({ kind }: { kind: IdeaType }) {
   );
 }
 
-type PickerMode = null | "create_under" | "match";
+type PickerMode = null | "create_under";
 
 /**
  * Actions for an arbitrary text selection from the capture textarea.
@@ -140,31 +139,25 @@ export function QuickNoteSelectionActions({
 
   const preview = selection.length > 120 ? selection.slice(0, 120).trimEnd() + "…" : selection;
 
-  if (pickerMode === "create_under" || pickerMode === "match") {
-    const isCreateUnder = pickerMode === "create_under";
+  if (pickerMode === "create_under") {
     return (
       <div className="flex flex-col gap-1.5 rounded-xl border border-black/10 bg-white/80 p-2 dark:border-white/10 dark:bg-gray-800/80">
-        <p className="px-1 text-[10px] font-bold text-gray-500 dark:text-gray-400">
-          {isCreateUnder ? "Create under…" : "Search existing…"}
-        </p>
+        <p className="px-1 text-[10px] font-bold text-gray-500 dark:text-gray-400">Create under…</p>
         <IdeaSearchPicker
           ideas={allIdeas}
-          initialQuery={isCreateUnder ? undefined : parsed.title}
+          initialQuery={undefined}
           matchAllWords
-          placeholder={
-            isCreateUnder ? "Search for a parent idea..." : "Search for a matching idea..."
-          }
+          placeholder="Search for a parent idea..."
           renderActions={(idea, clearSearch) => (
             <button
               onClick={() => {
                 clearSearch();
-                if (isCreateUnder) void handleCreate(idea.id);
-                else handleNavigate(idea.id);
+                void handleCreate(idea.id);
               }}
               className="flex cursor-pointer items-center gap-1 rounded-lg bg-violet-50 px-2 py-1 text-[10px] font-semibold text-violet-600 hover:bg-violet-100 dark:bg-violet-950/20 dark:text-violet-400"
             >
               <Check size={10} />
-              {isCreateUnder ? "Select" : "Go"}
+              Select
             </button>
           )}
         />
@@ -225,14 +218,6 @@ export function QuickNoteSelectionActions({
             >
               <Plus size={11} />
               Create new
-            </button>
-            <button
-              onClick={() => setPickerMode("match")}
-              disabled={saving}
-              className="flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-medium text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-            >
-              <Search size={11} />
-              Search existing…
             </button>
           </>
         )}
