@@ -10,7 +10,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useTaskTags } from "@/hooks/useTaskTags";
-import { buildBackupData, downloadBackup, parseBackupFile } from "@/lib/backup";
+import {
+  buildBackupData,
+  downloadBackup,
+  parseBackupFile,
+  restoreClassifications,
+  restoreLensPrefsIfEmpty,
+  restoreQuickNotes,
+} from "@/lib/backup";
 
 export function UserMenu() {
   const { user, signOut } = useAuth();
@@ -50,7 +57,7 @@ export function UserMenu() {
       downloadBackup(data);
       setStatus({
         type: "success",
-        text: `Exported ${data.ideas.length} ideas, ${data.ideaLinks.length} links and ${data.tags.length} tags.`,
+        text: `Exported ${data.ideas.length} ideas, ${data.ideaLinks.length} links, ${data.tags.length} tags, ${data.quickNotes.length} notes and ${data.ideaClassifications.length} classifications.`,
       });
     } catch (err) {
       setStatus({
@@ -72,9 +79,19 @@ export function UserMenu() {
       await restoreLinks(data.ideaLinks);
       await restoreTags(data.tags);
       await restoreTaskTags(data.taskTags);
+      await restoreQuickNotes(db, data.quickNotes);
+      await restoreClassifications(
+        db,
+        data.classificationSchemes,
+        data.classificationOptions,
+        data.ideaClassifications,
+      );
+      const restoredPrefs = restoreLensPrefsIfEmpty(data.lensPrefs);
+      const prefsSuffix =
+        restoredPrefs.length > 0 ? ` Lens prefs restored (${restoredPrefs.length}).` : "";
       setStatus({
         type: "success",
-        text: `Imported ${data.ideas.length} ideas, ${data.ideaLinks.length} links and ${data.tags.length} tags.`,
+        text: `Imported ${data.ideas.length} ideas, ${data.ideaLinks.length} links, ${data.tags.length} tags, ${data.quickNotes.length} notes and ${data.ideaClassifications.length} classifications.${prefsSuffix}`,
       });
     } catch (err) {
       setStatus({
