@@ -383,7 +383,12 @@ function DailyPlannerInner() {
       registerUndo({
         label: "Task cancelled",
         run: async () => {
-          await updateIdea(id, { status: previous.status, cancelled_at: null });
+          await updateIdea(id, {
+            status: previous.status,
+            completed_at: previous.completed_at,
+            cancelled_at: previous.cancelled_at,
+            paused_at: previous.paused_at,
+          });
         },
       });
     },

@@ -6,13 +6,13 @@ export function computeStatusUpdates(status: IdeaStatus): Partial<Idea> {
   const now = new Date().toISOString();
   switch (status) {
     case "completed":
-      return { status: "completed", completed_at: now };
+      return { status: "completed", completed_at: now, cancelled_at: null, paused_at: null };
     case "cancelled":
-      return { status: "cancelled", cancelled_at: now };
+      return { status: "cancelled", cancelled_at: now, completed_at: null, paused_at: null };
     case "in_progress":
-      return { status: "in_progress" };
+      return { status: "in_progress", completed_at: null, cancelled_at: null, paused_at: null };
     case "paused":
-      return { status: "paused", paused_at: now };
+      return { status: "paused", paused_at: now, completed_at: null, cancelled_at: null };
     case "planned":
     case "scheduled":
     case "draft":

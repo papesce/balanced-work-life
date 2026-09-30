@@ -211,7 +211,12 @@ export function useProjectActions({ ideasHook, linksHook, onDeleteIds }: UseProj
     await ideasHook.markDone(id);
     if (!prev) return;
     withUndo(registerUndo, "Idea completed", () =>
-      ideasHook.updateIdea(id, { status: prev.status, completed_at: prev.completed_at }),
+      ideasHook.updateIdea(id, {
+        status: prev.status,
+        completed_at: prev.completed_at,
+        cancelled_at: prev.cancelled_at,
+        paused_at: prev.paused_at,
+      }),
     );
     if (hasAnyEffects(effects)) setCompletionEffects({ effects, completedText: prev.text });
   };
@@ -221,7 +226,12 @@ export function useProjectActions({ ideasHook, linksHook, onDeleteIds }: UseProj
     await ideasHook.markUndone(id);
     if (!prev) return;
     withUndo(registerUndo, "Idea reopened", () =>
-      ideasHook.updateIdea(id, { status: prev.status, completed_at: prev.completed_at }),
+      ideasHook.updateIdea(id, {
+        status: prev.status,
+        completed_at: prev.completed_at,
+        cancelled_at: prev.cancelled_at,
+        paused_at: prev.paused_at,
+      }),
     );
   };
 

@@ -5,6 +5,8 @@ export function computeCompletePatch(): Partial<Idea> {
   return {
     status: "completed",
     completed_at: new Date().toISOString(),
+    cancelled_at: null,
+    paused_at: null,
   };
 }
 
@@ -13,6 +15,7 @@ export function computeCancelPatch(): Partial<Idea> {
     status: "cancelled",
     cancelled_at: new Date().toISOString(),
     completed_at: null,
+    paused_at: null,
   };
 }
 
@@ -53,6 +56,9 @@ export function computeReschedulePatch(idea: Idea, action: RescheduleAction): Pa
         scheduled_date: getToday(),
         status: "scheduled",
         attempt_dates: updatedAttemptDates,
+        completed_at: null,
+        cancelled_at: null,
+        paused_at: null,
       };
     case "try_now":
       return {
@@ -60,24 +66,36 @@ export function computeReschedulePatch(idea: Idea, action: RescheduleAction): Pa
         scheduled_time: getCurrentTimeRounded(15),
         status: "scheduled",
         attempt_dates: updatedAttemptDates,
+        completed_at: null,
+        cancelled_at: null,
+        paused_at: null,
       };
     case "reschedule":
       return {
         scheduled_date: action.newDate,
         status: "scheduled",
         attempt_dates: updatedAttemptDates,
+        completed_at: null,
+        cancelled_at: null,
+        paused_at: null,
       };
     case "move":
       return {
         scheduled_date: action.newDate,
         status: "scheduled",
         attempt_dates: updatedAttemptDates,
+        completed_at: null,
+        cancelled_at: null,
+        paused_at: null,
       };
     case "defer":
       return {
         scheduled_date: null,
         status: "deferred",
         attempt_dates: updatedAttemptDates,
+        completed_at: null,
+        cancelled_at: null,
+        paused_at: null,
       };
   }
 }

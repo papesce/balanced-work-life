@@ -530,7 +530,12 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
 
   const markDone = async (id: string) => {
     const now = new Date().toISOString();
-    await updateIdea(id, { status: "completed", completed_at: now });
+    await updateIdea(id, {
+      status: "completed",
+      completed_at: now,
+      cancelled_at: null,
+      paused_at: null,
+    });
   };
 
   const markUndone = async (id: string) => {
@@ -540,19 +545,39 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
         ? "scheduled"
         : "planned"
       : "draft";
-    await updateIdea(id, { status: fallbackStatus, completed_at: null });
+    await updateIdea(id, {
+      status: fallbackStatus,
+      completed_at: null,
+      cancelled_at: null,
+      paused_at: null,
+    });
   };
 
   const markInProgress = async (id: string) => {
-    await updateIdea(id, { status: "in_progress" });
+    await updateIdea(id, {
+      status: "in_progress",
+      completed_at: null,
+      cancelled_at: null,
+      paused_at: null,
+    });
   };
 
   const markPaused = async (id: string) => {
-    await updateIdea(id, { status: "paused", paused_at: new Date().toISOString() });
+    await updateIdea(id, {
+      status: "paused",
+      paused_at: new Date().toISOString(),
+      completed_at: null,
+      cancelled_at: null,
+    });
   };
 
   const markCancelled = async (id: string) => {
-    await updateIdea(id, { status: "cancelled", cancelled_at: new Date().toISOString() });
+    await updateIdea(id, {
+      status: "cancelled",
+      cancelled_at: new Date().toISOString(),
+      completed_at: null,
+      paused_at: null,
+    });
   };
 
   const scheduleIdea = async (id: string, date: string | null) => {
