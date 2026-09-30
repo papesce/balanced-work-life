@@ -237,9 +237,15 @@ export class SupabaseConnector {
 
     if (op.table === "task_tags") {
       switch (op.op) {
-        case "PUT": {
+        case "PUT":
+        case "PATCH": {
           const { idea_id, tag_id } = op.opData ?? {};
-          if (!idea_id || !tag_id) break;
+          if (!idea_id || !tag_id) {
+            console.warn(
+              `[QuickNote:sql] upload task_tags ${op.op} id=${op.id} SKIPPED: missing idea_id/tag_id`,
+            );
+            break;
+          }
           const { error } = await supabase
             .from("task_tags")
             .upsert({ id: op.id, idea_id, tag_id }, { onConflict: "idea_id,tag_id" });
@@ -249,6 +255,10 @@ export class SupabaseConnector {
         case "DELETE": {
           const { error } = await supabase.from("task_tags").delete().eq("id", op.id);
           throwIfSupabaseError(error, `delete task_tags id=${op.id}`);
+          break;
+        }
+        default: {
+          console.warn(`[QuickNote:sql] upload task_tags ${op.op} id=${op.id} SKIPPED: unknown op`);
           break;
         }
       }
