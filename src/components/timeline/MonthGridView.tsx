@@ -9,7 +9,8 @@ import { addMonths, getToday } from "@/lib/dateUtils";
 import { DayTaskList } from "./DayTaskList";
 import { QuickAddInput } from "./QuickAddInput";
 import { MiniBalanceBar } from "@/components/MiniBalanceBar";
-import { formatTimelineDate } from "./timelineUtils";
+import { DateChip } from "@/components/shared/DateChip";
+import { formatTimelineDate, formatDayTitle, formatTaskCount } from "./timelineUtils";
 import { TaskChip } from "./TaskChip";
 
 const DAY_HEADERS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -77,27 +78,17 @@ function DayCell({
         onSelect();
       }}
       aria-pressed={selected}
-      aria-label={`${formatTimelineDate(date)}: ${current.length} tasks. Select to view.`}
+      aria-label={`${formatTimelineDate(date)}: ${formatTaskCount(current.length)}. Select to view.`}
       className={`min-h-[88px] w-full cursor-pointer rounded-xl border p-1 text-left transition-colors sm:min-h-[104px] ${
         isOver
           ? "border-violet-400 bg-violet-50 ring-2 ring-violet-500/40 dark:border-violet-500 dark:bg-violet-950/20"
           : selected
             ? "glass-card-anchor"
             : "glass-card hover:bg-black/[0.02] dark:hover:bg-white/[0.03]"
-      } ${isCurrentMonth ? "" : "opacity-45"}`}
+      } ${isCurrentMonth ? "" : "opacity-45"}${isToday ? "day-cell-today" : ""}`}
     >
       <span className="flex items-center justify-between px-0.5">
-        <span
-          className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-            isToday
-              ? "bg-violet-600 text-white"
-              : selected
-                ? "text-violet-600 dark:text-violet-400"
-                : "text-gray-500 dark:text-gray-400"
-          }`}
-        >
-          {dayNum}
-        </span>
+        <DateChip dayNum={dayNum} isToday={isToday} isSelected={selected} />
         {current.length > 0 && (
           <span className="rounded-full bg-black/[0.05] px-1 text-[9px] font-bold text-gray-500 tabular-nums dark:bg-white/[0.08] dark:text-gray-400">
             {current.length}
@@ -154,7 +145,7 @@ export function MonthGridView(props: MonthGridViewProps) {
       }) ?? {};
     if (!taskId || !toDate || toDate === fromDate) return;
     justDraggedRef.current = Date.now();
-    void onReschedule(taskId, { type: "move", newDate: toDate });
+    void onReschedule(taskId, { type: "reschedule", newDate: toDate });
     if (toDate !== anchor) onAnchorChange(toDate);
   };
 
@@ -237,7 +228,7 @@ export function MonthGridView(props: MonthGridViewProps) {
           <div className="flex flex-wrap items-center justify-between gap-2 pb-3">
             <div className="flex items-center gap-3">
               <span className="text-[22px] leading-tight font-bold text-gray-900 dark:text-gray-100">
-                {formatTimelineDate(anchor)}
+                {formatDayTitle(anchor, "detail").full}
               </span>
               <MiniBalanceBar
                 tasks={selectedDayTasks}

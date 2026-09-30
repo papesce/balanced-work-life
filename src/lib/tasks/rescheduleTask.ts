@@ -1,4 +1,4 @@
-import { Idea } from "@/lib/types";
+import type { Idea } from "@/lib/types";
 import { getToday, addDays, getCurrentTimeRounded } from "@/lib/dateUtils";
 
 export function computeCompletePatch(): Partial<Idea> {
@@ -28,93 +28,86 @@ export function getContextDate(idea: Idea): string {
 }
 
 export type RescheduleAction =
-  | { type: "retry_today" }
-  | { type: "try_now" }
-  | { type: "reschedule"; newDate: string }
-  | { type: "move"; newDate: string }
+  | { type: "reschedule"; newDate: string; time?: string; recordAttempt?: boolean }
   | { type: "defer" };
 
-export function computeReschedulePatch(idea: Idea, action: RescheduleAction): Partial<Idea> {
-  const previousDate = idea.scheduled_date;
-  // The date this action moves the task TO (null for defer/clear paths).
-  const nextDate =
-    action.type === "reschedule" || action.type === "move"
-      ? action.newDate
-      : action.type === "retry_today" || action.type === "try_now"
-        ? getToday()
-        : null;
-  // Record the old date as an attempt — but not when there was no date, or
-  // when the "new" date is the same (avoids duplicate entries).
-  const updatedAttemptDates =
-    previousDate && previousDate !== nextDate
-      ? [...idea.attempt_dates, previousDate]
-      : idea.attempt_dates;
-
-  switch (action.type) {
-    case "retry_today":
-      return {
-        scheduled_date: getToday(),
-        status: "scheduled",
-        attempt_dates: updatedAttemptDates,
-        completed_at: null,
-        cancelled_at: null,
-        paused_at: null,
-      };
-    case "try_now":
-      return {
-        scheduled_date: getToday(),
-        scheduled_time: getCurrentTimeRounded(15),
-        status: "scheduled",
-        attempt_dates: updatedAttemptDates,
-        completed_at: null,
-        cancelled_at: null,
-        paused_at: null,
-      };
-    case "reschedule":
-      return {
-        scheduled_date: action.newDate,
-        status: "scheduled",
-        attempt_dates: updatedAttemptDates,
-        completed_at: null,
-        cancelled_at: null,
-        paused_at: null,
-      };
-    case "move":
-      return {
-        scheduled_date: action.newDate,
-        status: "scheduled",
-        attempt_dates: updatedAttemptDates,
-        completed_at: null,
-        cancelled_at: null,
-        paused_at: null,
-      };
-    case "defer":
-      return {
-        scheduled_date: null,
-        status: "deferred",
-        attempt_dates: updatedAttemptDates,
-        completed_at: null,
-        cancelled_at: null,
-        paused_at: null,
-      };
-  }
+/**
+ * Single predicate shared by labels and patch computation so consequence
+ * previews cannot drift from behavior. Records only when the old date is
+ * STRICTLY in the past (today is not a miss) and the date actually changes.
+ */
+export function willRecordAttempt(
+  previousDate: string | null,
+  newDate: string | null,
+  attemptDates: string[],
+  today: string = getToday(),
+): boolean {
+  return (
+    previousDate != null &&
+    previousDate < today &&
+    newDate !== previousDate &&
+    !attemptDates.includes(previousDate)
+  );
 }
 
-/** Clearing the date keeps the status but records the old date as an attempt. */
+export function computeReschedulePatch(idea: Idea, action: RescheduleAction): Partial<Idea> {
+  if (action.type === "defer") {
+    const previousDate = idea.scheduled_date;
+    const updatedAttemptDates =
+      previousDate && willRecordAttempt(previousDate, null, idea.attempt_dates)
+        ? [...idea.attempt_dates, previousDate]
+        : idea.attempt_dates;
+    return {
+      scheduled_date: null,
+      status: "deferred",
+      attempt_dates: updatedAttemptDates,
+      completed_at: null,
+      cancelled_at: null,
+      paused_at: null,
+    };
+  }
+
+  const previousDate = idea.scheduled_date;
+  const nextDate = action.newDate;
+  const today = getToday();
+  const record =
+    action.recordAttempt ?? willRecordAttempt(previousDate, nextDate, idea.attempt_dates, today);
+  const updatedAttemptDates =
+    record && previousDate ? [...idea.attempt_dates, previousDate] : idea.attempt_dates;
+
+  const patch: Partial<Idea> = {
+    scheduled_date: nextDate,
+    status: "scheduled",
+    attempt_dates: updatedAttemptDates,
+    completed_at: null,
+    cancelled_at: null,
+    paused_at: null,
+  };
+  if (action.time !== undefined) {
+    patch.scheduled_time = action.time;
+  }
+  return patch;
+}
+
+/** Clearing the date keeps the status but records the old date only if strictly in the past. */
 export function computeClearDatePatch(idea: Idea): Partial<Idea> {
   const previousDate = idea.scheduled_date;
   return {
     scheduled_date: null,
     attempt_dates:
-      previousDate && !idea.attempt_dates.includes(previousDate)
+      previousDate && willRecordAttempt(previousDate, null, idea.attempt_dates)
         ? [...idea.attempt_dates, previousDate]
         : idea.attempt_dates,
   };
 }
 
-/** Convenience action builders for the triage queue. */
+/** Convenience action builders. */
+export function carryToTodayAction(recordAttempt?: boolean): RescheduleAction {
+  return { type: "reschedule", newDate: getToday(), recordAttempt };
+}
+
 export function tryNowAction(): RescheduleAction {
-  return { type: "try_now" };
+  return { type: "reschedule", newDate: getToday(), time: getCurrentTimeRounded(15) };
 }
 
 export function tomorrowAction(): RescheduleAction {

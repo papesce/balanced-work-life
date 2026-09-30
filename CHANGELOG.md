@@ -26,6 +26,12 @@
   - Pin the undo bar as a fixed toast centered above the bottom navigation instead of rendering it inline
   - Prefer pointer position for tree drag-and-drop collision detection so drop zones match the cursor's third of a row, falling back to closest-center for keyboard drags
 
+- Regroup the task row action menu by intent with consequence previews and a single reschedule semantic
+
+  - Collapse `retry_today`, `try_now`, `reschedule` and `move` into one `{ type: "reschedule"; newDate; time?; recordAttempt? }` action (plus unchanged `defer`); attempt history is now recorded only when the old date is strictly in the past, with an explicit `recordAttempt` override and a shared `willRecordAttempt` predicate used by both labels and patches so they cannot drift
+  - Replace the duplicated Timeline/Planner menus with one shared `TaskRowMenu` grouped Date / Organize / Navigate / Destructive: overdue tasks show an emphasized "Carry to today" (with "keeps {Mon D} as missed" subtext) plus "Do it now" (today + rounded time) and a date submenu with a no-history "Fix a wrong date" option; today tasks get "Move to tomorrow" with an explicit "mark today as missed" variant; Archive stays destructive-first with planner-only Delete kept below it
+  - Migrate all call-sites (row menus, triage actions, day-slot "try now", week/month drag-drop) to the new action, remove the Move/Reschedule label flip, and reuse `SchedulePicker` in both rows; add `node --test` unit coverage for the attempt-recording rules (`pnpm test`)
+
 ## 0.3.0
 
 ### Minor Changes

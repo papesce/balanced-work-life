@@ -10,7 +10,13 @@ import { addDays, getToday, isPast, isPlanDate } from "@/lib/dateUtils";
 import { DayTaskList } from "./DayTaskList";
 import { QuickAddInput } from "./QuickAddInput";
 import { MiniBalanceBar } from "@/components/MiniBalanceBar";
-import { formatTimelineDate, getTimelineKicker } from "./timelineUtils";
+import { DateChip } from "@/components/shared/DateChip";
+import {
+  formatTimelineDate,
+  formatDayTitle,
+  formatTaskCount,
+  getTimelineKicker,
+} from "./timelineUtils";
 import { TASK_STATUS_DOT } from "./TaskChip";
 import { useClassifications } from "@/hooks/useClassifications";
 import { priorityRank, type PriorityValue } from "@/components/shared/PriorityChip";
@@ -266,22 +272,16 @@ function WeekDayCell({
           ? "border border-violet-400 bg-violet-50 ring-2 ring-violet-500/40 dark:border-violet-500 dark:bg-violet-950/20"
           : selected
             ? "glass-card-anchor"
-            : isToday
-              ? "glass-card-today"
-              : "glass-card hover:bg-black/[0.02] dark:hover:bg-white/[0.03]"
+            : "glass-card hover:bg-black/[0.02] dark:hover:bg-white/[0.03]"
       }`}
     >
-      <span className="flex items-center justify-between gap-1">
+      <span className="flex items-center gap-1.5">
+        <DateChip dayNum={Number(date.slice(8, 10))} isToday={isToday} isSelected={selected} />
         <span
-          className={`truncate text-xs font-bold text-gray-900 dark:text-gray-100 ${selected ? "text-violet-700 dark:text-violet-300" : ""}`}
+          className={`truncate text-xs font-bold text-gray-900 dark:text-gray-100 ${selected && !isToday ? "text-violet-700 dark:text-violet-300" : ""} ${isToday ? "underline decoration-violet-500 decoration-2 underline-offset-4" : ""}`}
         >
-          {formatTimelineDate(date)}
+          {formatDayTitle(date, "week").weekday}
         </span>
-        {isToday && (
-          <span className="flex-shrink-0 rounded-full bg-emerald-100/80 px-1.5 py-px text-[9px] font-bold text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
-            Today
-          </span>
-        )}
       </span>
       {kicker && (
         <span className="text-[9px] font-semibold tracking-[0.12em] text-gray-400 uppercase dark:text-gray-500">
@@ -292,7 +292,7 @@ function WeekDayCell({
       {previewContent}
       <span className="flex items-center gap-1 text-[10px] font-semibold text-gray-500 tabular-nums dark:text-gray-400">
         <span className="rounded-full bg-black/[0.05] px-1.5 py-px dark:bg-white/[0.08]">
-          {current.length} tasks
+          {formatTaskCount(current.length)}
         </span>
         {current.length > 0 && (
           <span>
@@ -368,7 +368,7 @@ export function WeekStripView(props: WeekStripViewProps) {
     const { taskId, fromDate } =
       (e.active.data.current as { taskId?: string; fromDate?: string }) ?? {};
     if (!taskId || !toDate || toDate === fromDate) return;
-    void onReschedule(taskId, { type: "move", newDate: toDate });
+    void onReschedule(taskId, { type: "reschedule", newDate: toDate });
     // Keep the moved task visible: follow it to the target day.
     if (toDate !== anchor) onAnchorChange(toDate);
   };
@@ -493,7 +493,7 @@ export function WeekStripView(props: WeekStripViewProps) {
           <div className="flex flex-wrap items-center justify-between gap-2 pb-3">
             <div className="flex items-center gap-3">
               <span className="text-[22px] leading-tight font-bold text-gray-900 dark:text-gray-100">
-                {formatTimelineDate(selectedDate)}
+                {formatDayTitle(selectedDate, "detail").full}
               </span>
               <MiniBalanceBar
                 tasks={selectedDayTasks}

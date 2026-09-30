@@ -17,6 +17,7 @@
     "start": "next start",
     "start:open": "./scripts/ctl.sh open prod --watch",
     "lint": "eslint",
+    "test": "node --import ./scripts/test-register.mjs --test \"src/**/*.test.ts\"",
     "format:check": "prettier --check .",
     "precommit": "sh scripts/precommit-check.sh",
     "check": "pnpm format:check && pnpm lint && pnpm exec tsc --noEmit && pnpm build",

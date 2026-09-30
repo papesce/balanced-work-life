@@ -125,15 +125,9 @@ body {
     0 0 0 1.5px rgba(139, 92, 246, 0.2);
 }
 
-/* Today card highlight (when not the selected anchor) */
-.glass-card-today {
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.06),
-    inset 4px 0 0 0 rgba(16, 185, 129, 0.85);
+/* Subtle violet tint for today's month-grid cell */
+.day-cell-today {
+  background: rgba(245, 243, 255, 0.6);
 }
 
 /* No scrollbar utility */
@@ -459,12 +453,8 @@ body {
       0 0 0 1.5px rgba(139, 92, 246, 0.3);
   }
 
-  .glass-card-today {
-    background: rgba(30, 30, 48, 0.72);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.3),
-      inset 4px 0 0 0 rgba(16, 185, 129, 0.85);
+  .day-cell-today {
+    background: rgba(139, 92, 246, 0.08);
   }
 
   .focus-button {

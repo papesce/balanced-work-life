@@ -14,6 +14,7 @@ import { formatTime } from "./plannerUtils";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { MoveIdeaPanel } from "@/components/brainstorm/MoveIdeaPanel";
 import { RescheduleAction } from "@/lib/tasks/rescheduleTask";
+import { TaskRowMenu } from "@/components/shared/TaskRowMenu";
 import { getToday } from "@/lib/dateUtils";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";
 import { PriorityChipField } from "@/components/shared/PriorityChip";
@@ -269,28 +270,12 @@ function TaskRow({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const deleteConfirmRef = useRef<HTMLDivElement>(null);
   const [showAttachPanel, setShowAttachPanel] = useState(false);
-  const [showDateInput, setShowDateInput] = useState(false);
-  const dateInputRef = useRef<HTMLInputElement>(null);
-  const isReschedule =
-    task.status === "deferred" ||
-    (task.scheduled_date !== null && task.scheduled_date < getToday());
-  const dateActionLabel = isReschedule ? "Reschedule" : "Move";
   const [revealPos, setRevealPos] = useState<{ top: number; right: number } | null>(null);
   const [showReveal, setShowReveal] = useState(false);
   const [showLinkPanel, setShowLinkPanel] = useState(false);
   const [linkPanelPos, setLinkPanelPos] = useState<{ top: number; left: number } | null>(null);
   const linkBadgeRef = useRef<HTMLButtonElement>(null);
   const { openNotes } = useNotes();
-
-  useEffect(() => {
-    if (!showDateInput || !dateInputRef.current) return;
-    const input = dateInputRef.current;
-    input.focus();
-    if (typeof input.showPicker === "function") {
-      const picker = input.showPicker() as unknown as Promise<void> | undefined;
-      picker?.catch?.(() => {});
-    }
-  }, [showDateInput]);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -774,7 +759,6 @@ function TaskRow({
               }
               const rect = menuTriggerRef.current?.getBoundingClientRect();
               if (rect) setMenuPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
-              setShowDateInput(false);
               setShowMenu(true);
             }}
             className="cursor-pointer text-gray-300 hover:text-gray-500 md:opacity-50 md:hover:opacity-100 dark:text-gray-600"
@@ -789,169 +773,125 @@ function TaskRow({
                 style={{ position: "fixed", top: menuPos.top, right: menuPos.right, zIndex: 9999 }}
                 className="glass-card-strong min-w-[160px] rounded-lg border border-black/5 py-1 shadow-lg dark:border-white/5"
               >
-                <button
-                  onClick={() => {
-                    const rect = menuTriggerRef.current?.getBoundingClientRect();
-                    if (rect)
-                      setRevealPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
-                    setShowMenu(false);
-                    setShowReveal(true);
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                >
-                  <Eye size={11} strokeWidth={1.5} />
-                  Reveal in...
-                </button>
-                {onAttach && allIdeas && (
-                  <div className="relative">
+                <TaskRowMenu
+                  task={task}
+                  today={getToday()}
+                  onReschedule={onReschedule}
+                  onUpdate={onUpdate}
+                  onDone={() => setShowMenu(false)}
+                  organizeSection={
+                    <>
+                      {onAttach && allIdeas && (
+                        <div className="relative">
+                          <button
+                            onClick={() => {
+                              setShowMenu(false);
+                              setShowAttachPanel(true);
+                            }}
+                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                          >
+                            <CornerDownRight size={11} strokeWidth={1.5} />
+                            Attach to…
+                          </button>
+                        </div>
+                      )}
+                      {onCreateLink && onDeleteLink && allIdeas && links && (
+                        <button
+                          onClick={() => {
+                            const rect = menuTriggerRef.current?.getBoundingClientRect();
+                            if (rect)
+                              setLinkPanelPos({
+                                top: rect.bottom + 6,
+                                left: Math.max(8, rect.left - 360),
+                              });
+                            setShowMenu(false);
+                            setShowLinkPanel(true);
+                          }}
+                          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                        >
+                          <Link2 size={11} strokeWidth={1.5} />
+                          Link…
+                        </button>
+                      )}
+                    </>
+                  }
+                  navigateSection={
                     <button
                       onClick={() => {
+                        const rect = menuTriggerRef.current?.getBoundingClientRect();
+                        if (rect)
+                          setRevealPos({
+                            top: rect.bottom + 6,
+                            right: window.innerWidth - rect.right,
+                          });
                         setShowMenu(false);
-                        setShowAttachPanel(true);
+                        setShowReveal(true);
                       }}
                       className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
                     >
-                      <CornerDownRight size={11} strokeWidth={1.5} />
-                      Attach to…
+                      <Eye size={11} strokeWidth={1.5} />
+                      Reveal in...
                     </button>
-                  </div>
-                )}
-                {onCreateLink && onDeleteLink && allIdeas && links && (
-                  <button
-                    onClick={() => {
-                      const rect = menuTriggerRef.current?.getBoundingClientRect();
-                      if (rect)
-                        setLinkPanelPos({
-                          top: rect.bottom + 6,
-                          left: Math.max(8, rect.left - 360),
-                        });
-                      setShowMenu(false);
-                      setShowLinkPanel(true);
-                    }}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                  >
-                    <Link2 size={11} strokeWidth={1.5} />
-                    Link…
-                  </button>
-                )}
-                <div className="my-1 border-t border-black/5 dark:border-white/5" />
-                <button
-                  onClick={() => {
-                    void onReschedule(task.id, { type: "try_now" });
-                    setShowMenu(false);
-                  }}
-                  className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                >
-                  ⚡ Try now
-                </button>
-                {task.scheduled_date !== getToday() && (
-                  <button
-                    onClick={() => {
-                      void onReschedule(
-                        task.id,
-                        isReschedule
-                          ? { type: "retry_today" }
-                          : { type: "move", newDate: getToday() },
-                      );
-                      setShowMenu(false);
-                    }}
-                    className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                  >
-                    {dateActionLabel} to Today
-                  </button>
-                )}
-                <button
-                  onClick={() => setShowDateInput((v) => !v)}
-                  className={`flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold ${
-                    showDateInput
-                      ? "bg-violet-50 text-violet-600 dark:bg-violet-950/20 dark:text-violet-400"
-                      : "text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                  }`}
-                >
-                  {dateActionLabel} Date…
-                </button>
-                {showDateInput && (
-                  <div className="px-2.5 pb-1.5">
-                    <input
-                      ref={dateInputRef}
-                      type="date"
-                      autoFocus
-                      className="w-full rounded-lg border border-black/10 bg-white/80 px-2 py-1.5 text-xs text-gray-800 focus:ring-1 focus:ring-violet-500 focus:outline-none dark:border-white/10 dark:bg-gray-800/80 dark:text-gray-200"
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          void onReschedule(
-                            task.id,
-                            isReschedule
-                              ? { type: "reschedule", newDate: e.target.value }
-                              : { type: "move", newDate: e.target.value },
-                          );
+                  }
+                  extraItems={
+                    <>
+                      {task.scheduled_time && (
+                        <button
+                          onClick={() => {
+                            onUpdate(task.id, { scheduled_time: null });
+                            setShowMenu(false);
+                          }}
+                          className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                        >
+                          Clear time
+                        </button>
+                      )}
+                      {task.productivity_signal && (
+                        <button
+                          onClick={() => {
+                            const oldSignal = task.productivity_signal;
+                            onUpdate(task.id, { productivity_signal: null });
+                            onUndoAction?.({
+                              label: "Cleared productivity signal",
+                              run: async () => {
+                                onUpdate(task.id, { productivity_signal: oldSignal });
+                              },
+                            });
+                            setShowMenu(false);
+                          }}
+                          className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-500 hover:bg-black/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.04]"
+                        >
+                          Clear signal
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          const oldSignal = task.productivity_signal;
+                          const newSignal =
+                            task.productivity_signal === "lazy" ? "productive" : "lazy";
+                          onUpdate(task.id, { productivity_signal: newSignal });
+                          onUndoAction?.({
+                            label: `Marked as ${newSignal === "lazy" ? "Lazy" : "Productive"}`,
+                            run: async () => {
+                              onUpdate(task.id, { productivity_signal: oldSignal });
+                            },
+                          });
                           setShowMenu(false);
-                        }
-                      }}
-                    />
-                  </div>
-                )}
-                {task.scheduled_time && (
-                  <button
-                    onClick={() => {
-                      onUpdate(task.id, { scheduled_time: null });
-                      setShowMenu(false);
-                    }}
-                    className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                  >
-                    Clear time
-                  </button>
-                )}
-                {task.productivity_signal && (
-                  <button
-                    onClick={() => {
-                      const oldSignal = task.productivity_signal;
-                      onUpdate(task.id, { productivity_signal: null });
-                      onUndoAction?.({
-                        label: "Cleared productivity signal",
-                        run: async () => {
-                          onUpdate(task.id, { productivity_signal: oldSignal });
-                        },
-                      });
-                      setShowMenu(false);
-                    }}
-                    className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-500 hover:bg-black/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.04]"
-                  >
-                    Clear signal
-                  </button>
-                )}
-                <button
-                  onClick={() => {
-                    const oldSignal = task.productivity_signal;
-                    const newSignal = task.productivity_signal === "lazy" ? "productive" : "lazy";
-                    onUpdate(task.id, { productivity_signal: newSignal });
-                    onUndoAction?.({
-                      label: `Marked as ${newSignal === "lazy" ? "Lazy" : "Productive"}`,
-                      run: async () => {
-                        onUpdate(task.id, { productivity_signal: oldSignal });
-                      },
-                    });
-                    setShowMenu(false);
-                  }}
-                  className={`flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${
-                    task.productivity_signal === "lazy"
-                      ? "text-green-600 dark:text-green-400"
-                      : "text-orange-600 dark:text-orange-400"
-                  }`}
-                >
-                  {task.productivity_signal === "lazy"
-                    ? "🎯 Mark as Productive"
-                    : "☕ Mark as Lazy"}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowDeleteConfirm(true);
-                    setShowMenu(false);
-                  }}
-                  className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20"
-                >
-                  Delete
-                </button>
+                        }}
+                        className={`flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${
+                          task.productivity_signal === "lazy"
+                            ? "text-green-600 dark:text-green-400"
+                            : "text-orange-600 dark:text-orange-400"
+                        }`}
+                      >
+                        {task.productivity_signal === "lazy"
+                          ? "🎯 Mark as Productive"
+                          : "☕ Mark as Lazy"}
+                      </button>
+                    </>
+                  }
+                  onDeleteRequest={() => setShowDeleteConfirm(true)}
+                />
               </div>,
               document.body,
             )}

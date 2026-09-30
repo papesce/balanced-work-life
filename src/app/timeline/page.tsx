@@ -50,8 +50,13 @@ import { MonthGridView } from "@/components/timeline/MonthGridView";
 import { WeekStripView, type WeekCardPreview } from "@/components/timeline/WeekStripView";
 import { QuickAddInput } from "@/components/timeline/QuickAddInput";
 import { UndoBar } from "@/components/shared/UndoBar";
+import { DateChip } from "@/components/shared/DateChip";
 import { DateNav } from "@/components/planner/DateNav";
-import { formatTimelineDate, getTimelineKicker } from "@/components/timeline/timelineUtils";
+import {
+  formatTimelineDate,
+  formatDayTitle,
+  getTimelineKicker,
+} from "@/components/timeline/timelineUtils";
 import { getCompletionEffects, hasAnyEffects, CompletionEffects } from "@/lib/linkEffects";
 import { LinkedEffectsReveal } from "@/components/shared/LinkedEffectsReveal";
 
@@ -306,6 +311,7 @@ function TimelineInner() {
   const windowMenuRef = useRef<HTMLDivElement>(null);
   const scrolledAnchorRef = useRef<string | null>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
+  const todayRef = useRef<HTMLDivElement>(null);
   const [renderedAnchor, setRenderedAnchor] = useState<string | null>(null);
   const [showDateInput, setShowDateInput] = useState(false);
   const [windowMenuOpen, setWindowMenuOpen] = useState(false);
@@ -318,6 +324,7 @@ function TimelineInner() {
   );
   const [quickAddArea, setQuickAddArea] = useState<LifeArea | null>(null);
   const [anchorVisible, setAnchorVisible] = useState(true);
+  const [todayVisible, setTodayVisible] = useState(true);
   const [scrollRequest, setScrollRequest] = useState(0);
   const { undoAction, clearUndo, handleUndo } = useUndoAction();
   const [completionEffects, setCompletionEffects] = useState<{
@@ -656,6 +663,10 @@ function TimelineInner() {
     setRenderedAnchor(date);
   }, []);
 
+  const setTodayReady = useCallback((_date: string, node: HTMLDivElement) => {
+    todayRef.current = node;
+  }, []);
+
   // Track anchor visibility in viewport
   useEffect(() => {
     const el = anchorRef.current;
@@ -666,6 +677,20 @@ function TimelineInner() {
     observer.observe(el);
     return () => observer.disconnect();
   }, [anchor, loading, anchorRef]);
+
+  // Track today's card visibility in viewport (sticky Today pill)
+  useEffect(() => {
+    const el = todayRef.current;
+    if (!el) {
+      setTodayVisible(false);
+      return;
+    }
+    const observer = new IntersectionObserver(([entry]) => setTodayVisible(entry.isIntersecting), {
+      threshold: 0,
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [anchor, loading, view, dates]);
 
   if (loading) {
     return (
@@ -685,6 +710,15 @@ function TimelineInner() {
         onChangeDate={handleAnchorChange}
       />
     ) : undefined;
+
+  // Sticky Today pill: agenda tracks the live card visibility, week/month
+  // check whether today is in the displayed dates (all derived at page level).
+  const showTodayPill =
+    view === "agenda"
+      ? !todayVisible
+      : view === "week"
+        ? !weekDates.includes(today)
+        : !monthGridDates.includes(today);
 
   const headerStartActions = (
     <>
@@ -880,6 +914,7 @@ function TimelineInner() {
             const isAnchorDate = date === anchor;
             const isTodayDate = date === today;
             const dateLabel = formatTimelineDate(date);
+            const dayTitle = formatDayTitle(date, "agenda");
             const timelineKicker = getTimelineKicker(date, today, tomorrow);
             const unresolvedCount = dayOccurrences.filter(
               (o) =>
@@ -899,113 +934,121 @@ function TimelineInner() {
                 animate="visible"
               >
                 <AnchorReadyMarker date={date} enabled={isAnchorDate} onReady={setAnchorReady}>
-                  <div
-                    id={isAnchorDate ? "anchor-card" : undefined}
-                    className={`rounded-[20px] transition-all ${
-                      isAnchorDate
-                        ? "glass-card-anchor"
-                        : isTodayDate
-                          ? "glass-card-today"
-                          : "glass-card"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between px-5 pt-4 pb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex flex-col">
-                          <span
-                            className={`text-[10px] font-semibold tracking-[0.12em] uppercase ${
-                              isAnchorDate
-                                ? "text-violet-600 dark:text-violet-400"
-                                : "text-gray-400 dark:text-gray-500"
-                            }`}
-                          >
-                            {timelineKicker}
-                          </span>
-                          <span className="flex items-center gap-2">
-                            <span className="text-[22px] leading-tight font-bold text-gray-900 dark:text-gray-100">
-                              {dateLabel}
+                  <AnchorReadyMarker date={date} enabled={isTodayDate} onReady={setTodayReady}>
+                    <div
+                      id={isAnchorDate ? "anchor-card" : undefined}
+                      className={`glass-card rounded-[20px] transition-all${
+                        isTodayDate
+                          ? "border-l-4! border-l-violet-500! bg-violet-50/70! shadow-lg! shadow-violet-500/10! dark:bg-violet-500/10!"
+                          : ""
+                      }${
+                        isAnchorDate && !isTodayDate
+                          ? "shadow-lg! ring-2! ring-violet-300/80! dark:ring-violet-400/60!"
+                          : ""
+                      }`}
+                    >
+                      <div className="flex items-center justify-between px-5 pt-4 pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex flex-col">
+                            <span
+                              className={`text-[10px] font-semibold tracking-[0.12em] uppercase ${
+                                isAnchorDate
+                                  ? "text-violet-600 dark:text-violet-400"
+                                  : "text-gray-400 dark:text-gray-500"
+                              }`}
+                            >
+                              {timelineKicker}
                             </span>
-                            {isTodayDate && (
-                              <span className="rounded-full bg-emerald-100/80 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
-                                Today
+                            <span className="flex items-center gap-2">
+                              <DateChip
+                                dayNum={Number(date.slice(8, 10))}
+                                isToday={isTodayDate}
+                                isSelected={isAnchorDate}
+                                size="md"
+                              />
+                              <span className="text-[22px] leading-tight font-bold text-gray-900 dark:text-gray-100">
+                                {dayTitle.weekday}
+                                <span className="ml-2 align-middle text-sm font-semibold text-gray-400 dark:text-gray-500">
+                                  {dayTitle.month}
+                                </span>
                               </span>
-                            )}
-                          </span>
+                            </span>
+                          </div>
+                          {unresolvedCount > 0 && (
+                            <span className="rounded-full bg-red-100/80 px-2.5 py-0.5 text-[10px] font-semibold text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                              {unresolvedCount} unresolved
+                            </span>
+                          )}
                         </div>
-                        {unresolvedCount > 0 && (
-                          <span className="rounded-full bg-red-100/80 px-2.5 py-0.5 text-[10px] font-semibold text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                            {unresolvedCount} unresolved
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MiniBalanceBar
-                          tasks={dayTasks}
-                          getTagsForIdea={taskTagsHook.getTagsForIdea}
-                          date={date}
-                        />
-                        {dayTasks.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <MiniBalanceBar
+                            tasks={dayTasks}
+                            getTagsForIdea={taskTagsHook.getTagsForIdea}
+                            date={date}
+                          />
+                          {dayTasks.length > 0 && (
+                            <button
+                              onClick={() => smartSortTasks(dayTasks, priorityRankOf)}
+                              className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-violet-500 transition-all hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/20"
+                              title="Sort tasks by priority score (effort × impact × urgency)"
+                            >
+                              <Sparkles size={12} />
+                              <span className="hidden sm:inline">Smart Sort</span>
+                            </button>
+                          )}
                           <button
-                            onClick={() => smartSortTasks(dayTasks, priorityRankOf)}
-                            className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-violet-500 transition-all hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/20"
-                            title="Sort tasks by priority score (effort × impact × urgency)"
+                            onClick={() => router.push(`/?date=${date}`)}
+                            className="focus-button"
                           >
-                            <Sparkles size={12} />
-                            <span className="hidden sm:inline">Smart Sort</span>
+                            Plan
                           </button>
+                        </div>
+                      </div>
+
+                      <div className="px-5 pb-2">
+                        {dayOccurrences.length === 0 ? (
+                          <p className="py-1 text-xs text-gray-400 italic dark:text-gray-500">
+                            {effectiveFilter === "deferred"
+                              ? "No deferred tasks this day"
+                              : "No tasks planned"}
+                          </p>
+                        ) : (
+                          <DayTaskList
+                            occurrences={dayOccurrences}
+                            onReorder={handleReorderDate}
+                            onDone={handleDone}
+                            onUndone={markUndone}
+                            onUpdate={handleUpdate}
+                            onReschedule={handleReschedule}
+                            onMove={handleMove}
+                            ideas={ideas}
+                            links={linksHook.links}
+                            onCreateLink={handleCreateLink}
+                            onDeleteLink={handleDeleteLink}
+                            today={today}
+                            onGoToDate={handleGoToDate}
+                            allTags={tagsHook.tags}
+                            getTagsForIdea={taskTagsHook.getTagsForIdea}
+                            onAddTag={taskTagsHook.addTagToTask}
+                            onRemoveTag={taskTagsHook.removeTagFromTask}
+                            onCreateTag={tagsHook.createTag}
+                          />
                         )}
-                        <button
-                          onClick={() => router.push(`/?date=${date}`)}
-                          className="focus-button"
-                        >
-                          Plan
-                        </button>
                       </div>
-                    </div>
 
-                    <div className="px-5 pb-2">
-                      {dayOccurrences.length === 0 ? (
-                        <p className="py-1 text-xs text-gray-400 italic dark:text-gray-500">
-                          {effectiveFilter === "deferred"
-                            ? "No deferred tasks this day"
-                            : "No tasks planned"}
-                        </p>
-                      ) : (
-                        <DayTaskList
-                          occurrences={dayOccurrences}
-                          onReorder={handleReorderDate}
-                          onDone={handleDone}
-                          onUndone={markUndone}
-                          onUpdate={handleUpdate}
-                          onReschedule={handleReschedule}
-                          onMove={handleMove}
-                          ideas={ideas}
-                          links={linksHook.links}
-                          onCreateLink={handleCreateLink}
-                          onDeleteLink={handleDeleteLink}
-                          today={today}
-                          onGoToDate={handleGoToDate}
-                          allTags={tagsHook.tags}
-                          getTagsForIdea={taskTagsHook.getTagsForIdea}
-                          onAddTag={taskTagsHook.addTagToTask}
-                          onRemoveTag={taskTagsHook.removeTagFromTask}
-                          onCreateTag={tagsHook.createTag}
-                        />
-                      )}
+                      {effectiveFilter === "all" || isPlanDate(date) ? (
+                        <div className="px-5 pt-1 pb-4">
+                          <QuickAddInput
+                            placeholder={`+ Add task for ${isTodayDate ? "today" : dateLabel}...`}
+                            area={quickAddArea}
+                            onAreaChange={setQuickAddArea}
+                            onAdd={(text) => handleQuickAdd(text, date, quickAddArea)}
+                            suggestFrom={ideas}
+                          />
+                        </div>
+                      ) : null}
                     </div>
-
-                    {effectiveFilter === "all" || isPlanDate(date) ? (
-                      <div className="px-5 pt-1 pb-4">
-                        <QuickAddInput
-                          placeholder={`+ Add task for ${isTodayDate ? "today" : dateLabel}...`}
-                          area={quickAddArea}
-                          onAreaChange={setQuickAddArea}
-                          onAdd={(text) => handleQuickAdd(text, date, quickAddArea)}
-                          suggestFrom={ideas}
-                        />
-                      </div>
-                    ) : null}
-                  </div>
+                  </AnchorReadyMarker>
                 </AnchorReadyMarker>
               </motion.section>
             );
@@ -1023,6 +1066,16 @@ function TimelineInner() {
           aria-label={`Jump to ${formatTimelineDate(anchor)}`}
         >
           <ChevronsUpDown size={20} />
+        </button>
+      )}
+      {/* Sticky Today pill when today is out of view */}
+      {showTodayPill && (
+        <button
+          onClick={() => handleAnchorChange(today)}
+          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-violet-600 px-4 py-2 text-xs font-bold text-white shadow-lg transition-all hover:scale-105 hover:bg-violet-700"
+          aria-label="Jump to today"
+        >
+          Today
         </button>
       )}
     </AppShell>

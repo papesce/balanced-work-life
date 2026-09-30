@@ -8,6 +8,7 @@ import {
   tomorrowAction,
   nextWeekAction,
   tryNowAction,
+  carryToTodayAction,
 } from "@/lib/tasks/rescheduleTask";
 
 interface TriageActionsProps {
@@ -39,7 +40,7 @@ export function TriageActions({
         Complete
       </button>
       <button
-        onClick={() => void onReschedule(task.id, { type: "retry_today" })}
+        onClick={() => void onReschedule(task.id, carryToTodayAction())}
         className={`${base} text-violet-600`}
       >
         Today

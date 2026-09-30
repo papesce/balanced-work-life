@@ -9,6 +9,8 @@ interface SchedulePickerProps {
   onClear: () => void;
   onClose: () => void;
   className?: string;
+  /** Hide the "Today" row (used when carrying to today is a separate menu item). */
+  hideToday?: boolean;
 }
 
 function getTodayString(): string {
@@ -44,6 +46,7 @@ export function SchedulePicker({
   onClear,
   onClose,
   className,
+  hideToday = false,
 }: SchedulePickerProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -69,15 +72,17 @@ export function SchedulePicker({
         "glass-card-strong absolute top-full right-0 z-50 mt-1 w-56 space-y-1 rounded-xl p-2"
       }
     >
-      <button
-        onClick={() => onSelect(today)}
-        className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.06]"
-      >
-        <span>Hoy</span>
-        <span className="font-mono text-[10px] text-gray-400 uppercase dark:text-gray-500">
-          {formatDate(today)}
-        </span>
-      </button>
+      {!hideToday && (
+        <button
+          onClick={() => onSelect(today)}
+          className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.06]"
+        >
+          <span>Hoy</span>
+          <span className="font-mono text-[10px] text-gray-400 uppercase dark:text-gray-500">
+            {formatDate(today)}
+          </span>
+        </button>
+      )}
       <button
         onClick={() => onSelect(tomorrow)}
         className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.06]"
