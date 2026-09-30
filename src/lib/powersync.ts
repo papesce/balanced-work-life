@@ -130,6 +130,21 @@ export const AppSchema = new Schema({
   idea_classifications: IdeaClassificationsTable,
 });
 
+// Allowlist of tables the connector knows how to upload. An unknown op.table
+// (stale client, schema drift, bad local write) must be skipped — never thrown —
+// otherwise batch.complete() is never reached and the upload queue wedges
+// behind a single poisoned op.
+const KNOWN_UPLOAD_TABLES: ReadonlySet<string> = new Set([
+  "ideas",
+  "idea_links",
+  "tags",
+  "task_tags",
+  "quick_notes",
+  "classification_schemes",
+  "classification_options",
+  "idea_classifications",
+]);
+
 export class SupabaseConnector {
   async fetchCredentials() {
     const {
@@ -173,6 +188,16 @@ export class SupabaseConnector {
     },
     database: AbstractPowerSyncDatabase,
   ): Promise<void> {
+    // Unknown tables must not throw: PowerSync retries the batch forever, so
+    // a single poisoned op would wedge the whole upload queue. Skip it so the
+    // rest of the batch (and batch.complete()) can proceed.
+    if (!KNOWN_UPLOAD_TABLES.has(op.table)) {
+      console.warn(
+        `[QuickNote:sql] upload ${op.table} ${op.op} id=${op.id} SKIPPED: unknown table`,
+      );
+      return;
+    }
+
     const throwIfSupabaseError = (
       error: { message: string; code?: string } | null,
       tag: string,
@@ -400,6 +425,11 @@ export class SupabaseConnector {
       case "DELETE": {
         const { error } = await supabase.from(op.table).delete().eq("id", op.id);
         throwIfSupabaseError(error, `delete ${op.table} id=${op.id}`);
+        break;
+      }
+      default: {
+        // Unknown op type (e.g. a future PowerSync op): skip, never wedge.
+        console.warn(`[QuickNote:sql] upload ${op.table} ${op.op} id=${op.id} SKIPPED: unknown op`);
         break;
       }
     }
