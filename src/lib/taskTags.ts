@@ -69,12 +69,24 @@ export interface TasksWithTags {
   tagsByIdea: Map<string, Tag[]>;
 }
 
+/**
+ * Statuses that must not count as load in Balance views.
+ * Cancelled/archived tasks are gone, deferred tasks live in the future —
+ * counting any of them inflates the day/week/month rings.
+ */
+export const BALANCE_EXCLUDED_STATUSES: readonly string[] = ["cancelled", "archived", "deferred"];
+
 export async function fetchTasksWithTags(
   db: AbstractPowerSyncDatabase,
   userId: string,
-  options: { start?: string; end?: string; select?: string } = {},
+  options: {
+    start?: string;
+    end?: string;
+    select?: string;
+    excludeStatuses?: readonly string[];
+  } = {},
 ): Promise<TasksWithTags> {
-  const { start, end } = options;
+  const { start, end, excludeStatuses = BALANCE_EXCLUDED_STATUSES } = options;
 
   let sql = `SELECT id, scheduled_date, type, status, productivity_signal FROM ideas WHERE user_id = ? AND type = 'task'`;
   const params: unknown[] = [userId];
@@ -86,6 +98,11 @@ export async function fetchTasksWithTags(
   if (end) {
     sql += " AND scheduled_date <= ?";
     params.push(end);
+  }
+
+  if (excludeStatuses.length > 0) {
+    sql += ` AND status NOT IN (${excludeStatuses.map(() => "?").join(",")})`;
+    params.push(...excludeStatuses);
   }
 
   const tasks = await db.getAll<RangedTask>(sql, params);
