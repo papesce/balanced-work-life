@@ -11,6 +11,9 @@ interface SchedulePickerProps {
   className?: string;
   /** Hide the "Today" row (used when carrying to today is a separate menu item). */
   hideToday?: boolean;
+  /** Earliest selectable date (YYYY-MM-DD). Reschedule-open-task flow passes
+   * today; correction flows (drawer, overdue fix input) omit it. */
+  minDate?: string;
 }
 
 function getTodayString(): string {
@@ -47,6 +50,7 @@ export function SchedulePicker({
   onClose,
   className,
   hideToday = false,
+  minDate,
 }: SchedulePickerProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -104,6 +108,7 @@ export function SchedulePicker({
       <input
         type="date"
         value={currentDate ?? ""}
+        min={minDate}
         onChange={(e) => {
           if (e.target.value) onSelect(e.target.value);
         }}

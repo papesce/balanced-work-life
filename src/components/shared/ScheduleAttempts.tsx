@@ -5,8 +5,16 @@ import { CalendarClock, ChevronDown, ChevronRight } from "lucide-react";
 import { getTriageMeta } from "@/lib/tasks/rescheduleTask";
 import type { Idea } from "@/lib/types";
 
-/** Read-only schedule-attempt history (attempt_dates + current scheduled_date). */
-export function ScheduleAttempts({ idea }: { idea: Idea }) {
+/** Schedule-attempt history (attempt_dates + current scheduled_date).
+ * Attempt entries are removable corrections; the current date is edited
+ * via the Dates & status section (clearing lives there). */
+export function ScheduleAttempts({
+  idea,
+  onRemoveAttempt,
+}: {
+  idea: Idea;
+  onRemoveAttempt?: (date: string) => void;
+}) {
   const [open, setOpen] = useState(false);
   const meta = getTriageMeta(idea);
   const attempts = Array.isArray(idea.attempt_dates) ? idea.attempt_dates : [];
@@ -50,6 +58,16 @@ export function ScheduleAttempts({ idea }: { idea: Idea }) {
                     {i + 1}
                   </span>
                   <span className="tabular-nums">{date}</span>
+                  {onRemoveAttempt && (
+                    <button
+                      onClick={() => onRemoveAttempt(date)}
+                      aria-label={`Remove attempt ${date}`}
+                      title={`Remove attempt ${date}`}
+                      className="ml-auto rounded px-1 text-gray-400 hover:bg-black/5 hover:text-red-500 dark:hover:bg-white/5"
+                    >
+                      ×
+                    </button>
+                  )}
                 </li>
               ))}
               {idea.scheduled_date && (

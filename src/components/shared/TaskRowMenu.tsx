@@ -193,6 +193,7 @@ export function TaskRowMenu({
                 onSelect={(date) => run({ type: "reschedule", newDate: date })}
                 onClear={clearDate}
                 onClose={() => setShowDatePicker(false)}
+                minDate={today}
               />
             )}
           </div>
@@ -207,6 +208,7 @@ export function TaskRowMenu({
               onSelect={(date) => run({ type: "reschedule", newDate: date })}
               onClear={clearDate}
               onClose={() => setShowDatePicker(false)}
+              minDate={today}
             />
           )}
         </div>

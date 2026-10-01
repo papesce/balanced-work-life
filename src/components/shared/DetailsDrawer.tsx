@@ -21,6 +21,8 @@ import { useClassifications } from "@/hooks/useClassifications";
 import { getRevealHref } from "@/lib/reveal";
 import type { Idea, IdeaLink } from "@/lib/types";
 import { DetailsEditor } from "./DetailsEditor";
+import { DateCorrectionSection } from "./DateCorrectionSection";
+import { computeRemoveAttemptCorrection } from "@/lib/tasks/dateCorrections";
 import { ScheduleAttempts } from "./ScheduleAttempts";
 import { LinkPanel } from "./LinkPanel";
 
@@ -402,7 +404,13 @@ export function DetailsDrawer({
           </div>
 
           {/* Notes Section */}
-          <ScheduleAttempts idea={idea} />
+          <DateCorrectionSection idea={idea} onUpdate={updateIdea} />
+          <ScheduleAttempts
+            idea={idea}
+            onRemoveAttempt={(date) =>
+              void updateIdea(ideaId, computeRemoveAttemptCorrection(idea, date))
+            }
+          />
           <DetailsEditor value={idea.notes} onSave={handleSave} />
           <p className="mt-2 text-[10px] text-gray-400 dark:text-gray-500">
             ⌘+Enter to save · Esc to close
