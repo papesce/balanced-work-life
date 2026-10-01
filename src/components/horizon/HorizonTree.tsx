@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useDroppable } from "@dnd-kit/core";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Target } from "lucide-react";
 import {
   Idea,
@@ -378,6 +379,16 @@ export interface HorizonTreeProps {
   collapsed?: boolean;
   onToggleCollapsed?: () => void;
   groupLabel?: string;
+  /** Parent id -> promoted direct children (own column differs from parent). */
+  promotedByParent?: Map<string, { id: string; columnKey: string }[]>;
+  /** Column key -> label, for trace/breadcrumb text. */
+  columnLabelByKey?: Map<string, string>;
+  /** Pre-grouped secondary subgroups (after secondary promotion). */
+  secondaryGrouped?: Map<string | null, TreeNode<Idea>[]>;
+  /** Parent id -> secondary-promoted children (same primary column). */
+  secondaryPromotedByParent?: Map<string, { id: string; columnKey: string }[]>;
+  /** Secondary value -> label, for trace text. */
+  secondaryLabelByValue?: Map<string, string>;
 }
 
 export function HorizonTree({
@@ -414,7 +425,14 @@ export function HorizonTree({
   secondaryValueOf,
   onSetSecondary,
   onAddSecondary,
+  promotedByParent,
+  columnLabelByKey,
+  secondaryGrouped,
+  secondaryPromotedByParent,
+  secondaryLabelByValue,
 }: HorizonTreeProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [composing, setComposing] = useState<ComposingState | null>(null);
@@ -432,6 +450,33 @@ export function HorizonTree({
 
   const handleSecondaryDrop = (draggedId: string, _key: string, value: string | null) => {
     if (onSetSecondary) void onSetSecondary(draggedId, value);
+  };
+
+  const ideasById = useMemo(() => new Map(ideas.map((i) => [i.id, i])), [ideas]);
+  const topLevelIds = useMemo(() => {
+    if (secondaryGrouped) return new Set([...secondaryGrouped.values()].flat().map((n) => n.id));
+    return new Set(nodes.map((n) => n.id));
+  }, [nodes, secondaryGrouped]);
+
+  const jumpToChild = (
+    childId: string,
+    childColumnKey: string,
+    opts?: { stayInColumn?: boolean },
+  ) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("lens", lensKey);
+    if (!opts?.stayInColumn) params.set("horizon", childColumnKey);
+    params.set("highlight", childId);
+    router.replace(`/horizon?${params.toString()}`, { scroll: false });
+    // Local scroll fallback (page effect also handles ?highlight=).
+    window.setTimeout(() => {
+      const el = document.getElementById(`idea-${childId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("highlight-pulse");
+        window.setTimeout(() => el.classList.remove("highlight-pulse"), 2500);
+      }
+    }, 150);
   };
 
   const treeOptions: import("@/components/tree").TreeOptions<Idea> = {
@@ -509,6 +554,65 @@ export function HorizonTree({
       />
     ),
     composerPlaceholder: () => "Add child...",
+    renderSubtitle: (node: IdeaNodeType) => {
+      if (!node.parent_id || !topLevelIds.has(node.id)) return null;
+      const parent = ideasById.get(node.parent_id);
+      if (!parent) return null;
+      return (
+        <div className="truncate px-9 text-[11px] text-gray-400 italic dark:text-gray-500">
+          ↳ {parent.text || "Untitled"}
+        </div>
+      );
+    },
+    renderAfterRow: (node: IdeaNodeType) => {
+      const refs = promotedByParent?.get(node.id) ?? [];
+      const secRefs = secondaryPromotedByParent?.get(node.id) ?? [];
+      if (refs.length === 0 && secRefs.length === 0) return null;
+      const byColumn = new Map<
+        string,
+        { ref: { id: string; columnKey: string }; secondary: boolean }[]
+      >();
+      for (const r of refs) {
+        const list = byColumn.get(`p:${r.columnKey}`) ?? [];
+        list.push({ ref: r, secondary: false });
+        byColumn.set(`p:${r.columnKey}`, list);
+      }
+      for (const r of secRefs) {
+        const list = byColumn.get(`s:${r.columnKey}`) ?? [];
+        list.push({ ref: r, secondary: true });
+        byColumn.set(`s:${r.columnKey}`, list);
+      }
+      return (
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 px-9 py-0.5">
+          {[...byColumn.entries()].map(([key, list]) => {
+            const { ref: first, secondary } = list[0];
+            const label = secondary
+              ? (secondaryLabelByValue?.get(first.columnKey) ?? first.columnKey)
+              : (columnLabelByKey?.get(first.columnKey) ?? first.columnKey);
+            const text =
+              list.length === 1 ? `1 child in ${label}` : `${list.length} children in ${label}`;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  jumpToChild(
+                    first.id,
+                    first.columnKey,
+                    secondary ? { stayInColumn: true } : undefined,
+                  );
+                }}
+                title={`Jump to ${label}`}
+                className="cursor-pointer text-[11px] text-gray-400 italic hover:text-indigo-500 hover:underline dark:text-gray-500"
+              >
+                ↳ {text}
+              </button>
+            );
+          })}
+        </div>
+      );
+    },
   };
 
   const controller = {
@@ -565,13 +669,19 @@ export function HorizonTree({
       );
     }
     if (!hasSecondary) return renderRows(nodes);
-    const grouped = new Map<string | null, TreeNode<Idea>[]>();
-    for (const node of nodes) {
-      const v = secondaryOf(node.id);
-      const list = grouped.get(v) ?? [];
-      list.push(node);
-      grouped.set(v, list);
-    }
+    const grouped =
+      secondaryGrouped ??
+      (() => {
+        const m = new Map<string | null, TreeNode<Idea>[]>();
+        for (const node of nodes) {
+          const v = secondaryOf(node.id);
+          const list = m.get(v) ?? [];
+          list.push(node);
+          m.set(v, list);
+        }
+        return m;
+      })();
+    const unclassified = grouped.get(null) ?? [];
     return (
       <div className="flex flex-col gap-1 py-1">
         {secondaryOptions.map((opt) => (
@@ -588,18 +698,20 @@ export function HorizonTree({
             suggestFrom={ideas}
           />
         ))}
-        <SecondarySubGroup
-          lensKey={lensKey}
-          groupValue={groupValue}
-          secondaryKey={secondaryKey!}
-          secondaryValue={null}
-          label="Unclassified"
-          nodes={grouped.get(null) ?? []}
-          renderRows={renderRows}
-          onAddSecondary={onAddSecondary}
-          suggestFrom={ideas}
-          muted
-        />
+        {unclassified.length > 0 && (
+          <SecondarySubGroup
+            lensKey={lensKey}
+            groupValue={groupValue}
+            secondaryKey={secondaryKey!}
+            secondaryValue={null}
+            label="Unclassified"
+            nodes={unclassified}
+            renderRows={renderRows}
+            onAddSecondary={onAddSecondary}
+            suggestFrom={ideas}
+            muted
+          />
+        )}
       </div>
     );
   };

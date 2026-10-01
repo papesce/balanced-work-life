@@ -52,6 +52,7 @@ const SEED_SCHEMES: SeedScheme[] = [
     options: [
       { value: "ready_to_complete", label: "Ready to complete" },
       { value: "about_to_start", label: "About to start" },
+      { value: "ready_to_start", label: "Ready to start" },
       { value: "dont_forget_about", label: "Don't forget about" },
     ],
   },
@@ -140,25 +141,39 @@ export function useClassifications() {
     [classificationRows],
   );
 
-  // Lazy per-user seed of the fixed schemes + options. Inserts only schemes
-  // missing by key, so adding a new seed scheme later backfills existing users.
+  // Lazy per-user seed of the fixed schemes + options. Inserts missing schemes
+  // by key, so adding a new seed scheme later backfills existing users.
   // IDs are deterministic per (user, key) so concurrent seeds converge.
+  // A second pass backfills missing options into already-existing schemes
+  // (e.g. a value added to attention later) and normalizes sort_order to the
+  // seed order, so option position changes apply to existing users too.
   useEffect(() => {
     if (!user || isLoading || seedAttempted.current) return;
-    const existingKeys = new Set(schemes.map((s) => s.key));
-    if (SEED_SCHEMES.every((s) => existingKeys.has(s.key))) return;
+    const upToDate = SEED_SCHEMES.every((seed) => {
+      const scheme = schemes.find((s) => s.key === seed.key);
+      if (!scheme) return false;
+      return seed.options.every((o, i) => {
+        const row = options.find((r) => r.scheme_id === scheme.id && r.value === o.value);
+        return row != null && row.sort_order === i;
+      });
+    });
+    if (upToDate) return;
     seedAttempted.current = true;
     const now = new Date().toISOString();
     void (async () => {
       await db.writeTransaction(async (tx) => {
+        const schemeIdByKey = new Map(schemes.map((s) => [s.key, s.id]));
         for (let s = 0; s < SEED_SCHEMES.length; s++) {
           const seed = SEED_SCHEMES[s];
-          if (existingKeys.has(seed.key)) continue;
-          const schemeId = schemeSeedId(user.id, seed.key);
-          await tx.execute(
-            `INSERT OR IGNORE INTO classification_schemes (id, user_id, key, label, sort_order, created_at) VALUES (?,?,?,?,?,?)`,
-            [schemeId, user.id, seed.key, seed.label, s, now],
-          );
+          let schemeId = schemeIdByKey.get(seed.key);
+          if (!schemeId) {
+            schemeId = schemeSeedId(user.id, seed.key);
+            await tx.execute(
+              `INSERT OR IGNORE INTO classification_schemes (id, user_id, key, label, sort_order, created_at) VALUES (?,?,?,?,?,?)`,
+              [schemeId, user.id, seed.key, seed.label, s, now],
+            );
+            schemeIdByKey.set(seed.key, schemeId);
+          }
           for (let o = 0; o < seed.options.length; o++) {
             await tx.execute(
               `INSERT OR IGNORE INTO classification_options (id, scheme_id, value, label, sort_order, created_at) VALUES (?,?,?,?,?,?)`,
@@ -171,11 +186,15 @@ export function useClassifications() {
                 now,
               ],
             );
+            await tx.execute(
+              `UPDATE classification_options SET sort_order = ?, label = ? WHERE scheme_id = ? AND value = ?`,
+              [o, seed.options[o].label, schemeId, seed.options[o].value],
+            );
           }
         }
       });
     })();
-  }, [user, isLoading, schemes, db]);
+  }, [user, isLoading, schemes, options, db]);
 
   // Heal divergent seeds: the SQL migration and/or multiple devices may have
   // created several rows for the same scheme key (different ids). Merge them

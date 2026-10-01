@@ -92,6 +92,10 @@ export interface TreeOptions<T extends TreeItem> {
   renderLeading?: (node: TreeNode<T>) => ReactNode;
   /** Rendered after the label (pills, chips, menus...). */
   renderTrailing?: (node: TreeNode<T>) => ReactNode;
+  /** Small muted line directly under the label (e.g. parent breadcrumb). */
+  renderSubtitle?: (node: TreeNode<T>) => ReactNode;
+  /** Muted line after the row (e.g. promoted-children trace). Rendered indented. */
+  renderAfterRow?: (node: TreeNode<T>) => ReactNode;
   /** Rendered below a row while it is selected (e.g. a read-only detail strip). */
   renderDetail?: (node: TreeNode<T>) => ReactNode;
   /** Optional content at the start of the inline composer row. */

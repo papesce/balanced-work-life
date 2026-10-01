@@ -455,6 +455,8 @@ export function TreeNodeRow<T extends TreeItem>({
 
             {!isCardMode && options.renderTrailing?.(node)}
           </div>
+          {options.renderSubtitle?.(node)}
+          {options.renderAfterRow?.(node)}
 
           {options.renderDetail && isSelected && (
             <div

@@ -17,7 +17,7 @@ import { AppShell } from "@/components/AppShell";
 import { UndoBar } from "@/components/shared/UndoBar";
 import { QuickAddInput } from "@/components/timeline/QuickAddInput";
 import { HorizonTree } from "@/components/horizon/HorizonTree";
-import { priorityRank, type PriorityValue } from "@/components/shared/PriorityChip";
+import { type PriorityValue } from "@/components/shared/PriorityChip";
 import { TypePicker } from "@/components/brainstorm/TypePicker";
 import { TypeFilterPicker } from "@/components/shared/TypeFilterPicker";
 import { Idea, IdeaNode, IdeaType } from "@/lib/types";
@@ -43,6 +43,7 @@ import {
   groupKeyOf,
   type LensColumn,
 } from "@/components/lens";
+import { groupTreesByLens, groupSecondaryByLens } from "@/lib/horizonGrouping";
 
 const ACTIVE_STATUSES = new Set(["draft", "planned", "in_progress", "scheduled"]);
 
@@ -321,44 +322,16 @@ export default function HorizonPage() {
     [valuesBySchemeKey],
   );
 
-  const treesByLens = useMemo(() => {
-    const grouped: Record<string, IdeaNode[]> = {};
+  const { grouped: treesByLens, promotedByParent } = useMemo(
+    () => groupTreesByLens(allTreeNodes, valueOf, priorityOf),
+    [allTreeNodes, valueOf, priorityOf],
+  );
 
-    // Recursively lift classified descendants whose own column differs from
-    // the root column they are nested under. Returns the pruned node.
-    // Containment context lives in the Details drawer, never as tree rows.
-    const process = (node: IdeaNode, rootColumnKey: string): IdeaNode => {
-      const keptChildren: IdeaNode[] = [];
-      for (const child of node.children) {
-        const childValue = valueOf(child.id);
-        const childColumnKey = groupKeyOf(childValue);
-        // Promote only classified descendants; unclassified nodes always
-        // stay nested under their parent.
-        if (childValue != null && childColumnKey !== rootColumnKey) {
-          // Promote: child's own subtree (recursively processed against its
-          // own column) becomes a pseudo-root in its own column.
-          const promoted = process(child, childColumnKey);
-          (grouped[childColumnKey] ??= []).push(promoted);
-        } else {
-          keptChildren.push(process(child, rootColumnKey));
-        }
-      }
-      return { ...node, children: keptChildren };
-    };
-
-    for (const node of allTreeNodes) {
-      const k = groupKeyOf(valueOf(node.id));
-      (grouped[k] ??= []).push(process(node, k));
-    }
-    for (const key of Object.keys(grouped)) {
-      grouped[key].sort((a, b) => {
-        const rankDiff = priorityRank(priorityOf(a.id)) - priorityRank(priorityOf(b.id));
-        if (rankDiff !== 0) return rankDiff;
-        return a.sort_order - b.sort_order;
-      });
-    }
-    return grouped;
-  }, [allTreeNodes, valueOf, priorityOf]);
+  const columnLabelByKey = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of columns) map.set(groupKeyOf(c.key), c.label);
+    return map;
+  }, [columns]);
 
   const filteredTreesByLens = useMemo(() => {
     let result = treesByLens;
@@ -378,6 +351,49 @@ export default function HorizonPage() {
     }
     return result;
   }, [treesByLens, focusOnly, typeFilter, ideas]);
+
+  /**
+   * Secondary-split promotion, per primary column. Runs after primary
+   * grouping + filters so filtered-out children never promote. Skipped when
+   * the column has no Split lens.
+   */
+  const secondaryByPrimary = useMemo(() => {
+    const out: Record<
+      string,
+      {
+        secKey: string;
+        grouped: Map<string | null, IdeaNode[]>;
+        promoted: Map<string, { id: string; columnKey: string }[]>;
+        labelByValue: Map<string, string>;
+      }
+    > = {};
+    for (const col of columns) {
+      const primaryGroupKey = groupKeyOf(col.key);
+      const secKey = secondaryKeyOf(col.key);
+      if (!secKey) continue;
+      const secMap = valuesBySchemeKey.get(secKey);
+      const secondaryOf = (ideaId: string): string | null => secMap?.get(ideaId) ?? null;
+      const pseudoRoots = filteredTreesByLens[primaryGroupKey] ?? [];
+      const { grouped, promotedByParent: promoted } = groupSecondaryByLens(
+        pseudoRoots,
+        secondaryOf,
+      );
+      const scheme = schemeByKey.get(secKey);
+      const labelByValue = new Map<string, string>();
+      if (scheme) {
+        for (const o of optionsBySchemeId.get(scheme.id) ?? []) labelByValue.set(o.value, o.label);
+      }
+      out[primaryGroupKey] = { secKey, grouped, promoted, labelByValue };
+    }
+    return out;
+  }, [
+    columns,
+    secondaryKeyOf,
+    valuesBySchemeKey,
+    filteredTreesByLens,
+    schemeByKey,
+    optionsBySchemeId,
+  ]);
 
   const handleSetValue = async (id: string, value: string | null) => {
     const previous = valueOf(id);
@@ -594,6 +610,11 @@ export default function HorizonPage() {
           onToggleCollapsed={toggleUnclassified}
           groupLabel={col.label}
           cardMode={cardMode}
+          promotedByParent={promotedByParent}
+          columnLabelByKey={columnLabelByKey}
+          secondaryGrouped={secondaryByPrimary[groupKeyOf(col.key)]?.grouped}
+          secondaryPromotedByParent={secondaryByPrimary[groupKeyOf(col.key)]?.promoted}
+          secondaryLabelByValue={secondaryByPrimary[groupKeyOf(col.key)]?.labelByValue}
           allTags={tagsHook.tags}
           links={linksHook.links}
           getTagsForIdea={taskTagsHook.getTagsForIdea}
