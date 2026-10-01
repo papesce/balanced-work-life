@@ -43,6 +43,7 @@ function PriorityChipSlot({
       <PriorityChip
         value={priorityValueOf(node.id)}
         onSelect={(v) => void onSetPriority(node.id, v)}
+        usePortal
       />
     </span>
   );

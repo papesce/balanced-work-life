@@ -253,7 +253,7 @@ export function downloadBackup(data: BackupData) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `balanced-work-life-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }

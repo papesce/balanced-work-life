@@ -1071,7 +1071,12 @@ function TimelineInner() {
       {/* Sticky Today pill when today is out of view */}
       {showTodayPill && (
         <button
-          onClick={() => handleAnchorChange(today)}
+          onClick={() => {
+            // Anchor already today (e.g. scrolled away manually): replacing
+            // the URL would be a no-op, so re-center via scrollRequest instead.
+            if (anchor === today) setScrollRequest((request) => request + 1);
+            else handleAnchorChange(today);
+          }}
           className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-violet-600 px-4 py-2 text-xs font-bold text-white shadow-lg transition-all hover:scale-105 hover:bg-violet-700"
           aria-label="Jump to today"
         >
