@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   computeCompletedAtCorrection,
+  computeQuickAssignPatch,
   computeRemoveAttemptCorrection,
   computeSetDateCorrection,
 } from "./dateCorrections";
@@ -62,5 +63,32 @@ describe("dateCorrections", () => {
       completed_at: "2026-09-30T10:00:00.000Z",
     });
     assert.deepEqual(computeCompletedAtCorrection(null), { completed_at: null });
+  });
+
+  it("quick assign defaults past to done-on-that-date, today+ to scheduled", () => {
+    const today = "2026-10-01";
+    const donePatch = computeQuickAssignPatch("2026-09-30", { today });
+    assert.equal(donePatch.scheduled_date, "2026-09-30");
+    assert.equal(donePatch.status, "completed");
+    assert.ok(donePatch.completed_at?.startsWith("2026-09-30"));
+    assert.ok(!("attempt_dates" in donePatch));
+
+    const plannedPatch = computeQuickAssignPatch("2026-10-01", { today });
+    assert.deepEqual(plannedPatch, {
+      scheduled_date: "2026-10-01",
+      status: "scheduled",
+      completed_at: null,
+      cancelled_at: null,
+      paused_at: null,
+    });
+  });
+
+  it("quick assign respects explicit markDone override", () => {
+    const today = "2026-10-01";
+    const forcedPlan = computeQuickAssignPatch("2026-09-30", { today, markDone: false });
+    assert.equal(forcedPlan.status, "scheduled");
+    const forcedDone = computeQuickAssignPatch("2026-10-02", { today, markDone: true });
+    assert.equal(forcedDone.status, "completed");
+    assert.ok(forcedDone.completed_at?.startsWith("2026-10-02"));
   });
 });

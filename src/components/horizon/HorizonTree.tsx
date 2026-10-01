@@ -24,6 +24,7 @@ import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { TypePicker } from "@/components/brainstorm/TypePicker";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { PriorityChip, type PriorityValue } from "@/components/shared/PriorityChip";
+import { HorizonQuickAssign } from "@/components/horizon/HorizonQuickAssign";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";
 import { NotesIndicator } from "@/components/shared/NotesIndicator";
 import { TaskComposer } from "@/components/shared/TaskComposer";
@@ -471,6 +472,7 @@ export function HorizonTree({
           onCreateTag={onCreateTag}
         />
         <StatusChipSlot node={node} onUpdate={onUpdate} />
+        <HorizonQuickAssign node={node} onUpdate={onUpdate} />
         {links.filter((l) => l.source_id === node.id || l.target_id === node.id).length > 0 && (
           <span className="flex-shrink-0 rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] text-indigo-500 dark:bg-indigo-500/20 dark:text-indigo-300">
             {links.filter((l) => l.source_id === node.id || l.target_id === node.id).length}
