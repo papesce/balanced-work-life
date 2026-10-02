@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { FileText } from "lucide-react";
-import { useQuickNoteContext } from "@/contexts/QuickNoteContext";
+import { useQuickNoteData } from "@/contexts/QuickNoteContext";
 import { formatAge } from "@/lib/quickNotes";
 
 function useFormattedAge(isoTimestamp: string, intervalMs: number): string {
@@ -20,7 +20,7 @@ function useFormattedAge(isoTimestamp: string, intervalMs: number): string {
  * latest note. Clicking opens the panel in list mode.
  */
 export function QuickNoteChip() {
-  const { note, totalUnreadCount, pendingNotesCount, openPanel } = useQuickNoteContext();
+  const { note, totalUnreadCount, pendingNotesCount, openPanel } = useQuickNoteData();
   const age = useFormattedAge(note?.created_at ?? "", 60_000);
 
   if (!note || totalUnreadCount === 0) return null;

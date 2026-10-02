@@ -12,7 +12,12 @@ import {
   List,
   Plus,
 } from "lucide-react";
-import { useQuickNoteContext, type QuickNotePanelMode } from "@/contexts/QuickNoteContext";
+import { memo } from "react";
+import {
+  useQuickNoteSaveState,
+  useQuickNoteData,
+  type QuickNotePanelMode,
+} from "@/contexts/QuickNoteContext";
 import { useCalmedSaveStatus } from "@/lib/quicknote/useCalmedSaveStatus";
 import { QuickNoteCapture } from "./QuickNoteCapture";
 import { QuickNoteList } from "./QuickNoteList";
@@ -41,6 +46,25 @@ function formatTimestamp(iso: string): string {
   );
 }
 
+/**
+ * Header unsaved dot. Isolated in its own component subscribed to the
+ * per-keystroke draft context so panel chrome doesn't re-render on typing.
+ */
+const CaptureStatusDot = memo(function CaptureStatusDot() {
+  const { saveStatus } = useQuickNoteSaveState();
+  const calmedSaveStatus = useCalmedSaveStatus(saveStatus);
+  if (calmedSaveStatus !== "editing" && calmedSaveStatus !== "error") return null;
+  const isError = calmedSaveStatus === "error";
+  const label = isError ? "Save failed — will retry" : "Unsaved changes";
+  return (
+    <span
+      className={`h-1.5 w-1.5 shrink-0 rounded-full ${isError ? "bg-red-500" : "bg-amber-400"}`}
+      title={label}
+      aria-label={label}
+    />
+  );
+});
+
 export function QuickNotePanel() {
   const {
     openNotes,
@@ -53,8 +77,7 @@ export function QuickNotePanel() {
     isSelectedNoteLive,
     requestedMode,
     consumeRequestedMode,
-    saveStatus,
-  } = useQuickNoteContext();
+  } = useQuickNoteData();
   const [mode, setMode] = useState<QuickNotePanelMode>(readStoredMode);
   const [menuOpen, setMenuOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -125,11 +148,6 @@ export function QuickNotePanel() {
       .finally(() => setCreating(false));
   }, [creating, createNote, persistMode]);
 
-  // Calmed write state (shared with the footer indicator): the header dot
-  // only appears for edits unsaved beyond the grace period, not on every
-  // keystroke. Errors surface immediately via the calmed status.
-  const calmedSaveStatus = useCalmedSaveStatus(saveStatus);
-
   const selectedIndex = selectedNote ? openNotes.findIndex((n) => n.id === selectedNote.id) : -1;
   // Displayed numbers are chronological (oldest = 1, newest = N) while
   // openNotes is sorted newest-first, so "previous" (‹, lower number) moves
@@ -189,22 +207,7 @@ export function QuickNotePanel() {
                 <span className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
                   {isSelectedNoteLive ? "Quick Note" : "Archived Note"}
                 </span>
-                {(calmedSaveStatus === "editing" || calmedSaveStatus === "error") &&
-                  isSelectedNoteLive && (
-                    <span
-                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${calmedSaveStatus === "error" ? "bg-red-500" : "bg-amber-400"}`}
-                      title={
-                        calmedSaveStatus === "error"
-                          ? "Save failed — will retry"
-                          : "Unsaved changes"
-                      }
-                      aria-label={
-                        calmedSaveStatus === "error"
-                          ? "Save failed — will retry"
-                          : "Unsaved changes"
-                      }
-                    />
-                  )}
+                {isSelectedNoteLive && <CaptureStatusDot />}
                 {effectiveMode === "capture" && openNotes.length > 1 && selectedIndex >= 0 && (
                   <span className="flex shrink-0 items-center">
                     <button

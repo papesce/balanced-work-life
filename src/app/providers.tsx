@@ -1,38 +1,17 @@
 "use client";
 
-import { ReactNode, useEffect, useRef } from "react";
+import { ReactNode, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { PowerSyncContext } from "@powersync/react";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { getPowerSync, SupabaseConnector } from "@/lib/powersync";
-import { qnLoggingEnabled } from "@/lib/quicknote/log";
 import { NotesProvider } from "@/contexts/NotesContext";
 import { QuickNoteProvider } from "@/contexts/QuickNoteContext";
-import type { PowerSyncDatabase } from "@powersync/web";
 
 function PowerSyncProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
-  const dbRef = useRef<PowerSyncDatabase | null>(null);
-
   useEffect(() => {
     const db = getPowerSync();
-    dbRef.current = db;
-
-    // Log sync-status transitions when debugging (quicknote-debug=1): shows
-    // whether the client is connected and whether uploads/downloads flow.
-    // Upload failures are always logged by the connector itself — never silent.
-    const unregister = db.registerListener({
-      statusChanged: (status) => {
-        if (!qnLoggingEnabled()) return;
-        let detail = "";
-        try {
-          detail = JSON.stringify(status, (_k, v) => (v instanceof Error ? v.message : v));
-        } catch {
-          detail = String(status);
-        }
-        console.log(`[QuickNote:sync] statusChanged: ${detail}`);
-      },
-    });
 
     if (session) {
       db.connect(new SupabaseConnector()).catch((err) => {
@@ -49,7 +28,6 @@ function PowerSyncProvider({ children }: { children: ReactNode }) {
         );
       });
     }
-    return () => unregister();
   }, [session]);
 
   const db = getPowerSync();

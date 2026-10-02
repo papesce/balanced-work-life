@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { v4 as uuidv4 } from "uuid";
 import type { AbstractPowerSyncDatabase } from "@powersync/web";
 import type { QuickNote } from "@/lib/types";
-import type { QuickNoteFlushOrigin, QuickNoteSaveStatus } from "./types";
+import type { QuickNoteSaveStatus } from "./types";
 import type { QuickNoteDraftApi } from "./draft";
-import { qnDebug, qnLogQuery, qnWarn, qnError, qnInfo, qnLoggingEnabled } from "./log";
 
 export interface QuickNotePersistence {
   saveStatus: QuickNoteSaveStatus;
@@ -15,8 +14,8 @@ export interface QuickNotePersistence {
   pendingNoteIdRef: React.MutableRefObject<string | null>;
   pendingInsertedRef: React.MutableRefObject<boolean>;
   /** THE single write path: every flush funnels through here. */
-  persistDraft: (text: string, origin?: QuickNoteFlushOrigin) => Promise<boolean>;
-  flushAutosave: (origin?: QuickNoteFlushOrigin) => Promise<void>;
+  persistDraft: (text: string) => Promise<boolean>;
+  flushAutosave: () => Promise<void>;
   scheduleAutosave: () => void;
   cancelAutosave: () => void;
   resetPending: () => void;
@@ -52,6 +51,22 @@ export function useQuickNotePersistence({
   const pendingNoteIdRef = useRef<string | null>(null);
   const pendingInsertedRef = useRef(false);
 
+  // Bind the draft's stable callbacks/refs once. The `draft` object identity
+  // changes on every keystroke (it carries the text), so depending on it
+  // wholesale would rebuild every write path per character.
+  const {
+    draftRef,
+    dirtyRef,
+    baseTextRef,
+    draftNoteIdRef,
+    explicitEditRef,
+    edit: editDraft,
+    setNoteId: setDraftNoteId,
+    setDirty: setDraftDirty,
+    beginWrite: beginDraftWrite,
+    markSaved: markDraftSaved,
+  } = draft;
+
   const cancelAutosave = useCallback(() => {
     if (autosaveTimer.current) {
       clearTimeout(autosaveTimer.current);
@@ -72,56 +87,16 @@ export function useQuickNotePersistence({
   const markError = useCallback(() => setSaveStatus("error"), []);
 
   const persistDraft = useCallback(
-    async (text: string, origin: QuickNoteFlushOrigin = "unknown"): Promise<boolean> => {
+    async (text: string): Promise<boolean> => {
       const existingNote = activeNoteRef.current;
       const pendingId = pendingNoteIdRef.current;
       const now = new Date().toISOString();
-      const startedAt = Date.now();
-
-      const checkQueue = async (): Promise<string> => {
-        try {
-          const batch = await db.getCrudBatch();
-          return batch == null
-            ? "empty (upload caught up)"
-            : "PENDING (local write awaiting upload)";
-        } catch (e) {
-          return `unreadable (${e instanceof Error ? e.message : String(e)})`;
-        }
-      };
-      const finish = async (ok: boolean, label: string) => {
-        if (!ok) {
-          qnError(
-            `${label} FAILED after ${Date.now() - startedAt}ms — will retry, text kept dirty`,
-          );
-          return;
-        }
-        if (!qnLoggingEnabled()) return;
-        // Immediate snapshot is provisional: the uploader cycle may not have
-        // run yet, so PENDING here is often transient noise. The 5s re-check
-        // is the real verdict.
-        const immediate = await checkQueue();
-        qnInfo(
-          `${label} OK in ${Date.now() - startedAt}ms (local write). Upload queue (immediate): ${immediate}.`,
-        );
-        setTimeout(() => {
-          void checkQueue().then((later) => {
-            if (later.startsWith("PENDING")) {
-              qnError(
-                `${label}: upload queue STILL PENDING 5s after local write — upload is stuck. Look for an 'upload <table> … FAILED' line above.`,
-              );
-            } else {
-              qnInfo(`${label}: upload queue after 5s: ${later}.`);
-            }
-          });
-        }, 5000);
-      };
-
       try {
         // Resolve the write target from draft provenance, NOT from whatever
         // note happens to be active: the draft may belong to a different
         // (e.g. archived, browsed) note, and flushing it into the active row
         // would be a cross-note overwrite.
-        const draftNoteId = draft.draftNoteIdRef.current;
+        const draftNoteId = draftNoteIdRef.current;
         let target: { kind: "existing" | "pending"; id: string } | null = null;
         if (draftNoteId && existingNote && draftNoteId === existingNote.id) {
           target = { kind: "existing", id: existingNote.id };
@@ -138,36 +113,22 @@ export function useQuickNotePersistence({
             // now rather than dropping the text.
             const id = uuidv4();
             pendingNoteIdRef.current = id;
-            draft.setNoteId(id);
-            draft.beginWrite(text);
-            qnDebug("flush: INSERT (recovered, no target)", { id, textLength: text.length, now });
+            setDraftNoteId(id);
+            beginDraftWrite(text);
             const params = [id, userId, text, "open", now, now];
-            qnLogQuery(
-              "start",
-              `[${origin}] INSERT quick_notes (recovered) id=${id} len=${text.length}`,
-              "INSERT INTO quick_notes (id, user_id, text, status, created_at, updated_at) VALUES (?,?,?,?,?,?)",
-              params,
-            );
             await db.execute(
               "INSERT INTO quick_notes (id, user_id, text, status, created_at, updated_at) VALUES (?,?,?,?,?,?)",
               params,
             );
             pendingInsertedRef.current = true;
-            draft.markSaved(text);
-            void finish(true, `INSERT quick_notes (recovered) id=${id}`);
+            markDraftSaved(text);
           } else if (draftNoteId) {
             // Draft belongs to a note that is neither active nor pending.
             // Refuse rather than writing one note's text into another's row.
-            qnError(
-              `[${origin}] persistDraft REFUSED: draft belongs to note ${draftNoteId} ` +
-                `but active=${existingNote?.id ?? "(none)"} pending=${pendingId ?? "(none)"} — keeping dirty to avoid a cross-note overwrite.`,
-            );
             return false;
           } else {
-            qnDebug("flush: no target and empty text — nothing to persist");
             return true;
           }
-          qnDebug("flush: success", { now });
           setLastSavedAt(now);
           setSaveStatus("saved");
           return true;
@@ -176,132 +137,101 @@ export function useQuickNotePersistence({
         if (target.kind === "existing") {
           // Empty-overwrite guard: never blank a non-empty row unless the
           // user explicitly edited the text to empty after the base was set.
-          if (text.length === 0 && !draft.explicitEditRef.current) {
+          if (text.length === 0 && !explicitEditRef.current) {
             const rows = await db.getAll<{ text: string }>(
               "SELECT text FROM quick_notes WHERE id = ?",
               [target.id],
             );
             const dbText = rows[0]?.text ?? "";
             if (dbText.length > 0) {
-              qnWarn(
-                `[${origin}] persistDraft SKIPPED: refusing to overwrite ${dbText.length} chars with "" (no explicit edit since base was set). Clearing spurious dirty flag.`,
-              );
-              draft.setDirty(false);
+              setDraftDirty(false);
               return true;
             }
           }
-          draft.beginWrite(text);
-          qnDebug("flush: UPDATE", { id: target.id, textLength: text.length, now });
+          beginDraftWrite(text);
           const params = [text, now, target.id];
-          qnLogQuery(
-            "start",
-            `[${origin}] UPDATE quick_notes id=${target.id} len=${text.length}`,
-            "UPDATE quick_notes SET text = ?, updated_at = ? WHERE id = ?",
-            params,
-          );
           await db.execute("UPDATE quick_notes SET text = ?, updated_at = ? WHERE id = ?", params);
-          void finish(true, `UPDATE quick_notes id=${target.id}`);
         } else {
           const targetPendingId = target.id;
           if (pendingInsertedRef.current) {
-            draft.beginWrite(text);
-            qnDebug("flush: UPDATE pending", { id: targetPendingId, textLength: text.length, now });
+            beginDraftWrite(text);
             const params = [text, now, targetPendingId];
-            qnLogQuery(
-              "start",
-              `[${origin}] UPDATE quick_notes (pending) id=${targetPendingId} len=${text.length}`,
-              "UPDATE quick_notes SET text = ?, updated_at = ? WHERE id = ?",
-              params,
-            );
             await db.execute(
               "UPDATE quick_notes SET text = ?, updated_at = ? WHERE id = ?",
               params,
             );
-            void finish(true, `UPDATE quick_notes (pending) id=${targetPendingId}`);
           } else {
-            draft.beginWrite(text);
-            qnDebug("flush: INSERT", { id: targetPendingId, textLength: text.length, now });
+            beginDraftWrite(text);
             const params = [targetPendingId, userId, text, "open", now, now];
-            qnLogQuery(
-              "start",
-              `[${origin}] INSERT quick_notes id=${targetPendingId} len=${text.length}`,
-              "INSERT INTO quick_notes (id, user_id, text, status, created_at, updated_at) VALUES (?,?,?,?,?,?)",
-              params,
-            );
             await db.execute(
               "INSERT INTO quick_notes (id, user_id, text, status, created_at, updated_at) VALUES (?,?,?,?,?,?)",
               params,
             );
             pendingInsertedRef.current = true;
-            void finish(true, `INSERT quick_notes id=${targetPendingId}`);
           }
         }
-        qnDebug("flush: success", { now });
-        draft.markSaved(text);
+        markDraftSaved(text);
         setLastSavedAt(now);
         setSaveStatus("saved");
         return true;
       } catch (err) {
-        qnDebug("flush: FAILED", err);
-        qnError("persistDraft FAILED", err);
+        console.error("[QuickNote] persistDraft failed", err);
         setSaveStatus("error");
         return false;
       }
     },
-    [db, userId, draft, activeNoteRef],
+    [
+      db,
+      userId,
+      activeNoteRef,
+      draftNoteIdRef,
+      explicitEditRef,
+      setDraftNoteId,
+      setDraftDirty,
+      beginDraftWrite,
+      markDraftSaved,
+    ],
   );
 
-  const flushAutosave = useCallback(
-    async (origin: QuickNoteFlushOrigin = "unknown") => {
-      if (autosaveTimer.current) {
-        clearTimeout(autosaveTimer.current);
-        autosaveTimer.current = null;
-      }
-      if (!draft.dirtyRef.current) {
-        qnDebug("flush: skipped (not dirty)");
-        return;
-      }
-      // Read the ref, NEVER state: edits write the ref synchronously while
-      // setDraft commits on the next render, so state can still hold "" (or
-      // older text) when this runs from unmount/pagehide/blur/rapid-close.
-      const text = draft.draftRef.current;
-      qnDebug("flush: start", {
-        origin,
-        textLength: text.length,
-        preview: text.slice(0, 200),
-        existingNoteId: activeNoteRef.current?.id ?? null,
-        pendingId: pendingNoteIdRef.current,
-      });
-
-      setSaveStatus("saving");
-      const ok = await persistDraft(text, origin);
-      // Preserve dirty only when there is actual unsaved content.
-      draft.setDirty(ok ? false : draft.draftRef.current !== draft.baseTextRef.current);
-    },
-    [persistDraft, draft, activeNoteRef],
-  );
+  const flushAutosave = useCallback(async () => {
+    if (autosaveTimer.current) {
+      clearTimeout(autosaveTimer.current);
+      autosaveTimer.current = null;
+    }
+    if (!dirtyRef.current) {
+      return;
+    }
+    // Read the ref, NEVER state: edits write the ref synchronously while
+    // setDraft commits on the next render, so state can still hold "" (or
+    // older text) when this runs from unmount/pagehide/blur/rapid-close.
+    const text = draftRef.current;
+    setSaveStatus("saving");
+    const ok = await persistDraft(text);
+    // Preserve dirty only when there is actual unsaved content.
+    setDraftDirty(ok ? false : draftRef.current !== baseTextRef.current);
+  }, [persistDraft, dirtyRef, draftRef, baseTextRef, setDraftDirty]);
 
   const scheduleAutosave = useCallback(() => {
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     autosaveTimer.current = setTimeout(() => {
       autosaveTimer.current = null;
-      void flushAutosave("timer");
+      void flushAutosave();
     }, 500);
   }, [flushAutosave]);
 
   // Flush on unmount (page navigation)
   useEffect(() => {
     return () => {
-      void flushAutosave("unmount");
+      void flushAutosave();
     };
   }, [flushAutosave]);
 
   // Flush on visibilitychange (hidden) and pagehide
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.visibilityState === "hidden") void flushAutosave("visibility:hidden");
+      if (document.visibilityState === "hidden") void flushAutosave();
     };
-    const handlePageHide = () => void flushAutosave("pagehide");
+    const handlePageHide = () => void flushAutosave();
     document.addEventListener("visibilitychange", handleVisibility);
     window.addEventListener("pagehide", handlePageHide);
     return () => {
@@ -312,44 +242,54 @@ export function useQuickNotePersistence({
 
   const updateText = useCallback(
     (text: string) => {
-      const isDirty = draft.edit("updateText", text);
+      const isDirty = editDraft("updateText", text);
       setSaveStatus((s) => {
         if (isDirty) return "editing";
         return s === "editing" ? "saved" : s;
-      });
-      qnDebug("updateText", {
-        textLength: text.length,
-        preview: text.slice(0, 200),
-        hasNote: !!activeNoteRef.current,
-        pendingId: pendingNoteIdRef.current,
       });
       // Lazily create note on first non-whitespace input
       if (text.trim().length > 0 && !activeNoteRef.current && !pendingNoteIdRef.current && userId) {
         pendingNoteIdRef.current = uuidv4();
         // The draft now belongs to the pending note, not to any active row.
-        draft.setNoteId(pendingNoteIdRef.current);
+        setDraftNoteId(pendingNoteIdRef.current);
       }
       scheduleAutosave();
     },
-    [draft, activeNoteRef, userId, scheduleAutosave],
+    [editDraft, setDraftNoteId, activeNoteRef, userId, scheduleAutosave],
   );
 
   const hasUnsaved = saveStatus === "editing" || saveStatus === "saving" || saveStatus === "error";
 
-  return {
-    saveStatus,
-    lastSavedAt,
-    hasUnsaved,
-    pendingNoteIdRef,
-    pendingInsertedRef,
-    persistDraft,
-    flushAutosave,
-    scheduleAutosave,
-    cancelAutosave,
-    resetPending,
-    markSaving,
-    markIdle,
-    markError,
-    updateText,
-  };
+  return useMemo(
+    () => ({
+      saveStatus,
+      lastSavedAt,
+      hasUnsaved,
+      pendingNoteIdRef,
+      pendingInsertedRef,
+      persistDraft,
+      flushAutosave,
+      scheduleAutosave,
+      cancelAutosave,
+      resetPending,
+      markSaving,
+      markIdle,
+      markError,
+      updateText,
+    }),
+    [
+      saveStatus,
+      lastSavedAt,
+      hasUnsaved,
+      persistDraft,
+      flushAutosave,
+      scheduleAutosave,
+      cancelAutosave,
+      resetPending,
+      markSaving,
+      markIdle,
+      markError,
+      updateText,
+    ],
+  );
 }

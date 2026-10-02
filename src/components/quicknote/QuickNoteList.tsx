@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { FileText, Plus } from "lucide-react";
-import { useQuickNoteContext, type QuickNotePanelMode } from "@/contexts/QuickNoteContext";
+import { useQuickNoteData, type QuickNotePanelMode } from "@/contexts/QuickNoteContext";
 import { parseNoteLines, formatAge } from "@/lib/quickNotes";
 import { QuickNote } from "@/lib/types";
 
@@ -76,7 +76,7 @@ function NoteRow({
  * notes stay in the DB and backups but are no longer listed.)
  */
 export function QuickNoteList({ onNavigate }: { onNavigate?: (mode: QuickNotePanelMode) => void }) {
-  const { openNotes, selectedNote, selectNote, createNote } = useQuickNoteContext();
+  const { openNotes, selectedNote, selectNote, createNote } = useQuickNoteData();
   const [creating, setCreating] = useState(false);
 
   const handleSelect = (id: string) => {

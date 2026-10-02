@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuickNoteContext } from "@/contexts/QuickNoteContext";
+import { useQuickNoteSaveState, useQuickNoteCaptureMeta } from "@/contexts/QuickNoteContext";
 import { useCalmedSaveStatus } from "@/lib/quicknote/useCalmedSaveStatus";
 
 function formatSavedTime(iso: string): string {
@@ -18,11 +18,12 @@ function formatSavedTime(iso: string): string {
  * edits, pulse only for slow saves, errors immediately.
  */
 export function QuickNoteSaveIndicator({ compact = false }: { compact?: boolean }) {
-  const { saveStatus, lastSavedAt, note } = useQuickNoteContext();
+  const { saveStatus, lastSavedAt } = useQuickNoteSaveState();
+  const { noteUpdatedAt } = useQuickNoteCaptureMeta();
   const displayStatus = useCalmedSaveStatus(saveStatus);
 
   // Before any edit this session, fall back to the persisted updated_at.
-  const fallbackAt = !lastSavedAt ? note?.updated_at : undefined;
+  const fallbackAt = !lastSavedAt ? noteUpdatedAt : undefined;
   const effectiveSavedAt = lastSavedAt ?? fallbackAt ?? null;
   if (displayStatus === "idle" && !effectiveSavedAt) return null;
 

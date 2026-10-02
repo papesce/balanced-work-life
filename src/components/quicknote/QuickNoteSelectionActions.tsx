@@ -19,7 +19,7 @@ import {
   ChevronLeft,
   ArrowRight,
 } from "lucide-react";
-import { useQuickNoteContext } from "@/contexts/QuickNoteContext";
+import { useQuickNoteEditor, useQuickNoteData } from "@/contexts/QuickNoteContext";
 import { parseTaskAll, findBestMatch } from "@/lib/quickNotes";
 import { Idea, IdeaType } from "@/lib/types";
 import { getRevealHref, getSmartRevealView, getRevealLabel, type RevealView } from "@/lib/reveal";
@@ -62,7 +62,8 @@ export function QuickNoteSelectionActions({
 }) {
   const router = useRouter();
   const { user } = useAuth();
-  const { createSelectionIdea, closePanel, flushNow } = useQuickNoteContext();
+  const { createSelectionIdea, closePanel } = useQuickNoteData();
+  const { flushNow } = useQuickNoteEditor();
   const [saving, setSaving] = useState(false);
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
   const [overflowOpen, setOverflowOpen] = useState(false);
@@ -129,7 +130,7 @@ export function QuickNoteSelectionActions({
       onMarked();
       // Persist the mark before leaving: the debounced autosave may not
       // have landed yet when the route changes.
-      await flushNow("selection");
+      await flushNow();
       onDone();
       closePanel();
       router.push(getRevealHref(target, idea, allIdeas));

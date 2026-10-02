@@ -7,7 +7,7 @@ import { QuickAddButton } from "@/components/QuickAddButton";
 import { DesktopSidebar } from "@/components/DesktopSidebar";
 import { UserMenu } from "@/components/UserMenu";
 import { GlobalSearchBar } from "@/components/shared/GlobalSearchBar";
-import { useQuickNoteContext } from "@/contexts/QuickNoteContext";
+import { useQuickNoteData } from "@/contexts/QuickNoteContext";
 import { STORAGE_KEYS, readRawString, writeRawString } from "@/lib/storage";
 
 const COLLAPSE_BELOW = 1024;
@@ -29,7 +29,7 @@ export function AppShell({
   fullWidth,
   onAdd,
 }: AppShellProps) {
-  const { openPanel: openQuickNote, pendingNotesCount } = useQuickNoteContext();
+  const { openPanel: openQuickNote, pendingNotesCount } = useQuickNoteData();
 
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;

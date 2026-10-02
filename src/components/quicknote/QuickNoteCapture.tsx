@@ -1,8 +1,12 @@
 "use client";
 
-import { useRef, useEffect, useCallback, useState } from "react";
+import { memo, useRef, useEffect, useCallback, useState } from "react";
 import { Search } from "lucide-react";
-import { useQuickNoteContext } from "@/contexts/QuickNoteContext";
+import {
+  useQuickNoteEditor,
+  useQuickNoteData,
+  useQuickNoteCaptureMeta,
+} from "@/contexts/QuickNoteContext";
 import { QuickNoteSaveIndicator } from "./QuickNoteSaveIndicator";
 import { QuickNoteSelectionActions } from "./QuickNoteSelectionActions";
 import { requestGlobalSearch } from "@/lib/globalSearchBus";
@@ -12,32 +16,26 @@ import { requestGlobalSearch } from "@/lib/globalSearchBus";
  * Lazy note creation is handled by the context's updateText.
  * When viewing an archived note, the textarea is read-only.
  */
-export function QuickNoteCapture() {
-  const {
-    note,
-    draft,
-    updateText,
-    flushNow,
-    closePanel,
-    isSelectedNoteLive,
-    saveStatus,
-    lastSavedAt,
-    reopenNote,
-  } = useQuickNoteContext();
+export const QuickNoteCapture = memo(function QuickNoteCapture() {
+  const { draft, updateText, flushNow } = useQuickNoteEditor();
+  const { noteId, isSelectedNoteLive, reopenNote } = useQuickNoteCaptureMeta();
+  const { closePanel } = useQuickNoteData();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const readonly = !isSelectedNoteLive;
   const [selection, setSelection] = useState<{ start: number; end: number; text: string } | null>(
     null,
   );
   const [selectionOpen, setSelectionOpen] = useState(false);
-  const debugEnabled =
-    typeof window !== "undefined" && window.localStorage?.getItem("quicknote-debug") === "1";
+  const selectionRef = useRef(selection);
+  const selectionOpenRef = useRef(selectionOpen);
+  selectionRef.current = selection;
+  selectionOpenRef.current = selectionOpen;
 
   // Drop stale selection state when switching notes. Reconciled during
   // render (no effect) so it runs exactly once per note id.
-  const prevNoteIdRef = useRef(note?.id);
-  if (note?.id !== prevNoteIdRef.current) {
-    prevNoteIdRef.current = note?.id;
+  const prevNoteIdRef = useRef(noteId);
+  if (noteId !== prevNoteIdRef.current) {
+    prevNoteIdRef.current = noteId;
     setSelection(null);
     setSelectionOpen(false);
   }
@@ -48,13 +46,16 @@ export function QuickNoteCapture() {
     if (!el) return;
     el.focus();
     el.setSelectionRange(el.value.length, el.value.length);
-  }, [note?.id, readonly]);
+  }, [noteId, readonly]);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       if (readonly) return;
-      setSelection(null);
-      setSelectionOpen(false);
+      // Selection actions only exist while the user is selecting text; typing
+      // clears them, so skip the state writes when they're already empty
+      // (React bails on identical state, this avoids the extra work entirely).
+      if (selectionRef.current) setSelection(null);
+      if (selectionOpenRef.current) setSelectionOpen(false);
       updateText(e.target.value);
     },
     [updateText, readonly],
@@ -72,12 +73,16 @@ export function QuickNoteCapture() {
     if (selectionStart !== selectionEnd) {
       const text = value.slice(selectionStart, selectionEnd);
       if (text.trim()) {
-        setSelection({ start: selectionStart, end: selectionEnd, text });
+        setSelection((prev) =>
+          prev?.start === selectionStart && prev.end === selectionEnd && prev.text === text
+            ? prev
+            : { start: selectionStart, end: selectionEnd, text },
+        );
         return;
       }
     }
-    setSelection(null);
-    setSelectionOpen(false);
+    setSelection((prev) => (prev === null ? prev : null));
+    setSelectionOpen((prev) => (prev ? false : prev));
   }, []);
 
   const handleSelectionDone = useCallback(() => {
@@ -129,7 +134,7 @@ export function QuickNoteCapture() {
   // verbatim — tags stay intact.
   const handleBlur = useCallback(() => {
     if (readonly) return;
-    void flushNow("blur");
+    void flushNow();
   }, [flushNow, readonly]);
 
   return (
@@ -195,18 +200,6 @@ export function QuickNoteCapture() {
           />
         </div>
       )}
-      {debugEnabled && (
-        <details className="mt-2 rounded-lg bg-gray-50 p-2 text-[10px] leading-relaxed text-gray-500 dark:bg-white/5 dark:text-gray-400">
-          <summary className="cursor-pointer font-semibold">Debug log (quicknote-debug=1)</summary>
-          <div className="mt-1 font-mono break-all whitespace-pre-wrap">
-            {`noteId: ${note?.id ?? "(none)"}\nreadonly: ${String(readonly)}\ndraftLength: ${draft.length}\nsaveStatus: ${saveStatus}\nlastSavedAt: ${lastSavedAt ?? "(never)"}\ndbTextLength: ${note?.text?.length ?? 0}\nupdated_at: ${note?.updated_at ?? "(none)"}`}
-          </div>
-          <p className="mt-1">
-            Open DevTools console and filter for [QuickNote]. Disable with
-            localStorage.removeItem(&quot;quicknote-debug&quot;).
-          </p>
-        </details>
-      )}
     </div>
   );
-}
+});

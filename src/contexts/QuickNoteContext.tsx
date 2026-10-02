@@ -3,19 +3,16 @@
 /**
  * QuickNoteContext — thin composition over focused modules.
  *
- * State and logic live in `src/lib/quicknote/`:
- * - `notes.ts` — row queries + selection model (single source of rows)
- * - `draft.ts` — draft state machine (single-writer, truthful dirty, provenance)
- * - `persistence.ts` — THE single write path + autosave + edit entry points
- * - `operations.ts` — select/create/resolve/discard orchestration
- * - `log.ts` — all logging behind the `quicknote-debug` flag
- * - `types.ts` — shared types
+ * Performance split: draft text changes on every keystroke, while note lists /
+ * counts / panel state change rarely. Separate contexts keep per-keystroke
+ * renders scoped to the textarea instead of the whole app shell:
+ * - editor context — high frequency: draft and updateText
+ * - save context — low frequency: save status and timestamp
+ * - `QuickNoteDataContext` — low frequency: notes, counts, panel, ops
  *
- * This file only wires them together: panel open/close, the global keyboard
- * shortcut, derived counts, the context value, and the UndoBar/Panel render.
- *
- * NOTE: useUndoAction is single-slot (last wins). Only the most recent
- * action is undoable. Acceptable for v1.
+ * Components subscribe to the narrowest slice they need: use
+ * `useQuickNoteDraftState()` in the textarea path, `useQuickNoteData()`
+ * everywhere else.
  */
 
 import {
@@ -26,6 +23,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useDeferredValue,
   type ReactNode,
 } from "react";
 import { usePowerSync } from "@powersync/react";
@@ -39,12 +37,7 @@ import { useQuickNoteDraft } from "@/lib/quicknote/draft";
 import { useQuickNoteNotes } from "@/lib/quicknote/notes";
 import { useQuickNotePersistence } from "@/lib/quicknote/persistence";
 import { useQuickNoteOperations } from "@/lib/quicknote/operations";
-import type {
-  QuickNotePanelMode,
-  QuickNoteSaveStatus,
-  QuickNoteFlushOrigin,
-} from "@/lib/quicknote/types";
-import { qnDebug, qnInfo } from "@/lib/quicknote/log";
+import type { QuickNotePanelMode, QuickNoteSaveStatus } from "@/lib/quicknote/types";
 
 export type { QuickNotePanelMode, QuickNoteSaveStatus } from "@/lib/quicknote/types";
 
@@ -58,7 +51,7 @@ interface QuickNoteContextValue {
   requestedMode: QuickNotePanelMode | null;
   consumeRequestedMode: () => void;
   /** Flush pending autosave immediately. Resolves after the write lands (or fails). */
-  flushNow: (origin?: QuickNoteFlushOrigin) => Promise<void>;
+  flushNow: () => Promise<void>;
   /** True while there are edits not yet confirmed persisted (drives close guards). */
   hasUnsaved: boolean;
   /** Update the full note text (capture mode). Creates the note lazily on first non-whitespace input. */
@@ -99,11 +92,76 @@ interface QuickNoteContextValue {
   lastSavedAt: string | null;
 }
 
-const QuickNoteContext = createContext<QuickNoteContextValue | null>(null);
+/** Per-keystroke slice: changes only when the draft text changes. */
+interface QuickNoteEditorContextValue {
+  draft: string;
+  updateText: (text: string) => void;
+  flushNow: () => Promise<void>;
+}
 
-export function useQuickNoteContext() {
-  const ctx = useContext(QuickNoteContext);
-  if (!ctx) throw new Error("useQuickNoteContext must be used within QuickNoteProvider");
+/** Per-flush slice: changes when an autosave cycle runs. */
+interface QuickNoteSaveContextValue {
+  saveStatus: QuickNoteSaveStatus;
+  lastSavedAt: string | null;
+  hasUnsaved: boolean;
+}
+
+/** Note identity/status used by capture UI without subscribing to note text updates. */
+interface QuickNoteCaptureMetaContextValue {
+  noteId: string | null;
+  noteUpdatedAt: string | null;
+  isSelectedNoteLive: boolean;
+  reopenNote: () => Promise<void>;
+}
+
+/** Low-frequency slice: stable across keystrokes. */
+type QuickNoteDataContextValue = Omit<
+  QuickNoteContextValue,
+  "draft" | "updateText" | "saveStatus" | "lastSavedAt" | "hasUnsaved" | "flushNow"
+>;
+
+const QuickNoteEditorContext = createContext<QuickNoteEditorContextValue | null>(null);
+const QuickNoteSaveContext = createContext<QuickNoteSaveContextValue | null>(null);
+const QuickNoteDataContext = createContext<QuickNoteDataContextValue | null>(null);
+const QuickNoteCaptureMetaContext = createContext<QuickNoteCaptureMetaContextValue | null>(null);
+
+/**
+ * Subscribes only to per-keystroke state (the textarea). This value changes
+ * exactly once per keystroke — never on flush cycles — so the editor renders
+ * 1:1 with typing.
+ */
+export function useQuickNoteEditor() {
+  const ctx = useContext(QuickNoteEditorContext);
+  if (!ctx) throw new Error("useQuickNoteEditor must be used within QuickNoteProvider");
+  return ctx;
+}
+
+/** Subscribes only to autosave feedback (indicator, header dot). */
+export function useQuickNoteSaveState() {
+  const ctx = useContext(QuickNoteSaveContext);
+  if (!ctx) throw new Error("useQuickNoteSaveState must be used within QuickNoteProvider");
+  return ctx;
+}
+
+export function useQuickNoteCaptureMeta() {
+  const ctx = useContext(QuickNoteCaptureMetaContext);
+  if (!ctx) throw new Error("useQuickNoteCaptureMeta must be used within QuickNoteProvider");
+  return ctx;
+}
+
+/** Back-compat alias: prefer useQuickNoteEditor() + useQuickNoteSaveState(). */
+export function useQuickNoteDraftState() {
+  const editor = useContext(QuickNoteEditorContext);
+  const save = useContext(QuickNoteSaveContext);
+  if (!editor || !save)
+    throw new Error("useQuickNoteDraftState must be used within QuickNoteProvider");
+  return { ...editor, ...save };
+}
+
+/** Subscribes only to low-frequency state (shell, chip, list, panel chrome). */
+export function useQuickNoteData() {
+  const ctx = useContext(QuickNoteDataContext);
+  if (!ctx) throw new Error("useQuickNoteData must be used within QuickNoteProvider");
   return ctx;
 }
 
@@ -137,13 +195,6 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const currentId = notes.note?.id ?? null;
     if (currentId === prevNoteIdRef.current) return;
-    qnDebug("draft-sync: note switch", {
-      prevId: prevNoteIdRef.current,
-      currentId,
-      dbTextLength: notes.note?.text?.length ?? 0,
-      dirty: draft.dirtyRef.current,
-      writing: draft.writingRef.current,
-    });
     prevNoteIdRef.current = currentId;
 
     if (draft.writingRef.current) {
@@ -154,14 +205,7 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
     }
     if (!draft.dirtyRef.current) {
       const dbText = notes.note?.text ?? "";
-      qnInfo(
-        `draft-sync: loading draft len=${dbText.length} for note ${currentId ?? "(none)"} from DB row`,
-      );
       draft.load(currentId, dbText);
-    } else {
-      qnInfo(
-        `draft-sync: note switch to ${currentId ?? "(none)"} skipped — draft is dirty (len=${draft.draftRef.current.length}, base len=${draft.baseTextRef.current.length})`,
-      );
     }
     // note text is tracked so the effect runs when DB text changes, but the
     // prevNoteId guard ensures the body only executes on note ID transitions.
@@ -176,13 +220,14 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
     setPanelOpen(true);
   }, []);
   const consumeRequestedMode = useCallback(() => setRequestedMode(null), []);
+  const { flushAutosave, updateText } = persistence;
   const closePanel = useCallback(async () => {
     // Await the flush so the last ~500ms of typing isn't lost behind the
     // unmount. On failure dirty stays truthful and the draft survives in
     // provider state, so reopening shows the unsaved text.
-    await persistence.flushAutosave("close");
+    await flushAutosave();
     setPanelOpen(false);
-  }, [persistence]);
+  }, [flushAutosave]);
 
   // ── Keyboard shortcut: Cmd/Ctrl + Alt + N ───────────────────────
   // Cmd+Shift+N is taken by Chrome/Safari (incognito window).
@@ -201,30 +246,61 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   // ── Derived values ───────────────────────────────────────────────
+  // Every count reads the DEFERRED draft, not the live one. The live draft
+  // changes per keystroke and these are the only draft-dependent values in
+  // the data slice, so deferring them is what keeps `dataValue` (and thus
+  // AppShell / chip / list / panel chrome) referentially stable while typing.
+  // Badges land a frame or two later — imperceptible for a count.
+  const deferredDraft = useDeferredValue(draft.draft);
+  const activeText = notes.note ? deferredDraft || notes.note.text : "";
   const unreadCount = useMemo(
-    () => (notes.note ? unresolvedNonEmptyCount(draft.draft || notes.note.text) : 0),
-    [notes.note, draft.draft],
+    () => (notes.note ? unresolvedNonEmptyCount(activeText) : 0),
+    [notes.note, activeText],
   );
   const totalUnreadCount = useMemo(
     () =>
       notes.openNotes.reduce(
         (sum, n) =>
-          sum + unresolvedNonEmptyCount(n.id === notes.note?.id ? draft.draft || n.text : n.text),
+          sum + unresolvedNonEmptyCount(n.id === notes.note?.id ? deferredDraft || n.text : n.text),
         0,
       ),
-    [notes.openNotes, notes.note?.id, draft.draft],
+    [notes.openNotes, notes.note?.id, deferredDraft],
   );
   const pendingNotesCount = useMemo(
     () =>
       notes.openNotes.reduce((count, n) => {
-        const text = n.id === notes.note?.id ? draft.draft || n.text : n.text;
+        const text = n.id === notes.note?.id ? deferredDraft || n.text : n.text;
         return count + (unresolvedNonEmptyCount(text) > 0 ? 1 : 0);
       }, 0),
-    [notes.openNotes, notes.note?.id, draft.draft],
+    [notes.openNotes, notes.note?.id, deferredDraft],
   );
 
-  // ── Context value ────────────────────────────────────────────────
-  const value: QuickNoteContextValue = useMemo(
+  // ── Split context values ─────────────────────────────────────────
+  // editorValue changes exactly once per keystroke (draft text only), so the
+  // textarea renders 1:1 with typing. saveValue changes as saving progresses
+  // and drives only the indicator + header dot.
+  // dataValue stays referentially stable across both, so AppShell / chip /
+  // list / panel chrome don't re-render while typing.
+  const { saveStatus, lastSavedAt, hasUnsaved } = persistence;
+  const editorValue: QuickNoteEditorContextValue = useMemo(
+    () => ({ draft: draft.draft, updateText, flushNow: flushAutosave }),
+    [draft.draft, updateText, flushAutosave],
+  );
+  const saveValue: QuickNoteSaveContextValue = useMemo(
+    () => ({ saveStatus, lastSavedAt, hasUnsaved }),
+    [saveStatus, lastSavedAt, hasUnsaved],
+  );
+  const captureMetaValue: QuickNoteCaptureMetaContextValue = useMemo(
+    () => ({
+      noteId: notes.note?.id ?? null,
+      noteUpdatedAt: notes.note?.updated_at ?? null,
+      isSelectedNoteLive: notes.isSelectedNoteLive,
+      reopenNote: ops.reopenNote,
+    }),
+    [notes.note?.id, notes.note?.updated_at, notes.isSelectedNoteLive, ops.reopenNote],
+  );
+
+  const dataValue: QuickNoteDataContextValue = useMemo(
     () => ({
       note: notes.note,
       loading: notes.loading,
@@ -233,9 +309,6 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
       closePanel,
       requestedMode,
       consumeRequestedMode,
-      flushNow: persistence.flushAutosave,
-      hasUnsaved: persistence.hasUnsaved,
-      updateText: persistence.updateText,
       createSelectionIdea: ops.createSelectionIdea,
       discardNote: ops.discardNote,
       reopenNote: ops.reopenNote,
@@ -245,21 +318,25 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
       undoAction,
       handleUndo,
       clearUndo,
-      draft: draft.draft,
       allNotes: notes.allNotes,
       openNotes: notes.openNotes,
       selectedNote: notes.selectedNote,
       selectNote: ops.selectNote,
       createNote: ops.createNote,
       isSelectedNoteLive: notes.isSelectedNoteLive,
-      saveStatus: persistence.saveStatus,
-      lastSavedAt: persistence.lastSavedAt,
     }),
     [
-      notes,
-      draft.draft,
-      persistence,
-      ops,
+      notes.note,
+      notes.loading,
+      notes.allNotes,
+      notes.openNotes,
+      notes.selectedNote,
+      notes.isSelectedNoteLive,
+      ops.createSelectionIdea,
+      ops.discardNote,
+      ops.reopenNote,
+      ops.selectNote,
+      ops.createNote,
       panelOpen,
       openPanel,
       closePanel,
@@ -274,11 +351,28 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
     ],
   );
 
-  return (
-    <QuickNoteContext.Provider value={value}>
-      {children}
+  // Kept referentially stable so the provider's per-keystroke re-render does
+  // not force the panel chrome / undo bar to re-render with it. They still
+  // update through their own context subscription.
+  const panelNode = useMemo(() => (user ? <QuickNotePanel /> : null), [user]);
+  const undoBarNode = useMemo(
+    () => (
       <UndoBar undoAction={undoAction} onUndo={() => void handleUndo()} onDismiss={clearUndo} />
-      {user && <QuickNotePanel />}
-    </QuickNoteContext.Provider>
+    ),
+    [undoAction, handleUndo, clearUndo],
+  );
+
+  return (
+    <QuickNoteEditorContext.Provider value={editorValue}>
+      <QuickNoteSaveContext.Provider value={saveValue}>
+        <QuickNoteCaptureMetaContext.Provider value={captureMetaValue}>
+          <QuickNoteDataContext.Provider value={dataValue}>
+            {children}
+            {undoBarNode}
+            {panelNode}
+          </QuickNoteDataContext.Provider>
+        </QuickNoteCaptureMetaContext.Provider>
+      </QuickNoteSaveContext.Provider>
+    </QuickNoteEditorContext.Provider>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
-import { qnLogInput } from "./log";
+import { useState, useRef, useCallback, useMemo } from "react";
 
 export interface QuickNoteDraftApi {
   /** Current draft text (React state, for rendering). */
@@ -75,8 +74,7 @@ export function useQuickNoteDraft(): QuickNoteDraftApi {
   );
 
   const edit = useCallback(
-    (caller: string, text: string) => {
-      qnLogInput(caller, draftRef.current, text);
+    (_caller: string, text: string) => {
       setDraft(text);
       explicitEditRef.current = true;
       const isDirty = text !== baseTextRef.current;
@@ -132,25 +130,41 @@ export function useQuickNoteDraft(): QuickNoteDraftApi {
     setDraft("");
   }, [setDraft]);
 
-  return {
-    draft,
-    draftRef,
-    dirtyRef,
-    writingRef,
-    lastWrittenRef,
-    draftNoteIdRef,
-    baseTextRef,
-    explicitEditRef,
-    setDraft,
-    load,
-    edit,
-    markSaved,
-    setDirty,
-    setNoteId,
-    beginWrite,
-    clearWriting,
-    clearWriteState,
-    detach,
-    reset,
-  };
+  return useMemo(
+    () => ({
+      draft,
+      draftRef,
+      dirtyRef,
+      writingRef,
+      lastWrittenRef,
+      draftNoteIdRef,
+      baseTextRef,
+      explicitEditRef,
+      setDraft,
+      load,
+      edit,
+      markSaved,
+      setDirty,
+      setNoteId,
+      beginWrite,
+      clearWriting,
+      clearWriteState,
+      detach,
+      reset,
+    }),
+    [
+      draft,
+      setDraft,
+      load,
+      edit,
+      markSaved,
+      setDirty,
+      setNoteId,
+      beginWrite,
+      clearWriting,
+      clearWriteState,
+      detach,
+      reset,
+    ],
+  );
 }
