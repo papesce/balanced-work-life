@@ -8,7 +8,7 @@ import { DesktopSidebar } from "@/components/DesktopSidebar";
 import { UserMenu } from "@/components/UserMenu";
 import { GlobalSearchBar } from "@/components/shared/GlobalSearchBar";
 import { useQuickNoteData } from "@/contexts/QuickNoteContext";
-import { STORAGE_KEYS, readRawString, writeRawString } from "@/lib/storage";
+import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 
 const COLLAPSE_BELOW = 1024;
 
@@ -31,15 +31,19 @@ export function AppShell({
 }: AppShellProps) {
   const { openPanel: openQuickNote, pendingNotesCount } = useQuickNoteData();
 
+  const setPrefs = useUiPrefsStore((s) => s.set);
+
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
-    const saved = readRawString(STORAGE_KEYS.sidebarCollapsed);
-    if (saved !== null) return saved === "true";
+    // Store hydrates synchronously from localStorage (with legacy migration),
+    // so getState() already holds the persisted value on first render.
+    const stored = useUiPrefsStore.getState().sidebarCollapsed;
+    if (stored !== null) return stored;
     return window.innerWidth < COLLAPSE_BELOW;
   });
 
   const [userOverride, setUserOverride] = useState<boolean | null>(() =>
-    readRawString(STORAGE_KEYS.sidebarCollapsed) !== null ? true : null,
+    useUiPrefsStore.getState().sidebarCollapsed !== null ? true : null,
   );
 
   useEffect(() => {
@@ -54,11 +58,11 @@ export function AppShell({
   const handleToggle = useCallback(() => {
     setCollapsed((prev) => {
       const next = !prev;
-      writeRawString(STORAGE_KEYS.sidebarCollapsed, String(next));
+      setPrefs({ sidebarCollapsed: next });
       return next;
     });
     setUserOverride(true);
-  }, []);
+  }, [setPrefs]);
 
   return (
     <div className="min-h-screen">

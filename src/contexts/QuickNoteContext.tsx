@@ -31,7 +31,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { QuickNote } from "@/lib/types";
 import { unresolvedNonEmptyCount } from "@/lib/quickNotes";
 import { useUndoAction } from "@/lib/tasks/undo";
-import { UndoBar } from "@/components/shared/UndoBar";
 import { QuickNotePanel } from "@/components/quicknote/QuickNotePanel";
 import { useQuickNoteDraft } from "@/lib/quicknote/draft";
 import { useQuickNoteNotes } from "@/lib/quicknote/notes";
@@ -68,7 +67,7 @@ interface QuickNoteContextValue {
   totalUnreadCount: number;
   /** Number of open notes with at least one unresolved non-empty line. */
   pendingNotesCount: number;
-  /** Undo bar state (owned by this context, not the page). */
+  /** Undo bar state (global singleton — rendered by the active page's bar). */
   undoAction: ReturnType<typeof useUndoAction>["undoAction"];
   handleUndo: ReturnType<typeof useUndoAction>["handleUndo"];
   clearUndo: ReturnType<typeof useUndoAction>["clearUndo"];
@@ -352,15 +351,10 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
   );
 
   // Kept referentially stable so the provider's per-keystroke re-render does
-  // not force the panel chrome / undo bar to re-render with it. They still
-  // update through their own context subscription.
+  // not force the panel chrome to re-render with it.
+  // Note: no UndoBar here — undo state is a global singleton (feedbackStore)
+  // rendered once by the active page's bar, avoiding duplicate toasts.
   const panelNode = useMemo(() => (user ? <QuickNotePanel /> : null), [user]);
-  const undoBarNode = useMemo(
-    () => (
-      <UndoBar undoAction={undoAction} onUndo={() => void handleUndo()} onDismiss={clearUndo} />
-    ),
-    [undoAction, handleUndo, clearUndo],
-  );
 
   return (
     <QuickNoteEditorContext.Provider value={editorValue}>
@@ -368,7 +362,6 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
         <QuickNoteCaptureMetaContext.Provider value={captureMetaValue}>
           <QuickNoteDataContext.Provider value={dataValue}>
             {children}
-            {undoBarNode}
             {panelNode}
           </QuickNoteDataContext.Provider>
         </QuickNoteCaptureMetaContext.Provider>

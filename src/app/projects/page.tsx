@@ -20,7 +20,6 @@ import {
   AREA_DOT_COLORS,
   AREA_ICONS,
   AREA_LABELS,
-  AREA_ORDER,
   STATUS_LABELS,
   STATUS_STYLES,
   TERMINAL_STATUSES,
@@ -29,8 +28,8 @@ import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { PriorityChip, priorityRank, type PriorityValue } from "@/components/shared/PriorityChip";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { areaColors } from "@/styles/tokens";
-import { useLens, LensTabs, ColumnShell, groupKeyOf } from "@/components/lens";
-import { STORAGE_KEYS, readRawString, writeRawString } from "@/lib/storage";
+import { LensTabs, ColumnShell, groupKeyOf } from "@/components/lens";
+import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 import { AppShell } from "@/components/AppShell";
 import { IdeaTree } from "@/components/brainstorm/IdeaTree";
 import { BrainstormBreadcrumb } from "@/components/brainstorm/BrainstormBreadcrumb";
@@ -40,7 +39,9 @@ import { useIdeas } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
-import { buildProjectTree, useProjectActions } from "@/hooks/useProjectActions";
+import { useProjectActions } from "@/hooks/useProjectActions";
+import { useProjectLookups } from "@/stores/projectLookups";
+import { useProjectTreeStore } from "@/stores/projectTreeStore";
 import { Idea, IdeaStatus, Tag } from "@/lib/types";
 import { getAncestorChain } from "@/lib/ideaTreeFocus";
 import { hasAnyEffects } from "@/lib/linkEffects";
@@ -57,12 +58,9 @@ export default function ProjectsPage() {
   const [hideCompleted, setHideCompleted] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"all" | "open">("open");
   const [selectedId, setSelectedId] = useState<string | null>(initialProjectId);
-  const [lensKey, setLensKey] = useState<string>(
-    () => readRawString(STORAGE_KEYS.projectsLens) ?? "term",
-  );
-  const [unclassifiedExpanded, setUnclassifiedExpanded] = useState(
-    () => readRawString(STORAGE_KEYS.projectsUnclassifiedExpanded) !== "false",
-  );
+  const lensKey = useUiPrefsStore((s) => s.projectsLens);
+  const unclassifiedExpanded = useUiPrefsStore((s) => s.projectsUnclassifiedExpanded);
+  const setPrefs = useUiPrefsStore((s) => s.set);
   const [statusPickerId, setStatusPickerId] = useState<string | null>(null);
   const [areaPickerId, setAreaPickerId] = useState<string | null>(null);
   // Detail focus is local-only (subtree re-root); selectedId stays the project in URL.
@@ -115,8 +113,13 @@ export default function ProjectsPage() {
     setCompletionEffects,
   } = actions;
 
-  // Memoized per-node subtree stats + sorted children (one O(N) pass per ideas change).
-  const projectTree = useMemo(() => buildProjectTree(ideasHook.ideas), [ideasHook.ideas]);
+  // Shared O(N) tree: computed once per ideas change in the store,
+  // not per page render. Feed PowerSync rows in; rows subscribe out.
+  const setTreeIdeas = useProjectTreeStore((s) => s.setIdeas);
+  const projectTree = useProjectTreeStore((s) => s.tree);
+  useEffect(() => {
+    setTreeIdeas(ideasHook.ideas);
+  }, [ideasHook.ideas, setTreeIdeas]);
   const statOf = (id: string) =>
     projectTree.stats.get(id) ?? { done: 0, total: 0, direct: 0, nextId: null };
 
@@ -209,7 +212,6 @@ export default function ProjectsPage() {
 
   useEffect(() => {
     if (selectedId && !ideasHook.loading && !ideasHook.ideas.some((i) => i.id === selectedId)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- self-heal deleted project
       handleSelect(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -229,26 +231,11 @@ export default function ProjectsPage() {
     [ideasHook.ideas],
   );
 
-  // Computed lens: area from first tag. Classification lenses
-  // (term/nnl/moscow/priority) come from the shared useLens hook.
-  const customs = useMemo(
-    () => ({
-      area: {
-        options: AREA_ORDER.map((a) => ({ value: a, label: AREA_LABELS[a] })),
-        valueOf: (ideaId: string) => taskTagsHook.getTagsForIdea(ideaId)[0]?.area ?? null,
-      },
-    }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [taskTagsHook.tagsByIdea],
-  );
-
-  const { columns, valueOf, valuesBySchemeKey } = useLens({
-    schemes,
-    classificationOptions,
-    classifications,
+  const { columns, valueOf, valuesBySchemeKey } = useProjectLookups(
+    taskTagsHook,
+    { schemes, options: classificationOptions, classifications },
     lensKey,
-    customs,
-  });
+  );
 
   const priorityOf = useCallback(
     (ideaId: string): PriorityValue =>
@@ -290,8 +277,7 @@ export default function ProjectsPage() {
 
   const handleLensChange = (key: string) => {
     if (key === lensKey) return;
-    setLensKey(key);
-    writeRawString(STORAGE_KEYS.projectsLens, key);
+    setPrefs({ projectsLens: key });
   };
 
   const handleSetClassification = async (id: string, value: string | null) => {
@@ -935,8 +921,7 @@ export default function ProjectsPage() {
         <div key="unclassified-collapsed" className="glass-card rounded-2xl">
           <button
             onClick={() => {
-              setUnclassifiedExpanded(true);
-              writeRawString(STORAGE_KEYS.projectsUnclassifiedExpanded, "true");
+              setPrefs({ projectsUnclassifiedExpanded: true });
             }}
             className="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold text-gray-500"
           >
@@ -949,8 +934,7 @@ export default function ProjectsPage() {
     const collapseControl = isUnclassified ? (
       <button
         onClick={() => {
-          setUnclassifiedExpanded(false);
-          writeRawString(STORAGE_KEYS.projectsUnclassifiedExpanded, "false");
+          setPrefs({ projectsUnclassifiedExpanded: false });
         }}
         title="Collapse unclassified section"
         aria-label="Collapse unclassified section"

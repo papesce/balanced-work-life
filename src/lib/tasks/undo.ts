@@ -1,21 +1,20 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useFeedbackStore } from "@/stores/feedbackStore";
 
 export interface UndoAction {
   label: string;
   run: () => Promise<void>;
 }
 
+/**
+ * Store-backed singleton (Phase 3): every caller shares the same last
+ * undoable action, so undo works across views. Same API as before.
+ */
 export function useUndoAction() {
-  const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
-  const registerUndo = useCallback((undo: UndoAction) => setUndoAction(undo), []);
-  const clearUndo = useCallback(() => setUndoAction(null), []);
-  const handleUndo = useCallback(async () => {
-    if (!undoAction) return;
-    const action = undoAction;
-    setUndoAction(null);
-    await action.run();
-  }, [undoAction]);
+  const undoAction = useFeedbackStore((s) => s.undoAction);
+  const registerUndo = useFeedbackStore((s) => s.registerUndo);
+  const clearUndo = useFeedbackStore((s) => s.clearUndo);
+  const handleUndo = useFeedbackStore((s) => s.handleUndo);
   return { undoAction, registerUndo, clearUndo, handleUndo };
 }

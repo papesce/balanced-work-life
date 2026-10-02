@@ -35,6 +35,7 @@ import { formatDayLabel } from "@/components/planner/plannerUtils";
 import { PlannerDndProvider } from "@/components/planner/PlannerDnd";
 import { minutesToTimeString } from "@/components/planner/dayslotAdapter";
 import { STORAGE_KEYS, loadAreaTargets, readRawString, writeRawString } from "@/lib/storage";
+import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 
 export default function DailyPlannerPage() {
   return (
@@ -83,22 +84,20 @@ function DailyPlannerInner() {
   }
 
   const [selectedArea, setSelectedArea] = useState<LifeArea | null>(null);
-  const [hideCompleted, setHideCompleted] = useState(
-    () => readRawString(STORAGE_KEYS.plannerHideCompleted) === "true",
-  );
+  const hideCompleted = useUiPrefsStore((s) => s.plannerHideCompleted);
+  const setPrefs = useUiPrefsStore((s) => s.set);
 
   useEffect(() => {
     if (!highlightId || loading) return;
     // Guarantee the highlight target is visible: lift filters that could hide it.
     const target = ideas.find((i) => i.id === highlightId);
     if (target?.status === "completed" && hideCompleted) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- highlight deep-link lifts hiding filter
-      setHideCompleted(false);
-      writeRawString(STORAGE_KEYS.plannerHideCompleted, "false");
+      setPrefs({ plannerHideCompleted: false });
     }
     if (target && selectedArea) {
       const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(target.id));
       const effective = areas.length === 0 ? (["life"] as LifeArea[]) : areas;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- highlight deep-link clears area filter
       if (!effective.includes(selectedArea)) setSelectedArea(null);
     }
     const timer = setTimeout(() => {
@@ -516,8 +515,7 @@ function DailyPlannerInner() {
                 <button
                   onClick={() => {
                     const next = !hideCompleted;
-                    setHideCompleted(next);
-                    writeRawString(STORAGE_KEYS.plannerHideCompleted, String(next));
+                    setPrefs({ plannerHideCompleted: next });
                   }}
                   className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-gray-100 px-3 py-1.5 text-[11px] font-bold text-gray-600 transition-all hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
                 >

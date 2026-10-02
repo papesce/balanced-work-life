@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { Idea, IdeaType, LinkType } from "@/lib/types";
-import { getCompletionEffects, hasAnyEffects, CompletionEffects } from "@/lib/linkEffects";
+import { getCompletionEffects, hasAnyEffects } from "@/lib/linkEffects";
 import { getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
 import { useUndoAction } from "@/lib/tasks/undo";
+import { useCompletionEffects } from "@/stores/feedbackStore";
 import { useIdeas, type CreateIdeaPosition } from "./useIdeas";
 import { useIdeaLinks } from "./useIdeaLinks";
 
@@ -114,10 +114,7 @@ interface UseProjectActionsOptions {
  */
 export function useProjectActions({ ideasHook, linksHook, onDeleteIds }: UseProjectActionsOptions) {
   const { undoAction, registerUndo, clearUndo, handleUndo } = useUndoAction();
-  const [completionEffects, setCompletionEffects] = useState<{
-    effects: CompletionEffects;
-    completedText: string;
-  } | null>(null);
+  const { completionEffects, setCompletionEffects } = useCompletionEffects();
 
   const createIdea = async (
     text: string,

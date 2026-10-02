@@ -25,15 +25,14 @@ import { TYPE_BADGE } from "@/lib/constants";
 import { useClassifications } from "@/hooks/useClassifications";
 import {
   STORAGE_KEYS,
-  SecondaryLensMap,
-  TreeOverrideState,
-  readRawString,
-  writeRawString,
+  type SecondaryLensMap,
+  type TreeOverrideState,
   readSecondaryLensMap,
   readTreeOverrides,
   writeSecondaryLensMap,
   writeTreeOverrides,
 } from "@/lib/storage";
+import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 
 import {
   useLens,
@@ -149,12 +148,16 @@ export default function HorizonPage() {
   const [focusOnly, setFocusOnly] = useState(false);
   const [typeFilter, setTypeFilter] = useState<IdeaType[]>([]);
   const [typePickerOpen, setTypePickerOpen] = useState(false);
-  const [cardMode, setCardMode] = useState(
-    () => readRawString(STORAGE_KEYS.brainstormCardMode) === "true",
-  );
-  const [unclassifiedExpanded, setUnclassifiedExpanded] = useState(
-    () => readRawString(STORAGE_KEYS.horizonUnclassifiedExpanded) === "true",
-  );
+  const cardMode = useUiPrefsStore((s) => s.cardMode);
+  const unclassifiedExpanded = useUiPrefsStore((s) => s.horizonUnclassifiedExpanded);
+  const prefsLens = useUiPrefsStore((s) => s.horizonLens);
+  const setPrefs = useUiPrefsStore((s) => s.set);
+  const setCardMode = (v: boolean | ((p: boolean) => boolean)) =>
+    setPrefs({ cardMode: typeof v === "function" ? v(cardMode) : v });
+  const setUnclassifiedExpanded = (v: boolean | ((p: boolean) => boolean)) =>
+    setPrefs({
+      horizonUnclassifiedExpanded: typeof v === "function" ? v(unclassifiedExpanded) : v,
+    });
   const {
     schemes,
     options: classificationOptions,
@@ -167,9 +170,7 @@ export default function HorizonPage() {
   const highlightId = searchParams.get("highlight");
   const horizonParam = searchParams.get("horizon");
   const lensParam = searchParams.get("lens");
-  const [lensKey, setLensKey] = useState<string>(
-    () => lensParam ?? readRawString(STORAGE_KEYS.horizonLens) ?? "term",
-  );
+  const [lensKey, setLensKey] = useState<string>(() => lensParam ?? prefsLens ?? "term");
 
   const [secondaryMap, setSecondaryMap] = useState<SecondaryLensMap>(() =>
     readSecondaryLensMap(STORAGE_KEYS.horizonSecondaryMap),
@@ -224,9 +225,7 @@ export default function HorizonPage() {
     [activeScheme, schemeByKey],
   );
 
-  useEffect(() => {
-    writeRawString(STORAGE_KEYS.brainstormCardMode, String(cardMode));
-  }, [cardMode]);
+  // cardMode persists via uiPrefsStore (no per-change localStorage write needed).
 
   const updateIdea = async (id: string, updates: Partial<Idea>) => {
     const previous = ideasHook.ideas.find((idea) => idea.id === id);
@@ -446,16 +445,13 @@ export default function HorizonPage() {
   };
 
   const toggleUnclassified = () => {
-    setUnclassifiedExpanded((v) => {
-      writeRawString(STORAGE_KEYS.horizonUnclassifiedExpanded, String(!v));
-      return !v;
-    });
+    setUnclassifiedExpanded(!unclassifiedExpanded);
   };
 
   const handleLensChange = (key: string) => {
     if (key === lensKey) return;
     setLensKey(key);
-    writeRawString(STORAGE_KEYS.horizonLens, key);
+    setPrefs({ horizonLens: key });
     const params = new URLSearchParams(searchParams.toString());
     params.set("lens", key);
     params.delete("horizon");
@@ -488,8 +484,7 @@ export default function HorizonPage() {
     if (idea) setActiveTab(groupKeyOf(valueOf(idea.id)));
     // Guarantee an unclassified highlight target is visible: expand the strip.
     if (idea && valueOf(idea.id) == null) {
-      setUnclassifiedExpanded(true);
-      writeRawString(STORAGE_KEYS.horizonUnclassifiedExpanded, "true");
+      setPrefs({ horizonUnclassifiedExpanded: true });
     }
     // Guarantee the highlight target is visible: lift filters that could hide it.
     if (idea && !ACTIVE_STATUSES.has(idea.status)) {
@@ -531,7 +526,7 @@ export default function HorizonPage() {
       router.replace(`/horizon?${params.toString()}`, { scroll: false });
     }, 400);
     return () => clearTimeout(timer);
-  }, [highlightId, loading, searchParams, router, valueOf]);
+  }, [highlightId, loading, searchParams, router, valueOf, setPrefs]);
 
   if (loading || classificationsLoading) {
     return (

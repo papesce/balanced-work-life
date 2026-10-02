@@ -57,7 +57,8 @@ import {
   formatDayTitle,
   getTimelineKicker,
 } from "@/components/timeline/timelineUtils";
-import { getCompletionEffects, hasAnyEffects, CompletionEffects } from "@/lib/linkEffects";
+import { getCompletionEffects, hasAnyEffects } from "@/lib/linkEffects";
+import { useCompletionEffects } from "@/stores/feedbackStore";
 import { LinkedEffectsReveal } from "@/components/shared/LinkedEffectsReveal";
 
 const cardVariants = {
@@ -327,10 +328,7 @@ function TimelineInner() {
   const [todayVisible, setTodayVisible] = useState(true);
   const [scrollRequest, setScrollRequest] = useState(0);
   const { undoAction, clearUndo, handleUndo } = useUndoAction();
-  const [completionEffects, setCompletionEffects] = useState<{
-    effects: CompletionEffects;
-    completedText: string;
-  } | null>(null);
+  const { completionEffects, setCompletionEffects } = useCompletionEffects();
 
   const today = getToday();
   const tomorrow = getTomorrow();
@@ -589,7 +587,7 @@ function TimelineInner() {
       if (prev && hasAnyEffects(effects))
         setCompletionEffects({ effects, completedText: prev.text });
     },
-    [ideas, markDone, linksHook.links],
+    [ideas, markDone, linksHook.links, setCompletionEffects],
   );
 
   const handleUpdate = useCallback(
@@ -603,7 +601,7 @@ function TimelineInner() {
       }
       await updateIdea(id, patch);
     },
-    [ideas, updateIdea, linksHook.links],
+    [ideas, updateIdea, linksHook.links, setCompletionEffects],
   );
 
   const handleReorderDate = useCallback(

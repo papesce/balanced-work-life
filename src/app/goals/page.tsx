@@ -12,7 +12,8 @@ import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { Idea, IdeaType, LinkType } from "@/lib/types";
 import { getAncestorChain, getChildCount, getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
-import { getCompletionEffects, hasAnyEffects, CompletionEffects } from "@/lib/linkEffects";
+import { getCompletionEffects, hasAnyEffects } from "@/lib/linkEffects";
+import { useCompletionEffects } from "@/stores/feedbackStore";
 import { LinkedEffectsReveal } from "@/components/shared/LinkedEffectsReveal";
 import { useUndoAction } from "@/lib/tasks/undo";
 import { UndoBar } from "@/components/shared/UndoBar";
@@ -44,10 +45,7 @@ export default function GoalsPage() {
     depth: number;
   } | null>(null);
   const { undoAction, registerUndo, clearUndo, handleUndo } = useUndoAction();
-  const [completionEffects, setCompletionEffects] = useState<{
-    effects: CompletionEffects;
-    completedText: string;
-  } | null>(null);
+  const { completionEffects, setCompletionEffects } = useCompletionEffects();
 
   const handleSelect = (id: string | null) => {
     setSelectedId(id);

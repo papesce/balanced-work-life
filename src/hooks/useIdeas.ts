@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { usePowerSync, useQuery } from "@powersync/react";
 import { useAuth } from "./useAuth";
@@ -193,7 +193,7 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
     userId ? params : [],
   );
 
-  const ideas: Idea[] = rawRows.map(deserializeIdea);
+  const ideas: Idea[] = useMemo(() => rawRows.map(deserializeIdea), [rawRows]);
 
   useEffect(() => {
     if (ideas.length === 0) return;
@@ -648,7 +648,7 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
     setCollapsedIds(parents);
   };
 
-  const tree = buildTree(ideas, collapsedIds);
+  const tree = useMemo(() => buildTree(ideas, collapsedIds), [ideas, collapsedIds]);
 
   return {
     ideas,

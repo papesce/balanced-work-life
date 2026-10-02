@@ -14,8 +14,10 @@ import { BrainstormBreadcrumb } from "@/components/brainstorm/BrainstormBreadcru
 import { GraphView } from "@/components/brainstorm/GraphView";
 import { Idea, IdeaType, LinkType } from "@/lib/types";
 import { STORAGE_KEYS, readRawString, writeRawString } from "@/lib/storage";
+import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 import { getAncestorChain, getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
-import { getCompletionEffects, hasAnyEffects, CompletionEffects } from "@/lib/linkEffects";
+import { getCompletionEffects, hasAnyEffects } from "@/lib/linkEffects";
+import { useCompletionEffects } from "@/stores/feedbackStore";
 import { LinkedEffectsReveal, LinkedEffectsBadge } from "@/components/shared/LinkedEffectsReveal";
 import type { IdeasScope } from "@/hooks/useIdeas";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -31,14 +33,12 @@ export default function BrainstormPage() {
   const router = useRouter();
   const highlightId = searchParams.get("highlight");
   const [viewMode, setViewMode] = useState<"tree" | "graph">("tree");
-  const [cardMode, setCardMode] = useState(
-    () => readRawString(STORAGE_KEYS.brainstormCardMode) === "true",
-  );
+  const cardMode = useUiPrefsStore((s) => s.cardMode);
+  const setPrefs = useUiPrefsStore((s) => s.set);
+  const setCardMode = (v: boolean | ((p: boolean) => boolean)) =>
+    setPrefs({ cardMode: typeof v === "function" ? v(cardMode) : v });
   const { undoAction, registerUndo, clearUndo, handleUndo } = useUndoAction();
-  const [completionEffects, setCompletionEffects] = useState<{
-    effects: CompletionEffects;
-    completedText: string;
-  } | null>(null);
+  const { completionEffects, setCompletionEffects } = useCompletionEffects();
 
   type EditMode = "view" | "edit" | "insert";
   const [editMode, setEditMode] = useState<EditMode>(() => {
@@ -85,9 +85,7 @@ export default function BrainstormPage() {
     writeRawString(STORAGE_KEYS.brainstormFocusId, focusedId ?? "");
   }, [focusedId]);
 
-  useEffect(() => {
-    writeRawString(STORAGE_KEYS.brainstormCardMode, String(cardMode));
-  }, [cardMode]);
+  // cardMode persists via uiPrefsStore (shared with horizon).
 
   useEffect(() => {
     writeRawString(STORAGE_KEYS.brainstormHideInHorizon, String(hideInHorizon));
