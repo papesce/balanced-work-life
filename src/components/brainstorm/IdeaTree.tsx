@@ -321,7 +321,6 @@ export function IdeaTree({
                 setSelectedId(node.id);
                 setEditingId(node.id);
               }}
-              onUpdate={updateIdea}
               onDelete={deleteIdea}
               onSchedule={onSchedule}
               onCreateLink={onCreateLink}

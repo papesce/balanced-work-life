@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, Target } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import {
   Idea,
   IdeaLink,
@@ -373,7 +373,6 @@ export interface HorizonTreeProps {
   priorityValueOf: (ideaId: string) => PriorityValue;
   onSetPriority: (ideaId: string, value: string | null) => Promise<void>;
   emptyMessage?: React.ReactNode;
-  onToggleInFocus?: (id: string, until?: string | null) => Promise<void>;
   cardMode?: boolean;
   /** Render as a collapsed strip (label + count); click expands. Drops still land. */
   collapsed?: boolean;
@@ -415,7 +414,6 @@ export function HorizonTree({
   priorityValueOf,
   onSetPriority,
   emptyMessage,
-  onToggleInFocus,
   cardMode,
   collapsed = false,
   onToggleCollapsed,
@@ -499,14 +497,6 @@ export function HorizonTree({
     renderTrailing: (node: IdeaNodeType) => (
       <>
         <NotesIndicator hasNotes={!!node.notes?.trim()} onClick={() => openNotes(node.id)} />
-        {node.in_focus && (
-          <span
-            title="In Focus"
-            className="flex flex-shrink-0 items-center text-amber-500 dark:text-amber-400"
-          >
-            <Target size={13} strokeWidth={1.75} />
-          </span>
-        )}
         <TypeBadgeSlot node={node} onUpdate={onUpdate} />
         <HorizonTagsSlot
           node={node}
@@ -530,14 +520,12 @@ export function HorizonTree({
           hasChildren={node.children.length > 0}
           getTagsForIdea={getTagsForIdea}
           onEdit={() => setEditingId(node.id)}
-          onUpdate={onUpdate}
           onDelete={onDelete}
           onSchedule={onSchedule}
           onCreateLink={onCreateLink}
           onDeleteLink={onDeleteLink}
           onMove={onMove}
           hiddenActions={["move"]}
-          onToggleInFocus={onToggleInFocus}
           onShowDetails={() => openNotes(node.id, { section: "context" })}
           currentView="horizon"
         />

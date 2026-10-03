@@ -809,7 +809,6 @@ export default function ProjectsPage() {
               hasChildren={directChildrenOf(p.id).length > 0}
               getTagsForIdea={taskTagsHook.getTagsForIdea}
               onEdit={() => startCardRename(p)}
-              onUpdate={updateIdea}
               onDelete={deleteIdea}
               onSchedule={scheduleIdea}
               onCreateLink={createLink}

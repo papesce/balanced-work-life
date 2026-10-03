@@ -146,7 +146,6 @@ function deserializeIdea(row: Record<string, unknown>): Idea {
   return {
     ...row,
     is_priority: Boolean(row.is_priority),
-    in_focus: Boolean(row.in_focus),
     attempt_dates: parseStringArray(row.attempt_dates),
     status_history: parseStatusHistory(row.status_history),
   } as unknown as Idea;
@@ -256,8 +255,6 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
       paused_at: null,
       attempt_dates: [],
       status_history: null,
-      in_focus: false,
-      in_focus_until: null,
       productivity_signal: null,
       sort_order: sortOrder,
       created_at: now,
@@ -289,8 +286,6 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
           paused_at: idea.paused_at,
           attempt_dates: idea.attempt_dates,
           status_history: idea.status_history,
-          in_focus: idea.in_focus,
-          in_focus_until: idea.in_focus_until,
           productivity_signal: idea.productivity_signal ?? null,
           sort_order: idea.sort_order,
           created_at: idea.created_at,
@@ -325,7 +320,7 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
       const v = finalUpdates[f as keyof Idea];
       if (f === "attempt_dates") return JSON.stringify(v ?? []);
       if (f === "status_history") return v ? JSON.stringify(v) : null;
-      if (f === "is_priority" || f === "in_focus") return v ? 1 : 0;
+      if (f === "is_priority") return v ? 1 : 0;
       return v ?? null;
     });
     values.push(updatedAt);
@@ -356,8 +351,8 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
           `INSERT OR REPLACE INTO ideas (id, user_id, parent_id, text, description, type, effort, impact, urgency,
             scheduled_date, scheduled_time, duration_minutes, is_priority, priority_order,
             status, notes, completed_at, cancelled_at, paused_at, attempt_dates, status_history,
-            in_focus, in_focus_until, productivity_signal, sort_order, created_at, updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            productivity_signal, sort_order, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
           [
             idea.id,
             idea.user_id,
@@ -380,8 +375,6 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
             idea.paused_at,
             JSON.stringify(idea.attempt_dates),
             idea.status_history ? JSON.stringify(idea.status_history) : null,
-            idea.in_focus ? 1 : 0,
-            idea.in_focus_until,
             idea.productivity_signal ?? null,
             idea.sort_order,
             idea.created_at,
@@ -389,16 +382,6 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
           ],
         );
       }
-    });
-  };
-
-  const toggleInFocus = async (id: string, until?: string | null) => {
-    const idea = ideas.find((i) => i.id === id);
-    if (!idea) return;
-    const nextFocus = !idea.in_focus;
-    await updateIdea(id, {
-      in_focus: nextFocus,
-      in_focus_until: until !== undefined ? until : nextFocus ? idea.in_focus_until : null,
     });
   };
 
@@ -512,8 +495,6 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
           paused_at: null,
           attempt_dates: [],
           status_history: null,
-          in_focus: false,
-          in_focus_until: null,
           productivity_signal: null,
           sort_order: maxOrder + 1,
           created_at: now,
@@ -667,7 +648,6 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
     markPaused,
     markCancelled,
     scheduleIdea,
-    toggleInFocus,
     restoreIdeas,
     toggleCollapse,
     expandIdea,

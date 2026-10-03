@@ -4,13 +4,13 @@ import { useMemo, useState, useRef, useCallback } from "react";
 import { useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronUp, EyeOff, Target, Tag } from "lucide-react";
+import { ChevronUp, EyeOff, Tag } from "lucide-react";
 import { useIdeas, type CreateIdeaPosition } from "@/hooks/useIdeas";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useUndoAction } from "@/lib/tasks/undo";
-import { filterTreeByFocus, filterTreeByType } from "@/lib/ideaTreeFilters";
+import { filterTreeByType } from "@/lib/ideaTreeFilters";
 import { getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
 import { buildTree as buildTreeGeneric } from "@/components/tree/buildTree";
 import { AppShell } from "@/components/AppShell";
@@ -145,7 +145,6 @@ export default function HorizonPage() {
     readTreeOverrides(STORAGE_KEYS.horizonTreeOverrides),
   );
   const [hideClosed, setHideClosed] = useState(true);
-  const [focusOnly, setFocusOnly] = useState(false);
   const [typeFilter, setTypeFilter] = useState<IdeaType[]>([]);
   const [typePickerOpen, setTypePickerOpen] = useState(false);
   const cardMode = useUiPrefsStore((s) => s.cardMode);
@@ -334,13 +333,6 @@ export default function HorizonPage() {
 
   const filteredTreesByLens = useMemo(() => {
     let result = treesByLens;
-    if (focusOnly) {
-      const focused: Record<string, IdeaNode[]> = {};
-      for (const key of Object.keys(result)) {
-        focused[key] = filterTreeByFocus(result[key], ideas);
-      }
-      result = focused;
-    }
     if (typeFilter.length > 0) {
       const typed: Record<string, IdeaNode[]> = {};
       for (const key of Object.keys(result)) {
@@ -349,7 +341,7 @@ export default function HorizonPage() {
       result = typed;
     }
     return result;
-  }, [treesByLens, focusOnly, typeFilter, ideas]);
+  }, [treesByLens, typeFilter]);
 
   /**
    * Secondary-split promotion, per primary column. Runs after primary
@@ -491,7 +483,6 @@ export default function HorizonPage() {
       setHideClosed(false);
     }
     if (idea && idea.type) {
-      setFocusOnly(false);
       setTypeFilter([]);
     }
     const expandAncestors = (id: string) => {
@@ -627,7 +618,6 @@ export default function HorizonPage() {
           onExpand={onExpandIdea}
           priorityValueOf={priorityOf}
           onSetPriority={handleSetPriority}
-          onToggleInFocus={ideasHook.toggleInFocus}
           emptyMessage={
             <p className="px-4 py-6 text-center text-xs text-gray-400 italic dark:text-gray-500">
               No items yet
@@ -668,18 +658,6 @@ export default function HorizonPage() {
       >
         <EyeOff size={12} />
         <span className="hidden sm:inline">Hide closed</span>
-      </button>
-      <button
-        type="button"
-        onClick={() => setFocusOnly((v) => !v)}
-        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-          focusOnly
-            ? "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/50 dark:bg-amber-900/20 dark:text-amber-300"
-            : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
-        }`}
-      >
-        <Target size={12} />
-        <span className="hidden sm:inline">Focus only</span>
       </button>
       <div className="relative">
         <button

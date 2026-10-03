@@ -72,8 +72,6 @@ function insertQuickNoteIdea(
         paused_at: null,
         attempt_dates: [],
         status_history: null,
-        in_focus: false,
-        in_focus_until: null,
         productivity_signal: null,
         sort_order: opts.sortOrder,
         created_at: opts.now,

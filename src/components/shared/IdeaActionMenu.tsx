@@ -8,7 +8,6 @@ import {
   Trash2,
   MoreHorizontal,
   Pencil,
-  Target,
   Eye,
   CornerDownRight,
 } from "lucide-react";
@@ -27,7 +26,6 @@ interface IdeaActionMenuProps {
   hasChildren: boolean;
   getTagsForIdea?: (ideaId: string) => Tag[];
   onEdit: () => void;
-  onUpdate: (id: string, updates: Partial<Idea>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onSchedule: (id: string, date: string | null) => Promise<void>;
   onCreateLink: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
@@ -37,7 +35,6 @@ interface IdeaActionMenuProps {
   /** Create a new parent for `id` and move it under it. Resolves to the new parent id. */
   onCreateParent?: (id: string, text: string, type: IdeaType) => Promise<string | null>;
   hiddenActions?: Array<"edit" | "link" | "move" | "attach" | "schedule" | "delete">;
-  onToggleInFocus?: (id: string, until?: string | null) => Promise<void>;
   currentView?: RevealView;
   /** Opens the details drawer (context/notes). Rendered as a menu item when provided. */
   onShowDetails?: () => void;
@@ -50,7 +47,6 @@ export function IdeaActionMenu({
   hasChildren,
   getTagsForIdea,
   onEdit,
-  onUpdate,
   onDelete,
   onSchedule,
   onCreateLink,
@@ -59,7 +55,6 @@ export function IdeaActionMenu({
   onMoved,
   onCreateParent,
   hiddenActions,
-  onToggleInFocus,
   currentView,
   onShowDetails,
 }: IdeaActionMenuProps) {
@@ -303,21 +298,6 @@ export function IdeaActionMenu({
                 </button>
               </div>
             )}
-            <button
-              onClick={() => {
-                setShowMenu(false);
-                if (onToggleInFocus) void onToggleInFocus(idea.id);
-                else
-                  void onUpdate(idea.id, {
-                    in_focus: !idea.in_focus,
-                    in_focus_until: idea.in_focus ? null : idea.in_focus_until,
-                  });
-              }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-            >
-              <Target size={12} strokeWidth={1.5} />
-              {idea.in_focus ? "Remove from Focus" : "Mark In Focus"}
-            </button>
             {currentView && (
               <>
                 <div className="my-1 border-t border-black/5 dark:border-white/5" />

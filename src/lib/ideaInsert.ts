@@ -29,8 +29,6 @@ export const IDEA_INSERT_COLUMNS = [
   "paused_at",
   "attempt_dates",
   "status_history",
-  "in_focus",
-  "in_focus_until",
   "productivity_signal",
   "sort_order",
   "created_at",
@@ -65,8 +63,6 @@ export interface IdeaInsertRow {
   paused_at: string | null;
   attempt_dates: string[];
   status_history: { status: string; at: string }[] | null;
-  in_focus: boolean;
-  in_focus_until: string | null;
   productivity_signal: string | null;
   sort_order: number;
   created_at: string;
@@ -97,8 +93,6 @@ export function ideaInsertParams(row: IdeaInsertRow): unknown[] {
     row.paused_at,
     JSON.stringify(row.attempt_dates),
     row.status_history ? JSON.stringify(row.status_history) : null,
-    row.in_focus ? 1 : 0,
-    row.in_focus_until,
     row.productivity_signal ?? null,
     row.sort_order,
     row.created_at,
