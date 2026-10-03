@@ -11,9 +11,11 @@ import type { Idea } from "@/lib/types";
 export function ScheduleAttempts({
   idea,
   onRemoveAttempt,
+  onGoToDate,
 }: {
   idea: Idea;
   onRemoveAttempt?: (date: string) => void;
+  onGoToDate?: (date: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const meta = getTriageMeta(idea);
@@ -57,10 +59,24 @@ export function ScheduleAttempts({
                   <span className="w-4 shrink-0 text-[10px] font-semibold text-gray-400 tabular-nums">
                     {i + 1}
                   </span>
-                  <span className="tabular-nums">{date}</span>
+                  <button
+                    type="button"
+                    onClick={() => onGoToDate?.(date)}
+                    title={onGoToDate ? `Open ${date} in planner` : date}
+                    className={
+                      onGoToDate
+                        ? "cursor-pointer tabular-nums hover:text-indigo-600 hover:underline dark:hover:text-indigo-300"
+                        : "tabular-nums"
+                    }
+                  >
+                    {date}
+                  </button>
                   {onRemoveAttempt && (
                     <button
-                      onClick={() => onRemoveAttempt(date)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveAttempt(date);
+                      }}
                       aria-label={`Remove attempt ${date}`}
                       title={`Remove attempt ${date}`}
                       className="ml-auto rounded px-1 text-gray-400 hover:bg-black/5 hover:text-red-500 dark:hover:bg-white/5"
@@ -75,7 +91,20 @@ export function ScheduleAttempts({
                   <span className="w-4 shrink-0 text-[10px] tabular-nums">
                     {attempts.length + 1}
                   </span>
-                  <span className="tabular-nums">{idea.scheduled_date}</span>
+                  <button
+                    type="button"
+                    onClick={() => idea.scheduled_date && onGoToDate?.(idea.scheduled_date)}
+                    title={
+                      onGoToDate && idea.scheduled_date
+                        ? `Open ${idea.scheduled_date} in planner`
+                        : idea.scheduled_date
+                    }
+                    className={
+                      onGoToDate ? "cursor-pointer tabular-nums hover:underline" : "tabular-nums"
+                    }
+                  >
+                    {idea.scheduled_date}
+                  </button>
                   <span className="ml-auto text-[10px] font-medium">current</span>
                 </li>
               )}

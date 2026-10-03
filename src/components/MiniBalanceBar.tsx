@@ -15,7 +15,8 @@ interface MiniBalanceBarProps {
 
 export function MiniBalanceBar({ tasks, getTagsForIdea, date }: MiniBalanceBarProps) {
   const router = useRouter();
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
     const d = date ?? getToday();
     router.push(`/balance?window=day&date=${d}`);
   };

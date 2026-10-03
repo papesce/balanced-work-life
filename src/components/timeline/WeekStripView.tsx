@@ -262,9 +262,17 @@ function WeekDayCell({
   }, [current, preview, unresolvedCount, priorityOf]);
 
   return (
-    <button
+    <div
       ref={setNodeRef}
       onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      role="button"
+      tabIndex={0}
       aria-pressed={selected}
       aria-label={`${formatTimelineDate(date)}: ${done}/${current.length} done. Select to view tasks.`}
       className={`flex h-full w-full cursor-pointer flex-col gap-1.5 rounded-2xl p-2.5 text-left transition-colors ${
@@ -305,7 +313,7 @@ function WeekDayCell({
           </span>
         )}
       </span>
-    </button>
+    </div>
   );
 }
 

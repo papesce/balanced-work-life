@@ -177,6 +177,11 @@ export function TaskRowMenu({
       {kind === "today" && (
         <>
           <DateItem
+            label="⚡ Do it now"
+            subtext={`today, ${nowTime}`}
+            onClick={() => run({ type: "reschedule", newDate: today, time: nowTime })}
+          />
+          <DateItem
             label="Move to tomorrow"
             onClick={() => run({ type: "reschedule", newDate: tomorrow })}
           />
@@ -200,18 +205,26 @@ export function TaskRowMenu({
         </>
       )}
       {(kind === "future" || kind === "unscheduled") && (
-        <div className="relative">
-          {submenuToggle(kind === "unscheduled" ? "Schedule…" : "Move to…")}
-          {showDatePicker && (
-            <SchedulePicker
-              currentDate={task.scheduled_date}
-              onSelect={(date) => run({ type: "reschedule", newDate: date })}
-              onClear={clearDate}
-              onClose={() => setShowDatePicker(false)}
-              minDate={today}
-            />
-          )}
-        </div>
+        <>
+          <DateItem
+            label="⚡ Do it now"
+            subtext={`today, ${nowTime}`}
+            emphasized={kind === "unscheduled"}
+            onClick={() => run({ type: "reschedule", newDate: today, time: nowTime })}
+          />
+          <div className="relative">
+            {submenuToggle(kind === "unscheduled" ? "Schedule…" : "Move to…")}
+            {showDatePicker && (
+              <SchedulePicker
+                currentDate={task.scheduled_date}
+                onSelect={(date) => run({ type: "reschedule", newDate: date })}
+                onClear={clearDate}
+                onClose={() => setShowDatePicker(false)}
+                minDate={today}
+              />
+            )}
+          </div>
+        </>
       )}
 
       {organizeSection && (

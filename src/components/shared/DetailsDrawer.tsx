@@ -410,6 +410,10 @@ export function DetailsDrawer({
             onRemoveAttempt={(date) =>
               void updateIdea(ideaId, computeRemoveAttemptCorrection(idea, date))
             }
+            onGoToDate={(date) => {
+              router.push(`/?date=${date}&highlight=${ideaId}`);
+              onClose();
+            }}
           />
           <DetailsEditor value={idea.notes} onSave={handleSave} />
           <p className="mt-2 text-[10px] text-gray-400 dark:text-gray-500">
