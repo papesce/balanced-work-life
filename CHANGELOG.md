@@ -1,5 +1,35 @@
 # balanced-work-life
 
+## 0.5.0
+
+### Minor Changes
+
+- 5747b17: - Add Quick Note feature: transient scratchpad for fast capture with process mode
+  - Add quick_notes table, PowerSync schema, and sync rules
+  - Add keyboard shortcut Cmd/Ctrl+Alt+N to toggle Quick Note panel
+  - Add IdeaSearchPicker props: initialQuery and matchAllWords for word-boundary matching
+- 915a938: - Add named Horizon views: pick a primary classification, set per-column Split lenses, and save the mix with a name; switcher supports retrieve, rename, duplicate, overwrite, revert, delete, and default-on-load with per-view summaries
+  - Fix month-grid nested `<button>` hydration error by rendering day cells as keyboard-accessible `div[role=button]`
+  - Drop deprecated Supabase `auth.lock` option (lockless session coordination)
+- f9e067c: - Fix PowerSync connector wedging the upload queue on unknown op.table/op: skip with a warning so batch.complete() is still reached
+  - Remove manual Search existing option from the Process selection panel (auto-match suggestion and Create under stay)
+  - Exclude cancelled/archived/deferred tasks from Balance load in fetchTasksWithTags
+
+### Patch Changes
+
+- b131d68: Fix backup silently dropping classifications and quick notes: export/import quick_notes, classification schemes/options/idea_classifications (v3 backup, old files still import), and restore lens prefs onto empty keys only.
+- 7656684: - Calm Quick Note save feedback: footer indicator and header unsaved dot share a grace-timed status hook, so steady typing no longer flickers amber/pulse on every pause-save cycle
+  - Stabilize Quick Note header Process count with deferred updates so it settles when typing pauses instead of ticking mid-word
+- bcc231c: - Default productivity signal to null instead of 'productive' on task creation
+  - Remove productivity signal picker from task creation forms; only settable via context menu
+  - Fix task_tags UUID generation to use proper UUIDs instead of composite strings
+- ef7cb2b: - Fix quick note losing typed text: autosave now reads the synchronously-updated draft ref instead of lagging React state, so unmount/blur/pagehide flushes can no longer persist stale content
+  - Fix quick note empty-overwrite and cross-note flushes via draft provenance tracking, truthful dirty flag, and refused mismatched-target writes
+  - Surface PowerSync upload failures per operation instead of silently dropping them; add sync-status transition logging
+  - Refactor QuickNoteContext into focused modules (notes, draft, persistence, operations) with a single write path and shared idea-insert SQL
+- 7b611bd: - Regroup the task row action menu by intent (Date / Organize / Navigate / Destructive) with consequence previews, collapsing retry/try-now/reschedule/move into a single reschedule action that records attempt history only for strictly past dates
+  - Unify today/selected highlighting across timeline agenda, week, and month views with a shared DateChip and formatDayTitle helper, plus a sticky Today jump pill
+
 ## 0.4.0
 
 ### Minor Changes
