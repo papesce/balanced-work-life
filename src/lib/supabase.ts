@@ -9,8 +9,5 @@ export const supabase = createBrowserClient(
       path: "/",
       maxAge: 400 * 24 * 60 * 60,
     },
-    auth: {
-      lock: async (name, acquireTimeout, fn) => await fn(),
-    },
   },
 );

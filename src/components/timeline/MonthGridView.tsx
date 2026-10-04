@@ -71,12 +71,20 @@ function DayCell({
   const dayNum = Number(date.slice(8, 10));
   const isToday = date === today;
   return (
-    <button
+    <div
       ref={setNodeRef}
       onClick={() => {
         if (Date.now() - justDraggedRef.current < 300) return;
         onSelect();
       }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      role="button"
+      tabIndex={0}
       aria-pressed={selected}
       aria-label={`${formatTimelineDate(date)}: ${formatTaskCount(current.length)}. Select to view.`}
       className={`min-h-[88px] w-full cursor-pointer rounded-xl border p-1 text-left transition-colors sm:min-h-[104px] ${
@@ -107,15 +115,19 @@ function DayCell({
           />
         ))}
         {overflow > 0 && (
-          <span
-            onClick={onSelect}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect();
+            }}
             className="block w-full truncate rounded-md px-1 py-px text-left text-[9px] font-bold text-violet-500 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/20"
           >
             +{overflow} more
-          </span>
+          </button>
         )}
       </span>
-    </button>
+    </div>
   );
 }
 

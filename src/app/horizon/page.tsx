@@ -17,6 +17,7 @@ import { AppShell } from "@/components/AppShell";
 import { UndoBar } from "@/components/shared/UndoBar";
 import { QuickAddInput } from "@/components/timeline/QuickAddInput";
 import { HorizonTree } from "@/components/horizon/HorizonTree";
+import { HorizonViewSwitcher } from "@/components/horizon/HorizonViewSwitcher";
 import { type PriorityValue } from "@/components/shared/PriorityChip";
 import { TypePicker } from "@/components/brainstorm/TypePicker";
 import { TypeFilterPicker } from "@/components/shared/TypeFilterPicker";
@@ -34,15 +35,21 @@ import {
 } from "@/lib/storage";
 import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 
-import {
-  useLens,
-  LensTabs,
-  ColumnShell,
-  UNCLASSIFIED,
-  groupKeyOf,
-  type LensColumn,
-} from "@/components/lens";
+import { useLens, ColumnShell, UNCLASSIFIED, groupKeyOf, type LensColumn } from "@/components/lens";
 import { groupTreesByLens, groupSecondaryByLens } from "@/lib/horizonGrouping";
+import {
+  applyViewToSecondaryMap,
+  isViewDirty,
+  newHorizonViewId,
+  readActiveHorizonViewId,
+  readDefaultHorizonViewId,
+  readHorizonViews,
+  snapshotSplits,
+  writeActiveHorizonViewId,
+  writeDefaultHorizonViewId,
+  writeHorizonViews,
+  type HorizonView,
+} from "@/lib/horizonViews";
 
 const ACTIVE_STATUSES = new Set(["draft", "planned", "in_progress", "scheduled"]);
 
@@ -169,7 +176,32 @@ export default function HorizonPage() {
   const highlightId = searchParams.get("highlight");
   const horizonParam = searchParams.get("horizon");
   const lensParam = searchParams.get("lens");
-  const [lensKey, setLensKey] = useState<string>(() => lensParam ?? prefsLens ?? "term");
+  const [views, setViews] = useState<HorizonView[]>(() => readHorizonViews());
+  const [activeViewId, setActiveViewId] = useState<string | null>(() => {
+    const viewsNow = readHorizonViews();
+    const stored = readActiveHorizonViewId();
+    if (stored && viewsNow.some((v) => v.id === stored)) return stored;
+    if (!lensParam) {
+      const def = readDefaultHorizonViewId();
+      if (def && viewsNow.some((v) => v.id === def)) return def;
+    }
+    return null;
+  });
+  const [defaultViewId, setDefaultViewId] = useState<string | null>(() => {
+    const stored = readDefaultHorizonViewId();
+    if (stored && readHorizonViews().some((v) => v.id === stored)) return stored;
+    return null;
+  });
+  const [lensKey, setLensKey] = useState<string>(() => {
+    if (lensParam) return lensParam;
+    const storedViews = readHorizonViews();
+    const ids = [readDefaultHorizonViewId(), readActiveHorizonViewId()];
+    for (const id of ids) {
+      const match = storedViews.find((v) => v.id === id);
+      if (match) return match.primary;
+    }
+    return prefsLens ?? "term";
+  });
 
   const [secondaryMap, setSecondaryMap] = useState<SecondaryLensMap>(() =>
     readSecondaryLensMap(STORAGE_KEYS.horizonSecondaryMap),
@@ -440,7 +472,7 @@ export default function HorizonPage() {
     setUnclassifiedExpanded(!unclassifiedExpanded);
   };
 
-  const handleLensChange = (key: string) => {
+  const applyLensKey = (key: string) => {
     if (key === lensKey) return;
     setLensKey(key);
     setPrefs({ horizonLens: key });
@@ -449,6 +481,149 @@ export default function HorizonPage() {
     params.delete("horizon");
     router.replace(`/horizon?${params.toString()}`, { scroll: false });
   };
+
+  const handleLensChange = (key: string) => {
+    applyLensKey(key);
+  };
+
+  const handleSelectView = useCallback(
+    (id: string) => {
+      const view = views.find((v) => v.id === id);
+      if (!view) return;
+      setSecondaryMap((prev) => {
+        const next = applyViewToSecondaryMap(view, prev);
+        writeSecondaryLensMap(STORAGE_KEYS.horizonSecondaryMap, next);
+        return next;
+      });
+      setActiveViewId(id);
+      writeActiveHorizonViewId(id);
+      if (view.primary !== lensKey) {
+        setLensKey(view.primary);
+        setPrefs({ horizonLens: view.primary });
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("lens", view.primary);
+        params.delete("horizon");
+        router.replace(`/horizon?${params.toString()}`, { scroll: false });
+      }
+    },
+    [views, lensKey, searchParams, router, setPrefs],
+  );
+
+  const handleSaveCurrentAsView = useCallback(
+    (name: string) => {
+      const splits = snapshotSplits(
+        columns.map((c) => c.key),
+        secondaryKeyOf,
+      );
+      const view: HorizonView = {
+        id: newHorizonViewId(),
+        name,
+        primary: lensKey,
+        splits,
+      };
+      setViews((prev) => {
+        const next = [...prev, view];
+        writeHorizonViews(next);
+        return next;
+      });
+      setActiveViewId(view.id);
+      writeActiveHorizonViewId(view.id);
+    },
+    [columns, secondaryKeyOf, lensKey],
+  );
+
+  const handleOverwriteActiveView = useCallback(() => {
+    if (!activeViewId) return;
+    const splits = snapshotSplits(
+      columns.map((c) => c.key),
+      secondaryKeyOf,
+    );
+    setViews((prev) => {
+      const next = prev.map((v) =>
+        v.id === activeViewId ? { ...v, primary: lensKey, splits } : v,
+      );
+      writeHorizonViews(next);
+      return next;
+    });
+  }, [activeViewId, columns, secondaryKeyOf, lensKey]);
+
+  const handleRevertActiveView = useCallback(() => {
+    if (!activeViewId) return;
+    const view = views.find((v) => v.id === activeViewId);
+    if (view) handleSelectView(view.id);
+  }, [activeViewId, views, handleSelectView]);
+
+  const handleRenameView = useCallback((id: string, name: string) => {
+    setViews((prev) => {
+      const next = prev.map((v) => (v.id === id ? { ...v, name } : v));
+      writeHorizonViews(next);
+      return next;
+    });
+  }, []);
+
+  const handleDeleteView = useCallback(
+    (id: string) => {
+      setViews((prev) => {
+        const next = prev.filter((v) => v.id !== id);
+        writeHorizonViews(next);
+        return next;
+      });
+      if (id === activeViewId) {
+        setActiveViewId(null);
+        writeActiveHorizonViewId(null);
+      }
+      if (id === defaultViewId) {
+        setDefaultViewId(null);
+        writeDefaultHorizonViewId(null);
+      }
+    },
+    [activeViewId, defaultViewId],
+  );
+
+  const handleDuplicateView = useCallback(
+    (id: string) => {
+      const source = views.find((v) => v.id === id);
+      if (!source) return;
+      const copy: HorizonView = {
+        ...source,
+        id: newHorizonViewId(),
+        name: `${source.name} copy`,
+        splits: { ...source.splits },
+      };
+      setViews((prev) => {
+        const next = [...prev, copy];
+        writeHorizonViews(next);
+        return next;
+      });
+      setActiveViewId(copy.id);
+      writeActiveHorizonViewId(copy.id);
+    },
+    [views],
+  );
+
+  const handleToggleDefaultView = useCallback(
+    (id: string) => {
+      const next = id === defaultViewId ? null : id;
+      setDefaultViewId(next);
+      writeDefaultHorizonViewId(next);
+    },
+    [defaultViewId],
+  );
+
+  const schemeLabelOf = useCallback(
+    (schemeKey: string): string | null => schemeByKey.get(schemeKey)?.label ?? null,
+    [schemeByKey],
+  );
+
+  const activeView = views.find((v) => v.id === activeViewId) ?? null;
+  const viewDirty = activeView
+    ? isViewDirty(
+        activeView,
+        lensKey,
+        columns.map((c) => c.key),
+        secondaryKeyOf,
+      )
+    : false;
 
   // Sync lens from ?lens= (deep links, global search) when it names a real scheme.
   useEffect(() => {
@@ -646,7 +821,39 @@ export default function HorizonPage() {
 
   const headerStartActions = (
     <>
-      <LensTabs tabs={lensTabItems} activeKey={lensKey} onChange={handleLensChange} />
+      <HorizonViewSwitcher
+        views={views}
+        activeViewId={activeViewId}
+        defaultViewId={defaultViewId}
+        dirty={viewDirty}
+        schemeLabelOf={schemeLabelOf}
+        onSelect={handleSelectView}
+        onSaveCurrent={handleSaveCurrentAsView}
+        onOverwriteActive={handleOverwriteActiveView}
+        onRevertActive={handleRevertActiveView}
+        onRename={handleRenameView}
+        onDelete={handleDeleteView}
+        onDuplicate={handleDuplicateView}
+        onToggleDefault={handleToggleDefaultView}
+      />
+      <label
+        className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-100 py-1.5 pr-2.5 pl-3 text-xs font-semibold text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
+        title="Primary classification"
+      >
+        <span className="hidden sm:inline">By</span>
+        <select
+          value={lensKey}
+          onChange={(e) => handleLensChange(e.target.value)}
+          aria-label="Primary classification"
+          className="cursor-pointer bg-transparent font-semibold outline-none"
+        >
+          {lensTabItems.map((t) => (
+            <option key={t.key} value={t.key}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </label>
       <button
         type="button"
         onClick={() => setHideClosed((v) => !v)}
@@ -703,7 +910,13 @@ export default function HorizonPage() {
 
   return (
     <AppShell
-      title={activeScheme ? `Horizon · ${activeScheme.label}` : "Horizon"}
+      title={
+        activeView
+          ? `Horizon · ${activeView.name}`
+          : activeScheme
+            ? `Horizon · ${activeScheme.label}`
+            : "Horizon"
+      }
       headerStartActions={headerStartActions}
     >
       <UndoBar undoAction={undoAction} onUndo={() => void handleUndo()} onDismiss={clearUndo} />
