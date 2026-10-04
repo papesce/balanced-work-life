@@ -27,7 +27,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
               "font-src 'self' data:",
-              "connect-src 'self' https://*.supabase.co https://*.powersync.journeyapps.com https://accounts.google.com https://oauth2.googleapis.com",
+              "connect-src 'self' https://*.supabase.co wss://*.powersync.journeyapps.com https://*.powersync.journeyapps.com https://accounts.google.com https://oauth2.googleapis.com",
               "frame-src 'none'",
               "object-src 'none'",
               "base-uri 'self'",
