@@ -20,8 +20,9 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useQuickNoteEditor, useQuickNoteData } from "@/contexts/QuickNoteContext";
-import { parseTaskAll, findBestMatch } from "@/lib/quickNotes";
+import { parseTaskAll, findBestMatch, isTaskLine } from "@/lib/quickNotes";
 import { Idea, IdeaType } from "@/lib/types";
+import { getToday, getTomorrow, formatDate } from "@/lib/dateUtils";
 import { getRevealHref, getSmartRevealView, getRevealLabel, type RevealView } from "@/lib/reveal";
 import { IdeaSearchPicker } from "@/components/brainstorm/IdeaSearchPicker";
 
@@ -68,6 +69,8 @@ export function QuickNoteSelectionActions({
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [revealSubmenuOpen, setRevealSubmenuOpen] = useState(false);
+  const [kindOverride, setKindOverride] = useState<IdeaType | null>(null);
+  const [scheduledDate, setScheduledDate] = useState<string | null>(null);
   const overflowRef = useRef<HTMLDivElement>(null);
 
   const { data: ideaRows } = useQuery<Record<string, unknown>>(
@@ -95,6 +98,19 @@ export function QuickNoteSelectionActions({
   const smartView = hasMatch ? getSmartRevealView(suggestedMatch!.idea, allIdeas) : null;
   // Selections starting with the processed mark can't be created again.
   const hasMarked = selection.trimStart().startsWith("✓");
+  // Effective type: explicit user choice wins, then #tag, then "- " → task.
+  const effectiveKind: IdeaType =
+    kindOverride ?? parsed.kind ?? (isTaskLine(firstLine) ? "task" : "idea");
+  const today = getToday();
+  const tomorrow = getTomorrow();
+  const dateLabel = !scheduledDate
+    ? null
+    : scheduledDate === today
+      ? "Today"
+      : scheduledDate === tomorrow
+        ? "Tomorrow"
+        : formatDate(scheduledDate);
+  const createLabel = `Create ${effectiveKind}${dateLabel ? ` · ${dateLabel}` : ""}`;
 
   useEffect(() => {
     if (!overflowOpen) return;
@@ -112,14 +128,17 @@ export function QuickNoteSelectionActions({
     async (parentId?: string) => {
       setSaving(true);
       try {
-        const id = await createSelectionIdea(selection, parentId ?? null);
+        const id = await createSelectionIdea(selection, parentId ?? null, {
+          type: effectiveKind,
+          scheduled_date: scheduledDate,
+        });
         if (id) onMarked();
         onDone();
       } finally {
         setSaving(false);
       }
     },
-    [createSelectionIdea, selection, onMarked, onDone],
+    [createSelectionIdea, selection, effectiveKind, scheduledDate, onMarked, onDone],
   );
 
   const handleNavigate = useCallback(
@@ -178,7 +197,58 @@ export function QuickNoteSelectionActions({
         <p className="min-w-0 flex-1 truncate text-[11px] text-gray-500 dark:text-gray-400">
           “{preview}”
         </p>
-        {parsed.kind && <KindPill kind={parsed.kind} />}
+        <KindPill kind={effectiveKind} />
+      </div>
+      {/* One-step type + schedule picker: pick kind and optional date, then Create. */}
+      <div className="flex flex-wrap items-center gap-1 px-1">
+        <select
+          value={effectiveKind}
+          onChange={(e) => setKindOverride(e.target.value as IdeaType)}
+          disabled={saving}
+          aria-label="Idea type"
+          className="cursor-pointer rounded-lg border border-black/10 bg-white px-1.5 py-1 text-[11px] font-medium text-gray-600 outline-none hover:border-black/20 disabled:opacity-40 dark:border-white/10 dark:bg-gray-800 dark:text-gray-300"
+        >
+          {(["idea", "task", "project", "objective", "initiative"] as IdeaType[]).map((k) => (
+            <option key={k} value={k}>
+              {k === "objective" ? "goal" : k}
+            </option>
+          ))}
+        </select>
+        <div className="flex items-center gap-1" role="group" aria-label="Schedule date">
+          <button
+            onClick={() => setScheduledDate(scheduledDate === today ? null : today)}
+            disabled={saving}
+            className={`cursor-pointer rounded-lg px-2 py-1 text-[11px] font-medium transition-colors disabled:opacity-40 ${scheduledDate === today ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"}`}
+          >
+            Today
+          </button>
+          <button
+            onClick={() => setScheduledDate(scheduledDate === tomorrow ? null : tomorrow)}
+            disabled={saving}
+            className={`cursor-pointer rounded-lg px-2 py-1 text-[11px] font-medium transition-colors disabled:opacity-40 ${scheduledDate === tomorrow ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"}`}
+          >
+            Tomorrow
+          </button>
+          <input
+            type="date"
+            value={scheduledDate ?? ""}
+            min={today}
+            onChange={(e) => setScheduledDate(e.target.value || null)}
+            disabled={saving}
+            aria-label="Custom scheduled date"
+            className="rounded-lg border border-black/10 bg-white px-1.5 py-1 text-[11px] text-gray-600 outline-none disabled:opacity-40 dark:border-white/10 dark:bg-gray-800 dark:text-gray-300"
+          />
+          {scheduledDate && (
+            <button
+              onClick={() => setScheduledDate(null)}
+              disabled={saving}
+              aria-label="Clear scheduled date"
+              className="cursor-pointer rounded-lg px-1.5 py-1 text-[11px] text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-40 dark:hover:bg-gray-800"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
       <div className="flex flex-wrap items-center gap-1">
         {hasMatch ? (
@@ -206,7 +276,7 @@ export function QuickNoteSelectionActions({
               className="flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-medium text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
             >
               <Plus size={11} />
-              Create new
+              {createLabel}
             </button>
           </>
         ) : (
@@ -218,7 +288,7 @@ export function QuickNoteSelectionActions({
               className="flex cursor-pointer items-center gap-1 rounded-lg bg-violet-600 px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Plus size={11} />
-              Create new
+              {createLabel}
             </button>
           </>
         )}

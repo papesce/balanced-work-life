@@ -13,7 +13,11 @@ export interface QuickNoteOperations {
   selectNote: (id: string) => Promise<void>;
   createNote: () => Promise<string | null>;
   /** Create an idea from arbitrary selected text. Never mutates note text. */
-  createSelectionIdea: (text: string, parentId?: string | null) => Promise<string | null>;
+  createSelectionIdea: (
+    text: string,
+    parentId?: string | null,
+    initial?: { type?: string | null; scheduled_date?: string | null },
+  ) => Promise<string | null>;
   discardNote: () => Promise<void>;
   /** Flip an archived note back to open. No-op when the selected note isn't archived. */
   reopenNote: () => Promise<void>;
@@ -42,11 +46,13 @@ function insertQuickNoteIdea(
     text: string;
     notes: string | null;
     type: string | null;
+    scheduledDate: string | null;
     sortOrder: number;
     now: string;
   },
 ): Promise<string> {
   const id = uuidv4();
+  const scheduled = !!opts.scheduledDate;
   return tx
     .execute(
       ideaInsertSql(),
@@ -60,12 +66,12 @@ function insertQuickNoteIdea(
         effort: null,
         impact: null,
         urgency: null,
-        scheduled_date: null,
+        scheduled_date: opts.scheduledDate,
         scheduled_time: null,
         duration_minutes: null,
         is_priority: false,
         priority_order: null,
-        status: "draft",
+        status: scheduled ? "scheduled" : "draft",
         notes: opts.notes,
         completed_at: null,
         cancelled_at: null,
@@ -198,7 +204,11 @@ export function useQuickNoteOperations({
    * line resolution or archiving happens here.
    */
   const createSelectionIdea = useCallback(
-    async (text: string, parentId: string | null = null): Promise<string | null> => {
+    async (
+      text: string,
+      parentId: string | null = null,
+      initial?: { type?: string | null; scheduled_date?: string | null },
+    ): Promise<string | null> => {
       if (!userId) return null;
       const rawTask = isTaskLine(text) ? stripTaskPrefix(text) : text;
       const taskLines = rawTask
@@ -211,6 +221,11 @@ export function useQuickNoteOperations({
       const cleanTitle = title.trim();
       if (!cleanTitle) return null;
       const combinedNotes = [detail, rest].filter(Boolean).join("\n") || null;
+      const finalType = initial?.type ?? kind ?? "idea";
+      const scheduledDate =
+        initial?.scheduled_date && /^\d{4}-\d{2}-\d{2}$/.test(initial.scheduled_date)
+          ? initial.scheduled_date
+          : null;
 
       let createdId: string | null = null;
       await db.writeTransaction(async (tx) => {
@@ -224,7 +239,8 @@ export function useQuickNoteOperations({
           parentId,
           text: cleanTitle,
           notes: combinedNotes,
-          type: kind ?? "idea",
+          type: finalType,
+          scheduledDate,
           sortOrder: (maxRow[0]?.max_order ?? -1) + 1,
           now,
         });

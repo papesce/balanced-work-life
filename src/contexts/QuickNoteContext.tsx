@@ -56,7 +56,11 @@ interface QuickNoteContextValue {
   /** Update the full note text (capture mode). Creates the note lazily on first non-whitespace input. */
   updateText: (text: string) => void;
   /** Create an idea from selected text. Never mutates note text. */
-  createSelectionIdea: (text: string, parentId?: string | null) => Promise<string | null>;
+  createSelectionIdea: (
+    text: string,
+    parentId?: string | null,
+    initial?: { type?: string | null; scheduled_date?: string | null },
+  ) => Promise<string | null>;
   /** Soft-delete the entire note. */
   discardNote: () => Promise<void>;
   /** Reopen the selected archived note. No-op unless it is archived. */
