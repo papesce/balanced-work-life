@@ -746,10 +746,10 @@ function TaskRow({
         );
       })()}
       <NotesIndicator hasNotes={!!task.notes?.trim()} onClick={() => openNotes(task.id)} />
-      <div className="flex flex-shrink-0 items-center gap-1 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+      <div className="flex flex-shrink-0 items-center gap-1">
         <PriorityChipField ideaId={task.id} />
 
-        <div className="relative">
+        <div className="relative transition-opacity md:opacity-0 md:group-hover:opacity-100">
           <button
             ref={menuTriggerRef}
             onClick={() => {

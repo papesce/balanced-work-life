@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { usePowerSync, useQuery } from "@powersync/react";
 import { useAuth } from "./useAuth";
+import { usePendingOverrides } from "./usePendingOverrides";
 import { Idea, IdeaNode } from "@/lib/types";
 import { buildTree as buildTreeGeneric } from "@/components/tree/buildTree";
 import { getToday, getWindowRange } from "@/lib/dateUtils";
@@ -192,13 +193,47 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
     userId ? params : [],
   );
 
-  const ideas: Idea[] = useMemo(() => rawRows.map(deserializeIdea), [rawRows]);
+  // Optimistic overlay: applied synchronously in updateIdea so status
+  // toggles render instantly instead of waiting for the live query.
+  const {
+    overrides: pendingIdeas,
+    setOverride: setPendingIdea,
+    removeOverride: removePendingIdea,
+    removeOverridesWhere: removePendingIdeasWhere,
+  } = usePendingOverrides<string, Partial<Idea>>();
+
+  const ideas: Idea[] = useMemo(() => {
+    const base = rawRows.map(deserializeIdea);
+    if (pendingIdeas.size === 0) return base;
+    return base.map((idea) => {
+      const patch = pendingIdeas.get(idea.id);
+      return patch ? { ...idea, ...patch } : idea;
+    });
+  }, [rawRows, pendingIdeas]);
 
   useEffect(() => {
     if (ideas.length === 0) return;
     setCollapsedIds(computeCollapsedIds(ideas, overridesRef.current, searchQuery));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawRows, searchQuery]);
+
+  // Drop optimistic patches once the live query has converged on them.
+  useEffect(() => {
+    if (pendingIdeas.size === 0 || rawRows.length === 0) return;
+    const liveById = new Map(rawRows.map((r) => [r.id as string, deserializeIdea(r)]));
+    removePendingIdeasWhere((id, patch) => {
+      const live = liveById.get(id);
+      if (!live) return false;
+      return (Object.keys(patch) as (keyof Idea)[]).every((key) => {
+        const pendingValue = patch[key];
+        const liveValue = live[key];
+        if (Array.isArray(pendingValue) || Array.isArray(liveValue)) {
+          return JSON.stringify(pendingValue ?? null) === JSON.stringify(liveValue ?? null);
+        }
+        return (pendingValue ?? null) === (liveValue ?? null);
+      });
+    });
+  }, [rawRows, pendingIdeas.size, removePendingIdeasWhere]);
 
   const createIdea = async (
     text: string,
@@ -315,6 +350,10 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
     const fields = Object.keys(finalUpdates);
     if (fields.length === 0) return;
 
+    // Instant UI: merge patch over the live row before touching SQLite.
+    const prevPending = pendingIdeas.get(id);
+    setPendingIdea(id, { ...prevPending, ...finalUpdates });
+
     const setClauses = [...fields, "updated_at"].map((f) => `${f} = ?`).join(", ");
     const values = fields.map((f) => {
       const v = finalUpdates[f as keyof Idea];
@@ -325,7 +364,13 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
     });
     values.push(updatedAt);
 
-    await db.execute(`UPDATE ideas SET ${setClauses} WHERE id = ?`, [...values, id]);
+    try {
+      await db.execute(`UPDATE ideas SET ${setClauses} WHERE id = ?`, [...values, id]);
+    } catch (e) {
+      if (prevPending) setPendingIdea(id, prevPending);
+      else removePendingIdea(id);
+      throw e;
+    }
   };
 
   const deleteIdea = async (id: string) => {

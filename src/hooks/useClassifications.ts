@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { v4 as uuidv4, v5 as uuidv5 } from "uuid";
 import { usePowerSync, useQuery } from "@powersync/react";
 import { useAuth } from "./useAuth";
+import { usePendingOverrides } from "./usePendingOverrides";
 import { ClassificationScheme, ClassificationOption, IdeaClassification } from "@/lib/types";
 
 interface SeedOption {
@@ -125,6 +126,16 @@ export function useClassifications() {
       : "SELECT * FROM idea_classifications WHERE 0",
     userId ? [userId] : [],
   );
+
+  // Optimistic overlay: set synchronously on write so chips update
+  // instantly instead of waiting for the live query to re-emit.
+  // Key: `${ideaId}::${schemeKey}`, value: option value or null (cleared).
+  const {
+    overrides: pendingClassification,
+    setOverride: setPendingClassification,
+    removeOverride: removePendingClassification,
+    removeOverridesWhere: removePendingClassificationsWhere,
+  } = usePendingOverrides<string, string | null>();
 
   const isLoading = schemesLoading || optionsLoading || classificationsLoading;
 
@@ -303,6 +314,14 @@ export function useClassifications() {
   }, [user, isLoading, schemes, options, classifications, db]);
 
   const getOptionForIdea = (ideaId: string, schemeKey: string): ClassificationOption | null => {
+    const pendingKey = `${ideaId}::${schemeKey}`;
+    if (pendingClassification.has(pendingKey)) {
+      const pendingValue = pendingClassification.get(pendingKey) ?? null;
+      if (pendingValue == null) return null;
+      const scheme = schemes.find((s) => s.key === schemeKey);
+      if (!scheme) return null;
+      return options.find((o) => o.scheme_id === scheme.id && o.value === pendingValue) ?? null;
+    }
     const scheme = schemes.find((s) => s.key === schemeKey);
     if (!scheme) return null;
     const classification = classifications.find(
@@ -312,25 +331,63 @@ export function useClassifications() {
     return options.find((o) => o.id === classification.option_id) ?? null;
   };
 
+  // Drop optimistic entries once the live query has converged on them.
+  useEffect(() => {
+    if (pendingClassification.size === 0) return;
+    removePendingClassificationsWhere((key, pendingValue) => {
+      const sep = key.lastIndexOf("::");
+      if (sep === -1) return true;
+      const ideaId = key.slice(0, sep);
+      const schemeKey = key.slice(sep + 2);
+      const scheme = schemes.find((s) => s.key === schemeKey);
+      if (!scheme) return false;
+      const classification = classifications.find(
+        (c) => c.idea_id === ideaId && c.scheme_id === scheme.id,
+      );
+      const liveValue = classification
+        ? (options.find((o) => o.id === classification.option_id)?.value ?? null)
+        : null;
+      return liveValue === pendingValue;
+    });
+  }, [
+    classifications,
+    options,
+    schemes,
+    pendingClassification.size,
+    removePendingClassificationsWhere,
+  ]);
+
   /** Set (or clear with null) one scheme's value for an idea. Never touches other schemes. */
   const setClassification = async (ideaId: string, schemeKey: string, value: string | null) => {
     if (!user) return;
     const scheme = schemes.find((s) => s.key === schemeKey);
     if (!scheme) return;
-    if (value == null) {
-      await db.execute(`DELETE FROM idea_classifications WHERE idea_id = ? AND scheme_id = ?`, [
-        ideaId,
-        scheme.id,
-      ]);
-      return;
+    const pendingKey = `${ideaId}::${schemeKey}`;
+    setPendingClassification(pendingKey, value);
+    try {
+      if (value == null) {
+        await db.execute(`DELETE FROM idea_classifications WHERE idea_id = ? AND scheme_id = ?`, [
+          ideaId,
+          scheme.id,
+        ]);
+        return;
+      }
+      const option = options.find((o) => o.scheme_id === scheme.id && o.value === value);
+      if (!option) {
+        removePendingClassification(pendingKey);
+        return;
+      }
+      const existing = classifications.find(
+        (c) => c.idea_id === ideaId && c.scheme_id === scheme.id,
+      );
+      await db.execute(
+        `INSERT OR REPLACE INTO idea_classifications (id, idea_id, scheme_id, option_id, user_id, created_at) VALUES (?,?,?,?,?,?)`,
+        [existing?.id ?? uuidv4(), ideaId, scheme.id, option.id, user.id, new Date().toISOString()],
+      );
+    } catch (e) {
+      removePendingClassification(pendingKey);
+      throw e;
     }
-    const option = options.find((o) => o.scheme_id === scheme.id && o.value === value);
-    if (!option) return;
-    const existing = classifications.find((c) => c.idea_id === ideaId && c.scheme_id === scheme.id);
-    await db.execute(
-      `INSERT OR REPLACE INTO idea_classifications (id, idea_id, scheme_id, option_id, user_id, created_at) VALUES (?,?,?,?,?,?)`,
-      [existing?.id ?? uuidv4(), ideaId, scheme.id, option.id, user.id, new Date().toISOString()],
-    );
   };
 
   return {

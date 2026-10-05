@@ -117,10 +117,19 @@ export function DayslotTimeline({
   const { setNodeRef: setTimelineDropRef, isOver: isDropOver } = useDroppable({
     id: PLANNER_TIMELINE_ID,
   });
-  const { registerTimeline, overTimeline } = usePlannerDnd();
+  const { registerTimeline, overTimeline, activeDrag, timelinePreviewMinute } = usePlannerDnd();
   const [pendingEvents, setPendingEvents] = useState<
     Array<{ id: string; startMinute: number; text: string; durationMinutes: number }>
   >([]);
+  // Optimistic positions for schedule-drops (middle → timeline) and
+  // in-timeline moves. Keyed by task id, cleared once live `allTasks`
+  // converges on the pending minute (or rolled back on write failure).
+  const [pendingPositions, setPendingPositions] = useState<
+    Map<string, { startMinute: number; durationMinutes?: number }>
+  >(() => new Map());
+  const prevActiveDragRef = useRef<string | null>(null);
+  const lastPreviewMinuteRef = useRef<number | null>(null);
+  const lastOverTimelineRef = useRef(false);
 
   const handleTimelineRef = useCallback((handle: DailyTimelineHandle | null) => {
     setScrollEl(handle?.scrollElement ?? null);
@@ -131,22 +140,106 @@ export function DayslotTimeline({
   useEffect(() => {
     registerTimeline({ scrollElement: scrollEl, startHour, endHour, hourHeight, snapMinutes });
   }, [scrollEl, hourHeight, registerTimeline]);
+
+  // Commit a pending position when a middle-section drag ends over the
+  // timeline. Dayslot doesn't see DragEnd directly, so infer the drop from
+  // the activeDrag → null transition (the provider resets on drag end).
+  useEffect(() => {
+    if (activeDrag) {
+      prevActiveDragRef.current = activeDrag.taskId;
+      if (timelinePreviewMinute !== null) lastPreviewMinuteRef.current = timelinePreviewMinute;
+      lastOverTimelineRef.current = overTimeline;
+      return;
+    }
+    const droppedTaskId = prevActiveDragRef.current;
+    const wasOverTimeline = lastOverTimelineRef.current;
+    const minute = lastPreviewMinuteRef.current;
+    prevActiveDragRef.current = null;
+    lastOverTimelineRef.current = false;
+    if (droppedTaskId && wasOverTimeline && minute !== null) {
+      lastPreviewMinuteRef.current = null;
+      setPendingPositions((prev) => {
+        const next = new Map(prev);
+        next.set(droppedTaskId, { startMinute: minute });
+        return next;
+      });
+    }
+  }, [activeDrag, timelinePreviewMinute, overTimeline]);
+
+  // Clear pending positions once live data converges (or the task vanished).
+  useEffect(() => {
+    if (pendingPositions.size === 0) return;
+    const liveById = new Map(allTasks.map((t) => [t.id, t] as const));
+    let changed = false;
+    const next = new Map(pendingPositions);
+    for (const [taskId, pending] of pendingPositions) {
+      const live = liveById.get(taskId);
+      if (!live) {
+        next.delete(taskId);
+        changed = true;
+      } else if (
+        live.scheduled_time &&
+        parseTimeToMinutes(live.scheduled_time) === pending.startMinute &&
+        (pending.durationMinutes === undefined || live.duration_minutes === pending.durationMinutes)
+      ) {
+        next.delete(taskId);
+        changed = true;
+      }
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- converge optimistic positions into live query results
+    if (changed) setPendingPositions(next);
+  }, [allTasks, pendingPositions]);
+
   const scheduledTasks = useMemo(
     () => allTasks.filter((t) => t.scheduled_time && t.status !== "archived"),
     [allTasks],
   );
-  const taskMap = useMemo(
-    () => new Map(scheduledTasks.map((t) => [t.id, t] as const)),
-    [scheduledTasks],
-  );
+  const taskMap = useMemo(() => new Map(allTasks.map((t) => [t.id, t] as const)), [allTasks]);
   const stableCustomProps = useMemo(
     () => ({ "--ds-event-padding": "0" }) as Record<string, string>,
     [],
   );
 
-  const events = useMemo(
-    () => [
-      ...scheduledTasks.map((t) => taskToEvent(t, getTagsForIdea(t.id))),
+  const events = useMemo(() => {
+    const livePreviewId =
+      activeDrag && overTimeline && timelinePreviewMinute !== null ? activeDrag.taskId : null;
+    const withPending = new Map<string, TimelineEvent>();
+    for (const t of scheduledTasks) {
+      const pending = pendingPositions.get(t.id);
+      const base = taskToEvent(t, getTagsForIdea(t.id));
+      withPending.set(t.id, {
+        ...base,
+        startMinute: pending?.startMinute ?? base.startMinute,
+        durationMinutes: pending?.durationMinutes ?? base.durationMinutes,
+      });
+    }
+    // Drops from the middle section: task has no scheduled_time yet live,
+    // but the pending position makes it appear instantly.
+    for (const [taskId, pending] of pendingPositions) {
+      if (withPending.has(taskId)) continue;
+      const task = taskMap.get(taskId);
+      if (!task) continue;
+      const base = taskToEvent(task, getTagsForIdea(taskId));
+      withPending.set(taskId, {
+        ...base,
+        startMinute: pending.startMinute,
+        durationMinutes: pending.durationMinutes ?? base.durationMinutes,
+      });
+    }
+    // Live position while the pointer is still over the timeline.
+    if (livePreviewId && !pendingPositions.has(livePreviewId)) {
+      const task = taskMap.get(livePreviewId);
+      if (task) {
+        const base = taskToEvent(task, getTagsForIdea(livePreviewId));
+        withPending.set(livePreviewId, {
+          ...base,
+          startMinute: timelinePreviewMinute as number,
+          durationMinutes: activeDrag?.durationMinutes ?? base.durationMinutes,
+        });
+      }
+    }
+    return [
+      ...withPending.values(),
       ...pendingEvents.map((pe) => ({
         id: pe.id,
         title: pe.text,
@@ -155,15 +248,40 @@ export function DayslotTimeline({
         color: undefined,
         category: undefined,
       })),
-    ],
-    [scheduledTasks, getTagsForIdea, pendingEvents],
-  );
+    ];
+  }, [
+    scheduledTasks,
+    getTagsForIdea,
+    pendingEvents,
+    pendingPositions,
+    taskMap,
+    activeDrag,
+    overTimeline,
+    timelinePreviewMinute,
+  ]);
 
   const handleEventChange = useCallback(
     (event: TimelineEvent) => {
-      onUpdateTask(event.id, {
-        scheduled_time: minutesToTimeString(event.startMinute),
-        duration_minutes: event.durationMinutes,
+      setPendingPositions((prev) => {
+        const next = new Map(prev);
+        next.set(event.id, {
+          startMinute: event.startMinute,
+          durationMinutes: event.durationMinutes,
+        });
+        return next;
+      });
+      void Promise.resolve(
+        onUpdateTask(event.id, {
+          scheduled_time: minutesToTimeString(event.startMinute),
+          duration_minutes: event.durationMinutes,
+        }),
+      ).catch(() => {
+        setPendingPositions((prev) => {
+          if (!prev.has(event.id)) return prev;
+          const next = new Map(prev);
+          next.delete(event.id);
+          return next;
+        });
       });
     },
     [onUpdateTask],
@@ -178,6 +296,14 @@ export function DayslotTimeline({
 
   const handleEventRemove = useCallback(
     (event: TimelineEvent) => {
+      // Drop any optimistic position so the event vanishes instantly;
+      // the useIdeas overlay + live query drive the confirmed state.
+      setPendingPositions((prev) => {
+        if (!prev.has(event.id)) return prev;
+        const next = new Map(prev);
+        next.delete(event.id);
+        return next;
+      });
       onUpdateTask(event.id, { scheduled_time: null });
     },
     [onUpdateTask],
