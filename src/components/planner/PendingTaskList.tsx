@@ -239,6 +239,7 @@ function TaskRow({
 }) {
   const isCompleted = task.status === "completed";
   const isCancelled = task.status === "cancelled";
+  const isMissed = task.status === "missed";
   const isPaused = task.status === "paused";
   const isInProgress = task.status === "in_progress";
   const statusConfig = STATUS_CONFIG[task.status];
@@ -470,9 +471,11 @@ function TaskRow({
               ? "font-normal text-gray-400 dark:text-gray-500"
               : isCancelled
                 ? "font-normal text-red-400/60"
-                : isPaused
-                  ? "font-semibold text-orange-600/70 dark:text-orange-400/70"
-                  : "font-semibold text-gray-700 dark:text-gray-200"
+                : isMissed
+                  ? "font-normal text-rose-400/60"
+                  : isPaused
+                    ? "font-semibold text-orange-600/70 dark:text-orange-400/70"
+                    : "font-semibold text-gray-700 dark:text-gray-200"
           }`}
         >
           {task.text}
@@ -497,20 +500,24 @@ function TaskRow({
               ? "#f5f3ff"
               : isCancelled
                 ? "#fef2f2"
-                : isPaused
-                  ? "#fff7ed"
-                  : isInProgress
-                    ? "#fefce8"
-                    : "rgba(0,0,0,0.05)",
+                : isMissed
+                  ? "#fff1f2"
+                  : isPaused
+                    ? "#fff7ed"
+                    : isInProgress
+                      ? "#fefce8"
+                      : "rgba(0,0,0,0.05)",
             color: isCompleted
               ? "#7c3aed"
               : isCancelled
                 ? "#ef4444"
-                : isPaused
-                  ? "#f97316"
-                  : isInProgress
-                    ? "#d97706"
-                    : "#9ca3af",
+                : isMissed
+                  ? "#f43f5e"
+                  : isPaused
+                    ? "#f97316"
+                    : isInProgress
+                      ? "#d97706"
+                      : "#9ca3af",
           }}
         >
           {statusConfig.label}

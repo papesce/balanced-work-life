@@ -24,6 +24,8 @@ export function DetailField({
   /** Notified on every keystroke so callers can mirror the field's internal draft. */
   onChange,
   onSave,
+  textareaRef,
+  onSelectText,
 }: {
   icon: React.ElementType;
   value: string | null;
@@ -33,6 +35,8 @@ export function DetailField({
   commitOnBlur?: boolean;
   onChange?: (next: string) => void;
   onSave: (next: string | null) => void;
+  textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
+  onSelectText?: () => void;
 }) {
   const [draft, setDraft] = useDraft(value ?? "");
 
@@ -65,6 +69,7 @@ export function DetailField({
       />
       {multiline ? (
         <textarea
+          ref={textareaRef}
           rows={3}
           value={draft}
           placeholder={placeholder}
@@ -75,6 +80,8 @@ export function DetailField({
           }}
           onBlur={commit}
           onKeyDown={handleKeyDown}
+          onSelect={onSelectText}
+          onMouseUp={onSelectText}
           className={`${fieldClasses} min-h-[4.5rem]`}
         />
       ) : (

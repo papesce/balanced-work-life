@@ -1,6 +1,6 @@
 import type { Idea } from "@/lib/types";
 
-export const DONE_STATUSES: Idea["status"][] = ["completed", "cancelled", "archived"];
+export const DONE_STATUSES: Idea["status"][] = ["completed", "cancelled", "missed", "archived"];
 
 export function getTypeLabel(type: Idea["type"]): string {
   if (!type) return "Idea";
@@ -47,7 +47,7 @@ export function searchIdeas(
     .filter((idea) => {
       if (excludeIds?.has(idea.id)) return false;
       if (!includeDone && DONE_STATUSES.includes(idea.status)) return false;
-      const haystack = `${idea.text ?? ""} ${idea.notes ?? ""}`.toLowerCase();
+      const haystack = `${idea.text ?? ""} ${idea.notes ?? ""} ${idea.why ?? ""}`.toLowerCase();
       return words.every((w) => haystack.includes(w));
     })
     .slice(0, limit);

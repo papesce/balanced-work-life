@@ -24,6 +24,7 @@ export const IDEA_INSERT_COLUMNS = [
   "priority_order",
   "status",
   "notes",
+  "why",
   "completed_at",
   "cancelled_at",
   "paused_at",
@@ -58,6 +59,7 @@ export interface IdeaInsertRow {
   priority_order: number | null;
   status: string;
   notes: string | null;
+  why: string | null;
   completed_at: string | null;
   cancelled_at: string | null;
   paused_at: string | null;
@@ -88,6 +90,7 @@ export function ideaInsertParams(row: IdeaInsertRow): unknown[] {
     row.priority_order,
     row.status,
     row.notes,
+    row.why,
     row.completed_at,
     row.cancelled_at,
     row.paused_at,

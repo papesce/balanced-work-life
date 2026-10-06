@@ -377,7 +377,7 @@ export function DayslotTimeline({
       const idea = taskMap.get(event.id);
       if (!idea) return null;
       const isCompleted = idea.status === "completed";
-      const isCancelled = idea.status === "cancelled";
+      const isCancelled = idea.status === "cancelled" || idea.status === "missed";
 
       const tagsForIdea = getTagsForIdea(idea.id);
       const areas = getAreasForIdea(tagsForIdea);

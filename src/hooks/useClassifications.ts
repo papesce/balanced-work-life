@@ -80,6 +80,17 @@ const SEED_SCHEMES: SeedScheme[] = [
       { value: "later", label: "Later" },
     ],
   },
+  {
+    key: "effort",
+    label: "Effort",
+    options: [
+      { value: "quick", label: "Quick win (XS)" },
+      { value: "focused", label: "Focused (S)" },
+      { value: "substantial", label: "Substantial (M)" },
+      { value: "deep", label: "Deep work (L)" },
+      { value: "epic", label: "Epic (XL)" },
+    ],
+  },
 ];
 
 /**

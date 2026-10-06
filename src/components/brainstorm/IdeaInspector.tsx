@@ -1,6 +1,6 @@
 "use client";
 
-import { StickyNote, X } from "lucide-react";
+import { StickyNote, Compass, X } from "lucide-react";
 import { Idea } from "@/lib/types";
 import { DetailField } from "./IdeaDetailField";
 
@@ -35,6 +35,13 @@ export function IdeaInspector({
           )}
         </div>
         <div className="space-y-2">
+          <DetailField
+            icon={Compass}
+            value={idea.why ?? null}
+            placeholder="Why does this matter?"
+            multiline
+            onSave={(next) => onUpdate(idea.id, { why: next })}
+          />
           <DetailField
             icon={StickyNote}
             value={idea.notes}

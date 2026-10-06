@@ -96,6 +96,7 @@ function hasActiveDescendant(ideaId: string, ideas: Idea[]): boolean {
     if (
       child.status !== "completed" &&
       child.status !== "cancelled" &&
+      child.status !== "missed" &&
       child.status !== "archived"
     ) {
       return true;
@@ -229,6 +230,8 @@ export function IdeaTree({
         return "text-violet-600/70 dark:text-violet-400/60";
       case "cancelled":
         return "text-red-400/60 dark:text-red-400/50";
+      case "missed":
+        return "text-rose-400/60 dark:text-rose-400/50";
       case "paused":
         return "text-orange-600/70 dark:text-orange-400/60";
       case "in_progress":

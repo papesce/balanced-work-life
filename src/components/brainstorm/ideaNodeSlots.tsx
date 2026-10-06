@@ -52,7 +52,11 @@ export function StatusIconSlot({
     <button
       onClick={(e) => {
         e.stopPropagation();
-        if (node.status === "completed" || node.status === "cancelled") {
+        if (
+          node.status === "completed" ||
+          node.status === "cancelled" ||
+          node.status === "missed"
+        ) {
           void onMarkUndone(node.id);
         } else {
           void onMarkDone(node.id);

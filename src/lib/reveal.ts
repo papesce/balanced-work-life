@@ -110,7 +110,10 @@ export function canRevealInView(view: RevealView, idea: Idea, allIdeas?: Idea[])
         return idea.scheduled_date >= start && idea.scheduled_date <= end;
       }
       return (
-        idea.status !== "completed" && idea.status !== "cancelled" && idea.status !== "archived"
+        idea.status !== "completed" &&
+        idea.status !== "cancelled" &&
+        idea.status !== "missed" &&
+        idea.status !== "archived"
       );
     }
     case "horizon":

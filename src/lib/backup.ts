@@ -66,6 +66,10 @@ export function normalizeBackup(data: BackupData): BackupData {
   return {
     ...data,
     version: typeof obj.version === "number" ? obj.version : 1,
+    ideas: asArray<Idea>(obj.ideas).map((idea) => ({
+      ...idea,
+      why: (idea as Partial<Idea>).why ?? null,
+    })),
     tags: asArray<Tag>(obj.tags),
     taskTags: asArray<BackupTaskTag>(obj.taskTags),
     quickNotes: asArray<QuickNote>(obj.quickNotes),
@@ -131,6 +135,7 @@ export async function buildBackupData(
     (row: Record<string, unknown>) =>
       ({
         ...row,
+        why: (row.why as string | null) ?? null,
         is_priority: Boolean(row.is_priority),
         attempt_dates: row.attempt_dates
           ? (JSON.parse(row.attempt_dates as string) as string[])

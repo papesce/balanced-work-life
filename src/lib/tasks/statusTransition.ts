@@ -9,6 +9,8 @@ export function computeStatusUpdates(status: IdeaStatus): Partial<Idea> {
       return { status: "completed", completed_at: now, cancelled_at: null, paused_at: null };
     case "cancelled":
       return { status: "cancelled", cancelled_at: now, completed_at: null, paused_at: null };
+    case "missed":
+      return { status: "missed", completed_at: null, cancelled_at: null, paused_at: null };
     case "in_progress":
       return { status: "in_progress", completed_at: null, cancelled_at: null, paused_at: null };
     case "paused":

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   X,
   StickyNote,
+  Compass,
   Telescope,
   ChevronDown,
   ChevronRight,
@@ -21,6 +22,7 @@ import { useClassifications } from "@/hooks/useClassifications";
 import { getRevealHref } from "@/lib/reveal";
 import type { Idea, IdeaLink } from "@/lib/types";
 import { DetailsEditor } from "./DetailsEditor";
+import { DetailField } from "@/components/brainstorm/IdeaDetailField";
 import { DateCorrectionSection } from "./DateCorrectionSection";
 import { computeRemoveAttemptCorrection } from "@/lib/tasks/dateCorrections";
 import { ScheduleAttempts } from "./ScheduleAttempts";
@@ -155,6 +157,10 @@ export function DetailsDrawer({
 
   const handleSave = async (next: string | null) => {
     await updateIdea(ideaId, { notes: next });
+  };
+
+  const handleSaveWhy = async (next: string | null) => {
+    await updateIdea(ideaId, { why: next });
   };
 
   const classificationSummary = schemes
@@ -403,6 +409,20 @@ export function DetailsDrawer({
             )}
           </div>
 
+          {/* Why Section */}
+          <div className="mb-3">
+            <p className="mb-1 text-[10px] font-medium tracking-wide text-gray-400 uppercase">
+              Why — motivation, later linkable to goals / initiatives
+            </p>
+            <DetailField
+              icon={Compass}
+              value={idea.why ?? null}
+              placeholder="Why does this matter? What goal does it serve?"
+              multiline
+              onSave={handleSaveWhy}
+            />
+          </div>
+
           {/* Notes Section */}
           <DateCorrectionSection idea={idea} onUpdate={updateIdea} />
           <ScheduleAttempts
@@ -415,7 +435,7 @@ export function DetailsDrawer({
               onClose();
             }}
           />
-          <DetailsEditor value={idea.notes} onSave={handleSave} />
+          <DetailsEditor value={idea.notes} onSave={handleSave} parentId={idea.id} />
           <p className="mt-2 text-[10px] text-gray-400 dark:text-gray-500">
             ⌘+Enter to save · Esc to close
           </p>

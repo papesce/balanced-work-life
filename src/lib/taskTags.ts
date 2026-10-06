@@ -74,7 +74,12 @@ export interface TasksWithTags {
  * Cancelled/archived tasks are gone, deferred tasks live in the future —
  * counting any of them inflates the day/week/month rings.
  */
-export const BALANCE_EXCLUDED_STATUSES: readonly string[] = ["cancelled", "archived", "deferred"];
+export const BALANCE_EXCLUDED_STATUSES: readonly string[] = [
+  "cancelled",
+  "missed",
+  "archived",
+  "deferred",
+];
 
 export async function fetchTasksWithTags(
   db: AbstractPowerSyncDatabase,

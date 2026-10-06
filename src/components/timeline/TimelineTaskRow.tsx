@@ -99,6 +99,7 @@ export function TimelineTaskRow({
 }: TimelineTaskRowProps) {
   const isCompleted = task.status === "completed";
   const isCancelled = task.status === "cancelled";
+  const isMissed = task.status === "missed";
   const isInProgress = task.status === "in_progress";
   const isPaused = task.status === "paused";
   const statusConfig = STATUS_CONFIG[task.status];
@@ -289,16 +290,18 @@ export function TimelineTaskRow({
       ) : (
         <span
           onClick={handleStartEdit}
-          className={`-mx-1 flex-1 cursor-text truncate rounded px-1 text-sm hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${isCancelled ? "text-red-400/60" : ""}`}
+          className={`-mx-1 flex-1 cursor-text truncate rounded px-1 text-sm hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${isCancelled ? "text-red-400/60" : isMissed ? "text-rose-400/60" : ""}`}
           style={{
             fontWeight: 450,
             color: isCompleted
               ? "rgba(107, 114, 128, 0.6)"
               : isCancelled
                 ? "rgba(239, 68, 68, 0.5)"
-                : isPaused
-                  ? "rgba(249, 115, 22, 0.7)"
-                  : "var(--text-primary)",
+                : isMissed
+                  ? "rgba(251, 113, 133, 0.6)"
+                  : isPaused
+                    ? "rgba(249, 115, 22, 0.7)"
+                    : "var(--text-primary)",
           }}
         >
           {task.text}
@@ -423,20 +426,24 @@ export function TimelineTaskRow({
               ? "#f5f3ff"
               : isCancelled
                 ? "#fef2f2"
-                : isPaused
-                  ? "#fff7ed"
-                  : isInProgress
-                    ? "#fefce8"
-                    : "rgba(0,0,0,0.05)",
+                : isMissed
+                  ? "#fff1f2"
+                  : isPaused
+                    ? "#fff7ed"
+                    : isInProgress
+                      ? "#fefce8"
+                      : "rgba(0,0,0,0.05)",
             color: isCompleted
               ? "#7c3aed"
               : isCancelled
                 ? "#ef4444"
-                : isPaused
-                  ? "#f97316"
-                  : isInProgress
-                    ? "#d97706"
-                    : "#9ca3af",
+                : isMissed
+                  ? "#f43f5e"
+                  : isPaused
+                    ? "#f97316"
+                    : isInProgress
+                      ? "#d97706"
+                      : "#9ca3af",
           }}
         >
           {statusConfig.label}

@@ -26,6 +26,7 @@ export const IdeasTable = new Table(
     priority_order: column.integer,
     status: column.text,
     notes: column.text,
+    why: column.text,
     completed_at: column.text,
     cancelled_at: column.text,
     paused_at: column.text,

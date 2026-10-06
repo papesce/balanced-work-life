@@ -16,7 +16,7 @@ export interface CompletionEffects {
   blockedBy: LinkEffect[]; // completed despite incomplete prerequisites (warning)
 }
 
-const DONE_STATUSES: Idea["status"][] = ["completed", "cancelled", "archived"];
+const DONE_STATUSES: Idea["status"][] = ["completed", "cancelled", "missed", "archived"];
 
 function isDone(idea: Idea): boolean {
   return DONE_STATUSES.includes(idea.status);

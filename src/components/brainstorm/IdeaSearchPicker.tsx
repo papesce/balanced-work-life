@@ -31,7 +31,7 @@ function getTypeLabel(type: IdeaType) {
   return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
-const DONE_STATUSES: Idea["status"][] = ["completed", "cancelled", "archived"];
+const DONE_STATUSES: Idea["status"][] = ["completed", "cancelled", "missed", "archived"];
 
 function formatScheduleLabel(idea: Idea): string | null {
   if (!idea.scheduled_date) return null;

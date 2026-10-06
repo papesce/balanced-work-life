@@ -26,6 +26,7 @@ function baseIdea(): Idea {
     priority_order: null,
     status: "scheduled",
     notes: null,
+    why: null,
     completed_at: null,
     cancelled_at: null,
     paused_at: null,

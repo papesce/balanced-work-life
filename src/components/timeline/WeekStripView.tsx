@@ -90,12 +90,17 @@ function WeekDayCell({
   const current = useMemo(() => occurrences.filter((o) => !o.isHistorical), [occurrences]);
   const dayTasks = useMemo(() => current.map((o) => o.task), [current]);
   const done = current.filter(
-    (o) => o.task.status === "completed" || o.task.status === "cancelled",
+    (o) =>
+      o.task.status === "completed" || o.task.status === "cancelled" || o.task.status === "missed",
   ).length;
   const isToday = date === today;
   const kicker = getTimelineKicker(date, today, tomorrow);
   const unresolvedCount = current.filter(
-    (o) => o.task.status !== "completed" && o.task.status !== "cancelled" && isPast(date),
+    (o) =>
+      o.task.status !== "completed" &&
+      o.task.status !== "cancelled" &&
+      o.task.status !== "missed" &&
+      isPast(date),
   ).length;
 
   const previewContent = useMemo(() => {
@@ -109,8 +114,18 @@ function WeekDayCell({
         if (at !== bt) return at < bt ? -1 : 1;
         const rankDiff = priorityRank(priorityOf(a.task.id)) - priorityRank(priorityOf(b.task.id));
         if (rankDiff !== 0) return rankDiff;
-        const ad = a.task.status === "completed" || a.task.status === "cancelled" ? 1 : 0;
-        const bd = b.task.status === "completed" || b.task.status === "cancelled" ? 1 : 0;
+        const ad =
+          a.task.status === "completed" ||
+          a.task.status === "cancelled" ||
+          a.task.status === "missed"
+            ? 1
+            : 0;
+        const bd =
+          b.task.status === "completed" ||
+          b.task.status === "cancelled" ||
+          b.task.status === "missed"
+            ? 1
+            : 0;
         return ad - bd;
       });
       const visible = sorted.slice(0, 3);
@@ -118,7 +133,10 @@ function WeekDayCell({
       return (
         <span className="block min-h-[44px] space-y-px">
           {visible.map((o) => {
-            const tDone = o.task.status === "completed" || o.task.status === "cancelled";
+            const tDone =
+              o.task.status === "completed" ||
+              o.task.status === "cancelled" ||
+              o.task.status === "missed";
             return (
               <span
                 key={o.task.id}
@@ -187,7 +205,10 @@ function WeekDayCell({
           key: "completed",
           label: "Done",
           count: current.filter(
-            (o) => o.task.status === "completed" || o.task.status === "cancelled",
+            (o) =>
+              o.task.status === "completed" ||
+              o.task.status === "cancelled" ||
+              o.task.status === "missed",
           ).length,
         },
         {
@@ -225,7 +246,7 @@ function WeekDayCell({
     }
     // priority
     const isOpen = (o: (typeof current)[number]) =>
-      o.task.status !== "completed" && o.task.status !== "cancelled";
+      o.task.status !== "completed" && o.task.status !== "cancelled" && o.task.status !== "missed";
     const ranked = current
       .filter((o) => isOpen(o) && priorityOf(o.task.id) !== null)
       .sort((a, b) => priorityRank(priorityOf(a.task.id)) - priorityRank(priorityOf(b.task.id)));
@@ -359,7 +380,10 @@ export function WeekStripView(props: WeekStripViewProps) {
       const occs = (occurrencesByDate[d] ?? []).filter((o) => !o.isHistorical);
       total += occs.length;
       done += occs.filter(
-        (o) => o.task.status === "completed" || o.task.status === "cancelled",
+        (o) =>
+          o.task.status === "completed" ||
+          o.task.status === "cancelled" ||
+          o.task.status === "missed",
       ).length;
     }
     return { total, done };
@@ -512,7 +536,10 @@ export function WeekStripView(props: WeekStripViewProps) {
                 <span className="text-[11px] font-semibold text-gray-400 tabular-nums">
                   {
                     selectedDayTasks.filter(
-                      (t) => t.status === "completed" || t.status === "cancelled",
+                      (t) =>
+                        t.status === "completed" ||
+                        t.status === "cancelled" ||
+                        t.status === "missed",
                     ).length
                   }
                   /{selectedDayTasks.length} done

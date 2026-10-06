@@ -522,7 +522,9 @@ function TimelineInner() {
     const target = ideas.find((i) => i.id === highlightId);
     if (
       target &&
-      (target.status === "completed" || target.status === "cancelled") &&
+      (target.status === "completed" ||
+        target.status === "cancelled" ||
+        target.status === "missed") &&
       filter !== "all"
     ) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- highlight deep-link lifts hiding filter
@@ -919,6 +921,7 @@ function TimelineInner() {
                 !o.isHistorical &&
                 o.task.status !== "completed" &&
                 o.task.status !== "cancelled" &&
+                o.task.status !== "missed" &&
                 isPast(date),
             ).length;
 

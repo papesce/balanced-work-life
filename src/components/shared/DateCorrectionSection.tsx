@@ -17,6 +17,7 @@ const STATUSES: IdeaStatus[] = [
   "paused",
   "completed",
   "cancelled",
+  "missed",
   "deferred",
   "archived",
 ];

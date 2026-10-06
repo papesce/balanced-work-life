@@ -62,6 +62,7 @@ function computeCollapsedIds(
     const q = search.toLowerCase();
     if (idea.text.toLowerCase().includes(q)) return true;
     if (idea.notes?.toLowerCase().includes(q)) return true;
+    if (idea.why?.toLowerCase().includes(q)) return true;
     return ideas.some((child) => child.parent_id === ideaId && nodeHasSearchMatch(child.id));
   };
 
@@ -78,8 +79,8 @@ function computeCollapsedIds(
 }
 
 function compareIdeasForTree(a: Idea, b: Idea): number {
-  const aDone = a.completed_at ? 1 : 0;
-  const bDone = b.completed_at ? 1 : 0;
+  const aDone = a.completed_at || a.status === "missed" ? 1 : 0;
+  const bDone = b.completed_at || b.status === "missed" ? 1 : 0;
   if (aDone !== bDone) return aDone - bDone;
   return a.sort_order - b.sort_order;
 }
@@ -146,6 +147,7 @@ function parseStatusHistory(value: unknown): { status: Idea["status"]; at: strin
 function deserializeIdea(row: Record<string, unknown>): Idea {
   return {
     ...row,
+    why: (row.why as string | null) ?? null,
     is_priority: Boolean(row.is_priority),
     attempt_dates: parseStringArray(row.attempt_dates),
     status_history: parseStatusHistory(row.status_history),
@@ -159,7 +161,7 @@ function buildScopedQuery(userId: string, scope: IdeasScope): { sql: string; par
       sql: `SELECT * FROM ideas WHERE user_id = ?
             AND (
               (scheduled_date >= ? AND scheduled_date <= ?)
-              OR (scheduled_date IS NULL AND status NOT IN ('completed','cancelled','archived'))
+              OR (scheduled_date IS NULL AND status NOT IN ('completed','cancelled','missed','archived'))
             )
             ORDER BY sort_order ASC`,
       params: [userId, start, end],
@@ -285,6 +287,7 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
       priority_order: null,
       status: "draft",
       notes: null,
+      why: null,
       completed_at: null,
       cancelled_at: null,
       paused_at: null,
@@ -316,6 +319,7 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
           priority_order: idea.priority_order,
           status: idea.status,
           notes: idea.notes,
+          why: idea.why ?? null,
           completed_at: idea.completed_at,
           cancelled_at: idea.cancelled_at,
           paused_at: idea.paused_at,
@@ -395,9 +399,9 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
         await tx.execute(
           `INSERT OR REPLACE INTO ideas (id, user_id, parent_id, text, description, type, effort, impact, urgency,
             scheduled_date, scheduled_time, duration_minutes, is_priority, priority_order,
-            status, notes, completed_at, cancelled_at, paused_at, attempt_dates, status_history,
+            status, notes, why, completed_at, cancelled_at, paused_at, attempt_dates, status_history,
             productivity_signal, sort_order, created_at, updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
           [
             idea.id,
             idea.user_id,
@@ -415,6 +419,7 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
             idea.priority_order,
             idea.status,
             idea.notes,
+            idea.why ?? null,
             idea.completed_at,
             idea.cancelled_at,
             idea.paused_at,
@@ -535,6 +540,7 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
           priority_order: null,
           status: "draft",
           notes: null,
+          why: null,
           completed_at: null,
           cancelled_at: null,
           paused_at: null,
@@ -604,6 +610,22 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
       completed_at: null,
       paused_at: null,
     });
+  };
+
+  const markMissed = async (id: string) => {
+    const idea = ideas.find((i) => i.id === id);
+    const updates: Partial<Idea> = {
+      status: "missed",
+      completed_at: null,
+      cancelled_at: null,
+      paused_at: null,
+    };
+    // Keep the scheduled date as evidence, but record it as an attempt
+    // so the miss shows up in history / "go to last attempt".
+    if (idea?.scheduled_date && !(idea.attempt_dates ?? []).includes(idea.scheduled_date)) {
+      updates.attempt_dates = [...(idea.attempt_dates ?? []), idea.scheduled_date];
+    }
+    await updateIdea(id, updates);
   };
 
   const scheduleIdea = async (id: string, date: string | null) => {
@@ -692,6 +714,7 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
     markInProgress,
     markPaused,
     markCancelled,
+    markMissed,
     scheduleIdea,
     restoreIdeas,
     toggleCollapse,

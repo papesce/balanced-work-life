@@ -62,6 +62,7 @@ function insertQuickNoteIdea(
         parent_id: opts.parentId,
         text: opts.text,
         description: null,
+        why: null,
         type: opts.type ?? "idea",
         effort: null,
         impact: null,

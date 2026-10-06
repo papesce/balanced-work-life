@@ -190,7 +190,7 @@ export function formatAge(isoTimestamp: string, style: "long" | "short" = "long"
   return style === "long" ? `${days} day${days === 1 ? "" : "s"} ago` : `${days}d`;
 }
 
-const DONE_STATUSES: Idea["status"][] = ["completed", "cancelled", "archived"];
+const DONE_STATUSES: Idea["status"][] = ["completed", "cancelled", "missed", "archived"];
 
 /**
  * Find the best matching idea for a given line text.

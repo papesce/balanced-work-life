@@ -15,5 +15,7 @@ export function getCommitCount(history: { status: IdeaStatus; at: string }[] | n
 
 export function getAbandonCount(history: { status: IdeaStatus; at: string }[] | null): number {
   if (!history) return 0;
-  return history.filter((e) => e.status === "paused" || e.status === "archived").length;
+  return history.filter(
+    (e) => e.status === "paused" || e.status === "missed" || e.status === "archived",
+  ).length;
 }

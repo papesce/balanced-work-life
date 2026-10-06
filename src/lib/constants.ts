@@ -110,6 +110,13 @@ export const STATUS_CONFIG: Record<
     bg: "rgba(239,68,68,0.1)",
     icon: X,
   },
+  missed: {
+    label: "Missed",
+    textClass: "text-rose-400",
+    hex: "#fb7185",
+    bg: "rgba(251,113,133,0.1)",
+    icon: X,
+  },
   archived: {
     label: "Archived",
     textClass: "text-gray-400",
@@ -141,13 +148,20 @@ export const STATUS_STYLES: Record<IdeaStatus, string> = {
     "border-violet-200 dark:border-violet-700/30 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300",
   cancelled:
     "border-red-200 dark:border-red-700/30 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300",
+  missed:
+    "border-rose-200 dark:border-rose-700/30 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300",
   archived: "border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 bg-transparent",
   deferred:
     "border-amber-200 dark:border-amber-700/30 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300",
 };
 
 /** Statuses that close an item. Everything else counts as open. */
-export const TERMINAL_STATUSES: readonly IdeaStatus[] = ["completed", "cancelled", "archived"];
+export const TERMINAL_STATUSES: readonly IdeaStatus[] = [
+  "completed",
+  "cancelled",
+  "missed",
+  "archived",
+];
 
 export const STATUS_LABELS: Record<IdeaStatus, string> = Object.fromEntries(
   Object.entries(STATUS_CONFIG).map(([k, v]) => [k, v.label]),

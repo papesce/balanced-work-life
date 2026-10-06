@@ -158,7 +158,11 @@ export function getDayOccurrences(
   const result: DayOccurrence[] = [];
   for (const idea of ideas) {
     if (idea.type !== "task" || idea.status === "archived") continue;
-    if (!includeInactive && (idea.status === "completed" || idea.status === "cancelled")) continue;
+    if (
+      !includeInactive &&
+      (idea.status === "completed" || idea.status === "cancelled" || idea.status === "missed")
+    )
+      continue;
     if (idea.scheduled_date === date) {
       result.push({ task: idea, date, isHistorical: false });
       continue;
@@ -175,7 +179,12 @@ export function getDayOccurrences(
  * same view as All minus inactive tasks. */
 export function isActiveOccurrence(occ: DayOccurrence): boolean {
   const { task } = occ;
-  return task.status !== "completed" && task.status !== "cancelled" && task.status !== "archived";
+  return (
+    task.status !== "completed" &&
+    task.status !== "cancelled" &&
+    task.status !== "missed" &&
+    task.status !== "archived"
+  );
 }
 
 export interface TriageMeta {

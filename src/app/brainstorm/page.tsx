@@ -327,7 +327,10 @@ export default function BrainstormPage() {
     if (focusedId && !getFocusedSubtreeIds(focusedId, ideasHook.ideas).has(highlightId)) {
       setFocusedId(null);
     }
-    if (hideClosed && (idea.status === "cancelled" || idea.status === "archived")) {
+    if (
+      hideClosed &&
+      (idea.status === "cancelled" || idea.status === "missed" || idea.status === "archived")
+    ) {
       setHideClosed(false);
     }
     if (hideCompleted && idea.status === "completed") setHideCompleted(false);

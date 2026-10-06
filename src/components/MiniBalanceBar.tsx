@@ -21,7 +21,9 @@ export function MiniBalanceBar({ tasks, getTagsForIdea, date }: MiniBalanceBarPr
     router.push(`/balance?window=day&date=${d}`);
   };
   const segments = useMemo(() => {
-    const activeTasks = tasks.filter((t) => t.status !== "archived" && t.status !== "cancelled");
+    const activeTasks = tasks.filter(
+      (t) => t.status !== "archived" && t.status !== "cancelled" && t.status !== "missed",
+    );
     const counts: Record<LifeArea, number> = {
       work: 0,
       health: 0,

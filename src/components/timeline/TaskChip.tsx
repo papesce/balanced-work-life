@@ -6,6 +6,7 @@ import { Idea } from "@/lib/types";
 export const TASK_STATUS_DOT: Record<string, string> = {
   completed: "bg-violet-500",
   cancelled: "bg-red-400",
+  missed: "bg-rose-400",
   in_progress: "bg-amber-500",
   paused: "bg-orange-400",
   scheduled: "bg-sky-500",
@@ -28,7 +29,8 @@ export function TaskChip({ task, date, idPrefix, onOpen, justDraggedRef }: TaskC
     id: `${idPrefix}-chip-${task.id}-${date}`,
     data: { taskId: task.id, fromDate: date },
   });
-  const done = task.status === "completed" || task.status === "cancelled";
+  const done =
+    task.status === "completed" || task.status === "cancelled" || task.status === "missed";
   return (
     <button
       ref={setNodeRef}

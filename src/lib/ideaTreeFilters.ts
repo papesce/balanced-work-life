@@ -17,7 +17,10 @@ export function filterTreeBySearch(nodes: IdeaNode[], query: string): IdeaNode[]
 }
 
 export function filterTreeHideClosed(nodes: IdeaNode[]): IdeaNode[] {
-  return dropSubtrees(nodes, (node) => node.status === "cancelled" || node.status === "archived");
+  return dropSubtrees(
+    nodes,
+    (node) => node.status === "cancelled" || node.status === "missed" || node.status === "archived",
+  );
 }
 
 export function filterTreeByType(nodes: IdeaNode[], types: IdeaType[]): IdeaNode[] {
@@ -68,7 +71,11 @@ export function filterIdeaTree(
   if (hasHideFilters) {
     for (const idea of ideas) {
       let passes = true;
-      if (hideClosed && (idea.status === "cancelled" || idea.status === "archived")) passes = false;
+      if (
+        hideClosed &&
+        (idea.status === "cancelled" || idea.status === "missed" || idea.status === "archived")
+      )
+        passes = false;
       if (hideCompleted && idea.status === "completed") passes = false;
       if (hideDeferred && idea.status === "deferred") passes = false;
       if (passes) hidePassedIds.add(idea.id);
@@ -100,6 +107,7 @@ export function filterIdeaTree(
   const matchesSearch = (idea: Idea): boolean => {
     if (idea.text.toLowerCase().includes(q)) return true;
     if (idea.notes?.toLowerCase().includes(q)) return true;
+    if (idea.why?.toLowerCase().includes(q)) return true;
     return ideas.some((child) => child.parent_id === idea.id && matchesSearch(child));
   };
 

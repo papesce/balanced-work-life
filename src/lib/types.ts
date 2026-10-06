@@ -8,6 +8,7 @@ export type IdeaStatus =
   | "paused"
   | "completed"
   | "cancelled"
+  | "missed"
   | "archived"
   | "deferred";
 export type TermValue = "short" | "medium" | "long";
@@ -53,6 +54,7 @@ export interface Idea {
   priority_order: number | null;
   status: IdeaStatus;
   notes: string | null;
+  why: string | null;
   completed_at: string | null;
   cancelled_at: string | null;
   paused_at: string | null;

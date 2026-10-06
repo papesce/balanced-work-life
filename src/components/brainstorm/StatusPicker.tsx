@@ -44,6 +44,11 @@ const STATUS_OPTIONS: {
     color: "text-red-600 dark:text-red-400",
     bg: "bg-red-50 dark:bg-red-950/20",
   },
+  {
+    value: "missed",
+    color: "text-rose-500 dark:text-rose-400",
+    bg: "bg-rose-50 dark:bg-rose-950/20",
+  },
 ];
 
 interface StatusPickerProps {
