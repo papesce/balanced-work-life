@@ -8,7 +8,6 @@ import {
   ChevronUp,
   FolderKanban,
   Plus,
-  Search,
   FileText,
   Pencil,
   Check,
@@ -53,8 +52,6 @@ export default function ProjectsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const initialProjectId = searchParams.get("projectId");
-
-  const [search, setSearch] = useState("");
   const [hideCompleted, setHideCompleted] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"all" | "open">("open");
   const [selectedId, setSelectedId] = useState<string | null>(initialProjectId);
@@ -75,7 +72,7 @@ export default function ProjectsPage() {
   // Detail-local filters (list filters don't leak into detail).
   const [detailHideCompleted, setDetailHideCompleted] = useState(false);
 
-  const ideasHook = useIdeas({ scope: "all", searchQuery: search });
+  const ideasHook = useIdeas({ scope: "all" });
   const linksHook = useIdeaLinks();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
@@ -245,12 +242,6 @@ export default function ProjectsPage() {
 
   const visibleProjects = useMemo(() => {
     let list = projects;
-    const q = search.trim().toLowerCase();
-    if (q) {
-      list = list.filter(
-        (p) => p.text.toLowerCase().includes(q) || (p.notes?.toLowerCase().includes(q) ?? false),
-      );
-    }
     if (statusFilter === "open") {
       list = list.filter((p) => !(TERMINAL_STATUSES as readonly string[]).includes(p.status));
     }
@@ -262,7 +253,7 @@ export default function ProjectsPage() {
       if (rankDiff !== 0) return rankDiff;
       return b.updated_at.localeCompare(a.updated_at);
     });
-  }, [projects, search, statusFilter, hideCompleted, priorityOf]);
+  }, [projects, statusFilter, hideCompleted, priorityOf]);
 
   const groupedProjects = useMemo(() => {
     const grouped = new Map<string | null, Idea[]>();
@@ -987,18 +978,6 @@ export default function ProjectsPage() {
           ariaLabel="Group projects by"
         />
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[180px] flex-1">
-            <Search
-              size={14}
-              className="absolute top-1/2 left-2.5 -translate-y-1/2 text-gray-400"
-            />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search projects..."
-              className="w-full rounded-xl border border-black/10 bg-white/60 py-2 pr-3 pl-8 text-sm placeholder:text-gray-300 focus:ring-2 focus:ring-violet-500/30 focus:outline-none dark:border-white/10 dark:bg-gray-800/60 dark:placeholder:text-gray-500"
-            />
-          </div>
           <div className="flex gap-1">
             <button
               onClick={() => setStatusFilter("open")}

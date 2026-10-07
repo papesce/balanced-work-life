@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Target, Plus, Search } from "lucide-react";
+import { ArrowLeft, Target, Plus } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { IdeaTree } from "@/components/brainstorm/IdeaTree";
 import { BrainstormBreadcrumb } from "@/components/brainstorm/BrainstormBreadcrumb";
@@ -24,12 +24,11 @@ export default function GoalsPage() {
   const router = useRouter();
   const initialGoalId = searchParams.get("goalId");
 
-  const [search, setSearch] = useState("");
   const [hideCompleted, setHideCompleted] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"all" | "open">("open");
   const [selectedId, setSelectedId] = useState<string | null>(initialGoalId);
 
-  const ideasHook = useIdeas({ scope: "all", searchQuery: search });
+  const ideasHook = useIdeas({ scope: "all" });
   const linksHook = useIdeaLinks();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
@@ -143,12 +142,6 @@ export default function GoalsPage() {
 
   const visibleGoals = useMemo(() => {
     let list = goals;
-    const q = search.trim().toLowerCase();
-    if (q) {
-      list = list.filter(
-        (p) => p.text.toLowerCase().includes(q) || (p.notes?.toLowerCase().includes(q) ?? false),
-      );
-    }
     if (statusFilter === "open") {
       list = list.filter((p) => !(TERMINAL_STATUSES as readonly string[]).includes(p.status));
     }
@@ -156,7 +149,7 @@ export default function GoalsPage() {
       list = list.filter((p) => p.status !== "completed");
     }
     return [...list].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-  }, [goals, search, statusFilter, hideCompleted]);
+  }, [goals, statusFilter, hideCompleted]);
 
   const selectedGoal = useMemo(
     () => (selectedId ? (ideasHook.ideas.find((i) => i.id === selectedId) ?? null) : null),
@@ -440,18 +433,6 @@ export default function GoalsPage() {
     <AppShell title="Goals">
       <div className="mx-auto max-w-2xl space-y-4">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[180px] flex-1">
-            <Search
-              size={14}
-              className="absolute top-1/2 left-2.5 -translate-y-1/2 text-gray-400"
-            />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search goals..."
-              className="w-full rounded-xl border border-black/10 bg-white/60 py-2 pr-3 pl-8 text-sm placeholder:text-gray-300 focus:ring-2 focus:ring-violet-500/30 focus:outline-none dark:border-white/10 dark:bg-gray-800/60 dark:placeholder:text-gray-500"
-            />
-          </div>
           <div className="flex gap-1">
             <button
               onClick={() => setStatusFilter("open")}
