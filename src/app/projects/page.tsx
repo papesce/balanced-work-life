@@ -736,7 +736,7 @@ export default function ProjectsPage() {
                   {p.scheduled_date ? ` · ${p.scheduled_date}` : ""}
                 </span>
                 {lensKey !== "area" && (
-                  <span className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                  <span onClick={(e) => e.stopPropagation()}>
                     <select
                       aria-label={`Change ${lensTabs.find((t) => t.key === lensKey)?.label ?? "group"} for ${p.text || "untitled project"}`}
                       title={hintForValue(lensKey, valueOf(p.id)) ?? undefined}
@@ -753,19 +753,10 @@ export default function ProjectsPage() {
                           </option>
                         ))}
                     </select>
-                    <ValueHelpInfo
-                      lensKey={lensKey}
-                      schemeLabel={lensTabs.find((t) => t.key === lensKey)?.label ?? "Group"}
-                      columns={columns}
-                      current={valueOf(p.id)}
-                    />
                   </span>
                 )}
                 {lensKey === "area" && (
-                  <span
-                    className="relative flex items-center gap-0.5"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  <span className="relative" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => setAreaPickerId(areaPickerId === p.id ? null : p.id)}
                       title={hintForValue("area", area) ?? undefined}
@@ -773,12 +764,6 @@ export default function ProjectsPage() {
                     >
                       {area ? (AREA_LABELS[area as keyof typeof AREA_LABELS] ?? area) : "Set area"}
                     </button>
-                    <ValueHelpInfo
-                      lensKey="area"
-                      schemeLabel="Area"
-                      columns={columns}
-                      current={area}
-                    />
                     {areaPickerId === p.id && (
                       <span className="absolute top-full left-0 z-50 mt-1">
                         <TagPicker
@@ -928,15 +913,24 @@ export default function ProjectsPage() {
     if (isUnclassified && !unclassifiedExpanded) {
       return (
         <div key="unclassified-collapsed" className="glass-card rounded-2xl">
-          <button
-            onClick={() => {
-              setPrefs({ projectsUnclassifiedExpanded: true });
-            }}
-            className="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold text-gray-500"
-          >
-            <span>Unclassified · {list.length} for triage</span>
-            <ChevronUp size={14} className="rotate-180" />
-          </button>
+          <div className="flex w-full items-center justify-between gap-2 px-4 py-3">
+            <button
+              onClick={() => {
+                setPrefs({ projectsUnclassifiedExpanded: true });
+              }}
+              className="flex flex-1 items-center justify-between text-sm font-semibold text-gray-500"
+            >
+              <span>Unclassified · {list.length} for triage</span>
+              <ChevronUp size={14} className="rotate-180" />
+            </button>
+            <ValueHelpInfo
+              lensKey={lensKey}
+              schemeLabel={lensTabs.find((t) => t.key === lensKey)?.label ?? "Group"}
+              columns={columns}
+              current={null}
+              onlyValue={null}
+            />
+          </div>
         </div>
       );
     }
@@ -958,6 +952,15 @@ export default function ProjectsPage() {
         label={label}
         count={list.length}
         collapseControl={collapseControl}
+        labelSuffix={
+          <ValueHelpInfo
+            lensKey={lensKey}
+            schemeLabel={lensTabs.find((t) => t.key === lensKey)?.label ?? "Group"}
+            columns={columns}
+            current={null}
+            onlyValue={value}
+          />
+        }
       >
         <div className="space-y-2 p-3">
           {list.length === 0 ? (

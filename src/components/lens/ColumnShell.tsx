@@ -9,6 +9,8 @@ interface ColumnShellProps {
   headerActions?: ReactNode;
   /** Collapse chevron for the unclassified strip, rendered next to the label. */
   collapseControl?: ReactNode;
+  /** Extra content right after the label (e.g. an explainer ⓘ for the column value). */
+  labelSuffix?: ReactNode;
   /** Footer content (e.g. quick-add input). */
   footer?: ReactNode;
   children: ReactNode;
@@ -20,6 +22,7 @@ export function ColumnShell({
   count,
   headerActions,
   collapseControl,
+  labelSuffix,
   footer,
   children,
 }: ColumnShellProps) {
@@ -29,6 +32,7 @@ export function ColumnShell({
         <span className="flex items-center gap-1.5">
           <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{label}</span>
           {collapseControl}
+          {labelSuffix}
         </span>
         <span className="flex items-center gap-2">
           {headerActions}
