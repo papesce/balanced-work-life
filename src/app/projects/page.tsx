@@ -47,6 +47,8 @@ import { hasAnyEffects } from "@/lib/linkEffects";
 import { LinkedEffectsReveal } from "@/components/shared/LinkedEffectsReveal";
 import { UndoBar } from "@/components/shared/UndoBar";
 import { IdeaActionMenu } from "@/components/shared/IdeaActionMenu";
+import { ValueHelpInfo } from "@/components/shared/ValueHelpInfo";
+import { hintForValue } from "@/lib/classificationHelp";
 
 export default function ProjectsPage() {
   const searchParams = useSearchParams();
@@ -326,7 +328,7 @@ export default function ProjectsPage() {
 
   const lensTabs = useMemo(() => {
     const tabs: { key: string; label: string }[] = schemes
-      .filter((s) => ["term", "nnl", "moscow", "priority", "attention"].includes(s.key))
+      .filter((s) => ["term", "nnl", "moscow", "priority", "attention", "nature"].includes(s.key))
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((s) => ({ key: s.key, label: s.key === "term" ? "Horizon" : s.label }));
     return [...tabs, { key: "area", label: "Area" }];
@@ -734,9 +736,10 @@ export default function ProjectsPage() {
                   {p.scheduled_date ? ` · ${p.scheduled_date}` : ""}
                 </span>
                 {lensKey !== "area" && (
-                  <span onClick={(e) => e.stopPropagation()}>
+                  <span className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
                     <select
                       aria-label={`Change ${lensTabs.find((t) => t.key === lensKey)?.label ?? "group"} for ${p.text || "untitled project"}`}
+                      title={hintForValue(lensKey, valueOf(p.id)) ?? undefined}
                       value={valueOf(p.id) ?? ""}
                       onChange={(e) => void handleSetClassification(p.id, e.target.value || null)}
                       className="max-w-[110px] cursor-pointer rounded-md border border-black/10 bg-transparent px-1 py-0 text-[10px] font-semibold text-gray-500 dark:border-white/10 dark:text-gray-400"
@@ -750,16 +753,32 @@ export default function ProjectsPage() {
                           </option>
                         ))}
                     </select>
+                    <ValueHelpInfo
+                      lensKey={lensKey}
+                      schemeLabel={lensTabs.find((t) => t.key === lensKey)?.label ?? "Group"}
+                      columns={columns}
+                      current={valueOf(p.id)}
+                    />
                   </span>
                 )}
                 {lensKey === "area" && (
-                  <span className="relative" onClick={(e) => e.stopPropagation()}>
+                  <span
+                    className="relative flex items-center gap-0.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <button
                       onClick={() => setAreaPickerId(areaPickerId === p.id ? null : p.id)}
+                      title={hintForValue("area", area) ?? undefined}
                       className="cursor-pointer rounded-md border border-black/10 px-1 py-0 text-[10px] font-semibold text-gray-500 dark:border-white/10 dark:text-gray-400"
                     >
                       {area ? (AREA_LABELS[area as keyof typeof AREA_LABELS] ?? area) : "Set area"}
                     </button>
+                    <ValueHelpInfo
+                      lensKey="area"
+                      schemeLabel="Area"
+                      columns={columns}
+                      current={area}
+                    />
                     {areaPickerId === p.id && (
                       <span className="absolute top-full left-0 z-50 mt-1">
                         <TagPicker

@@ -91,6 +91,14 @@ const SEED_SCHEMES: SeedScheme[] = [
       { value: "epic", label: "Epic (XL)" },
     ],
   },
+  {
+    key: "nature",
+    label: "Nature",
+    options: [
+      { value: "finite", label: "Finite" },
+      { value: "ongoing", label: "Ongoing" },
+    ],
+  },
 ];
 
 /**
