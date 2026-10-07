@@ -27,7 +27,7 @@ import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { PriorityChip, priorityRank, type PriorityValue } from "@/components/shared/PriorityChip";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { areaColors } from "@/styles/tokens";
-import { LensTabs, ColumnShell, groupKeyOf } from "@/components/lens";
+import { ColumnShell, groupKeyOf } from "@/components/lens";
 import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 import { AppShell } from "@/components/AppShell";
 import { IdeaTree } from "@/components/brainstorm/IdeaTree";
@@ -957,9 +957,65 @@ export default function ProjectsPage() {
     );
   };
 
+  const listHeaderStartActions = (
+    <>
+      <label
+        className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-100 py-1.5 pr-2.5 pl-3 text-xs font-semibold text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
+        title="Project grouping"
+      >
+        <span className="hidden sm:inline">By</span>
+        <select
+          value={lensKey}
+          onChange={(e) => handleLensChange(e.target.value)}
+          aria-label="Group projects by"
+          className="cursor-pointer bg-transparent font-semibold outline-none"
+        >
+          {lensTabs.map((t) => (
+            <option key={t.key} value={t.key}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="flex gap-1">
+        <button
+          type="button"
+          onClick={() => setStatusFilter("open")}
+          aria-pressed={statusFilter === "open"}
+          className={`toolbar-btn ${statusFilter === "open" ? "toolbar-btn--accent" : ""}`}
+        >
+          Open
+        </button>
+        <button
+          type="button"
+          onClick={() => setStatusFilter("all")}
+          aria-pressed={statusFilter === "all"}
+          className={`toolbar-btn ${statusFilter === "all" ? "toolbar-btn--accent" : ""}`}
+        >
+          All
+        </button>
+      </div>
+      <button
+        type="button"
+        onClick={() => setHideCompleted((v) => !v)}
+        aria-pressed={hideCompleted}
+        title="Hide completed projects"
+        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+          hideCompleted
+            ? "border-indigo-300 bg-white text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
+            : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
+        }`}
+      >
+        <span className="hidden sm:inline">Hide completed</span>
+        <span className="sm:hidden">Hide done</span>
+      </button>
+    </>
+  );
+
   return (
     <AppShell
       title="Projects"
+      headerStartActions={listHeaderStartActions}
       headerActions={
         <button
           onClick={handleAddProject}
@@ -970,39 +1026,6 @@ export default function ProjectsPage() {
       }
     >
       <div className="mx-auto max-w-2xl space-y-4">
-        <LensTabs
-          tabs={lensTabs}
-          activeKey={lensKey}
-          onChange={handleLensChange}
-          label="Group by:"
-          ariaLabel="Group projects by"
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex gap-1">
-            <button
-              onClick={() => setStatusFilter("open")}
-              className={`toolbar-btn ${statusFilter === "open" ? "toolbar-btn--accent" : ""}`}
-            >
-              Open
-            </button>
-            <button
-              onClick={() => setStatusFilter("all")}
-              className={`toolbar-btn ${statusFilter === "all" ? "toolbar-btn--accent" : ""}`}
-            >
-              All
-            </button>
-          </div>
-          <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-gray-400">
-            <input
-              type="checkbox"
-              checked={hideCompleted}
-              onChange={(e) => setHideCompleted(e.target.checked)}
-              className="rounded"
-            />
-            Hide completed
-          </label>
-        </div>
-
         <p className="text-xs text-gray-400">
           {visibleProjects.length} project{visibleProjects.length !== 1 ? "s" : ""}
         </p>

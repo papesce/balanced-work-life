@@ -429,35 +429,46 @@ export default function GoalsPage() {
   }
 
   // List view — all goals
-  return (
-    <AppShell title="Goals">
-      <div className="mx-auto max-w-2xl space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex gap-1">
-            <button
-              onClick={() => setStatusFilter("open")}
-              className={`toolbar-btn ${statusFilter === "open" ? "toolbar-btn--accent" : ""}`}
-            >
-              Open
-            </button>
-            <button
-              onClick={() => setStatusFilter("all")}
-              className={`toolbar-btn ${statusFilter === "all" ? "toolbar-btn--accent" : ""}`}
-            >
-              All
-            </button>
-          </div>
-          <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-gray-400">
-            <input
-              type="checkbox"
-              checked={hideCompleted}
-              onChange={(e) => setHideCompleted(e.target.checked)}
-              className="rounded"
-            />
-            Hide completed
-          </label>
-        </div>
+  const listHeaderStartActions = (
+    <>
+      <div className="flex gap-1">
+        <button
+          type="button"
+          onClick={() => setStatusFilter("open")}
+          aria-pressed={statusFilter === "open"}
+          className={`toolbar-btn ${statusFilter === "open" ? "toolbar-btn--accent" : ""}`}
+        >
+          Open
+        </button>
+        <button
+          type="button"
+          onClick={() => setStatusFilter("all")}
+          aria-pressed={statusFilter === "all"}
+          className={`toolbar-btn ${statusFilter === "all" ? "toolbar-btn--accent" : ""}`}
+        >
+          All
+        </button>
+      </div>
+      <button
+        type="button"
+        onClick={() => setHideCompleted((v) => !v)}
+        aria-pressed={hideCompleted}
+        title="Hide completed goals"
+        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+          hideCompleted
+            ? "border-indigo-300 bg-white text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
+            : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
+        }`}
+      >
+        <span className="hidden sm:inline">Hide completed</span>
+        <span className="sm:hidden">Hide done</span>
+      </button>
+    </>
+  );
 
+  return (
+    <AppShell title="Goals" headerStartActions={listHeaderStartActions}>
+      <div className="mx-auto max-w-2xl space-y-4">
         <p className="text-xs text-gray-400">
           {visibleGoals.length} goal{visibleGoals.length !== 1 ? "s" : ""}
         </p>
