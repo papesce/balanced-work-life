@@ -5,6 +5,7 @@ import { ArrowDown, CornerDownRight } from "lucide-react";
 import { Idea, IdeaType, Tag } from "@/lib/types";
 import { IdeaSearchPicker } from "./IdeaSearchPicker";
 import { getDefaultParentType } from "@/lib/ideaParentType";
+import { FloatingPanel, type FloatingAnchor } from "@/components/shared/FloatingPanel";
 
 interface MoveIdeaPanelProps {
   idea: Idea;
@@ -16,6 +17,12 @@ interface MoveIdeaPanelProps {
   variant?: "move" | "attach";
   className?: string;
   onAttach?: (parentId: string) => Promise<void>;
+  /**
+   * When set, renders in a FloatingPanel portal (FLOATING layer) so the
+   * picker paints above glass-card stacking contexts instead of being
+   * clipped behind sibling cards. Always prefer this over inline tails.
+   */
+  position?: FloatingAnchor;
   /**
    * When provided, the picker shows a "Create "<query>" as <type>" row
    * that creates a new root parent and moves this idea under it.
@@ -47,18 +54,21 @@ export function MoveIdeaPanel({
   className,
   onAttach,
   onCreateParent,
+  position,
 }: MoveIdeaPanelProps) {
   const ref = useRef<HTMLDivElement>(null);
   const excludedIds = getDescendantIds(idea.id, ideas);
   excludedIds.add(idea.id);
 
   useEffect(() => {
+    // FloatingPanel owns outside-click/Escape/scroll handling when portaled.
+    if (position) return;
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [onClose]);
+  }, [onClose, position]);
 
   const moveBelow = async (target: Idea) => {
     await onMove(target.parent_id, target.sort_order + 1);
@@ -88,14 +98,8 @@ export function MoveIdeaPanel({
     }
   };
 
-  return (
-    <div
-      ref={ref}
-      className={
-        className ??
-        "glass-card-strong absolute top-full right-0 z-50 mt-1 max-w-[min(560px,90vw)] min-w-[420px] rounded-xl p-3 sm:min-w-[480px]"
-      }
-    >
+  const content = (
+    <>
       <div className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
         {verb} this {typeLabel}
       </div>
@@ -128,6 +132,29 @@ export function MoveIdeaPanel({
           </>
         )}
       />
+    </>
+  );
+
+  return position ? (
+    <FloatingPanel
+      anchor={position}
+      onClose={onClose}
+      className={
+        className ??
+        "glass-card-strong mt-1 max-w-[min(560px,90vw)] min-w-[420px] rounded-xl p-3 sm:min-w-[480px]"
+      }
+    >
+      {content}
+    </FloatingPanel>
+  ) : (
+    <div
+      ref={ref}
+      className={
+        className ??
+        "glass-card-strong absolute top-full right-0 z-50 mt-1 max-w-[min(560px,90vw)] min-w-[420px] rounded-xl p-3 sm:min-w-[480px]"
+      }
+    >
+      {content}
     </div>
   );
 }

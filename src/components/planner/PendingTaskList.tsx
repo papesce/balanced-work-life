@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, KeyboardEvent } from "react";
-import { createPortal } from "react-dom";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { MoreHorizontal, GripVertical, Clock, CornerDownRight, Link2 } from "lucide-react";
 import { UndoAction } from "@/lib/tasks/undo";
 import { areaColors } from "@/styles/tokens";
+import { FloatingPanel } from "@/components/shared/FloatingPanel";
 import { Idea, IdeaStatus, IdeaLink, LinkType, LifeArea, Tag } from "@/lib/types";
 import { STATUS_CONFIG, PRODUCTIVITY_SIGNALS } from "@/lib/constants";
 import { TagPicker } from "@/components/shared/TagPicker";
@@ -250,27 +250,24 @@ function TaskRow({
     null,
   );
   const statusTriggerRef = useRef<HTMLButtonElement>(null);
-  const statusPickerRef = useRef<HTMLDivElement>(null);
   const [showDurationDropdown, setShowDurationDropdown] = useState(false);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customVal, setCustomVal] = useState(task.duration_minutes?.toString() ?? "");
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(task.text);
   const inputRef = useRef<HTMLInputElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const durationRef = useRef<HTMLDivElement>(null);
+  const [durationPos, setDurationPos] = useState<{ top: number; left: number } | null>(null);
   const areaDotRef = useRef<HTMLButtonElement>(null);
-  const areaPickerRef = useRef<HTMLDivElement>(null);
   const [areaPickerPos, setAreaPickerPos] = useState<{ top: number; left: number } | null>(null);
   const timeRef = useRef<HTMLButtonElement>(null);
-  const timeMenuRef = useRef<HTMLDivElement>(null);
   const [showTimeMenu, setShowTimeMenu] = useState(false);
   const [timeMenuPos, setTimeMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const deleteConfirmRef = useRef<HTMLDivElement>(null);
   const [showAttachPanel, setShowAttachPanel] = useState(false);
+  const [attachPos, setAttachPos] = useState<{ top: number; left: number } | null>(null);
   const [revealPos, setRevealPos] = useState<{ top: number; right: number } | null>(null);
   const [showReveal, setShowReveal] = useState(false);
   const [showLinkPanel, setShowLinkPanel] = useState(false);
@@ -313,45 +310,15 @@ function TaskRow({
 
   useEffect(() => {
     const handler = (e: PointerEvent) => {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(e.target as Node) &&
-        menuTriggerRef.current &&
-        !menuTriggerRef.current.contains(e.target as Node)
-      ) {
-        setShowMenu(false);
-      }
-      if (
-        statusPickerRef.current &&
-        !statusPickerRef.current.contains(e.target as Node) &&
-        statusTriggerRef.current &&
-        !statusTriggerRef.current.contains(e.target as Node)
-      ) {
-        setShowStatusPicker(false);
-      }
+      // Menu, status, area and time overlays render in FloatingPanel portals,
+      // which own their outside-click handling. Only the inline duration
+      // dropdown still needs a manual check here.
       if (durationRef.current && !durationRef.current.contains(e.target as Node))
         setShowDurationDropdown(false);
-      if (
-        areaPickerRef.current &&
-        !areaPickerRef.current.contains(e.target as Node) &&
-        areaDotRef.current &&
-        !areaDotRef.current.contains(e.target as Node)
-      ) {
-        setShowAreaPicker(false);
-      }
-      if (
-        timeMenuRef.current &&
-        !timeMenuRef.current.contains(e.target as Node) &&
-        timeRef.current &&
-        !timeRef.current.contains(e.target as Node)
-      ) {
-        setShowTimeMenu(false);
-      }
     };
-    if (showMenu || showStatusPicker || showDurationDropdown || showAreaPicker || showTimeMenu)
-      document.addEventListener("pointerdown", handler);
+    if (showDurationDropdown) document.addEventListener("pointerdown", handler);
     return () => document.removeEventListener("pointerdown", handler);
-  }, [showMenu, showStatusPicker, showDurationDropdown, showAreaPicker, showTimeMenu]);
+  }, [showDurationDropdown]);
 
   useEffect(() => {
     if (!showMenu) return;
@@ -522,32 +489,22 @@ function TaskRow({
         >
           {statusConfig.label}
         </button>
-        {showStatusPicker &&
-          statusPickerPos &&
-          createPortal(
-            <div
-              ref={statusPickerRef}
-              style={{
-                position: "fixed",
-                top: statusPickerPos.top,
-                left: statusPickerPos.left,
-                zIndex: 9999,
-              }}
-            >
-              <StatusPicker
-                current={task.status}
-                onSelect={handleStatusSelect}
-                onClose={() => setShowStatusPicker(false)}
-              />
-            </div>,
-            document.body,
-          )}
+        {showStatusPicker && statusPickerPos && (
+          <StatusPicker
+            current={task.status}
+            onSelect={handleStatusSelect}
+            onClose={() => setShowStatusPicker(false)}
+            position={statusPickerPos}
+          />
+        )}
       </div>
 
       <div className="relative" ref={durationRef}>
         <button
           onClick={(e) => {
             e.stopPropagation();
+            const rect = e.currentTarget.getBoundingClientRect();
+            setDurationPos({ top: rect.bottom + 6, left: rect.left });
             setShowDurationDropdown(!showDurationDropdown);
             setShowCustomInput(false);
           }}
@@ -562,8 +519,12 @@ function TaskRow({
           {task.duration_minutes ? `${task.duration_minutes}m` : ""}
         </button>
 
-        {showDurationDropdown && (
-          <div className="glass-card-strong absolute top-full right-0 z-50 mt-1.5 min-w-[110px] space-y-1 rounded-xl border border-black/5 p-1.5 shadow-xl dark:border-white/5">
+        {showDurationDropdown && durationPos && (
+          <FloatingPanel
+            anchor={durationPos}
+            onClose={() => setShowDurationDropdown(false)}
+            className="glass-card-strong min-w-[110px] space-y-1 rounded-xl border border-black/5 p-1.5 shadow-xl dark:border-white/5"
+          >
             {!showCustomInput ? (
               <>
                 {[15, 30, 45, 60, 90, 120].map((preset) => (
@@ -637,7 +598,7 @@ function TaskRow({
                 </div>
               </div>
             )}
-          </div>
+          </FloatingPanel>
         )}
       </div>
 
@@ -660,31 +621,23 @@ function TaskRow({
           >
             {formatTime(task.scheduled_time)}
           </button>
-          {showTimeMenu &&
-            timeMenuPos &&
-            createPortal(
-              <div
-                ref={timeMenuRef}
-                style={{
-                  position: "fixed",
-                  top: timeMenuPos.top,
-                  left: timeMenuPos.left,
-                  zIndex: 9999,
+          {showTimeMenu && timeMenuPos && (
+            <FloatingPanel
+              anchor={timeMenuPos}
+              onClose={() => setShowTimeMenu(false)}
+              className="glass-card-strong min-w-[130px] rounded-lg border border-black/5 py-1 shadow-lg dark:border-white/5"
+            >
+              <button
+                onClick={() => {
+                  onUpdate(task.id, { scheduled_time: null });
+                  setShowTimeMenu(false);
                 }}
-                className="glass-card-strong min-w-[130px] rounded-lg border border-black/5 py-1 shadow-lg dark:border-white/5"
+                className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
               >
-                <button
-                  onClick={() => {
-                    onUpdate(task.id, { scheduled_time: null });
-                    setShowTimeMenu(false);
-                  }}
-                  className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                >
-                  Clear time
-                </button>
-              </div>,
-              document.body,
-            )}
+                Clear time
+              </button>
+            </FloatingPanel>
+          )}
         </>
       )}
 
@@ -772,172 +725,164 @@ function TaskRow({
           >
             <MoreHorizontal size={13} />
           </button>
-          {showMenu &&
-            menuPos &&
-            createPortal(
-              <div
-                ref={menuRef}
-                style={{ position: "fixed", top: menuPos.top, right: menuPos.right, zIndex: 9999 }}
-                className="glass-card-strong min-w-[160px] rounded-lg border border-black/5 py-1 shadow-lg dark:border-white/5"
-              >
-                <TaskRowMenu
-                  task={task}
-                  today={getToday()}
-                  onReschedule={onReschedule}
-                  onUpdate={onUpdate}
-                  onDone={() => setShowMenu(false)}
-                  organizeSection={
-                    <>
-                      {onAttach && allIdeas && (
-                        <div className="relative">
-                          <button
-                            onClick={() => {
-                              setShowMenu(false);
-                              setShowAttachPanel(true);
-                            }}
-                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                          >
-                            <CornerDownRight size={11} strokeWidth={1.5} />
-                            Attach to…
-                          </button>
-                        </div>
-                      )}
-                      {onCreateLink && onDeleteLink && allIdeas && links && (
+          {showMenu && menuPos && (
+            <FloatingPanel
+              anchor={menuPos}
+              onClose={() => setShowMenu(false)}
+              className="glass-card-strong min-w-[160px] rounded-lg border border-black/5 py-1 shadow-lg dark:border-white/5"
+            >
+              <TaskRowMenu
+                task={task}
+                today={getToday()}
+                onReschedule={onReschedule}
+                onUpdate={onUpdate}
+                onDone={() => setShowMenu(false)}
+                organizeSection={
+                  <>
+                    {onAttach && allIdeas && (
+                      <div className="relative">
                         <button
-                          onClick={() => {
-                            const rect = menuTriggerRef.current?.getBoundingClientRect();
-                            if (rect)
-                              setLinkPanelPos({
-                                top: rect.bottom + 6,
-                                left: Math.max(8, rect.left - 360),
-                              });
+                          onClick={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setAttachPos({ top: rect.bottom + 4, left: rect.left });
                             setShowMenu(false);
-                            setShowLinkPanel(true);
+                            setShowAttachPanel(true);
                           }}
                           className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
                         >
-                          <Link2 size={11} strokeWidth={1.5} />
-                          Link…
+                          <CornerDownRight size={11} strokeWidth={1.5} />
+                          Attach to…
                         </button>
-                      )}
-                    </>
-                  }
-                  navigateSection={
-                    <button
-                      onClick={() => {
-                        const rect = menuTriggerRef.current?.getBoundingClientRect();
-                        if (rect)
-                          setRevealPos({
-                            top: rect.bottom + 6,
-                            right: window.innerWidth - rect.right,
-                          });
-                        setShowMenu(false);
-                        setShowReveal(true);
-                      }}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                    >
-                      <Eye size={11} strokeWidth={1.5} />
-                      Reveal in...
-                    </button>
-                  }
-                  extraItems={
-                    <>
-                      {task.scheduled_time && (
-                        <button
-                          onClick={() => {
-                            onUpdate(task.id, { scheduled_time: null });
-                            setShowMenu(false);
-                          }}
-                          className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                        >
-                          Clear time
-                        </button>
-                      )}
-                      {task.productivity_signal && (
-                        <button
-                          onClick={() => {
-                            const oldSignal = task.productivity_signal;
-                            onUpdate(task.id, { productivity_signal: null });
-                            onUndoAction?.({
-                              label: "Cleared productivity signal",
-                              run: async () => {
-                                onUpdate(task.id, { productivity_signal: oldSignal });
-                              },
+                      </div>
+                    )}
+                    {onCreateLink && onDeleteLink && allIdeas && links && (
+                      <button
+                        onClick={() => {
+                          const rect = menuTriggerRef.current?.getBoundingClientRect();
+                          if (rect)
+                            setLinkPanelPos({
+                              top: rect.bottom + 6,
+                              left: Math.max(8, rect.left - 360),
                             });
-                            setShowMenu(false);
-                          }}
-                          className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-500 hover:bg-black/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.04]"
-                        >
-                          Clear signal
-                        </button>
-                      )}
+                          setShowMenu(false);
+                          setShowLinkPanel(true);
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                      >
+                        <Link2 size={11} strokeWidth={1.5} />
+                        Link…
+                      </button>
+                    )}
+                  </>
+                }
+                navigateSection={
+                  <button
+                    onClick={() => {
+                      const rect = menuTriggerRef.current?.getBoundingClientRect();
+                      if (rect)
+                        setRevealPos({
+                          top: rect.bottom + 6,
+                          right: window.innerWidth - rect.right,
+                        });
+                      setShowMenu(false);
+                      setShowReveal(true);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                  >
+                    <Eye size={11} strokeWidth={1.5} />
+                    Reveal in...
+                  </button>
+                }
+                extraItems={
+                  <>
+                    {task.scheduled_time && (
+                      <button
+                        onClick={() => {
+                          onUpdate(task.id, { scheduled_time: null });
+                          setShowMenu(false);
+                        }}
+                        className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                      >
+                        Clear time
+                      </button>
+                    )}
+                    {task.productivity_signal && (
                       <button
                         onClick={() => {
                           const oldSignal = task.productivity_signal;
-                          const newSignal =
-                            task.productivity_signal === "lazy" ? "productive" : "lazy";
-                          onUpdate(task.id, { productivity_signal: newSignal });
+                          onUpdate(task.id, { productivity_signal: null });
                           onUndoAction?.({
-                            label: `Marked as ${newSignal === "lazy" ? "Lazy" : "Productive"}`,
+                            label: "Cleared productivity signal",
                             run: async () => {
                               onUpdate(task.id, { productivity_signal: oldSignal });
                             },
                           });
                           setShowMenu(false);
                         }}
-                        className={`flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${
-                          task.productivity_signal === "lazy"
-                            ? "text-green-600 dark:text-green-400"
-                            : "text-orange-600 dark:text-orange-400"
-                        }`}
+                        className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-500 hover:bg-black/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.04]"
                       >
-                        {task.productivity_signal === "lazy"
-                          ? "🎯 Mark as Productive"
-                          : "☕ Mark as Lazy"}
+                        Clear signal
                       </button>
-                    </>
-                  }
-                  onDeleteRequest={() => setShowDeleteConfirm(true)}
-                />
-              </div>,
-              document.body,
-            )}
+                    )}
+                    <button
+                      onClick={() => {
+                        const oldSignal = task.productivity_signal;
+                        const newSignal =
+                          task.productivity_signal === "lazy" ? "productive" : "lazy";
+                        onUpdate(task.id, { productivity_signal: newSignal });
+                        onUndoAction?.({
+                          label: `Marked as ${newSignal === "lazy" ? "Lazy" : "Productive"}`,
+                          run: async () => {
+                            onUpdate(task.id, { productivity_signal: oldSignal });
+                          },
+                        });
+                        setShowMenu(false);
+                      }}
+                      className={`flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${
+                        task.productivity_signal === "lazy"
+                          ? "text-green-600 dark:text-green-400"
+                          : "text-orange-600 dark:text-orange-400"
+                      }`}
+                    >
+                      {task.productivity_signal === "lazy"
+                        ? "🎯 Mark as Productive"
+                        : "☕ Mark as Lazy"}
+                    </button>
+                  </>
+                }
+                onDeleteRequest={() => setShowDeleteConfirm(true)}
+              />
+            </FloatingPanel>
+          )}
 
-          {showDeleteConfirm &&
-            createPortal(
-              <div
-                ref={deleteConfirmRef}
-                style={{
-                  position: "fixed",
-                  top: menuPos ? menuPos.top : 0,
-                  right: menuPos ? menuPos.right : 0,
-                  zIndex: 10001,
-                }}
-                className="glass-card-strong min-w-[180px] rounded-xl border border-red-200 p-2 shadow-lg dark:border-red-500/30"
-              >
-                <p className="px-1 text-[11px] font-medium text-red-700 dark:text-red-400">
-                  Delete this task?
-                </p>
-                <div className="mt-2 flex justify-end gap-1.5">
-                  <button
-                    onClick={() => setShowDeleteConfirm(false)}
-                    className="cursor-pointer rounded-lg px-2 py-1 text-[11px] text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.06]"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => {
-                      onDelete(task.id);
-                      setShowDeleteConfirm(false);
-                    }}
-                    className="cursor-pointer rounded-lg bg-red-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-400"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>,
-              document.body,
-            )}
+          {showDeleteConfirm && (
+            <FloatingPanel
+              anchor={menuPos ?? { top: 0, left: 0 }}
+              onClose={() => setShowDeleteConfirm(false)}
+              className="glass-card-strong min-w-[180px] rounded-xl border border-red-200 p-2 shadow-lg dark:border-red-500/30"
+            >
+              <p className="px-1 text-[11px] font-medium text-red-700 dark:text-red-400">
+                Delete this task?
+              </p>
+              <div className="mt-2 flex justify-end gap-1.5">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="cursor-pointer rounded-lg px-2 py-1 text-[11px] text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.06]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    onDelete(task.id);
+                    setShowDeleteConfirm(false);
+                  }}
+                  className="cursor-pointer rounded-lg bg-red-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-400"
+                >
+                  Delete
+                </button>
+              </div>
+            </FloatingPanel>
+          )}
           {showReveal && revealPos && (
             <RevealInMenu
               idea={task}
@@ -958,7 +903,7 @@ function TaskRow({
               fixedPosition={linkPanelPos}
             />
           )}
-          {showAttachPanel && allIdeas && (
+          {showAttachPanel && allIdeas && attachPos && (
             <MoveIdeaPanel
               idea={task}
               ideas={allIdeas}
@@ -973,37 +918,26 @@ function TaskRow({
               onAttach={onAttach ? (parentId) => onAttach(task.id, parentId) : undefined}
               onMoved={() => setShowAttachPanel(false)}
               onClose={() => setShowAttachPanel(false)}
+              position={attachPos}
             />
           )}
         </div>
       </div>
 
-      {showAreaPicker &&
-        areaPickerPos &&
-        createPortal(
-          <div
-            ref={areaPickerRef}
-            style={{
-              position: "fixed",
-              top: areaPickerPos.top,
-              left: areaPickerPos.left,
-              zIndex: 10000,
-            }}
-          >
-            <TagPicker
-              allTags={allTags ?? []}
-              selectedTags={taskTags}
-              onAdd={handleTagSelected}
-              onRemove={async (tagId) => {
-                if (onRemoveTag) await onRemoveTag(task.id, tagId);
-                setShowAreaPicker(false);
-              }}
-              onCreateTag={onCreateTag ?? (async () => null)}
-              onClose={() => setShowAreaPicker(false)}
-            />
-          </div>,
-          document.body,
-        )}
+      {showAreaPicker && areaPickerPos && (
+        <TagPicker
+          allTags={allTags ?? []}
+          selectedTags={taskTags}
+          onAdd={handleTagSelected}
+          onRemove={async (tagId) => {
+            if (onRemoveTag) await onRemoveTag(task.id, tagId);
+            setShowAreaPicker(false);
+          }}
+          onCreateTag={onCreateTag ?? (async () => null)}
+          onClose={() => setShowAreaPicker(false)}
+          fixedPosition={areaPickerPos}
+        />
+      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { getToday, toLocalDateString } from "@/lib/dateUtils";
+import { FloatingPanel, type FloatingAnchor } from "@/components/shared/FloatingPanel";
 
 interface SchedulePickerProps {
   currentDate: string | null;
@@ -14,6 +15,11 @@ interface SchedulePickerProps {
   /** Earliest selectable date (YYYY-MM-DD). Reschedule-open-task flow passes
    * today; correction flows (drawer, overdue fix input) omit it. */
   minDate?: string;
+  /**
+   * When set, renders in a FloatingPanel portal (FLOATING layer) so the
+   * picker paints above glass-card stacking contexts.
+   */
+  position?: FloatingAnchor;
 }
 
 function getTodayString(): string {
@@ -51,10 +57,13 @@ export function SchedulePicker({
   className,
   hideToday = false,
   minDate,
+  position,
 }: SchedulePickerProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // FloatingPanel owns outside-click/Escape/scroll handling when portaled.
+    if (position) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         onClose();
@@ -62,20 +71,14 @@ export function SchedulePicker({
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [onClose]);
+  }, [onClose, position]);
 
   const today = getTodayString();
   const tomorrow = addDays(today, 1);
   const nextMonday = getNextMonday();
 
-  return (
-    <div
-      ref={menuRef}
-      className={
-        className ??
-        "glass-card-strong absolute top-full right-0 z-50 mt-1 w-56 space-y-1 rounded-xl p-2"
-      }
-    >
+  const content = (
+    <>
       {!hideToday && (
         <button
           onClick={() => onSelect(today)}
@@ -122,6 +125,29 @@ export function SchedulePicker({
           Quitar
         </button>
       )}
+    </>
+  );
+
+  if (position)
+    return (
+      <FloatingPanel
+        anchor={position}
+        onClose={onClose}
+        className={className ?? "glass-card-strong w-56 space-y-1 rounded-xl p-2"}
+      >
+        {content}
+      </FloatingPanel>
+    );
+
+  return (
+    <div
+      ref={menuRef}
+      className={
+        className ??
+        "glass-card-strong absolute top-full right-0 z-50 mt-1 w-56 space-y-1 rounded-xl p-2"
+      }
+    >
+      {content}
     </div>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { createPortal } from "react-dom";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -13,6 +12,7 @@ import {
 } from "lucide-react";
 import type { Idea } from "@/lib/types";
 import { getRevealOptions, type RevealView } from "@/lib/reveal";
+import { FloatingPanel, type FloatingAnchor } from "@/components/shared/FloatingPanel";
 
 const VIEW_ICON: Record<RevealView, React.ReactNode> = {
   planner: <LayoutDashboard size={12} strokeWidth={1.5} />,
@@ -26,7 +26,7 @@ const VIEW_ICON: Record<RevealView, React.ReactNode> = {
 interface RevealInMenuProps {
   idea: Idea;
   currentView: RevealView;
-  position: { top: number; right: number } | null;
+  position: FloatingAnchor | null;
   onClose: () => void;
   allIdeas?: Idea[];
 }
@@ -42,14 +42,16 @@ export function RevealInMenu({
   if (!position) return null;
   const options = getRevealOptions(currentView, idea, allIdeas);
   if (options.length === 0) return null;
-  return createPortal(
-    <div
-      style={{
-        position: "fixed",
-        top: position.top,
-        right: position.right + 200,
-        zIndex: 9999,
-      }}
+  // Cascade next to the parent menu (the old fixed portal offset right by 200).
+  const anchor: FloatingAnchor = {
+    top: position.top,
+    ...(position.right !== undefined ? { right: position.right + 200 } : {}),
+    ...(position.left !== undefined ? { left: position.left - 200 } : {}),
+  };
+  return (
+    <FloatingPanel
+      anchor={anchor}
+      onClose={onClose}
       className="glass-card-strong min-w-[180px] rounded-xl py-1.5 shadow-lg"
     >
       <p className="flex items-center gap-1.5 px-3 py-1 text-[10px] font-medium tracking-wide text-gray-400 uppercase">
@@ -69,7 +71,6 @@ export function RevealInMenu({
           {opt.label}
         </button>
       ))}
-    </div>,
-    document.body,
+    </FloatingPanel>
   );
 }

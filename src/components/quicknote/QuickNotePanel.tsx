@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { LAYER_MODAL } from "@/lib/layers";
 import {
   X,
   FileText,
@@ -171,7 +172,10 @@ export function QuickNotePanel() {
   const timestampLabel = selectedNote ? formatTimestamp(selectedNote.created_at) : null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[10000] flex items-end justify-center sm:items-center">
+    <div
+      style={{ zIndex: LAYER_MODAL }}
+      className="fixed inset-0 flex items-end justify-center sm:items-center"
+    >
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/20 backdrop-blur-[1px]"

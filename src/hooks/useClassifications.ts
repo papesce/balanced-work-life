@@ -91,14 +91,6 @@ const SEED_SCHEMES: SeedScheme[] = [
       { value: "epic", label: "Epic (XL)" },
     ],
   },
-  {
-    key: "nature",
-    label: "Nature",
-    options: [
-      { value: "finite", label: "Finite" },
-      { value: "ongoing", label: "Ongoing" },
-    ],
-  },
 ];
 
 /**
@@ -225,6 +217,24 @@ export function useClassifications() {
       });
     })();
   }, [user, isLoading, schemes, options, db]);
+
+  // Retired schemes: "nature" was seeded briefly, then removed. Delete rows
+  // left behind on devices that picked it up so it disappears from lenses
+  // and drawers. Self-terminating: no-ops once the scheme is gone. Deletes
+  // propagate through PowerSync like any other write.
+  useEffect(() => {
+    if (!user || isLoading) return;
+    const retired = schemes.find((s) => s.key === "nature");
+    if (!retired) return;
+    void (async () => {
+      await db.writeTransaction(async (tx) => {
+        await tx.execute(`DELETE FROM idea_classifications WHERE scheme_id = ?`, [retired.id]);
+        await tx.execute(`DELETE FROM classification_options WHERE scheme_id = ?`, [retired.id]);
+        await tx.execute(`DELETE FROM classification_schemes WHERE id = ?`, [retired.id]);
+      });
+      removePendingClassificationsWhere((key) => key.endsWith("::nature"));
+    })();
+  }, [user, isLoading, schemes, db, removePendingClassificationsWhere]);
 
   // Heal divergent seeds: the SQL migration and/or multiple devices may have
   // created several rows for the same scheme key (different ids). Merge them

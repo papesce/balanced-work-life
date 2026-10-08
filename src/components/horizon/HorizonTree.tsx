@@ -59,11 +59,16 @@ function TypeBadgeSlot({
   onUpdate: (id: string, updates: Partial<Idea>) => Promise<void>;
 }) {
   const [showPicker, setShowPicker] = useState(false);
+  const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null);
   const badge = node.type ? TYPE_BADGE[node.type] : null;
   return (
     <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
       <button
-        onClick={() => setShowPicker(!showPicker)}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setPickerPos({ top: rect.bottom + 4, left: rect.left });
+          setShowPicker(!showPicker);
+        }}
         className={
           badge
             ? `rounded-full px-1.5 py-0 text-[10px] font-semibold ${badge.className} cursor-pointer transition-opacity hover:opacity-80`
@@ -72,7 +77,7 @@ function TypeBadgeSlot({
       >
         {badge?.label ?? "Type"}
       </button>
-      {showPicker && (
+      {showPicker && pickerPos && (
         <TypePicker
           current={node.type}
           onSelect={(type) => {
@@ -80,6 +85,7 @@ function TypeBadgeSlot({
             setShowPicker(false);
           }}
           onClose={() => setShowPicker(false)}
+          position={pickerPos}
         />
       )}
     </div>
@@ -102,6 +108,7 @@ function HorizonTagsSlot({
   onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
 }) {
   const [showPicker, setShowPicker] = useState(false);
+  const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null);
   const nodeTags = getTagsForIdea(node.id);
   return (
     <>
@@ -124,7 +131,11 @@ function HorizonTagsSlot({
       )}
       <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
         <button
-          onClick={() => setShowPicker(!showPicker)}
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setPickerPos({ top: rect.bottom + 4, left: rect.left });
+            setShowPicker(!showPicker);
+          }}
           className="flex h-5 w-5 items-center justify-center rounded text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400"
           title="Tags"
         >
@@ -140,7 +151,7 @@ function HorizonTagsSlot({
             <line x1="7" y1="7" x2="7.01" y2="7" />
           </svg>
         </button>
-        {showPicker && (
+        {showPicker && pickerPos && (
           <TagPicker
             allTags={allTags}
             selectedTags={nodeTags}
@@ -148,6 +159,7 @@ function HorizonTagsSlot({
             onRemove={(tagId) => onRemoveTag(node.id, tagId)}
             onCreateTag={onCreateTag}
             onClose={() => setShowPicker(false)}
+            fixedPosition={pickerPos}
           />
         )}
       </div>
@@ -163,6 +175,7 @@ function StatusChipSlot({
   onUpdate: (id: string, updates: Partial<Idea>) => Promise<void>;
 }) {
   const [showPicker, setShowPicker] = useState(false);
+  const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null);
 
   const handleStatusSelect = (status: IdeaStatus) => {
     void onUpdate(node.id, computeStatusUpdates(status));
@@ -172,19 +185,22 @@ function StatusChipSlot({
   return (
     <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
       <button
-        onClick={() => setShowPicker(!showPicker)}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setPickerPos({ top: rect.bottom + 4, left: rect.left });
+          setShowPicker(!showPicker);
+        }}
         className={`cursor-pointer rounded-full border px-2 py-0.5 text-[10px] font-medium whitespace-nowrap ${STATUS_STYLES[node.status]}`}
       >
         {STATUS_LABELS[node.status]}
       </button>
-      {showPicker && (
-        <div className="absolute top-full right-0 z-50 mt-1">
-          <StatusPicker
-            current={node.status}
-            onSelect={handleStatusSelect}
-            onClose={() => setShowPicker(false)}
-          />
-        </div>
+      {showPicker && pickerPos && (
+        <StatusPicker
+          current={node.status}
+          onSelect={handleStatusSelect}
+          onClose={() => setShowPicker(false)}
+          position={pickerPos}
+        />
       )}
     </div>
   );
@@ -199,16 +215,21 @@ function ComposingTypePill({
 }) {
   const [type, setType] = useState<IdeaType>(initialType);
   const [showPicker, setShowPicker] = useState(false);
+  const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null);
   const badge = TYPE_BADGE[type];
   return (
     <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
       <button
-        onClick={() => setShowPicker(!showPicker)}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setPickerPos({ top: rect.bottom + 4, left: rect.left });
+          setShowPicker(!showPicker);
+        }}
         className={`rounded-full px-1.5 py-0 text-[10px] font-semibold ${badge?.className ?? ""} cursor-pointer transition-opacity hover:opacity-80`}
       >
         {badge?.label ?? "Task"}
       </button>
-      {showPicker && (
+      {showPicker && pickerPos && (
         <TypePicker
           current={type}
           onSelect={(next) => {
@@ -218,6 +239,7 @@ function ComposingTypePill({
             setShowPicker(false);
           }}
           onClose={() => setShowPicker(false)}
+          position={pickerPos}
         />
       )}
     </div>
@@ -252,6 +274,7 @@ function SecondarySubGroup({
   });
   const [draftType, setDraftType] = useState<IdeaType>("task");
   const [showTypePicker, setShowTypePicker] = useState(false);
+  const [typePickerPos, setTypePickerPos] = useState<{ top: number; left: number } | null>(null);
   return (
     <div
       ref={setNodeRef}
@@ -278,12 +301,16 @@ function SecondarySubGroup({
         <div className="flex items-center gap-1.5 border-t border-black/[0.04] px-3 py-1.5 dark:border-white/[0.06]">
           <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
             <button
-              onClick={() => setShowTypePicker(!showTypePicker)}
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setTypePickerPos({ top: rect.bottom + 4, left: rect.left });
+                setShowTypePicker(!showTypePicker);
+              }}
               className={`rounded-full px-1.5 py-0 text-[10px] font-semibold ${TYPE_BADGE[draftType].className} cursor-pointer transition-opacity hover:opacity-80`}
             >
               {TYPE_BADGE[draftType].label}
             </button>
-            {showTypePicker && (
+            {showTypePicker && typePickerPos && (
               <TypePicker
                 current={draftType}
                 onSelect={(type) => {
@@ -291,6 +318,7 @@ function SecondarySubGroup({
                   setShowTypePicker(false);
                 }}
                 onClose={() => setShowTypePicker(false)}
+                position={typePickerPos}
               />
             )}
           </div>

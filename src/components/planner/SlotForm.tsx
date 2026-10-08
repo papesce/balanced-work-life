@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { createPortal } from "react-dom";
 import { Idea, LifeArea, Tag } from "@/lib/types";
 import { AREA_LABELS } from "@/lib/constants";
 import { minutesToTimeString } from "./dayslotAdapter";
@@ -87,33 +86,22 @@ export function SlotForm({
           </button>
         </div>
       </div>
-      {showAreaPicker &&
-        areaPickerPos &&
-        createPortal(
-          <div
-            style={{
-              position: "fixed",
-              top: areaPickerPos.top,
-              left: areaPickerPos.left,
-              zIndex: 10000,
-            }}
-          >
-            <TagPicker
-              allTags={tags}
-              selectedTags={areaSystemTag ? [areaSystemTag] : []}
-              onAdd={(tag) => {
-                setSelectedArea(tag.area);
-                setSelectedTag(tag);
-                setShowAreaPicker(false);
-              }}
-              onRemove={() => {}}
-              onCreateTag={onCreateTag ?? (async () => null)}
-              onClose={() => setShowAreaPicker(false)}
-              singleSelect
-            />
-          </div>,
-          document.body,
-        )}
+      {showAreaPicker && areaPickerPos && (
+        <TagPicker
+          allTags={tags}
+          selectedTags={areaSystemTag ? [areaSystemTag] : []}
+          onAdd={(tag) => {
+            setSelectedArea(tag.area);
+            setSelectedTag(tag);
+            setShowAreaPicker(false);
+          }}
+          onRemove={() => {}}
+          onCreateTag={onCreateTag ?? (async () => null)}
+          onClose={() => setShowAreaPicker(false)}
+          singleSelect
+          fixedPosition={areaPickerPos}
+        />
+      )}
     </div>
   );
 }

@@ -11,12 +11,12 @@ import {
   Eye,
   CornerDownRight,
 } from "lucide-react";
-import { createPortal } from "react-dom";
 import { Idea, IdeaLink, IdeaType, LinkType, Tag } from "@/lib/types";
 import { LinkPanel } from "@/components/shared/LinkPanel";
 import { MoveIdeaPanel } from "@/components/brainstorm/MoveIdeaPanel";
 import { SchedulePicker } from "@/components/brainstorm/SchedulePicker";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";
+import { FloatingPanel } from "@/components/shared/FloatingPanel";
 import type { RevealView } from "@/lib/reveal";
 
 interface IdeaActionMenuProps {
@@ -68,8 +68,6 @@ export function IdeaActionMenu({
   const [deletePos, setDeletePos] = useState<{ top: number; right: number } | null>(null);
   const [showRevealPicker, setShowRevealPicker] = useState(false);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const deleteConfirmRef = useRef<HTMLDivElement>(null);
 
   const descendantCount = useMemo(() => {
     if (!hasChildren) return 0;
@@ -89,22 +87,8 @@ export function IdeaActionMenu({
 
   const hidden = hiddenActions ?? [];
 
-  useEffect(() => {
-    if (!showMenu) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(target) &&
-        menuTriggerRef.current &&
-        !menuTriggerRef.current.contains(target)
-      ) {
-        setShowMenu(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [showMenu]);
+  // Outside-click, Escape, scroll and resize handling for the menu and the
+  // delete confirm is owned by FloatingPanel.
 
   useEffect(() => {
     if (!showRevealPicker) return;
@@ -125,24 +109,6 @@ export function IdeaActionMenu({
       document.removeEventListener("keydown", keyHandler);
     };
   }, [showRevealPicker]);
-
-  useEffect(() => {
-    if (!showDeleteWarning) return;
-    const handler = (e: MouseEvent) => {
-      if (deleteConfirmRef.current && !deleteConfirmRef.current.contains(e.target as Node)) {
-        setShowDeleteWarning(false);
-      }
-    };
-    const keyHandler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setShowDeleteWarning(false);
-    };
-    document.addEventListener("mousedown", handler);
-    document.addEventListener("keydown", keyHandler);
-    return () => {
-      document.removeEventListener("mousedown", handler);
-      document.removeEventListener("keydown", keyHandler);
-    };
-  }, [showDeleteWarning]);
 
   const closeAll = () => {
     setShowMenu(false);
@@ -210,124 +176,121 @@ export function IdeaActionMenu({
       >
         <MoreHorizontal size={14} strokeWidth={1.5} />
       </button>
-      {showMenu &&
-        menuPos &&
-        createPortal(
-          <div
-            ref={menuRef}
-            style={{ position: "fixed", top: menuPos.top, right: menuPos.right, zIndex: 9999 }}
-            className="glass-card-strong min-w-[160px] rounded-xl py-1.5 shadow-lg"
-          >
-            {onShowDetails && (
-              <>
-                <button
-                  onClick={() => {
-                    setShowMenu(false);
-                    onShowDetails();
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                >
-                  <Eye size={12} strokeWidth={1.5} />
-                  Details…
-                </button>
-                <div className="my-1 border-t border-black/5 dark:border-white/5" />
-              </>
-            )}
-            {!hidden.includes("edit") && (
-              <>
-                <button
-                  onClick={() => {
-                    setShowMenu(false);
-                    onEdit();
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                >
-                  <Pencil size={12} strokeWidth={1.5} />
-                  Edit
-                </button>
-                <div className="my-1 border-t border-black/5 dark:border-white/5" />
-              </>
-            )}
-            {!hidden.includes("link") && (
+      {showMenu && menuPos && (
+        <FloatingPanel
+          anchor={menuPos}
+          onClose={() => setShowMenu(false)}
+          className="glass-card-strong min-w-[160px] rounded-xl py-1.5 shadow-lg"
+        >
+          {onShowDetails && (
+            <>
               <button
                 onClick={() => {
                   setShowMenu(false);
-                  setShowLinkPanel(true);
+                  onShowDetails();
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
               >
-                <Link2 size={12} strokeWidth={1.5} />
-                Link…
+                <Eye size={12} strokeWidth={1.5} />
+                Details…
               </button>
-            )}
-            {!hidden.includes("move") && (
+              <div className="my-1 border-t border-black/5 dark:border-white/5" />
+            </>
+          )}
+          {!hidden.includes("edit") && (
+            <>
               <button
                 onClick={() => {
                   setShowMenu(false);
-                  setShowMovePanel(true);
+                  onEdit();
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
               >
-                <ArrowUpDown size={12} strokeWidth={1.5} />
-                Move…
+                <Pencil size={12} strokeWidth={1.5} />
+                Edit
               </button>
-            )}
-            {!hidden.includes("attach") && (
+              <div className="my-1 border-t border-black/5 dark:border-white/5" />
+            </>
+          )}
+          {!hidden.includes("link") && (
+            <button
+              onClick={() => {
+                setShowMenu(false);
+                setShowLinkPanel(true);
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+            >
+              <Link2 size={12} strokeWidth={1.5} />
+              Link…
+            </button>
+          )}
+          {!hidden.includes("move") && (
+            <button
+              onClick={() => {
+                setShowMenu(false);
+                setShowMovePanel(true);
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+            >
+              <ArrowUpDown size={12} strokeWidth={1.5} />
+              Move…
+            </button>
+          )}
+          {!hidden.includes("attach") && (
+            <button
+              onClick={() => {
+                setShowMenu(false);
+                setShowAttachPanel(true);
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+            >
+              <CornerDownRight size={12} strokeWidth={1.5} />
+              Attach to…
+            </button>
+          )}
+          {!hidden.includes("schedule") && (
+            <div className="relative">
               <button
                 onClick={() => {
                   setShowMenu(false);
-                  setShowAttachPanel(true);
+                  setShowSchedulePicker(true);
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
               >
-                <CornerDownRight size={12} strokeWidth={1.5} />
-                Attach to…
+                <Calendar size={12} strokeWidth={1.5} />
+                Schedule
               </button>
-            )}
-            {!hidden.includes("schedule") && (
-              <div className="relative">
-                <button
-                  onClick={() => {
-                    setShowMenu(false);
-                    setShowSchedulePicker(true);
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                >
-                  <Calendar size={12} strokeWidth={1.5} />
-                  Schedule
-                </button>
-              </div>
-            )}
-            {currentView && (
-              <>
-                <div className="my-1 border-t border-black/5 dark:border-white/5" />
-                <button
-                  onClick={() => {
-                    setShowMenu(false);
-                    setShowRevealPicker(true);
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                >
-                  <Eye size={12} strokeWidth={1.5} />
-                  Reveal in...
-                </button>
-              </>
-            )}
-            {!hidden.includes("delete") && (
-              <>
-                <div className="my-1 border-t border-black/5 dark:border-white/5" />
-                <button
-                  onClick={handleRequestDelete}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-red-500 hover:bg-red-50/50 dark:hover:bg-red-900/20"
-                >
-                  <Trash2 size={12} strokeWidth={1.5} />
-                  Delete
-                </button>
-              </>
-            )}
-          </div>,
-          document.body,
-        )}
+            </div>
+          )}
+          {currentView && (
+            <>
+              <div className="my-1 border-t border-black/5 dark:border-white/5" />
+              <button
+                onClick={() => {
+                  setShowMenu(false);
+                  setShowRevealPicker(true);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+              >
+                <Eye size={12} strokeWidth={1.5} />
+                Reveal in...
+              </button>
+            </>
+          )}
+          {!hidden.includes("delete") && (
+            <>
+              <div className="my-1 border-t border-black/5 dark:border-white/5" />
+              <button
+                onClick={handleRequestDelete}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-red-500 hover:bg-red-50/50 dark:hover:bg-red-900/20"
+              >
+                <Trash2 size={12} strokeWidth={1.5} />
+                Delete
+              </button>
+            </>
+          )}
+        </FloatingPanel>
+      )}
 
       {showRevealPicker && currentView && menuPos && (
         <RevealInMenu
@@ -340,7 +303,7 @@ export function IdeaActionMenu({
       )}
 
       {/* Sub-panels */}
-      {showLinkPanel && (
+      {showLinkPanel && menuPos && (
         <LinkPanel
           ideaId={idea.id}
           ideas={allIdeas}
@@ -349,9 +312,10 @@ export function IdeaActionMenu({
           onCreateLink={onCreateLink}
           onDeleteLink={onDeleteLink}
           onClose={() => setShowLinkPanel(false)}
+          fixedPosition={menuPos}
         />
       )}
-      {showMovePanel && (
+      {showMovePanel && menuPos && (
         <MoveIdeaPanel
           idea={idea}
           ideas={allIdeas}
@@ -362,9 +326,10 @@ export function IdeaActionMenu({
           onCreateParent={
             onCreateParent ? (text, type) => onCreateParent(idea.id, text, type) : undefined
           }
+          position={menuPos}
         />
       )}
-      {showAttachPanel && (
+      {showAttachPanel && menuPos && (
         <MoveIdeaPanel
           idea={idea}
           ideas={allIdeas}
@@ -373,38 +338,31 @@ export function IdeaActionMenu({
           onMove={handleMove}
           onMoved={handleMoved}
           onClose={() => setShowAttachPanel(false)}
+          position={menuPos}
         />
       )}
-      {showSchedulePicker && (
-        <div className="relative">
-          <SchedulePicker
-            currentDate={idea.scheduled_date}
-            onSelect={(date) => {
-              onSchedule(idea.id, date);
-              setShowSchedulePicker(false);
-            }}
-            onClear={() => {
-              onSchedule(idea.id, null);
-              setShowSchedulePicker(false);
-            }}
-            onClose={() => setShowSchedulePicker(false)}
-          />
-        </div>
+      {showSchedulePicker && menuPos && (
+        <SchedulePicker
+          currentDate={idea.scheduled_date}
+          onSelect={(date) => {
+            onSchedule(idea.id, date);
+            setShowSchedulePicker(false);
+          }}
+          onClear={() => {
+            onSchedule(idea.id, null);
+            setShowSchedulePicker(false);
+          }}
+          onClose={() => setShowSchedulePicker(false)}
+          position={menuPos}
+        />
       )}
-      {showDeleteWarning &&
-        createPortal(
-          <div
-            ref={deleteConfirmRef}
-            role="alertdialog"
-            aria-label="Confirm delete"
-            style={{
-              position: "fixed",
-              top: deletePos ? deletePos.top : 0,
-              right: deletePos ? deletePos.right : 0,
-              zIndex: 10000,
-            }}
-            className="glass-card-strong w-64 rounded-xl border border-red-200 p-3 shadow-lg dark:border-red-500/30"
-          >
+      {showDeleteWarning && deletePos && (
+        <FloatingPanel
+          anchor={deletePos}
+          onClose={() => setShowDeleteWarning(false)}
+          className="glass-card-strong w-64 rounded-xl border border-red-200 p-3 shadow-lg dark:border-red-500/30"
+        >
+          <div role="alertdialog" aria-label="Confirm delete">
             <p className="text-xs font-medium text-red-700 dark:text-red-400">
               Delete &ldquo;{idea.text || "empty"}&rdquo;?
             </p>
@@ -430,9 +388,9 @@ export function IdeaActionMenu({
                 Delete
               </button>
             </div>
-          </div>,
-          document.body,
-        )}
+          </div>
+        </FloatingPanel>
+      )}
     </div>
   );
 }

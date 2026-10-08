@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Bookmark, Check, ChevronDown, Copy, Pencil, Plus, Star, Trash2 } from "lucide-react";
 import { summarizeHorizonView, type HorizonView } from "@/lib/horizonViews";
+import { FloatingPanel } from "@/components/shared/FloatingPanel";
 
 interface HorizonViewSwitcherProps {
   views: HorizonView[];
@@ -36,26 +37,14 @@ export function HorizonViewSwitcher({
   onToggleDefault,
 }: HorizonViewSwitcherProps) {
   const [open, setOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [creating, setCreating] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
-  const rootRef = useRef<HTMLDivElement>(null);
+  // Outside-click, Escape, scroll and resize handling is owned by FloatingPanel.
 
   const active = views.find((v) => v.id === activeViewId) ?? null;
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setCreating(false);
-        setRenamingId(null);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
 
   const submitCreate = () => {
     const name = draftName.trim();
@@ -74,10 +63,14 @@ export function HorizonViewSwitcher({
   };
 
   return (
-    <div ref={rootRef} className="relative">
+    <div className="relative">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setMenuPos({ top: rect.bottom + 4, left: rect.left });
+          setOpen((v) => !v);
+        }}
         title={active ? `Horizon view: ${active.name}` : "Save and switch Horizon views"}
         className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
           active
@@ -97,8 +90,16 @@ export function HorizonViewSwitcher({
         )}
         <ChevronDown size={12} className="flex-shrink-0 opacity-60" />
       </button>
-      {open && (
-        <div className="absolute top-full left-0 z-50 mt-1 w-72 overflow-hidden rounded-xl border border-black/10 bg-white shadow-xl dark:border-white/10 dark:bg-gray-900">
+      {open && menuPos && (
+        <FloatingPanel
+          anchor={menuPos}
+          onClose={() => {
+            setOpen(false);
+            setCreating(false);
+            setRenamingId(null);
+          }}
+          className="w-72 overflow-hidden rounded-xl border border-black/10 bg-white shadow-xl dark:border-white/10 dark:bg-gray-900"
+        >
           <div className="max-h-64 overflow-y-auto p-1">
             {views.length === 0 && (
               <p className="px-3 py-2 text-xs text-gray-400 italic">
@@ -279,7 +280,7 @@ export function HorizonViewSwitcher({
               </button>
             )}
           </div>
-        </div>
+        </FloatingPanel>
       )}
     </div>
   );

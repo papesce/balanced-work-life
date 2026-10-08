@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { createPortal } from "react-dom";
 import type { TimelineEvent } from "@papesce/dayslot";
 import { Idea, IdeaStatus, LifeArea, getPrimaryTagForIdea, Tag } from "@/lib/types";
 import { STATUS_CONFIG, PRODUCTIVITY_SIGNALS } from "@/lib/constants";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { computeStatusUpdates } from "@/lib/tasks/statusTransition";
+import { FloatingPanel } from "@/components/shared/FloatingPanel";
 
 export function EventCard({
   idea,
@@ -62,24 +62,13 @@ export function EventCard({
   const [statusPickerPos, setStatusPickerPos] = useState<{ top: number; left: number } | null>(
     null,
   );
-  const menuRef = useRef<HTMLDivElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const areaBtnRef = useRef<HTMLButtonElement>(null);
   const [areaPickerPos, setAreaPickerPos] = useState<{ top: number; left: number } | null>(null);
   const statusBtnRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    const handler = (e: PointerEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setShowMenu(false);
-        setShowAreaPicker(false);
-      }
-    };
-    if (showMenu || showAreaPicker) {
-      document.addEventListener("pointerdown", handler);
-    }
-    return () => document.removeEventListener("pointerdown", handler);
-  }, [showMenu, showAreaPicker]);
+  // Outside-click, Escape, scroll and resize handling for the menu and
+  // pickers is owned by FloatingPanel.
 
   useEffect(() => {
     if (!scrollElement) return;
@@ -224,112 +213,87 @@ export function EventCard({
         </div>
       </div>
 
-      {showMenu &&
-        menuPos &&
-        createPortal(
-          <div
-            ref={menuRef}
-            style={{ position: "fixed", top: menuPos.top, left: menuPos.left, zIndex: 9999 }}
-            className="glass-card-strong min-w-[160px] rounded-lg border border-black/5 py-1 shadow-lg dark:border-white/5"
-          >
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleOpenStatusPicker();
-              }}
-              className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-            >
-              Change Status...
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleOpenAreaPicker();
-              }}
-              className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-            >
-              Change Area...
-            </button>
-            <div className="my-1 border-t border-black/5 dark:border-white/5" />
-            {onTryNow && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onTryNow(idea.id);
-                  setShowMenu(false);
-                }}
-                className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-              >
-                ⚡ Try now
-              </button>
-            )}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onUpdateTask(idea.id, { scheduled_time: null });
-                setShowMenu(false);
-              }}
-              className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-            >
-              Clear time
-            </button>
-          </div>,
-          document.body,
-        )}
-
-      {showAreaPicker &&
-        areaPickerPos &&
-        createPortal(
-          <div
-            style={{
-              position: "fixed",
-              top: areaPickerPos.top,
-              left: areaPickerPos.left,
-              zIndex: 10000,
+      {showMenu && menuPos && (
+        <FloatingPanel
+          anchor={menuPos}
+          onClose={() => setShowMenu(false)}
+          className="glass-card-strong min-w-[160px] rounded-lg border border-black/5 py-1 shadow-lg dark:border-white/5"
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenStatusPicker();
             }}
+            className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
           >
-            <TagPicker
-              allTags={allTags}
-              selectedTags={areaTags}
-              onAdd={handleExclusiveTagSelected}
-              onRemove={async (tagId) => {
-                if (onRemoveTag) await onRemoveTag(idea.id, tagId);
-                setShowAreaPicker(false);
-                setShowMenu(false);
-              }}
-              onCreateTag={onCreateTag ?? (async () => null)}
-              onClose={() => {
-                setShowAreaPicker(false);
-                setShowMenu(false);
-              }}
-              singleSelect
-            />
-          </div>,
-          document.body,
-        )}
-
-      {showStatusPicker &&
-        statusPickerPos &&
-        createPortal(
-          <div
-            style={{
-              position: "fixed",
-              top: statusPickerPos.top,
-              left: statusPickerPos.left,
-              zIndex: 10000,
+            Change Status...
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenAreaPicker();
             }}
+            className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
           >
-            <StatusPicker
-              current={idea.status}
-              onSelect={handleStatusSelect}
-              onClose={() => {
-                setShowStatusPicker(false);
+            Change Area...
+          </button>
+          <div className="my-1 border-t border-black/5 dark:border-white/5" />
+          {onTryNow && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onTryNow(idea.id);
                 setShowMenu(false);
               }}
-            />
-          </div>,
-          document.body,
-        )}
+              className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+            >
+              ⚡ Try now
+            </button>
+          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onUpdateTask(idea.id, { scheduled_time: null });
+              setShowMenu(false);
+            }}
+            className="flex w-full cursor-pointer px-3 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+          >
+            Clear time
+          </button>
+        </FloatingPanel>
+      )}
+
+      {showAreaPicker && areaPickerPos && (
+        <TagPicker
+          allTags={allTags}
+          selectedTags={areaTags}
+          onAdd={handleExclusiveTagSelected}
+          onRemove={async (tagId) => {
+            if (onRemoveTag) await onRemoveTag(idea.id, tagId);
+            setShowAreaPicker(false);
+            setShowMenu(false);
+          }}
+          onCreateTag={onCreateTag ?? (async () => null)}
+          onClose={() => {
+            setShowAreaPicker(false);
+            setShowMenu(false);
+          }}
+          singleSelect
+          fixedPosition={areaPickerPos}
+        />
+      )}
+
+      {showStatusPicker && statusPickerPos && (
+        <StatusPicker
+          current={idea.status}
+          onSelect={handleStatusSelect}
+          onClose={() => {
+            setShowStatusPicker(false);
+            setShowMenu(false);
+          }}
+          position={statusPickerPos}
+        />
+      )}
     </div>
   );
 }

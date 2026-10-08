@@ -10,10 +10,6 @@ export const CLASSIFICATION_HINTS: Record<string, Record<string, string>> = {
     medium: "Pays off over months — this year.",
     long: "Pays off over years — no rush.",
   },
-  nature: {
-    finite: "Has a finish line — completes and closes.",
-    ongoing: "Continuous — never completes (term doesn't apply).",
-  },
   nnl: {
     now: "Actively being worked on right now.",
     next: "Up right after current work wraps up.",

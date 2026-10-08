@@ -61,6 +61,10 @@ export default function ProjectsPage() {
   const unclassifiedExpanded = useUiPrefsStore((s) => s.projectsUnclassifiedExpanded);
   const setPrefs = useUiPrefsStore((s) => s.set);
   const [statusPickerId, setStatusPickerId] = useState<string | null>(null);
+  const [areaPickerPos, setAreaPickerPos] = useState<{ top: number; left: number } | null>(null);
+  const [statusPickerPos, setStatusPickerPos] = useState<{ top: number; left: number } | null>(
+    null,
+  );
   const [areaPickerId, setAreaPickerId] = useState<string | null>(null);
   // Detail focus is local-only (subtree re-root); selectedId stays the project in URL.
   const [focusedId, setFocusedId] = useState<string | null>(null);
@@ -328,7 +332,7 @@ export default function ProjectsPage() {
 
   const lensTabs = useMemo(() => {
     const tabs: { key: string; label: string }[] = schemes
-      .filter((s) => ["term", "nnl", "moscow", "priority", "attention", "nature"].includes(s.key))
+      .filter((s) => ["term", "nnl", "moscow", "priority", "attention"].includes(s.key))
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((s) => ({ key: s.key, label: s.key === "term" ? "Horizon" : s.label }));
     return [...tabs, { key: "area", label: "Area" }];
@@ -715,12 +719,16 @@ export default function ProjectsPage() {
               <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-gray-400">
                 <span className="relative" onClick={(e) => e.stopPropagation()}>
                   <button
-                    onClick={() => setStatusPickerId(statusPickerId === p.id ? null : p.id)}
+                    onClick={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setStatusPickerPos({ top: rect.bottom + 4, left: rect.left });
+                      setStatusPickerId(statusPickerId === p.id ? null : p.id);
+                    }}
                     className={`rounded-full border px-1.5 py-0 text-[10px] font-semibold whitespace-nowrap transition hover:opacity-80 ${STATUS_STYLES[p.status]}`}
                   >
                     {STATUS_LABELS[p.status] ?? p.status}
                   </button>
-                  {statusPickerId === p.id && (
+                  {statusPickerId === p.id && statusPickerPos && (
                     <StatusPicker
                       current={p.status}
                       onSelect={(s: IdeaStatus) => {
@@ -728,6 +736,7 @@ export default function ProjectsPage() {
                         void updateIdea(p.id, { status: s });
                       }}
                       onClose={() => setStatusPickerId(null)}
+                      position={statusPickerPos}
                     />
                   )}
                 </span>
@@ -758,26 +767,29 @@ export default function ProjectsPage() {
                 {lensKey === "area" && (
                   <span className="relative" onClick={(e) => e.stopPropagation()}>
                     <button
-                      onClick={() => setAreaPickerId(areaPickerId === p.id ? null : p.id)}
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setAreaPickerPos({ top: rect.bottom + 4, left: rect.left });
+                        setAreaPickerId(areaPickerId === p.id ? null : p.id);
+                      }}
                       title={hintForValue("area", area) ?? undefined}
                       className="cursor-pointer rounded-md border border-black/10 px-1 py-0 text-[10px] font-semibold text-gray-500 dark:border-white/10 dark:text-gray-400"
                     >
                       {area ? (AREA_LABELS[area as keyof typeof AREA_LABELS] ?? area) : "Set area"}
                     </button>
-                    {areaPickerId === p.id && (
-                      <span className="absolute top-full left-0 z-50 mt-1">
-                        <TagPicker
-                          allTags={tagsHook.tags}
-                          selectedTags={taskTagsHook.getTagsForIdea(p.id)}
-                          onAdd={(tag) => void handleReplaceAreaTag(p.id, tag)}
-                          onRemove={(tagId) => {
-                            void taskTagsHook.removeTagFromTask(p.id, tagId);
-                          }}
-                          onCreateTag={tagsHook.createTag}
-                          onClose={() => setAreaPickerId(null)}
-                          singleSelect
-                        />
-                      </span>
+                    {areaPickerId === p.id && areaPickerPos && (
+                      <TagPicker
+                        allTags={tagsHook.tags}
+                        selectedTags={taskTagsHook.getTagsForIdea(p.id)}
+                        onAdd={(tag) => void handleReplaceAreaTag(p.id, tag)}
+                        onRemove={(tagId) => {
+                          void taskTagsHook.removeTagFromTask(p.id, tagId);
+                        }}
+                        onCreateTag={tagsHook.createTag}
+                        onClose={() => setAreaPickerId(null)}
+                        singleSelect
+                        fixedPosition={areaPickerPos}
+                      />
                     )}
                   </span>
                 )}

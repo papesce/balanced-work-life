@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useState, type MouseEvent as ReactMouseEvent } from "react";
 import { useClassifications } from "@/hooks/useClassifications";
+import { FloatingPanel, type FloatingAnchor } from "@/components/shared/FloatingPanel";
 
 /** Classification value for the `priority` scheme, or null when unranked. */
 export type PriorityValue = "high" | "medium" | "low" | null;
@@ -24,39 +24,16 @@ interface PriorityChipProps {
   value: PriorityValue;
   onSelect: (value: Exclude<PriorityValue, null> | null) => void;
   size?: "xs" | "sm";
-  /** Render the menu in a fixed-position portal so it escapes clipping
-   * ancestors (e.g. scrollable columns). Off by default. */
+  /**
+   * @deprecated No longer needed — the menu always renders in a
+   * FloatingPanel portal (FLOATING layer). Kept for prop compatibility.
+   */
   usePortal?: boolean;
 }
 
-/** Estimated menu footprint, used to flip/clamp the portal position. */
-const MENU_WIDTH = 140;
-const MENU_HEIGHT = 170;
-
-export function PriorityChip({
-  value,
-  onSelect,
-  size = "xs",
-  usePortal = false,
-}: PriorityChipProps) {
+export function PriorityChip({ value, onSelect, size = "xs" }: PriorityChipProps) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLSpanElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const [menuPos, setMenuPos] = useState<{ top?: number; bottom?: number; left: number } | null>(
-    null,
-  );
-
-  // A fixed portal can't follow its trigger, so close on scroll/resize.
-  useEffect(() => {
-    if (!open || !usePortal) return;
-    const close = () => setOpen(false);
-    window.addEventListener("scroll", close, { capture: true, passive: true });
-    window.addEventListener("resize", close);
-    return () => {
-      window.removeEventListener("scroll", close, { capture: true });
-      window.removeEventListener("resize", close);
-    };
-  }, [open, usePortal]);
+  const [menuPos, setMenuPos] = useState<FloatingAnchor | null>(null);
 
   const active = OPTIONS.find((o) => o.value === value);
   const textSize = size === "xs" ? "text-[10px]" : "text-xs";
@@ -95,48 +72,21 @@ export function PriorityChip({
     </>
   );
 
-  // Outside-click must accept both the trigger wrapper and the portal menu
-  // (the portal lives outside `ref`; without this, mousedown unmounts the
-  // menu before the option's click fires).
-  const menuRef = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (ref.current?.contains(t) || menuRef.current?.contains(t)) return;
-      setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  // Position the portal from the trigger rect on open: flip upward near
-  // the viewport bottom, clamp to the viewport's right edge.
-  const handleToggle = () => {
-    if (!open && usePortal) {
-      const rect = triggerRef.current?.getBoundingClientRect();
-      if (rect) {
-        const left = Math.max(8, Math.min(rect.left, window.innerWidth - MENU_WIDTH - 8));
-        setMenuPos(
-          rect.bottom + MENU_HEIGHT + 8 > window.innerHeight
-            ? { bottom: window.innerHeight - rect.top + 4, left }
-            : { top: rect.bottom + 4, left },
-        );
-      }
-    } else if (open) {
+  // Outside-click, Escape, scroll and resize handling is owned by
+  // FloatingPanel; the trigger rect is captured on toggle.
+  const handleToggle = (e: ReactMouseEvent<HTMLButtonElement>) => {
+    if (!open) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      setMenuPos({ top: rect.bottom + 4, left: rect.left });
+    } else {
       setMenuPos(null);
     }
     setOpen((v) => !v);
   };
 
   return (
-    <span
-      ref={ref}
-      className="relative inline-flex flex-shrink-0"
-      onClick={(e) => e.stopPropagation()}
-    >
+    <span className="relative inline-flex flex-shrink-0" onClick={(e) => e.stopPropagation()}>
       <button
-        ref={triggerRef}
         onClick={handleToggle}
         title={active ? `Priority: ${active.label}` : "Set priority"}
         aria-label={active ? `Priority: ${active.label}` : "Set priority"}
@@ -148,32 +98,15 @@ export function PriorityChip({
       >
         {active ? active.short : "–"}
       </button>
-      {open &&
-        (usePortal && menuPos ? (
-          createPortal(
-            <span
-              ref={menuRef}
-              style={{
-                position: "fixed",
-                top: menuPos.top,
-                bottom: menuPos.bottom,
-                left: menuPos.left,
-                zIndex: 9999,
-              }}
-              className="glass-card-strong min-w-[120px] rounded-xl py-1 shadow-lg"
-            >
-              {menuItems}
-            </span>,
-            document.body,
-          )
-        ) : (
-          <span
-            ref={menuRef}
-            className="glass-card-strong absolute top-full left-0 z-50 mt-1 min-w-[120px] rounded-xl py-1 shadow-lg"
-          >
-            {menuItems}
-          </span>
-        ))}
+      {open && menuPos && (
+        <FloatingPanel
+          anchor={menuPos}
+          onClose={() => setOpen(false)}
+          className="glass-card-strong min-w-[120px] rounded-xl py-1 shadow-lg"
+        >
+          {menuItems}
+        </FloatingPanel>
+      )}
     </span>
   );
 }

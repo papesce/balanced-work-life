@@ -101,6 +101,7 @@ function RootAddInput({
 }) {
   const [rootType, setRootType] = useState<IdeaType>("task");
   const [showTypePicker, setShowTypePicker] = useState(false);
+  const [typePickerPos, setTypePickerPos] = useState<{ top: number; left: number } | null>(null);
   const badge = TYPE_BADGE[rootType];
 
   return (
@@ -108,12 +109,16 @@ function RootAddInput({
       <div className="flex items-center gap-1.5">
         <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
           <button
-            onClick={() => setShowTypePicker(!showTypePicker)}
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setTypePickerPos({ top: rect.bottom + 4, left: rect.left });
+              setShowTypePicker(!showTypePicker);
+            }}
             className={`rounded-full px-1.5 py-0 text-[10px] font-semibold ${badge.className} cursor-pointer transition-opacity hover:opacity-80`}
           >
             {badge.label}
           </button>
-          {showTypePicker && (
+          {showTypePicker && typePickerPos && (
             <TypePicker
               current={rootType}
               onSelect={(type) => {
@@ -121,6 +126,7 @@ function RootAddInput({
                 setShowTypePicker(false);
               }}
               onClose={() => setShowTypePicker(false)}
+              position={typePickerPos}
             />
           )}
         </div>
@@ -154,6 +160,7 @@ export default function HorizonPage() {
   const [hideClosed, setHideClosed] = useState(true);
   const [typeFilter, setTypeFilter] = useState<IdeaType[]>([]);
   const [typePickerOpen, setTypePickerOpen] = useState(false);
+  const [typePickerPos, setTypePickerPos] = useState<{ top: number; left: number } | null>(null);
   const cardMode = useUiPrefsStore((s) => s.cardMode);
   const unclassifiedExpanded = useUiPrefsStore((s) => s.horizonUnclassifiedExpanded);
   const prefsLens = useUiPrefsStore((s) => s.horizonLens);
@@ -869,7 +876,11 @@ export default function HorizonPage() {
       <div className="relative">
         <button
           type="button"
-          onClick={() => setTypePickerOpen((v) => !v)}
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setTypePickerPos({ top: rect.bottom + 4, left: rect.left });
+            setTypePickerOpen((v) => !v);
+          }}
           className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
             typeFilter.length > 0
               ? "border-indigo-300 bg-white text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
@@ -883,7 +894,7 @@ export default function HorizonPage() {
               : "Type"}
           </span>
         </button>
-        {typePickerOpen && (
+        {typePickerOpen && typePickerPos && (
           <TypeFilterPicker
             selected={typeFilter}
             onToggle={(type) =>
@@ -893,6 +904,7 @@ export default function HorizonPage() {
             }
             onClear={() => setTypeFilter([])}
             onClose={() => setTypePickerOpen(false)}
+            position={typePickerPos}
           />
         )}
       </div>

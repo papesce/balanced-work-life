@@ -5,6 +5,7 @@ import { CalendarPlus } from "lucide-react";
 import { addDays, getToday } from "@/lib/dateUtils";
 import { computeQuickAssignPatch } from "@/lib/tasks/dateCorrections";
 import type { Idea } from "@/lib/types";
+import { FloatingPanel } from "@/components/shared/FloatingPanel";
 
 /**
  * One-tap date assign for Horizon rows/cards. Chips assign immediately with
@@ -20,6 +21,7 @@ export function HorizonQuickAssign({
   onUpdate: (id: string, updates: Partial<Idea>) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
+  const [panelPos, setPanelPos] = useState<{ top: number; left: number } | null>(null);
   const [markDoneOverride, setMarkDoneOverride] = useState<boolean | null>(null);
 
   const today = getToday();
@@ -46,7 +48,11 @@ export function HorizonQuickAssign({
   return (
     <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setPanelPos({ top: rect.bottom + 4, left: rect.left });
+          setOpen(!open);
+        }}
         title={node.scheduled_date ? `Scheduled: ${node.scheduled_date}` : "Quick assign date"}
         className={`flex cursor-pointer items-center gap-1 rounded-full border px-1.5 py-0 text-[10px] font-semibold whitespace-nowrap transition-opacity hover:opacity-80 ${
           node.scheduled_date
@@ -57,8 +63,12 @@ export function HorizonQuickAssign({
         <CalendarPlus size={11} strokeWidth={2} />
         {label}
       </button>
-      {open && (
-        <div className="glass-card-strong absolute top-full left-0 z-50 mt-1 w-44 space-y-1 rounded-xl p-2">
+      {open && panelPos && (
+        <FloatingPanel
+          anchor={panelPos}
+          onClose={() => setOpen(false)}
+          className="glass-card-strong w-44 space-y-1 rounded-xl p-2"
+        >
           {(
             [
               { label: "Yesterday", date: yesterday },
@@ -104,7 +114,7 @@ export function HorizonQuickAssign({
               <span className="text-[10px] font-normal text-gray-400">(auto: past = done)</span>
             )}
           </label>
-        </div>
+        </FloatingPanel>
       )}
     </div>
   );

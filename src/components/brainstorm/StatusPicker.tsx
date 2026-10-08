@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { STATUS_CONFIG } from "@/lib/constants";
 import { IdeaStatus } from "@/lib/types";
+import { FloatingPanel, type FloatingAnchor } from "@/components/shared/FloatingPanel";
 
 const STATUS_OPTIONS: {
   value: IdeaStatus;
@@ -55,24 +56,28 @@ interface StatusPickerProps {
   current: IdeaStatus;
   onSelect: (status: IdeaStatus) => void;
   onClose: () => void;
+  /**
+   * When set, renders in a FloatingPanel portal (FLOATING layer) so the
+   * picker paints above glass-card stacking contexts.
+   */
+  position?: FloatingAnchor;
 }
 
-export function StatusPicker({ current, onSelect, onClose }: StatusPickerProps) {
+export function StatusPicker({ current, onSelect, onClose, position }: StatusPickerProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // FloatingPanel owns outside-click/Escape/scroll handling when portaled.
+    if (position) return;
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [onClose]);
+  }, [onClose, position]);
 
-  return (
-    <div
-      ref={ref}
-      className="glass-card-strong absolute top-full left-0 z-50 mt-1 min-w-[160px] rounded-xl border border-black/5 py-1 shadow-lg dark:border-white/5"
-    >
+  const content = (
+    <>
       {STATUS_OPTIONS.map(({ value, color, bg }) => {
         const isActive = current === value;
         const { label, icon: Icon } = STATUS_CONFIG[value];
@@ -93,6 +98,26 @@ export function StatusPicker({ current, onSelect, onClose }: StatusPickerProps) 
           </button>
         );
       })}
+    </>
+  );
+
+  if (position)
+    return (
+      <FloatingPanel
+        anchor={position}
+        onClose={onClose}
+        className="glass-card-strong min-w-[160px] rounded-xl border border-black/5 py-1 shadow-lg dark:border-white/5"
+      >
+        {content}
+      </FloatingPanel>
+    );
+
+  return (
+    <div
+      ref={ref}
+      className="glass-card-strong absolute top-full left-0 z-50 mt-1 min-w-[160px] rounded-xl border border-black/5 py-1 shadow-lg dark:border-white/5"
+    >
+      {content}
     </div>
   );
 }

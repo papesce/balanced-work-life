@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { LAYER_MODAL } from "@/lib/layers";
 import { useRouter } from "next/navigation";
 import {
   X,
@@ -171,7 +172,7 @@ export function DetailsDrawer({
   const termValue = getOptionForIdea(idea.id, "term")?.value ?? null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[10000] flex justify-end">
+    <div style={{ zIndex: LAYER_MODAL }} className="fixed inset-0 flex justify-end">
       <div
         className="absolute inset-0 bg-black/20 backdrop-blur-[1px]"
         onClick={onClose}
@@ -356,34 +357,16 @@ export function DetailsDrawer({
                 {schemes.map((scheme) => {
                   const schemeOptions = options.filter((o) => o.scheme_id === scheme.id);
                   const current = getOptionForIdea(idea.id, scheme.key);
-                  // Orthogonality: term answers "when does this complete?" which has
-                  // no meaning for ongoing work. Grey it out (still settable).
-                  const termNotApplicable =
-                    scheme.key === "term" &&
-                    getOptionForIdea(idea.id, "nature")?.value === "ongoing";
                   return (
-                    <div
-                      key={scheme.id}
-                      className={`mb-2 last:mb-0 ${termNotApplicable ? "rounded bg-black/[0.02] px-1 py-1 dark:bg-white/[0.03]" : ""}`}
-                    >
-                      <p className="mb-1 flex items-center justify-between text-[10px] font-medium tracking-wide text-gray-400 uppercase">
-                        <span>{scheme.label}</span>
-                        {termNotApplicable && (
-                          <span className="font-normal normal-case italic">
-                            Ongoing — term doesn&apos;t apply
-                          </span>
-                        )}
+                    <div key={scheme.id} className="mb-2 last:mb-0">
+                      <p className="mb-1 text-[10px] font-medium tracking-wide text-gray-400 uppercase">
+                        {scheme.label}
                       </p>
                       {schemeOptions.map((option) => (
                         <button
                           key={option.id}
                           onClick={() => setClassification(idea.id, scheme.key, option.value)}
-                          title={
-                            termNotApplicable
-                              ? "Ongoing work has no term — settable but not meaningful"
-                              : undefined
-                          }
-                          className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-gray-600 hover:bg-black/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.04] ${termNotApplicable ? "opacity-60" : ""}`}
+                          className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-gray-600 hover:bg-black/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.04]"
                         >
                           <span className="w-4">
                             {current?.id === option.id && (
@@ -393,15 +376,6 @@ export function DetailsDrawer({
                           {option.label}
                         </button>
                       ))}
-                      {current && termNotApplicable && (
-                        <button
-                          onClick={() => setClassification(idea.id, "term", null)}
-                          className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs font-medium text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-500/10"
-                        >
-                          <span className="w-4" />
-                          Clear stale term value
-                        </button>
-                      )}
                       {current && (
                         <>
                           <div className="my-1 border-t border-black/5 dark:border-white/5" />

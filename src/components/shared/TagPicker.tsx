@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { Plus, Check } from "lucide-react";
 import { Tag, LifeArea } from "@/lib/types";
 import { AREA_LABELS, AREA_ORDER, AREA_TEXT_COLORS } from "@/lib/constants";
 import { areaColors } from "@/styles/tokens";
+import { FloatingPanel, type FloatingAnchor } from "@/components/shared/FloatingPanel";
 
 function areaBg(area: LifeArea, opacity: number): string {
   const base = areaColors[area]?.bg ?? "rgba(0,0,0,0)";
@@ -19,8 +19,8 @@ interface TagPickerProps {
   onRemove: (tagId: string) => void;
   onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
   onClose: () => void;
-  /** When set, renders in a fixed-position portal so the menu paints above everything. */
-  fixedPosition?: { top: number; left: number };
+  /** When set, renders in a FloatingPanel portal (FLOATING layer) so the menu paints above everything. */
+  fixedPosition?: FloatingAnchor;
   /** When set, only one tag can be selected: renders radios and clicking a new tag is exclusive (parent clears the rest). */
   singleSelect?: boolean;
 }
@@ -43,23 +43,14 @@ export function TagPicker({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    // FloatingPanel owns outside-click/Escape/scroll handling when portaled.
+    if (fixedPosition) return;
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [onClose]);
-
-  useEffect(() => {
-    if (!fixedPosition) return;
-    const close = () => onClose();
-    window.addEventListener("scroll", close, { capture: true, passive: true });
-    window.addEventListener("resize", close);
-    return () => {
-      window.removeEventListener("scroll", close, { capture: true });
-      window.removeEventListener("resize", close);
-    };
-  }, [fixedPosition, onClose]);
+  }, [onClose, fixedPosition]);
 
   useEffect(() => {
     if (creating) inputRef.current?.focus();
@@ -104,12 +95,8 @@ export function TagPicker({
 
   const areasWithTags = AREA_ORDER.filter((a) => tagsByArea[a].length > 0);
 
-  const content = (
-    <div
-      ref={ref}
-      className={`${fixedPosition ? "fixed z-[9999]" : "absolute top-full left-0 z-50 mt-1"} glass-card-strong max-w-[260px] min-w-[200px] rounded-xl py-2 shadow-lg`}
-      style={fixedPosition ? { top: fixedPosition.top, left: fixedPosition.left } : undefined}
-    >
+  const contentInner = (
+    <>
       {areasWithTags.length === 0 && !creating && (
         <p className="px-3 py-1 text-xs text-gray-400 dark:text-gray-500">No tags yet</p>
       )}
@@ -208,8 +195,27 @@ export function TagPicker({
           New tag
         </button>
       )}
+    </>
+  );
+
+  const content = (
+    <div
+      ref={ref}
+      className="glass-card-strong absolute top-full left-0 z-50 mt-1 max-w-[260px] min-w-[200px] rounded-xl py-2 shadow-lg"
+    >
+      {contentInner}
     </div>
   );
 
-  return fixedPosition ? createPortal(content, document.body) : content;
+  if (fixedPosition)
+    return (
+      <FloatingPanel
+        anchor={fixedPosition}
+        onClose={onClose}
+        className="glass-card-strong max-w-[260px] min-w-[200px] rounded-xl py-2 shadow-lg"
+      >
+        {contentInner}
+      </FloatingPanel>
+    );
+  return content;
 }

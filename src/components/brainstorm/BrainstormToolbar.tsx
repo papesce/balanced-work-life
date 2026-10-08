@@ -77,6 +77,7 @@ export function BrainstormToolbar({
 }: BrainstormToolbarProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [typePickerOpen, setTypePickerOpen] = useState(false);
+  const [typePickerPos, setTypePickerPos] = useState<{ top: number; left: number } | null>(null);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const filtersRef = useRef<HTMLDivElement>(null);
   const typePickerRef = useRef<HTMLDivElement>(null);
@@ -294,7 +295,11 @@ export function BrainstormToolbar({
       <div ref={typePickerRef} className="relative">
         <button
           type="button"
-          onClick={() => setTypePickerOpen((v) => !v)}
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setTypePickerPos({ top: rect.bottom + 4, left: rect.left });
+            setTypePickerOpen((v) => !v);
+          }}
           className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
             typeFilter.length > 0
               ? "border-indigo-300 bg-white text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
@@ -308,7 +313,7 @@ export function BrainstormToolbar({
               : "Type"}
           </span>
         </button>
-        {typePickerOpen && (
+        {typePickerOpen && typePickerPos && (
           <TypeFilterPicker
             selected={typeFilter}
             onToggle={(type) =>
@@ -318,6 +323,7 @@ export function BrainstormToolbar({
             }
             onClear={() => setTypeFilter([])}
             onClose={() => setTypePickerOpen(false)}
+            position={typePickerPos}
           />
         )}
       </div>

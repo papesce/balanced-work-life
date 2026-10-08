@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, KeyboardEvent } from "react";
-import { createPortal } from "react-dom";
+import { FloatingPanel } from "@/components/shared/FloatingPanel";
 import { useDragControls } from "framer-motion";
 import { useDraggable } from "@dnd-kit/core";
 import { MoreHorizontal, Link2, GripVertical, CalendarDays } from "lucide-react";
@@ -111,7 +111,6 @@ export function TimelineTaskRow({
   const [showAttachPanel, setShowAttachPanel] = useState(false);
   const [showLinkPanel, setShowLinkPanel] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [showReveal, setShowReveal] = useState(false);
@@ -126,22 +125,10 @@ export function TimelineTaskRow({
   const router = useRouter();
   const linkBadgeRef = useRef<HTMLButtonElement>(null);
   const [linkPanelPos, setLinkPanelPos] = useState<{ top: number; left: number } | null>(null);
+  const [attachPos, setAttachPos] = useState<{ top: number; left: number } | null>(null);
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(e.target as Node) &&
-        menuTriggerRef.current &&
-        !menuTriggerRef.current.contains(e.target as Node)
-      ) {
-        setShowMenu(false);
-      }
-    };
-    if (showMenu) document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [showMenu]);
-
+  // Menu outside-click/scroll handling is owned by FloatingPanel. The
+  // scroll effect below also closes the inline submenu expanders.
   useEffect(() => {
     if (!showMenu) return;
     const close = () => {
@@ -448,25 +435,14 @@ export function TimelineTaskRow({
         >
           {statusConfig.label}
         </button>
-        {showStatusPicker &&
-          statusPickerPos &&
-          createPortal(
-            <div
-              style={{
-                position: "fixed",
-                top: statusPickerPos.top,
-                left: statusPickerPos.left,
-                zIndex: 9999,
-              }}
-            >
-              <StatusPicker
-                current={task.status}
-                onSelect={handleStatusSelect}
-                onClose={() => setShowStatusPicker(false)}
-              />
-            </div>,
-            document.body,
-          )}
+        {showStatusPicker && statusPickerPos && (
+          <StatusPicker
+            current={task.status}
+            onSelect={handleStatusSelect}
+            onClose={() => setShowStatusPicker(false)}
+            position={statusPickerPos}
+          />
+        )}
       </div>
 
       <NotesIndicator hasNotes={!!task.notes?.trim()} onClick={() => openNotes(task.id)} />
@@ -497,113 +473,120 @@ export function TimelineTaskRow({
         >
           <MoreHorizontal size={16} strokeWidth={1.5} />
         </button>
-        {showMenu &&
-          menuPos &&
-          createPortal(
-            <div
-              ref={menuRef}
-              style={{ position: "fixed", top: menuPos.top, right: menuPos.right, zIndex: 9999 }}
-              className="glass-card-strong min-w-[160px] rounded-xl py-1.5 shadow-lg"
-            >
-              {isHistorical && onGoToDate && attemptTarget && (
+        {showMenu && menuPos && (
+          <FloatingPanel
+            anchor={menuPos}
+            onClose={() => setShowMenu(false)}
+            className="glass-card-strong min-w-[160px] rounded-xl py-1.5 shadow-lg"
+          >
+            {isHistorical && onGoToDate && attemptTarget && (
+              <>
+                <button
+                  onClick={() => {
+                    onGoToDate(attemptTarget, task.id);
+                    setShowMenu(false);
+                  }}
+                  className="flex w-full px-3 py-2 text-left text-xs font-medium text-violet-600 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/20"
+                >
+                  {attemptLabel}
+                </button>
+                <div className="my-1 border-t border-black/5 dark:border-white/5" />
+              </>
+            )}
+            <TaskRowMenu
+              task={task}
+              today={today}
+              onReschedule={onReschedule}
+              onUpdate={onUpdate}
+              onDone={() => {
+                setShowMenu(false);
+                setShowAttachPanel(false);
+                setShowLinkPanel(false);
+              }}
+              organizeSection={
                 <>
-                  <button
-                    onClick={() => {
-                      onGoToDate(attemptTarget, task.id);
-                      setShowMenu(false);
-                    }}
-                    className="flex w-full px-3 py-2 text-left text-xs font-medium text-violet-600 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/20"
-                  >
-                    {attemptLabel}
-                  </button>
-                  <div className="my-1 border-t border-black/5 dark:border-white/5" />
+                  {onMove && ideas && (
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setAttachPos({ top: rect.bottom + 4, left: rect.left });
+                          setShowAttachPanel((v) => !v);
+                        }}
+                        className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                        title="Keeps deferred occurrence on this day, also shows under selected parent"
+                      >
+                        Attach to…{" "}
+                        <span className="text-[10px]">{showAttachPanel ? "▴" : "▸"}</span>
+                      </button>
+                      {showAttachPanel && attachPos && (
+                        <MoveIdeaPanel
+                          idea={task}
+                          ideas={ideas}
+                          variant="attach"
+                          onMove={async (newParentId, newSortOrder) => {
+                            await onMove(task.id, newParentId, newSortOrder);
+                            setShowAttachPanel(false);
+                            setShowMenu(false);
+                          }}
+                          onMoved={() => {
+                            setShowAttachPanel(false);
+                            setShowMenu(false);
+                          }}
+                          onClose={() => setShowAttachPanel(false)}
+                          position={attachPos}
+                        />
+                      )}
+                    </div>
+                  )}
+                  {onCreateLink && onDeleteLink && ideas && links && (
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setLinkPanelPos({ top: rect.bottom + 4, left: rect.left });
+                          setShowLinkPanel((v) => !v);
+                        }}
+                        className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                      >
+                        Link… <span className="text-[10px]">{showLinkPanel ? "▴" : "▸"}</span>
+                      </button>
+                      {showLinkPanel && linkPanelPos && (
+                        <LinkPanel
+                          ideaId={task.id}
+                          ideas={ideas}
+                          links={links}
+                          onCreateLink={onCreateLink}
+                          onDeleteLink={onDeleteLink}
+                          onClose={() => setShowLinkPanel(false)}
+                          fixedPosition={linkPanelPos}
+                        />
+                      )}
+                    </div>
+                  )}
                 </>
-              )}
-              <TaskRowMenu
-                task={task}
-                today={today}
-                onReschedule={onReschedule}
-                onUpdate={onUpdate}
-                onDone={() => {
-                  setShowMenu(false);
-                  setShowAttachPanel(false);
-                  setShowLinkPanel(false);
-                }}
-                organizeSection={
-                  <>
-                    {onMove && ideas && (
-                      <div className="relative">
-                        <button
-                          onClick={() => setShowAttachPanel((v) => !v)}
-                          className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                          title="Keeps deferred occurrence on this day, also shows under selected parent"
-                        >
-                          Attach to…{" "}
-                          <span className="text-[10px]">{showAttachPanel ? "▴" : "▸"}</span>
-                        </button>
-                        {showAttachPanel && (
-                          <MoveIdeaPanel
-                            idea={task}
-                            ideas={ideas}
-                            variant="attach"
-                            onMove={async (newParentId, newSortOrder) => {
-                              await onMove(task.id, newParentId, newSortOrder);
-                              setShowAttachPanel(false);
-                              setShowMenu(false);
-                            }}
-                            onMoved={() => {
-                              setShowAttachPanel(false);
-                              setShowMenu(false);
-                            }}
-                            onClose={() => setShowAttachPanel(false)}
-                          />
-                        )}
-                      </div>
-                    )}
-                    {onCreateLink && onDeleteLink && ideas && links && (
-                      <div className="relative">
-                        <button
-                          onClick={() => setShowLinkPanel((v) => !v)}
-                          className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                        >
-                          Link… <span className="text-[10px]">{showLinkPanel ? "▴" : "▸"}</span>
-                        </button>
-                        {showLinkPanel && (
-                          <LinkPanel
-                            ideaId={task.id}
-                            ideas={ideas}
-                            links={links}
-                            onCreateLink={onCreateLink}
-                            onDeleteLink={onDeleteLink}
-                            onClose={() => setShowLinkPanel(false)}
-                          />
-                        )}
-                      </div>
-                    )}
-                  </>
-                }
-                navigateSection={
-                  <button
-                    onClick={() => {
-                      const rect = menuTriggerRef.current?.getBoundingClientRect();
-                      if (rect)
-                        setRevealPos({
-                          top: rect.bottom + 4,
-                          right: window.innerWidth - rect.right,
-                        });
-                      setShowMenu(false);
-                      setShowReveal(true);
-                    }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                  >
-                    <Eye size={12} strokeWidth={1.5} />
-                    Reveal in...
-                  </button>
-                }
-              />
-            </div>,
-            document.body,
-          )}
+              }
+              navigateSection={
+                <button
+                  onClick={() => {
+                    const rect = menuTriggerRef.current?.getBoundingClientRect();
+                    if (rect)
+                      setRevealPos({
+                        top: rect.bottom + 4,
+                        right: window.innerWidth - rect.right,
+                      });
+                    setShowMenu(false);
+                    setShowReveal(true);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                >
+                  <Eye size={12} strokeWidth={1.5} />
+                  Reveal in...
+                </button>
+              }
+            />
+          </FloatingPanel>
+        )}
         {showReveal && revealPos && (
           <RevealInMenu
             idea={task}
@@ -618,27 +601,16 @@ export function TimelineTaskRow({
           onCreateLink &&
           onDeleteLink &&
           ideas &&
-          links &&
-          createPortal(
-            <div
-              data-link-panel-portal
-              style={{
-                position: "fixed",
-                top: linkPanelPos.top,
-                left: linkPanelPos.left,
-                zIndex: 9999,
-              }}
-            >
-              <LinkPanel
-                ideaId={task.id}
-                ideas={ideas}
-                links={links}
-                onCreateLink={onCreateLink}
-                onDeleteLink={onDeleteLink}
-                onClose={() => setShowLinkPanel(false)}
-              />
-            </div>,
-            document.body,
+          links && (
+            <LinkPanel
+              ideaId={task.id}
+              ideas={ideas}
+              links={links}
+              onCreateLink={onCreateLink}
+              onDeleteLink={onDeleteLink}
+              onClose={() => setShowLinkPanel(false)}
+              fixedPosition={linkPanelPos}
+            />
           )}
       </div>
     </div>

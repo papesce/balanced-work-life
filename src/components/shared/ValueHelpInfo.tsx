@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Check, Info } from "lucide-react";
 import { CLASSIFICATION_HINTS } from "@/lib/classificationHelp";
+import { FloatingPanel } from "@/components/shared/FloatingPanel";
 
 interface ValueHelpInfoProps {
-  /** Active lens key (e.g. "term", "nature", "area"). */
+  /** Active lens key (e.g. "term", "nnl", "area"). */
   lensKey: string;
-  /** Human label of the active lens (e.g. "Horizon", "Nature"). */
+  /** Human label of the active lens (e.g. "Horizon", "NNL"). */
   schemeLabel: string;
   /** Lens columns; the null (Unclassified) entry is skipped unless onlyValue is null. */
   columns: { key: string | null; label: string }[];
@@ -35,7 +36,7 @@ export function ValueHelpInfo({
   onlyValue,
 }: ValueHelpInfoProps) {
   const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLSpanElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const singleMode = onlyValue !== undefined;
   const entries = singleMode
     ? columns.filter((c) => c.key === onlyValue).slice(0, 1)
@@ -43,22 +44,6 @@ export function ValueHelpInfo({
   const singleHint =
     singleMode && onlyValue !== null ? (CLASSIFICATION_HINTS[lensKey]?.[onlyValue] ?? null) : null;
   const currentHint = current != null ? (CLASSIFICATION_HINTS[lensKey]?.[current] ?? null) : null;
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
 
   if (singleMode && onlyValue !== null && singleHint == null) return null;
   if (entries.length === 0 && !(singleMode && onlyValue === null)) return null;
@@ -73,14 +58,17 @@ export function ValueHelpInfo({
 
   return (
     <span
-      ref={wrapRef}
       className="relative inline-flex items-center"
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
     >
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setPos({ top: rect.bottom + 4, left: rect.left });
+          setOpen((v) => !v);
+        }}
         aria-label={triggerAria}
         aria-expanded={open}
         title={triggerTitle}
@@ -88,8 +76,12 @@ export function ValueHelpInfo({
       >
         <Info size={11} />
       </button>
-      {open && (
-        <span className="absolute top-full left-0 z-50 mt-1 w-56 rounded-xl border border-black/10 bg-white p-2 shadow-xl dark:border-white/10 dark:bg-gray-900">
+      {open && pos && (
+        <FloatingPanel
+          anchor={pos}
+          onClose={() => setOpen(false)}
+          className="w-56 rounded-xl border border-black/10 bg-white p-2 shadow-xl dark:border-white/10 dark:bg-gray-900"
+        >
           <p className="px-1 pb-1 text-[10px] font-semibold tracking-wide text-gray-400 uppercase">
             {singleMode ? singleLabel : `${schemeLabel} values`}
           </p>
@@ -115,7 +107,7 @@ export function ValueHelpInfo({
               </span>
             </span>
           ))}
-        </span>
+        </FloatingPanel>
       )}
     </span>
   );

@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { Check } from "lucide-react";
 import { IdeaType } from "@/lib/types";
 import { TYPE_BADGE } from "@/lib/constants";
+import { FloatingPanel, type FloatingAnchor } from "@/components/shared/FloatingPanel";
 
 const TYPES: IdeaType[] = ["idea", "objective", "project", "initiative", "task"];
 
@@ -12,24 +13,34 @@ interface TypeFilterPickerProps {
   onToggle: (type: IdeaType) => void;
   onClear: () => void;
   onClose: () => void;
+  /**
+   * When set, renders in a FloatingPanel portal (FLOATING layer) so the
+   * picker paints above glass-card stacking contexts.
+   */
+  position?: FloatingAnchor;
 }
 
-export function TypeFilterPicker({ selected, onToggle, onClear, onClose }: TypeFilterPickerProps) {
+export function TypeFilterPicker({
+  selected,
+  onToggle,
+  onClear,
+  onClose,
+  position,
+}: TypeFilterPickerProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // FloatingPanel owns outside-click/Escape/scroll handling when portaled.
+    if (position) return;
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [onClose]);
+  }, [onClose, position]);
 
-  return (
-    <div
-      ref={ref}
-      className="glass-card-strong absolute top-full left-0 z-50 mt-1 min-w-[160px] rounded-xl border border-black/5 py-1.5 shadow-xl dark:border-white/5"
-    >
+  const content = (
+    <>
       <div className="px-2.5 pb-1 text-[10px] font-bold tracking-wider text-gray-400 uppercase dark:text-gray-500">
         Filter by type
       </div>
@@ -63,6 +74,26 @@ export function TypeFilterPicker({ selected, onToggle, onClear, onClose }: TypeF
           Clear
         </button>
       )}
+    </>
+  );
+
+  if (position)
+    return (
+      <FloatingPanel
+        anchor={position}
+        onClose={onClose}
+        className="glass-card-strong min-w-[160px] rounded-xl border border-black/5 py-1.5 shadow-xl dark:border-white/5"
+      >
+        {content}
+      </FloatingPanel>
+    );
+
+  return (
+    <div
+      ref={ref}
+      className="glass-card-strong absolute top-full left-0 z-50 mt-1 min-w-[160px] rounded-xl border border-black/5 py-1.5 shadow-xl dark:border-white/5"
+    >
+      {content}
     </div>
   );
 }

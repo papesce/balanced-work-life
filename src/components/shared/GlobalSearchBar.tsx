@@ -34,6 +34,7 @@ import {
 } from "@/lib/reveal";
 import { useClassifications } from "@/hooks/useClassifications";
 import { subscribeGlobalSearch } from "@/lib/globalSearchBus";
+import { FloatingPanel } from "@/components/shared/FloatingPanel";
 
 const VIEW_ICON: Record<RevealView, React.ReactNode> = {
   planner: <LayoutDashboard size={12} strokeWidth={1.5} />,
@@ -66,8 +67,14 @@ export function GlobalSearchBar() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [includeDone, setIncludeDone] = useState(true);
+  const [dropPos, setDropPos] = useState<{ top: number; left: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const captureDropPos = () => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) setDropPos({ top: rect.bottom + 4, left: rect.left });
+  };
 
   // Debounce query
   useEffect(() => {
@@ -116,18 +123,9 @@ export function GlobalSearchBar() {
     return () => document.removeEventListener("keydown", handler);
   }, []);
 
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setExpandedId(null);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  // Outside-click, Escape (when open), scroll and resize handling is owned
+  // by FloatingPanel. Note: the results render in a body portal, so the
+  // old container-contains check would wrongly close on result clicks.
 
   const ideasById = useMemo(() => new Map(ideas.map((i) => [i.id, i])), [ideas]);
   const results = useMemo(
@@ -210,9 +208,13 @@ export function GlobalSearchBar() {
           aria-label="Search ideas"
           onChange={(e) => {
             setRawQuery(e.target.value);
+            captureDropPos();
             setOpen(true);
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => {
+            captureDropPos();
+            setOpen(true);
+          }}
           onKeyDown={(e) => {
             if (!open || results.length === 0) return;
             if (e.key === "ArrowDown") {
@@ -257,8 +259,15 @@ export function GlobalSearchBar() {
         )}
       </div>
 
-      {open && query.trim().length >= 2 && (
-        <div className="absolute top-full right-0 left-0 z-50 mt-1 overflow-hidden rounded-xl border border-black/10 bg-white shadow-xl sm:right-auto sm:w-[380px] dark:border-white/10 dark:bg-gray-900">
+      {open && query.trim().length >= 2 && dropPos && (
+        <FloatingPanel
+          anchor={dropPos}
+          onClose={() => {
+            setOpen(false);
+            setExpandedId(null);
+          }}
+          className="w-[min(380px,calc(100vw-16px))] overflow-hidden rounded-xl border border-black/10 bg-white shadow-xl dark:border-white/10 dark:bg-gray-900"
+        >
           <div className="flex items-center justify-between border-b border-black/5 px-3 py-1.5 dark:border-white/5">
             <span className="text-[10px] font-medium tracking-wide text-gray-400 uppercase">
               {results.length > 0
@@ -416,7 +425,7 @@ export function GlobalSearchBar() {
               </div>
             );
           })}
-        </div>
+        </FloatingPanel>
       )}
     </div>
   );

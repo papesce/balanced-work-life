@@ -77,17 +77,22 @@ export function TypePillSlot({
   onUpdate: (id: string, updates: Partial<Idea>) => Promise<void>;
 }) {
   const [showPicker, setShowPicker] = useState(false);
+  const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null);
   return (
     <div className="relative w-20 flex-shrink-0 text-center" onClick={(e) => e.stopPropagation()}>
       <button
-        onClick={() => setShowPicker(!showPicker)}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setPickerPos({ top: rect.bottom + 4, left: rect.left });
+          setShowPicker(!showPicker);
+        }}
         className={`rounded-full border px-2 py-0.5 text-xs ${
           node.type ? TYPE_COLORS[node.type] : "border-gray-200 text-gray-400"
         }`}
       >
         {node.type ? node.type.charAt(0).toUpperCase() + node.type.slice(1) : "—"}
       </button>
-      {showPicker && (
+      {showPicker && pickerPos && (
         <TypePicker
           current={node.type}
           onSelect={(type) => {
@@ -95,6 +100,7 @@ export function TypePillSlot({
             setShowPicker(false);
           }}
           onClose={() => setShowPicker(false)}
+          position={pickerPos}
         />
       )}
     </div>
@@ -117,6 +123,7 @@ export function TagChipsSlot({
   onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
 }) {
   const [showPicker, setShowPicker] = useState(false);
+  const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null);
   const nodeTags = getTagsForIdea(node.id);
   return (
     <div
@@ -138,13 +145,17 @@ export function TagChipsSlot({
         </span>
       ))}
       <button
-        onClick={() => setShowPicker(!showPicker)}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setPickerPos({ top: rect.bottom + 4, left: rect.left });
+          setShowPicker(!showPicker);
+        }}
         className="rounded-full border border-gray-200 px-1.5 py-0.5 text-[10px] text-gray-400 hover:border-gray-400 hover:text-gray-600 dark:border-gray-700 dark:text-gray-500 dark:hover:border-gray-500 dark:hover:text-gray-300"
         title="Add tag"
       >
         {nodeTags.length === 0 ? "tag" : "+"}
       </button>
-      {showPicker && (
+      {showPicker && pickerPos && (
         <TagPicker
           allTags={allTags}
           selectedTags={nodeTags}
@@ -156,6 +167,7 @@ export function TagChipsSlot({
           }}
           onCreateTag={onCreateTag}
           onClose={() => setShowPicker(false)}
+          fixedPosition={pickerPos}
         />
       )}
     </div>
@@ -170,6 +182,7 @@ export function StatusPillSlot({
   onUpdate: (id: string, updates: Partial<Idea>) => Promise<void>;
 }) {
   const [showPicker, setShowPicker] = useState(false);
+  const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null);
 
   const handleStatusSelect = async (status: IdeaStatus) => {
     setShowPicker(false);
@@ -184,19 +197,22 @@ export function StatusPillSlot({
   return (
     <div className="relative w-20 flex-shrink-0 text-center" onClick={(e) => e.stopPropagation()}>
       <button
-        onClick={() => setShowPicker(!showPicker)}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setPickerPos({ top: rect.bottom + 4, left: rect.left });
+          setShowPicker(!showPicker);
+        }}
         className={`cursor-pointer rounded-full border px-2 py-0.5 text-xs whitespace-nowrap ${STATUS_STYLES[node.status]}`}
       >
         {STATUS_LABELS[node.status]}
       </button>
-      {showPicker && (
-        <div className="absolute top-full right-0 z-50 mt-1">
-          <StatusPicker
-            current={node.status}
-            onSelect={handleStatusSelect}
-            onClose={() => setShowPicker(false)}
-          />
-        </div>
+      {showPicker && pickerPos && (
+        <StatusPicker
+          current={node.status}
+          onSelect={handleStatusSelect}
+          onClose={() => setShowPicker(false)}
+          position={pickerPos}
+        />
       )}
     </div>
   );

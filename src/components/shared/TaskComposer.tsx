@@ -3,6 +3,7 @@
 import { KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { LAYER_MODAL } from "@/lib/layers";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { searchIdeas } from "@/lib/ideaSearch";
 import { formatScheduleLabel, getTypeLabel } from "@/lib/ideaSearch";
@@ -300,7 +301,7 @@ export function TaskComposer({
               top: listPos.top,
               left: listPos.left,
               width: listPos.width,
-              zIndex: 10000,
+              zIndex: LAYER_MODAL,
             }}
             className="overflow-hidden rounded-xl border border-amber-200/70 bg-white shadow-lg dark:border-amber-500/20 dark:bg-gray-900"
           >

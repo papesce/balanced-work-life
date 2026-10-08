@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { IdeaType } from "@/lib/types";
+import { FloatingPanel, type FloatingAnchor } from "@/components/shared/FloatingPanel";
 
 const TYPES: { value: IdeaType; label: string; color: string }[] = [
   { value: "idea", label: "Idea", color: "text-orange-700 dark:text-orange-300" },
@@ -15,24 +16,28 @@ interface TypePickerProps {
   current: IdeaType | null;
   onSelect: (type: IdeaType | null) => void;
   onClose: () => void;
+  /**
+   * When set, renders in a FloatingPanel portal (FLOATING layer) so the
+   * picker paints above glass-card stacking contexts.
+   */
+  position?: FloatingAnchor;
 }
 
-export function TypePicker({ current, onSelect, onClose }: TypePickerProps) {
+export function TypePicker({ current, onSelect, onClose, position }: TypePickerProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // FloatingPanel owns outside-click/Escape/scroll handling when portaled.
+    if (position) return;
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [onClose]);
+  }, [onClose, position]);
 
-  return (
-    <div
-      ref={ref}
-      className="glass-card-strong absolute top-full right-0 z-50 mt-1 min-w-[130px] rounded-xl py-1"
-    >
+  const content = (
+    <>
       {TYPES.map(({ value, label, color }) => (
         <button
           key={value}
@@ -52,6 +57,26 @@ export function TypePicker({ current, onSelect, onClose }: TypePickerProps) {
           Clear
         </button>
       )}
+    </>
+  );
+
+  if (position)
+    return (
+      <FloatingPanel
+        anchor={position}
+        onClose={onClose}
+        className="glass-card-strong min-w-[130px] rounded-xl py-1"
+      >
+        {content}
+      </FloatingPanel>
+    );
+
+  return (
+    <div
+      ref={ref}
+      className="glass-card-strong absolute top-full right-0 z-50 mt-1 min-w-[130px] rounded-xl py-1"
+    >
+      {content}
     </div>
   );
 }

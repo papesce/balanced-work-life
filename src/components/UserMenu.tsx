@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useRef, useState } from "react";
+import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { Download, LogOut, Tags, Upload, User as UserIcon } from "lucide-react";
@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useTaskTags } from "@/hooks/useTaskTags";
+import { FloatingPanel } from "@/components/shared/FloatingPanel";
 import {
   buildBackupData,
   downloadBackup,
@@ -27,26 +28,12 @@ export function UserMenu() {
   const { restoreTags, restoreTaskTags } = useTaskTags();
 
   const [open, setOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [busy, setBusy] = useState<"export" | "import" | null>(null);
   const [status, setStatus] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (e: PointerEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
+  // Outside-click, Escape, scroll and resize handling is owned by FloatingPanel.
 
   const handleExport = async () => {
     if (!user || busy) return;
@@ -117,10 +104,14 @@ export function UserMenu() {
     `${nameParts[0]?.[0] ?? ""}${nameParts.length > 1 ? nameParts[nameParts.length - 1][0] : ""}`.toUpperCase();
 
   return (
-    <div ref={menuRef} className="relative">
+    <div className="relative">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setMenuPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+          setOpen((v) => !v);
+        }}
         aria-haspopup="menu"
         aria-expanded={open}
         title={name}
@@ -146,15 +137,17 @@ export function UserMenu() {
         </span>
       </button>
 
-      <AnimatePresence>
-        {open && (
+      {open && menuPos && (
+        <FloatingPanel
+          anchor={menuPos}
+          onClose={() => setOpen(false)}
+          className="glass-card-strong min-w-[230px] rounded-xl border border-black/5 p-1.5 shadow-xl dark:border-white/5"
+        >
           <motion.div
             role="menu"
             initial={{ opacity: 0, y: -4, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.15 }}
-            className="glass-card-strong absolute top-full right-0 z-50 mt-2 min-w-[230px] rounded-xl border border-black/5 p-1.5 shadow-xl dark:border-white/5"
           >
             <div className="px-2.5 pt-2 pb-1.5">
               <p className="truncate text-sm font-bold text-gray-800 dark:text-gray-200">{name}</p>
@@ -237,8 +230,8 @@ export function UserMenu() {
               </p>
             )}
           </motion.div>
-        )}
-      </AnimatePresence>
+        </FloatingPanel>
+      )}
     </div>
   );
 }

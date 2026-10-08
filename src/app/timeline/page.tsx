@@ -9,7 +9,6 @@ import {
   useState,
   useCallback,
   Suspense,
-  type RefObject,
   type ReactNode,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -22,6 +21,7 @@ import { priorityRank } from "@/components/shared/PriorityChip";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { AppShell } from "@/components/AppShell";
+import { FloatingPanel } from "@/components/shared/FloatingPanel";
 import { MiniBalanceBar } from "@/components/MiniBalanceBar";
 import { Idea, LifeArea } from "@/lib/types";
 import {
@@ -203,25 +203,30 @@ function RangeWindowDropdown({
   spans,
   open,
   onToggle,
+  onClose,
   onSelect,
-  menuRef,
 }: {
   preset: TimelinePresetId;
   counts: Record<string, string>;
   spans: Record<string, string>;
   open: boolean;
   onToggle: () => void;
+  onClose: () => void;
   onSelect: (id: TimelinePresetId) => void;
-  menuRef: RefObject<HTMLDivElement | null>;
 }) {
   const selected = TIMELINE_PRESETS.find((option) => option.id === preset) ?? TIMELINE_PRESETS[0];
   const [detailId, setDetailId] = useState<TimelinePresetId | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const detail = TIMELINE_PRESETS.find((option) => option.id === detailId);
   return (
-    <div ref={menuRef} className="relative">
+    <div className="relative">
       <button
         type="button"
-        onClick={onToggle}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setMenuPos({ top: rect.bottom + 6, left: rect.left });
+          onToggle();
+        }}
         className={`toolbar-btn gap-1.5 px-2.5 ${open ? "toolbar-btn--accent" : "hover:text-gray-600 dark:hover:text-gray-300"}`}
       >
         <CalendarRange size={13} />
@@ -233,8 +238,12 @@ function RangeWindowDropdown({
         </span>
         <ChevronDown size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && (
-        <div className="glass-card-strong absolute top-full right-0 z-50 mt-1.5 min-w-[250px] rounded-xl border border-black/5 p-1.5 shadow-xl dark:border-white/5">
+      {open && menuPos && (
+        <FloatingPanel
+          anchor={menuPos}
+          onClose={onClose}
+          className="glass-card-strong min-w-[250px] rounded-xl border border-black/5 p-1.5 shadow-xl dark:border-white/5"
+        >
           {TIMELINE_PRESETS.map((r, index) => (
             <div key={r.id}>
               {(index === 0 || r.group !== TIMELINE_PRESETS[index - 1].group) && (
@@ -270,7 +279,7 @@ function RangeWindowDropdown({
               <div className="mt-0.5">{counts[detail.id] ?? "0 before · 0 after"}</div>
             </div>
           )}
-        </div>
+        </FloatingPanel>
       )}
     </div>
   );
@@ -309,7 +318,6 @@ function TimelineInner() {
       ),
     [getOptionForIdea],
   );
-  const windowMenuRef = useRef<HTMLDivElement>(null);
   const scrolledAnchorRef = useRef<string | null>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
   const todayRef = useRef<HTMLDivElement>(null);
@@ -474,25 +482,8 @@ function TimelineInner() {
     writeJson(STORAGE_KEYS.timelinePrefs, { filter, preset, view, weekCardPreview });
   }, [filter, preset, view, weekCardPreview]);
 
-  useEffect(() => {
-    if (!windowMenuOpen) return;
-    const handler = (e: PointerEvent) => {
-      const target = e.target as Node;
-      if (windowMenuRef.current && !windowMenuRef.current.contains(target))
-        setWindowMenuOpen(false);
-    };
-    document.addEventListener("pointerdown", handler);
-    return () => document.removeEventListener("pointerdown", handler);
-  }, [windowMenuOpen]);
-
-  useEffect(() => {
-    if (!windowMenuOpen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setWindowMenuOpen(false);
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [windowMenuOpen]);
+  // Outside-click, Escape, scroll and resize handling for the range menu
+  // is owned by FloatingPanel (see RangeWindowDropdown).
 
   // Auto-scroll to the selected (anchor) day once data has loaded, and on every
   // URL-driven anchor change (e.g. browser back/forward or ?date= deep links).
@@ -790,13 +781,13 @@ function TimelineInner() {
           spans={rangeSpans}
           open={windowMenuOpen}
           onToggle={() => setWindowMenuOpen((v) => !v)}
+          onClose={() => setWindowMenuOpen(false)}
           onSelect={(id) => {
             setPreset(id);
             setRangeFlash(true);
             window.setTimeout(() => setRangeFlash(false), 900);
             setWindowMenuOpen(false);
           }}
-          menuRef={windowMenuRef}
         />
       )}
     </>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { getToday, getTomorrow } from "@/lib/dateUtils";
 import { TaskComposer } from "@/components/shared/TaskComposer";
 import { useIdeas } from "@/hooks/useIdeas";
+import { LAYER_MODAL } from "@/lib/layers";
 
 type WhenOption = "today" | "tomorrow" | "custom" | "none";
 
@@ -50,7 +51,10 @@ export function QuickAddButton({ onAdd }: QuickAddButtonProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-4 backdrop-blur-sm sm:items-center dark:bg-black/60">
+    <div
+      style={{ zIndex: LAYER_MODAL }}
+      className="fixed inset-0 flex items-end justify-center bg-black/30 p-4 backdrop-blur-sm sm:items-center dark:bg-black/60"
+    >
       <div className="glass-card-strong w-full max-w-md space-y-4 rounded-[24px] p-6">
         <h2 className="text-base font-bold text-gray-800 dark:text-gray-200">Quick Add</h2>
         <TaskComposer

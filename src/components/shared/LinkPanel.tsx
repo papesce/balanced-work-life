@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { ArrowRight, ArrowLeft, X } from "lucide-react";
 import { Idea, IdeaLink, LinkType, Tag } from "@/lib/types";
 import { IdeaSearchPicker } from "@/components/brainstorm/IdeaSearchPicker";
+import { FloatingPanel, type FloatingAnchor } from "@/components/shared/FloatingPanel";
 
 const LINK_TYPES: { value: LinkType; label: string }[] = [
   { value: "unblocks", label: "Unblocks" },
@@ -22,8 +22,8 @@ interface LinkPanelProps {
   onCreateLink: (sourceId: string, targetId: string, linkType: LinkType) => Promise<string>;
   onDeleteLink: (id: string) => Promise<void>;
   onClose: () => void;
-  /** When set, renders in a fixed-position portal so the panel paints above drawers/menus. */
-  fixedPosition?: { top: number; left: number };
+  /** When set, renders in a FloatingPanel portal (FLOATING layer) so the panel paints above drawers/menus. */
+  fixedPosition?: FloatingAnchor;
 }
 
 export function LinkPanel({
@@ -46,12 +46,14 @@ export function LinkPanel({
   const headerText = `Link this ${sourceLabel.toLowerCase()}`;
 
   useEffect(() => {
+    // FloatingPanel owns outside-click/Escape/scroll handling when portaled.
+    if (fixedPosition) return;
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [onClose]);
+  }, [onClose, fixedPosition]);
 
   const ideaLinks = links.filter((l) => l.source_id === ideaId || l.target_id === ideaId);
 
@@ -68,27 +70,8 @@ export function LinkPanel({
     return idea?.text || "Unknown";
   };
 
-  useEffect(() => {
-    if (!fixedPosition) return;
-    const close = () => onClose();
-    window.addEventListener("scroll", close, { capture: true, passive: true });
-    window.addEventListener("resize", close);
-    return () => {
-      window.removeEventListener("scroll", close, { capture: true });
-      window.removeEventListener("resize", close);
-    };
-  }, [fixedPosition, onClose]);
-
-  const panel = (
-    <div
-      ref={ref}
-      style={
-        fixedPosition
-          ? { position: "fixed", top: fixedPosition.top, left: fixedPosition.left, zIndex: 10001 }
-          : undefined
-      }
-      className={`glass-card-strong z-50 mt-1 w-[440px] max-w-[min(480px,90vw)] min-w-[360px] rounded-xl p-3 ${fixedPosition ? "" : "absolute top-full left-0"}`}
-    >
+  const panelContent = (
+    <>
       <div className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">{headerText}</div>
 
       {/* Link type selector */}
@@ -158,9 +141,27 @@ export function LinkPanel({
           </div>
         </div>
       )}
+    </>
+  );
+
+  const panel = (
+    <div
+      ref={ref}
+      className="glass-card-strong absolute top-full left-0 z-50 mt-1 w-[440px] max-w-[min(480px,90vw)] min-w-[360px] rounded-xl p-3"
+    >
+      {panelContent}
     </div>
   );
 
-  if (fixedPosition) return createPortal(panel, document.body);
+  if (fixedPosition)
+    return (
+      <FloatingPanel
+        anchor={fixedPosition}
+        onClose={onClose}
+        className="glass-card-strong mt-1 w-[440px] max-w-[min(480px,90vw)] min-w-[360px] rounded-xl p-3"
+      >
+        {panelContent}
+      </FloatingPanel>
+    );
   return panel;
 }
