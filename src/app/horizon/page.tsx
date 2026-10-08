@@ -37,6 +37,7 @@ import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 
 import { useLens, ColumnShell, UNCLASSIFIED, groupKeyOf, type LensColumn } from "@/components/lens";
 import { groupTreesByLens, groupSecondaryByLens } from "@/lib/horizonGrouping";
+import { getHiddenProjectIds } from "@/lib/horizonProjectVisibility";
 import {
   applyViewToSecondaryMap,
   readActiveHorizonViewId,
@@ -54,8 +55,13 @@ function buildFilteredTree(
   ideas: Idea[],
   collapsedIds: Set<string>,
   hideClosed: boolean,
+  hideProjectsWithTasks: boolean,
 ): IdeaNode[] {
-  const pool = hideClosed ? ideas.filter((i) => ACTIVE_STATUSES.has(i.status)) : ideas;
+  let pool = hideClosed ? ideas.filter((i) => ACTIVE_STATUSES.has(i.status)) : ideas;
+  if (hideProjectsWithTasks) {
+    const hidden = getHiddenProjectIds(pool, ideas);
+    if (hidden.size > 0) pool = pool.filter((i) => !hidden.has(i.id));
+  }
 
   const poolIds = new Set(pool.map((i) => i.id));
   const childIds = new Set(
@@ -159,6 +165,7 @@ export default function HorizonPage() {
   const [typePickerOpen, setTypePickerOpen] = useState(false);
   const [typePickerPos, setTypePickerPos] = useState<{ top: number; left: number } | null>(null);
   const cardMode = useUiPrefsStore((s) => s.cardMode);
+  const hideProjectsWithTasks = useUiPrefsStore((s) => s.horizonHideProjectsWithTasks);
   const unclassifiedExpanded = useUiPrefsStore((s) => s.horizonUnclassifiedExpanded);
   const prefsLens = useUiPrefsStore((s) => s.horizonLens);
   const setPrefs = useUiPrefsStore((s) => s.set);
@@ -334,8 +341,8 @@ export default function HorizonPage() {
   };
 
   const allTreeNodes = useMemo(
-    () => buildFilteredTree(ideas, collapsedIds, hideClosed),
-    [ideas, collapsedIds, hideClosed],
+    () => buildFilteredTree(ideas, collapsedIds, hideClosed, hideProjectsWithTasks),
+    [ideas, collapsedIds, hideClosed, hideProjectsWithTasks],
   );
 
   const priorityOf = useCallback(
@@ -587,6 +594,9 @@ export default function HorizonPage() {
     if (idea && idea.type) {
       setTypeFilter([]);
     }
+    if (idea && idea.type === "project" && hideProjectsWithTasks) {
+      setPrefs({ horizonHideProjectsWithTasks: false });
+    }
     const expandAncestors = (id: string) => {
       const m = new Map(currentIdeas.map((i) => [i.id, i]));
       let cur = m.get(id);
@@ -619,7 +629,7 @@ export default function HorizonPage() {
       router.replace(`/horizon?${params.toString()}`, { scroll: false });
     }, 400);
     return () => clearTimeout(timer);
-  }, [highlightId, loading, searchParams, router, valueOf, setPrefs]);
+  }, [highlightId, loading, searchParams, router, valueOf, setPrefs, hideProjectsWithTasks]);
 
   if (loading || classificationsLoading) {
     return (
@@ -747,6 +757,20 @@ export default function HorizonPage() {
       >
         <EyeOff size={12} />
         <span className="hidden sm:inline">Hide closed</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => setPrefs({ horizonHideProjectsWithTasks: !hideProjectsWithTasks })}
+        title="Hide projects that have a visible task (tasks show on their own with the project breadcrumb)"
+        aria-pressed={hideProjectsWithTasks}
+        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+          hideProjectsWithTasks
+            ? "border-indigo-300 bg-white text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
+            : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
+        }`}
+      >
+        <EyeOff size={12} />
+        <span className="hidden sm:inline">Hide projects with visible tasks</span>
       </button>
       <div className="relative">
         <button
