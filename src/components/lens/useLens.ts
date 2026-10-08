@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from "react";
 import type { ClassificationOption, ClassificationScheme, IdeaClassification } from "@/lib/types";
 import { LensColumn, buildValuesBySchemeKey, optionsForScheme } from "@/components/lens/lensUtils";
+import { buildLensColumns, resolveLens, type HorizonLensDef } from "@/lib/horizonLenses";
 
 /**
  * Non-classification lens (e.g. area from first tag, priority flag).
@@ -61,17 +62,32 @@ export function useLens({
 
   const custom = customs?.[lensKey];
 
+  /**
+   * Resolved presentation lens for the active scheme key. Accepts both lens
+   * ids and scheme keys; legacy keys resolve to the equivalent default lens,
+   * keys without one (nnl, priority) synthesize today's behavior exactly.
+   * Column order comes from the lens; Unclassified behavior is unchanged.
+   */
+  const { lens, synthesized: lensSynthesized } = useMemo(() => {
+    const infos = schemes.map((s) => ({
+      key: s.key,
+      label: s.label,
+      options: optionsForScheme(classificationOptions, s.id).map((o) => o.value),
+    }));
+    return resolveLens(lensKey, infos);
+  }, [schemes, classificationOptions, lensKey]);
+
+  const lensForColumns: HorizonLensDef | null = custom ? null : lens;
+
   const columns: LensColumn[] = useMemo(() => {
     if (custom) return [...custom.options.map((o) => ({ key: o.value, label: o.label }))];
     if (!activeScheme) return [];
-    return [
-      ...optionsForScheme(classificationOptions, activeScheme.id).map((o) => ({
-        key: o.value as string,
-        label: o.label,
-      })),
-      { key: null, label: "Unclassified" },
-    ];
-  }, [custom, activeScheme, classificationOptions]);
+    if (!lensForColumns) return [];
+    return buildLensColumns(
+      lensForColumns,
+      optionsForScheme(classificationOptions, activeScheme.id),
+    );
+  }, [custom, activeScheme, classificationOptions, lensForColumns]);
 
   const valueById = useMemo(
     () => valuesBySchemeKey.get(activeScheme?.key ?? "") ?? EMPTY_MAP,
@@ -93,5 +109,7 @@ export function useLens({
     optionsBySchemeId,
     columns,
     valueOf,
+    lens,
+    lensSynthesized,
   };
 }

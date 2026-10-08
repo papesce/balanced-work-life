@@ -48,6 +48,11 @@ export const CLASSIFICATION_HINTS: Record<string, Record<string, string>> = {
     deep: "Sustained deep work over days.",
     epic: "A major undertaking — break it down.",
   },
+  impact: {
+    high: "Big payoff — do it for the value it creates.",
+    medium: "Solid payoff — worth doing well.",
+    low: "Small payoff — only if there's spare capacity.",
+  },
   area: {
     work: "Career, craft, and professional output.",
     health: "Body and mind — sleep, food, movement.",

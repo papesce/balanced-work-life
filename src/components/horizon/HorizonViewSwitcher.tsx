@@ -5,17 +5,24 @@ import { Bookmark, Check, ChevronDown, Plus, Settings2, Star } from "lucide-reac
 import { FloatingPanel } from "@/components/shared/FloatingPanel";
 import type { ClassificationScheme } from "@/lib/types";
 import { viewColumnKey, type HorizonView } from "@/lib/horizonViews";
+import type { HorizonLensDef } from "@/lib/horizonLenses";
 
 interface HorizonViewSwitcherProps {
   views: HorizonView[];
   activeViewId: string | null;
   defaultViewId: string | null;
+  /** Built-in lenses shown above saved views. */
+  lenses: HorizonLensDef[];
+  activeLensId: string | null;
+  defaultLensId: string | null;
   schemes: ClassificationScheme[];
   columnKeys: (string | null)[];
   onSelect: (id: string) => void;
   onSave: (view: HorizonView) => void;
   onDelete: (id: string) => void;
   onToggleDefault: (id: string) => void;
+  onSelectLens: (lens: HorizonLensDef) => void;
+  onToggleDefaultLens: (id: string) => void;
 }
 
 const fieldClass =
@@ -25,21 +32,38 @@ export function HorizonViewSwitcher({
   views,
   activeViewId,
   defaultViewId,
+  lenses,
+  activeLensId,
+  defaultLensId,
   schemes,
   columnKeys,
   onSelect,
   onSave,
   onDelete,
   onToggleDefault,
+  onSelectLens,
+  onToggleDefaultLens,
 }: HorizonViewSwitcherProps) {
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
   const [editing, setEditing] = useState<HorizonView | null>(null);
   const active = views.find((view) => view.id === activeViewId) ?? null;
+  const activeLens = lenses.find((lens) => lens.id === activeLensId) ?? null;
   const orderedSchemes = useMemo(
     () => [...schemes].sort((a, b) => a.sort_order - b.sort_order),
     [schemes],
   );
+  /** Group-by options: default lenses by lens name, then schemes without a
+   *  default lens (synthesized, e.g. nnl/priority) by scheme label. */
+  const groupByOptions = useMemo(() => {
+    const lensed = new Set(lenses.map((lens) => lens.primaryScheme));
+    return [
+      ...lenses.map((lens) => ({ value: lens.primaryScheme, label: lens.name })),
+      ...orderedSchemes
+        .filter((scheme) => !lensed.has(scheme.key))
+        .map((scheme) => ({ value: scheme.key, label: scheme.label })),
+    ];
+  }, [lenses, orderedSchemes]);
 
   const startNew = () => {
     const primary = active?.primary ?? orderedSchemes[0]?.key ?? "term";
@@ -72,7 +96,9 @@ export function HorizonViewSwitcher({
         title="Choose or manage Horizon lenses"
       >
         <Bookmark size={12} />
-        <span className="max-w-[140px] truncate">{active?.name ?? "Choose lens"}</span>
+        <span className="max-w-[140px] truncate">
+          {active?.name ?? activeLens?.name ?? "Choose lens"}
+        </span>
         <ChevronDown size={12} className="opacity-60" />
       </button>
       {open && anchor && (
@@ -113,9 +139,9 @@ export function HorizonViewSwitcher({
                   }
                   className={fieldClass}
                 >
-                  {orderedSchemes.map((scheme) => (
-                    <option key={scheme.key} value={scheme.key}>
-                      {scheme.label}
+                  {groupByOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
                     </option>
                   ))}
                 </select>
@@ -170,7 +196,7 @@ export function HorizonViewSwitcher({
                   className={fieldClass}
                 >
                   <option value="manual">Manual order</option>
-                  <option value="priority">Priority: high to low</option>
+                  <option value="priority">Lens order</option>
                 </select>
               </label>
               <div className="flex justify-end gap-2 border-t border-black/5 pt-3 dark:border-white/5">
@@ -194,6 +220,48 @@ export function HorizonViewSwitcher({
           ) : (
             <>
               <div className="max-h-72 overflow-y-auto p-2">
+                {lenses.map((lens) => (
+                  <div
+                    key={lens.id}
+                    className={`group flex items-center gap-1 rounded-lg px-2 py-2 ${lens.id === activeLensId && !active ? "bg-violet-50 dark:bg-violet-900/20" : "hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"}`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSelectLens(lens);
+                        setOpen(false);
+                      }}
+                      title={lens.description}
+                      className="min-w-0 flex-1 text-left text-xs font-semibold text-gray-700 dark:text-gray-200"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span className="truncate">{lens.name}</span>
+                        {lens.id === activeLensId && !active && (
+                          <Check size={12} className="text-violet-600" />
+                        )}
+                      </span>
+                      {lens.description && (
+                        <span className="mt-0.5 block truncate text-[10px] font-normal text-gray-400">
+                          {lens.description}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onToggleDefaultLens(lens.id)}
+                      aria-label={
+                        defaultLensId === lens.id ? "Remove default lens" : "Set default lens"
+                      }
+                      title={defaultLensId === lens.id ? "Default lens" : "Set as default"}
+                      className={`rounded p-1.5 ${defaultLensId === lens.id ? "text-amber-500" : "text-gray-400 opacity-0 group-hover:opacity-100"}`}
+                    >
+                      <Star
+                        size={13}
+                        className={defaultLensId === lens.id ? "fill-amber-400" : ""}
+                      />
+                    </button>
+                  </div>
+                ))}
                 {views.length === 0 && (
                   <p className="px-3 py-3 text-xs text-gray-500">
                     No saved lenses yet. Create one to choose grouping and priority order.
@@ -221,7 +289,7 @@ export function HorizonViewSwitcher({
                       <span className="mt-0.5 block truncate text-[10px] font-normal text-gray-400">
                         {orderedSchemes.find((scheme) => scheme.key === view.primary)?.label ??
                           view.primary}
-                        {view.sortBy === "priority" ? " · priority order" : " · manual order"}
+                        {view.sortBy === "priority" ? " · lens order" : " · manual order"}
                       </span>
                     </button>
                     <button

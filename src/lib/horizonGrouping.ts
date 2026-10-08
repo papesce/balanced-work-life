@@ -22,6 +22,7 @@ export function groupTreesByLens(
   allTreeNodes: IdeaNode[],
   valueOf: (ideaId: string) => string | null,
   priorityOf: (ideaId: string) => PriorityValue,
+  compare?: (aId: string, bId: string) => number,
 ): { grouped: Record<string, IdeaNode[]>; promotedByParent: Map<string, PromotedChildRef[]> } {
   const grouped: Record<string, IdeaNode[]> = {};
   const promotedByParent = new Map<string, PromotedChildRef[]>();
@@ -50,6 +51,9 @@ export function groupTreesByLens(
   }
   for (const key of Object.keys(grouped)) {
     grouped[key].sort((a, b) => {
+      // Injected lens-tiebreaker comparator; without one, fall back to the
+      // legacy priority-then-manual order.
+      if (compare) return compare(a.id, b.id);
       const rankDiff = priorityRank(priorityOf(a.id)) - priorityRank(priorityOf(b.id));
       if (rankDiff !== 0) return rankDiff;
       return a.sort_order - b.sort_order;

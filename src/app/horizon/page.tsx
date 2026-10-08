@@ -38,6 +38,7 @@ import { useLens, ColumnShell, UNCLASSIFIED, groupKeyOf, type LensColumn } from 
 import { groupTreesByLens, groupSecondaryByLens } from "@/lib/horizonGrouping";
 import { getHiddenProjectIds } from "@/lib/horizonProjectVisibility";
 import { applyViewToSecondaryMap, type HorizonView } from "@/lib/horizonViews";
+import { DEFAULT_LENSES, buildLensComparator, type HorizonLensDef } from "@/lib/horizonLenses";
 
 const ACTIVE_STATUSES = new Set(["draft", "planned", "in_progress", "scheduled"]);
 
@@ -81,6 +82,16 @@ function compareIdeasForTree(a: Idea, b: Idea): number {
   const bDone = b.completed_at ? 1 : 0;
   if (aDone !== bDone) return aDone - bDone;
   return a.sort_order - b.sort_order;
+}
+
+/**
+ * Normalize a ?lens= value (or stored key) to a primary scheme key: scheme
+ * keys pass through, built-in lens ids map to their primary scheme, unknown
+ * values pass through for the Term fallback in useLens.
+ */
+function primarySchemeForKey(key: string, schemeKeys: Set<string>): string {
+  if (schemeKeys.has(key)) return key;
+  return DEFAULT_LENSES.find((l) => l.id === key)?.primaryScheme ?? key;
 }
 
 function RootAddInput({
@@ -148,7 +159,12 @@ export default function HorizonPage() {
 }
 
 function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
-  const { views, defaultViewId: dbDefaultViewId, secondaryMap: dbSecondaryMap } = prefs;
+  const {
+    views,
+    defaultViewId: dbDefaultViewId,
+    defaultLensId: dbDefaultLensId,
+    secondaryMap: dbSecondaryMap,
+  } = prefs;
   const ideasHook = useIdeas();
   const { ideas, loading, moveIdea, scheduleIdea } = ideasHook;
   const ideasRef = useRef(ideas);
@@ -198,10 +214,13 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
     return def?.id ?? null;
   });
   const [defaultViewId, setDefaultViewId] = useState<string | null>(() => dbDefaultViewId);
+  const [defaultLensId, setDefaultLensId] = useState<string | null>(() => dbDefaultLensId);
   const [lensKey, setLensKey] = useState<string>(() => {
-    if (lensParam) return lensParam;
+    if (lensParam) return primarySchemeForKey(lensParam, new Set(schemes.map((s) => s.key)));
     const def = views.find((v) => v.id === dbDefaultViewId) ?? null;
     if (def) return def.primary;
+    const defLens = DEFAULT_LENSES.find((l) => l.id === dbDefaultLensId) ?? null;
+    if (defLens) return defLens.primaryScheme;
     return prefsLens ?? "term";
   });
 
@@ -211,12 +230,24 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
   });
   const [sortBy, setSortBy] = useState<"manual" | "priority">(() => {
     const def = !lensParam ? (views.find((v) => v.id === dbDefaultViewId) ?? null) : null;
-    return def?.sortBy ?? "manual";
+    if (def) return def.sortBy ?? "manual";
+    // Built-in lenses always use lens order.
+    if (!lensParam && DEFAULT_LENSES.some((l) => l.id === dbDefaultLensId)) return "priority";
+    if (lensParam && DEFAULT_LENSES.some((l) => l.id === lensParam)) return "priority";
+    return "manual";
   });
 
   /** Active lens scheme; unknown keys fall back to Term. */
-  const { valuesBySchemeKey, schemeByKey, activeScheme, optionsBySchemeId, columns, valueOf } =
-    useLens({ schemes, classificationOptions, classifications, lensKey });
+  const {
+    valuesBySchemeKey,
+    schemeByKey,
+    activeScheme,
+    optionsBySchemeId,
+    columns,
+    valueOf,
+    lens,
+    lensSynthesized,
+  } = useLens({ schemes, classificationOptions, classifications, lensKey });
 
   const validTabs = useMemo(() => new Set(columns.map((c) => groupKeyOf(c.key))), [columns]);
 
@@ -335,9 +366,32 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
     [valuesBySchemeKey],
   );
 
+  /** Lens-tiebreaker comparator for in-column ordering (unvalued last). */
+  const lensCompare = useMemo(() => {
+    const optionOrderByScheme = new Map<string, string[]>();
+    for (const s of schemes) {
+      optionOrderByScheme.set(
+        s.key,
+        classificationOptions
+          .filter((o) => o.scheme_id === s.id)
+          .sort((a, b) => a.sort_order - b.sort_order)
+          .map((o) => o.value),
+      );
+    }
+    const valueOfScheme = (ideaId: string, schemeKey: string): string | null =>
+      valuesBySchemeKey.get(schemeKey)?.get(ideaId) ?? null;
+    const sortOrderById = new Map(ideas.map((i) => [i.id, i.sort_order]));
+    return buildLensComparator(
+      lens,
+      optionOrderByScheme,
+      valueOfScheme,
+      (ideaId) => sortOrderById.get(ideaId) ?? 0,
+    );
+  }, [lens, schemes, classificationOptions, valuesBySchemeKey, ideas]);
+
   const { grouped: treesByLens, promotedByParent } = useMemo(
-    () => groupTreesByLens(allTreeNodes, valueOf, priorityOf),
-    [allTreeNodes, valueOf, priorityOf],
+    () => groupTreesByLens(allTreeNodes, valueOf, priorityOf, lensCompare),
+    [allTreeNodes, valueOf, priorityOf, lensCompare],
   );
 
   const columnLabelByKey = useMemo(() => {
@@ -476,7 +530,7 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
         return next;
       });
       setActiveViewId(id);
-      setPrefs({ horizonActiveViewId: id });
+      setPrefs({ horizonActiveViewId: id, horizonLensId: null });
       setSortBy(view.sortBy ?? "manual");
       setLensKey(view.primary);
       setPrefs({ horizonLens: view.primary });
@@ -504,9 +558,29 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
       });
       setSortBy(view.sortBy ?? "manual");
       setActiveViewId(view.id);
-      setPrefs({ horizonActiveViewId: view.id });
+      setPrefs({ horizonActiveViewId: view.id, horizonLensId: null });
     },
     [searchParams, router, setPrefs, prefs],
+  );
+
+  const handleSelectLens = useCallback(
+    (next: HorizonLensDef) => {
+      // Selecting a built-in lens always uses lens order; saved views keep
+      // their own sortBy.
+      setSortBy("priority");
+      setLensKey(next.primaryScheme);
+      setPrefs({
+        horizonLens: next.primaryScheme,
+        horizonLensId: next.id,
+        horizonActiveViewId: null,
+      });
+      setActiveViewId(null);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("lens", next.primaryScheme);
+      params.delete("horizon");
+      router.replace(`/horizon?${params.toString()}`, { scroll: false });
+    },
+    [searchParams, router, setPrefs],
   );
 
   const handleDeleteView = useCallback(
@@ -527,18 +601,33 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
     (id: string) => {
       const next = id === defaultViewId ? null : id;
       setDefaultViewId(next);
+      // The two stars are mutually exclusive (single-statement setDefault).
+      setDefaultLensId(null);
       void prefs.setDefault(next ? { viewId: next } : {});
     },
     [defaultViewId, prefs],
   );
 
+  const handleToggleDefaultLens = useCallback(
+    (id: string) => {
+      const next = id === defaultLensId ? null : id;
+      setDefaultLensId(next);
+      setDefaultViewId(null);
+      void prefs.setDefault(next ? { lensId: next } : {});
+    },
+    [defaultLensId, prefs],
+  );
+
   const activeView = views.find((v) => v.id === activeViewId) ?? null;
 
-  // Sync lens from ?lens= (deep links, global search) when it names a real scheme.
+  // Sync lens from ?lens= (deep links, global search). Accepts both scheme
+  // keys and built-in lens ids; the URL keeps carrying the scheme key.
   useEffect(() => {
-    if (lensParam && lensParam !== lensKey && schemes.some((s) => s.key === lensParam)) {
+    if (!lensParam || schemes.length === 0) return;
+    const primary = primarySchemeForKey(lensParam, new Set(schemes.map((s) => s.key)));
+    if (primary !== lensKey && schemes.some((s) => s.key === primary)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- sync lens from URL param
-      setLensKey(lensParam);
+      setLensKey(primary);
     }
   }, [lensParam, lensKey, schemes]);
 
@@ -714,12 +803,17 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
         views={views}
         activeViewId={activeViewId}
         defaultViewId={defaultViewId}
+        lenses={DEFAULT_LENSES}
+        activeLensId={!activeView && !lensSynthesized ? lens.id : null}
+        defaultLensId={defaultLensId}
         schemes={schemes}
         columnKeys={columns.map((column) => column.key)}
         onSelect={handleSelectView}
         onSave={handleSaveView}
         onDelete={handleDeleteView}
         onToggleDefault={handleToggleDefaultView}
+        onSelectLens={handleSelectLens}
+        onToggleDefaultLens={handleToggleDefaultLens}
       />
       <button
         type="button"
@@ -797,11 +891,7 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
   return (
     <AppShell
       title={
-        activeView
-          ? `Horizon · ${activeView.name}`
-          : activeScheme
-            ? `Horizon · ${activeScheme.label}`
-            : "Horizon"
+        activeView ? `Horizon · ${activeView.name}` : lens ? `Horizon · ${lens.name}` : "Horizon"
       }
       headerStartActions={headerStartActions}
     >
