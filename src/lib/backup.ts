@@ -12,14 +12,9 @@ import {
   Tag,
   TaskTag,
 } from "@/lib/types";
-import {
-  STORAGE_KEYS,
-  SecondaryLensMap,
-  readRawString,
-  readSecondaryLensMap,
-  writeRawString,
-  writeSecondaryLensMap,
-} from "@/lib/storage";
+import type { SecondaryLensMap } from "@/lib/storage";
+import { parseSecondaryMapText, sanitizeView, horizonPrefsId } from "@/lib/horizonViews";
+import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 
 export interface BackupTaskTag extends TaskTag {
   id: string;
@@ -29,6 +24,20 @@ export interface BackupLensPrefs {
   horizonLens: string | null;
   projectsLens: string | null;
   horizonSecondaryMap: SecondaryLensMap;
+}
+
+export interface BackupHorizonView {
+  id: string;
+  name: string;
+  primary_scheme: string;
+  splits: string;
+  sort_by: string;
+}
+
+export interface BackupHorizonPrefs {
+  default_view_id: string | null;
+  default_lens_id: string | null;
+  secondary_map: string;
 }
 
 export interface BackupData {
@@ -43,9 +52,11 @@ export interface BackupData {
   classificationOptions: ClassificationOption[];
   ideaClassifications: IdeaClassification[];
   lensPrefs: BackupLensPrefs | null;
+  horizonViews: BackupHorizonView[];
+  horizonPrefs: BackupHorizonPrefs | null;
 }
 
-export const BACKUP_VERSION = 3;
+export const BACKUP_VERSION = 4;
 
 export function isValidBackup(data: unknown): data is BackupData {
   if (!data || typeof data !== "object") return false;
@@ -58,8 +69,9 @@ function asArray<T>(value: unknown): T[] {
 }
 
 /**
- * Accepts v1 backups (no tags/taskTags) and v2 backups (no
- * quickNotes/classifications/lensPrefs) by defaulting new fields to empty.
+ * Accepts v1 backups (no tags/taskTags), v2 backups (no
+ * quickNotes/classifications/lensPrefs) and v3 backups (no
+ * horizonViews/horizonPrefs) by defaulting new fields to empty.
  */
 export function normalizeBackup(data: BackupData): BackupData {
   const obj = data as unknown as Record<string, unknown>;
@@ -80,14 +92,11 @@ export function normalizeBackup(data: BackupData): BackupData {
       obj.lensPrefs && typeof obj.lensPrefs === "object"
         ? (obj.lensPrefs as BackupLensPrefs)
         : null,
-  };
-}
-
-export function readLensPrefsForBackup(): BackupLensPrefs {
-  return {
-    horizonLens: readRawString(STORAGE_KEYS.horizonLens),
-    projectsLens: readRawString(STORAGE_KEYS.projectsLens),
-    horizonSecondaryMap: readSecondaryLensMap(STORAGE_KEYS.horizonSecondaryMap),
+    horizonViews: asArray<BackupHorizonView>(obj.horizonViews),
+    horizonPrefs:
+      obj.horizonPrefs && typeof obj.horizonPrefs === "object"
+        ? (obj.horizonPrefs as BackupHorizonPrefs)
+        : null,
   };
 }
 
@@ -104,6 +113,8 @@ export async function buildBackupData(
     rawSchemes,
     rawOptions,
     rawClassifications,
+    rawHorizonViews,
+    rawHorizonPrefs,
   ] = await Promise.all([
     db.getAll<Record<string, unknown>>("SELECT * FROM ideas WHERE user_id = ?", [user.id]),
     db.getAll<IdeaLink>("SELECT * FROM idea_links WHERE user_id = ?", [user.id]),
@@ -128,6 +139,14 @@ export async function buildBackupData(
     db.getAll<IdeaClassification>("SELECT * FROM idea_classifications WHERE user_id = ?", [
       user.id,
     ]),
+    db.getAll<BackupHorizonView>(
+      "SELECT id, name, primary_scheme, splits, sort_by FROM horizon_views WHERE user_id = ?",
+      [user.id],
+    ),
+    db.getAll<BackupHorizonPrefs>(
+      "SELECT default_view_id, default_lens_id, secondary_map FROM horizon_prefs WHERE user_id = ?",
+      [user.id],
+    ),
   ]);
 
   // Deserialize JSON text columns stored by PowerSync
@@ -162,7 +181,9 @@ export async function buildBackupData(
     classificationSchemes: rawSchemes,
     classificationOptions: rawOptions,
     ideaClassifications: rawClassifications,
-    lensPrefs: readLensPrefsForBackup(),
+    lensPrefs: null,
+    horizonViews: rawHorizonViews,
+    horizonPrefs: rawHorizonPrefs[0] ?? null,
   };
 }
 
@@ -227,28 +248,113 @@ export async function restoreQuickNotes(
 }
 
 /**
- * Restore lens view prefs only onto empty local keys — never overwrite an
- * active device's view config. Returns the keys that were restored.
+ * Additive merge restore for Horizon views (INSERT OR IGNORE, never deletes).
+ * Invalid rows are skipped. Returns the number of valid rows imported.
  */
-export function restoreLensPrefsIfEmpty(prefs: BackupLensPrefs | null): string[] {
-  if (!prefs) return [];
+export async function restoreHorizonViews(
+  db: AbstractPowerSyncDatabase,
+  userId: string,
+  views: BackupHorizonView[],
+): Promise<number> {
+  const clean = views
+    .map((v) =>
+      sanitizeView({
+        id: v.id,
+        name: v.name,
+        primary: v.primary_scheme,
+        splits: parseSecondaryMapText(v.splits),
+        sortBy: v.sort_by,
+      }),
+    )
+    .filter((v) => v !== null);
+  if (clean.length === 0) return 0;
+  const now = new Date().toISOString();
+  await db.writeTransaction(async (tx) => {
+    for (const v of clean) {
+      await tx.execute(
+        `INSERT OR IGNORE INTO horizon_views (id, user_id, name, primary_scheme, splits, sort_by, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)`,
+        [
+          v.id,
+          userId,
+          v.name,
+          v.primary,
+          JSON.stringify(v.splits ?? {}),
+          v.sortBy ?? "manual",
+          now,
+          now,
+        ],
+      );
+    }
+  });
+  return clean.length;
+}
+
+/**
+ * Restore Horizon prefs + legacy lens prefs only onto an empty DB — never
+ * overwrite this device's synced config. Old (v2/v3) backups carry
+ * `lensPrefs` (localStorage-era active lens + secondary map); v4 backups
+ * carry `horizonPrefs`/`horizonViews`. Returns what was restored.
+ */
+export async function restoreHorizonLensConfig(
+  db: AbstractPowerSyncDatabase,
+  userId: string,
+  data: Pick<BackupData, "horizonViews" | "horizonPrefs" | "lensPrefs">,
+): Promise<string[]> {
   const restored: string[] = [];
-  if (prefs.horizonLens && !readRawString(STORAGE_KEYS.horizonLens)) {
-    writeRawString(STORAGE_KEYS.horizonLens, prefs.horizonLens);
-    restored.push(STORAGE_KEYS.horizonLens);
+  const viewsImported = await restoreHorizonViews(db, userId, data.horizonViews ?? []);
+  if (viewsImported > 0) restored.push(`horizon_views:${viewsImported}`);
+  const existingViews = await db.getAll<Record<string, unknown>>(
+    `SELECT id FROM horizon_views WHERE user_id = ? LIMIT 1`,
+    [userId],
+  );
+  const existingPrefs = await db.getAll<Record<string, unknown>>(
+    `SELECT * FROM horizon_prefs WHERE user_id = ?`,
+    [userId],
+  );
+  if (existingPrefs.length > 0) return restored;
+  // Prefer the v4 prefs row; fall back to the legacy secondary map.
+  const legacyMap = parseSecondaryMapText(data.lensPrefs?.horizonSecondaryMap);
+  const secondaryMap = data.horizonPrefs
+    ? parseSecondaryMapText(data.horizonPrefs.secondary_map)
+    : legacyMap;
+  const hasContent =
+    (data.horizonPrefs != null &&
+      (data.horizonPrefs.default_view_id != null || data.horizonPrefs.default_lens_id != null)) ||
+    Object.keys(secondaryMap).length > 0;
+  if (!hasContent) return restored;
+  // Only adopt a default view that actually exists (restored above or local).
+  let defaultViewId = data.horizonPrefs?.default_view_id ?? null;
+  if (defaultViewId && existingViews.length === 0 && viewsImported === 0) defaultViewId = null;
+  if (defaultViewId) {
+    const found = await db.getOptional<Record<string, unknown>>(
+      `SELECT id FROM horizon_views WHERE id = ?`,
+      [defaultViewId],
+    );
+    if (!found) defaultViewId = null;
   }
-  if (prefs.projectsLens && !readRawString(STORAGE_KEYS.projectsLens)) {
-    writeRawString(STORAGE_KEYS.projectsLens, prefs.projectsLens);
-    restored.push(STORAGE_KEYS.projectsLens);
+  await db.execute(
+    `INSERT OR IGNORE INTO horizon_prefs (id, user_id, default_view_id, default_lens_id, secondary_map, updated_at) VALUES (?,?,?,?,?,?)`,
+    [
+      horizonPrefsId(userId),
+      userId,
+      defaultViewId,
+      data.horizonPrefs?.default_lens_id ?? null,
+      JSON.stringify(secondaryMap),
+      new Date().toISOString(),
+    ],
+  );
+  restored.push("horizon_prefs");
+  // The legacy active lens is local device state: adopt it via uiPrefs only
+  // when this device never chose one (still the default "term").
+  const legacyLens = data.lensPrefs?.horizonLens;
+  if (legacyLens && useUiPrefsStore.getState().horizonLens === "term") {
+    useUiPrefsStore.getState().set({ horizonLens: legacyLens });
+    restored.push("horizonLens");
   }
-  const hasSecondary =
-    prefs.horizonSecondaryMap && Object.keys(prefs.horizonSecondaryMap).length > 0;
-  if (
-    hasSecondary &&
-    Object.keys(readSecondaryLensMap(STORAGE_KEYS.horizonSecondaryMap)).length === 0
-  ) {
-    writeSecondaryLensMap(STORAGE_KEYS.horizonSecondaryMap, prefs.horizonSecondaryMap);
-    restored.push(STORAGE_KEYS.horizonSecondaryMap);
+  const legacyProjectsLens = data.lensPrefs?.projectsLens;
+  if (legacyProjectsLens && useUiPrefsStore.getState().projectsLens === "term") {
+    useUiPrefsStore.getState().set({ projectsLens: legacyProjectsLens });
+    restored.push("projectsLens");
   }
   return restored;
 }

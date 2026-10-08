@@ -16,6 +16,10 @@ interface TimelinePrefs {
 interface UiPrefsState {
   projectsLens: string;
   horizonLens: string;
+  /** Last selected built-in Horizon lens id (local device state). */
+  horizonLensId: string | null;
+  /** Currently active saved Horizon view id (local device state). */
+  horizonActiveViewId: string | null;
   projectsUnclassifiedExpanded: boolean;
   horizonUnclassifiedExpanded: boolean;
   horizonHideProjectsWithTasks: boolean;
@@ -51,6 +55,8 @@ export const useUiPrefsStore = create<UiPrefsState>()(
     (set) => ({
       projectsLens: "term",
       horizonLens: "term",
+      horizonLensId: null,
+      horizonActiveViewId: null,
       projectsUnclassifiedExpanded: true,
       horizonUnclassifiedExpanded: false,
       horizonHideProjectsWithTasks: true,
@@ -66,6 +72,8 @@ export const useUiPrefsStore = create<UiPrefsState>()(
       partialize: (s) => ({
         projectsLens: s.projectsLens,
         horizonLens: s.horizonLens,
+        horizonLensId: s.horizonLensId,
+        horizonActiveViewId: s.horizonActiveViewId,
         projectsUnclassifiedExpanded: s.projectsUnclassifiedExpanded,
         horizonUnclassifiedExpanded: s.horizonUnclassifiedExpanded,
         horizonHideProjectsWithTasks: s.horizonHideProjectsWithTasks,

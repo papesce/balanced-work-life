@@ -118,6 +118,30 @@ export const IdeaClassificationsTable = new Table(
   { indexes: {} },
 );
 
+export const HorizonViewsTable = new Table(
+  {
+    user_id: column.text,
+    name: column.text,
+    primary_scheme: column.text,
+    splits: column.text,
+    sort_by: column.text,
+    created_at: column.text,
+    updated_at: column.text,
+  },
+  { indexes: {} },
+);
+
+export const HorizonPrefsTable = new Table(
+  {
+    user_id: column.text,
+    default_view_id: column.text,
+    default_lens_id: column.text,
+    secondary_map: column.text,
+    updated_at: column.text,
+  },
+  { indexes: {} },
+);
+
 export const AppSchema = new Schema({
   ideas: IdeasTable,
   idea_links: IdeaLinksTable,
@@ -127,6 +151,8 @@ export const AppSchema = new Schema({
   classification_schemes: ClassificationSchemesTable,
   classification_options: ClassificationOptionsTable,
   idea_classifications: IdeaClassificationsTable,
+  horizon_views: HorizonViewsTable,
+  horizon_prefs: HorizonPrefsTable,
 });
 
 // Allowlist of tables the connector knows how to upload. An unknown op.table
@@ -142,6 +168,8 @@ const KNOWN_UPLOAD_TABLES: ReadonlySet<string> = new Set([
   "classification_schemes",
   "classification_options",
   "idea_classifications",
+  "horizon_views",
+  "horizon_prefs",
 ]);
 
 export class SupabaseConnector {
@@ -408,6 +436,69 @@ export class SupabaseConnector {
               { id: op.id, ...(op.opData as Record<string, unknown>) },
               { onConflict: "idea_id,scheme_id" },
             );
+          throwIfSupabaseError(error, `upsert ${op.table} id=${op.id}`);
+          break;
+        }
+        case "DELETE": {
+          const { error } = await supabase.from(op.table).delete().eq("id", op.id);
+          throwIfSupabaseError(error, `delete ${op.table} id=${op.id}`);
+          break;
+        }
+      }
+      return;
+    }
+
+    if (op.table === "horizon_views") {
+      // Views are keyed by id; the queue may hold a stale snapshot of a
+      // row that was edited or deleted locally since. Upload current local
+      // state instead; skip rows deleted locally (their queued DELETE syncs
+      // the outcome) so a stale PUT can't resurrect them server-side.
+      switch (op.op) {
+        case "PUT":
+        case "PATCH": {
+          const current = await database.getOptional<Record<string, unknown>>(
+            `SELECT * FROM horizon_views WHERE id = ?`,
+            [op.id],
+          );
+          if (!current) return;
+          if (op.op === "PUT") {
+            const { error } = await supabase
+              .from(op.table)
+              .upsert({ ...(current as Record<string, unknown>) }, { onConflict: "id" });
+            throwIfSupabaseError(error, `upsert ${op.table} id=${op.id}`);
+          } else {
+            const { error } = await supabase
+              .from(op.table)
+              .update({ ...(current as Record<string, unknown>) })
+              .eq("id", op.id);
+            throwIfSupabaseError(error, `update ${op.table} id=${op.id}`);
+          }
+          break;
+        }
+        case "DELETE": {
+          const { error } = await supabase.from(op.table).delete().eq("id", op.id);
+          throwIfSupabaseError(error, `delete ${op.table} id=${op.id}`);
+          break;
+        }
+      }
+      return;
+    }
+    if (op.table === "horizon_prefs") {
+      // One row per user, upserted on the real unique key (user_id): the
+      // deterministic id is stable per user, but a stale row from another
+      // device must update the winner instead of erroring 23505 and wedging
+      // the queue.
+      switch (op.op) {
+        case "PUT":
+        case "PATCH": {
+          const current = await database.getOptional<Record<string, unknown>>(
+            `SELECT * FROM horizon_prefs WHERE id = ?`,
+            [op.id],
+          );
+          if (!current) return;
+          const { error } = await supabase
+            .from(op.table)
+            .upsert({ ...(current as Record<string, unknown>) }, { onConflict: "user_id" });
           throwIfSupabaseError(error, `upsert ${op.table} id=${op.id}`);
           break;
         }

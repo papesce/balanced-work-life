@@ -16,7 +16,7 @@ import {
   downloadBackup,
   parseBackupFile,
   restoreClassifications,
-  restoreLensPrefsIfEmpty,
+  restoreHorizonLensConfig,
   restoreQuickNotes,
 } from "@/lib/backup";
 
@@ -44,7 +44,7 @@ export function UserMenu() {
       downloadBackup(data);
       setStatus({
         type: "success",
-        text: `Exported ${data.ideas.length} ideas, ${data.ideaLinks.length} links, ${data.tags.length} tags, ${data.quickNotes.length} notes and ${data.ideaClassifications.length} classifications.`,
+        text: `Exported ${data.ideas.length} ideas, ${data.ideaLinks.length} links, ${data.tags.length} tags, ${data.quickNotes.length} notes, ${data.ideaClassifications.length} classifications and ${data.horizonViews.length} horizon views.`,
       });
     } catch (err) {
       setStatus({
@@ -73,9 +73,11 @@ export function UserMenu() {
         data.classificationOptions,
         data.ideaClassifications,
       );
-      const restoredPrefs = restoreLensPrefsIfEmpty(data.lensPrefs);
+      const restoredPrefs = user ? await restoreHorizonLensConfig(db, user.id, data) : [];
       const prefsSuffix =
-        restoredPrefs.length > 0 ? ` Lens prefs restored (${restoredPrefs.length}).` : "";
+        restoredPrefs.length > 0
+          ? ` Horizon lens config restored (${restoredPrefs.join(", ")}).`
+          : "";
       setStatus({
         type: "success",
         text: `Imported ${data.ideas.length} ideas, ${data.ideaLinks.length} links, ${data.tags.length} tags, ${data.quickNotes.length} notes and ${data.ideaClassifications.length} classifications.${prefsSuffix}`,
