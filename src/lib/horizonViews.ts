@@ -17,6 +17,8 @@ export interface HorizonView {
   primary: string;
   /** Column group key -> secondary scheme key (null = no split). */
   splits: Record<string, string | null>;
+  /** Sort items within each group. */
+  sortBy?: "manual" | "priority";
 }
 
 function sanitizeView(raw: unknown): HorizonView | null {
@@ -32,7 +34,13 @@ function sanitizeView(raw: unknown): HorizonView | null {
       splits[k] = typeof val === "string" && val.length > 0 ? val : null;
     }
   }
-  return { id: v.id, name: v.name.trim(), primary: v.primary, splits };
+  return {
+    id: v.id,
+    name: v.name.trim(),
+    primary: v.primary,
+    splits,
+    sortBy: v.sortBy === "priority" ? "priority" : "manual",
+  };
 }
 
 export function readHorizonViews(): HorizonView[] {
@@ -93,10 +101,12 @@ export function summarizeHorizonView(
   const secondaries = Object.values(view.splits).filter(
     (s): s is string => typeof s === "string" && s.length > 0,
   );
-  if (secondaries.length === 0) return `${primary} · no splits`;
+  const sort = view.sortBy === "priority" ? " · priority" : "";
+  if (secondaries.length === 0) return `${primary} · no splits${sort}`;
   const distinct = [...new Set(secondaries.map((s) => labelOf(s) ?? s))];
-  if (distinct.length === 1) return `${primary} · split: ${distinct[0]} (${secondaries.length})`;
-  return `${primary} · ${secondaries.length} splits`;
+  if (distinct.length === 1)
+    return `${primary} · split: ${distinct[0]} (${secondaries.length})${sort}`;
+  return `${primary} · ${secondaries.length} splits${sort}`;
 }
 
 /** Merge a view's splits into the secondary map under its primary scheme. */
@@ -125,8 +135,10 @@ export function isViewDirty(
   lensKey: string,
   columnKeys: (string | null)[],
   secondaryKeyOf: (colKey: string | null) => string | null,
+  sortBy: "manual" | "priority" = "manual",
 ): boolean {
   if (view.primary !== lensKey) return true;
+  if ((view.sortBy ?? "manual") !== sortBy) return true;
   for (const key of columnKeys) {
     const live = secondaryKeyOf(key) ?? null;
     const saved = view.splits[viewColumnKey(key)] ?? null;
