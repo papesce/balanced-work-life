@@ -19,3 +19,4 @@ streams:
       - SELECT * FROM idea_classifications WHERE user_id = auth.user_id()
       - SELECT * FROM horizon_views WHERE user_id = auth.user_id()
       - SELECT * FROM horizon_prefs WHERE user_id = auth.user_id()
+      - SELECT * FROM project_workflows WHERE user_id = auth.user_id()

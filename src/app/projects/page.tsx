@@ -49,6 +49,8 @@ import { UndoBar } from "@/components/shared/UndoBar";
 import { IdeaActionMenu } from "@/components/shared/IdeaActionMenu";
 import { ValueHelpInfo } from "@/components/shared/ValueHelpInfo";
 import { hintForValue } from "@/lib/classificationHelp";
+import { useProjectWorkflow } from "@/hooks/useProjectWorkflow";
+import { ProjectWorkflowCanvas } from "@/components/projects/ProjectWorkflowView";
 
 export default function ProjectsPage() {
   const searchParams = useSearchParams();
@@ -77,6 +79,7 @@ export default function ProjectsPage() {
   const [titleDraft, setTitleDraft] = useState("");
   // Detail-local filters (list filters don't leak into detail).
   const [detailHideCompleted, setDetailHideCompleted] = useState(false);
+  const [detailView, setDetailView] = useState<"list" | "workflow">("list");
 
   const ideasHook = useIdeas({ scope: "all" });
   const linksHook = useIdeaLinks();
@@ -97,6 +100,7 @@ export default function ProjectsPage() {
       if (selectedId && deletedIds.has(selectedId)) handleSelect(null);
     },
   });
+  const workflowState = useProjectWorkflow(selectedId ?? "");
   const {
     createIdea,
     updateIdea,
@@ -343,6 +347,25 @@ export default function ProjectsPage() {
     [ideasHook.ideas, selectedId],
   );
 
+  const projectTasks = useMemo(() => {
+    if (!selectedProject) return [];
+    const children = new Map<string, Idea[]>();
+    for (const idea of ideasHook.ideas) {
+      if (!idea.parent_id) continue;
+      const group = children.get(idea.parent_id) ?? [];
+      group.push(idea);
+      children.set(idea.parent_id, group);
+    }
+    const result: Idea[] = [];
+    const stack = [...(children.get(selectedProject.id) ?? [])];
+    while (stack.length) {
+      const task = stack.pop()!;
+      result.push(task);
+      stack.push(...(children.get(task.id) ?? []));
+    }
+    return result;
+  }, [ideasHook.ideas, selectedProject]);
+
   const breadcrumbChain = useMemo(
     () => (selectedId ? getAncestorChain(selectedId, ideasHook.ideas) : []),
     [selectedId, ideasHook.ideas],
@@ -430,6 +453,25 @@ export default function ProjectsPage() {
         }
         headerActions={
           <div className="flex items-center gap-2">
+            <div
+              className="flex rounded-xl border border-gray-200 p-0.5 dark:border-gray-700"
+              aria-label="Project view"
+            >
+              <button
+                onClick={() => setDetailView("list")}
+                aria-pressed={detailView === "list"}
+                className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${detailView === "list" ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300" : "text-gray-500"}`}
+              >
+                List
+              </button>
+              <button
+                onClick={() => setDetailView("workflow")}
+                aria-pressed={detailView === "workflow"}
+                className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${detailView === "workflow" ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300" : "text-gray-500"}`}
+              >
+                Workflow
+              </button>
+            </div>
             <button
               onClick={() => openNotes(selectedId)}
               className="toolbar-btn flex items-center gap-1.5"
@@ -570,46 +612,61 @@ export default function ProjectsPage() {
           </label>
         </div>
 
-        <IdeaTree
-          tree={ideasHook.tree}
-          ideas={ideasHook.ideas}
-          links={linksHook.links}
-          scope="all"
-          createIdea={createIdea}
-          updateIdea={updateIdea}
-          deleteIdea={deleteIdea}
-          moveIdea={moveIdea}
-          onCreateParent={createParentAndMove}
-          toggleCollapse={ideasHook.toggleCollapse}
-          expandIdea={ideasHook.expandIdea}
-          onCreateLink={createLink}
-          onDeleteLink={deleteLink}
-          onMarkDone={markDone}
-          onMarkUndone={markUndone}
-          onSchedule={scheduleIdea}
-          allTags={tagsHook.tags}
-          getTagsForIdea={taskTagsHook.getTagsForIdea}
-          onAddTag={taskTagsHook.addTagToTask}
-          onRemoveTag={taskTagsHook.removeTagFromTask}
-          onCreateTag={tagsHook.createTag}
-          search=""
-          showType={showType}
-          showArea={showArea}
-          editMode="edit"
-          editingId={editingId}
-          setEditingId={setEditingId}
-          selectedId={selectedTreeId}
-          setSelectedId={setSelectedTreeId}
-          composing={composing}
-          setComposing={setComposing}
-          showToday={false}
-          hideClosed={false}
-          hideCompleted={detailHideCompleted}
-          hideDeferred={false}
-          focusedId={focusedId ?? selectedId}
-          onFocus={(id) => setFocusedId(id === selectedId ? null : id)}
-          cardMode={false}
-        />
+        {detailView === "workflow" ? (
+          <ProjectWorkflowCanvas
+            tasks={projectTasks}
+            links={linksHook.links}
+            workflow={workflowState.workflow}
+            onSaveWorkflow={workflowState.save}
+            tagsForTask={taskTagsHook.getTagsForIdea}
+            onUpdateTask={updateIdea}
+            onOpenNotes={openNotes}
+            onCreateLink={(s, t, type) => createLink(s, t, type)}
+            onDeleteLink={deleteLink}
+            onAddStep={() => actions.addTask(selectedId ?? "")}
+          />
+        ) : (
+          <IdeaTree
+            tree={ideasHook.tree}
+            ideas={ideasHook.ideas}
+            links={linksHook.links}
+            scope="all"
+            createIdea={createIdea}
+            updateIdea={updateIdea}
+            deleteIdea={deleteIdea}
+            moveIdea={moveIdea}
+            onCreateParent={createParentAndMove}
+            toggleCollapse={ideasHook.toggleCollapse}
+            expandIdea={ideasHook.expandIdea}
+            onCreateLink={createLink}
+            onDeleteLink={deleteLink}
+            onMarkDone={markDone}
+            onMarkUndone={markUndone}
+            onSchedule={scheduleIdea}
+            allTags={tagsHook.tags}
+            getTagsForIdea={taskTagsHook.getTagsForIdea}
+            onAddTag={taskTagsHook.addTagToTask}
+            onRemoveTag={taskTagsHook.removeTagFromTask}
+            onCreateTag={tagsHook.createTag}
+            search=""
+            showType={showType}
+            showArea={showArea}
+            editMode="edit"
+            editingId={editingId}
+            setEditingId={setEditingId}
+            selectedId={selectedTreeId}
+            setSelectedId={setSelectedTreeId}
+            composing={composing}
+            setComposing={setComposing}
+            showToday={false}
+            hideClosed={false}
+            hideCompleted={detailHideCompleted}
+            hideDeferred={false}
+            focusedId={focusedId ?? selectedId}
+            onFocus={(id) => setFocusedId(id === selectedId ? null : id)}
+            cardMode={false}
+          />
+        )}
         {completionEffects && hasAnyEffects(completionEffects.effects) && (
           <div className="mt-4">
             <LinkedEffectsReveal

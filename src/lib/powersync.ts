@@ -8,6 +8,7 @@ import {
   AbstractPowerSyncDatabase,
 } from "@powersync/web";
 import { supabase } from "./supabase";
+import { isUuid, newHorizonViewId } from "./horizonViews";
 
 export const IdeasTable = new Table(
   {
@@ -123,8 +124,12 @@ export const HorizonViewsTable = new Table(
     user_id: column.text,
     name: column.text,
     primary_scheme: column.text,
+    description: column.text,
+    column_order: column.text,
+    tiebreakers: column.text,
     splits: column.text,
     sort_by: column.text,
+    is_builtin: column.integer,
     created_at: column.text,
     updated_at: column.text,
   },
@@ -142,6 +147,16 @@ export const HorizonPrefsTable = new Table(
   { indexes: {} },
 );
 
+export const ProjectWorkflowsTable = new Table(
+  {
+    user_id: column.text,
+    project_id: column.text,
+    document: column.text,
+    updated_at: column.text,
+  },
+  { indexes: {} },
+);
+
 export const AppSchema = new Schema({
   ideas: IdeasTable,
   idea_links: IdeaLinksTable,
@@ -153,6 +168,7 @@ export const AppSchema = new Schema({
   idea_classifications: IdeaClassificationsTable,
   horizon_views: HorizonViewsTable,
   horizon_prefs: HorizonPrefsTable,
+  project_workflows: ProjectWorkflowsTable,
 });
 
 // Allowlist of tables the connector knows how to upload. An unknown op.table
@@ -170,6 +186,7 @@ const KNOWN_UPLOAD_TABLES: ReadonlySet<string> = new Set([
   "idea_classifications",
   "horizon_views",
   "horizon_prefs",
+  "project_workflows",
 ]);
 
 export class SupabaseConnector {
@@ -222,6 +239,25 @@ export class SupabaseConnector {
       console.warn(
         `[QuickNote:sql] upload ${op.table} ${op.op} id=${op.id} SKIPPED: unknown table`,
       );
+      return;
+    }
+
+    // All synced id columns are uuid server-side. A non-uuid id (legacy
+    // horizon view ids like "seed-term") is rejected by Postgres with 22P02
+    // — including on DELETE via .eq("id", badId) — so never send it to the
+    // server. The horizon_views branch below remaps the local row onto a
+    // fresh uuid (preserving the view); other tables keep the row local-only
+    // and the poisoned op is purged via batch.complete().
+    if (!isUuid(op.id)) {
+      if (op.table === "horizon_views" && (op.op === "PUT" || op.op === "PATCH")) {
+        await this.remapHorizonViewId(database, op.id);
+      } else if (op.table === "horizon_views" && op.op === "DELETE") {
+        // Local row already gone; just drop the poisoned DELETE op.
+      } else {
+        console.warn(
+          `[QuickNote:sql] upload ${op.table} ${op.op} id=${op.id} SKIPPED: non-uuid id`,
+        );
+      }
       return;
     }
 
@@ -510,6 +546,31 @@ export class SupabaseConnector {
       }
       return;
     }
+    if (op.table === "project_workflows") {
+      const current = await database.getOptional<Record<string, unknown>>(
+        `SELECT * FROM project_workflows WHERE id = ?`,
+        [op.id],
+      );
+      if (!current && op.op !== "DELETE") return;
+      if (op.op === "DELETE") {
+        const { error } = await supabase.from(op.table).delete().eq("id", op.id);
+        throwIfSupabaseError(error, `delete ${op.table} id=${op.id}`);
+      } else {
+        const payload = { ...(current as Record<string, unknown>) };
+        if (typeof payload.document === "string") {
+          try {
+            payload.document = JSON.parse(payload.document) as unknown;
+          } catch {
+            payload.document = { version: 1, nodes: [], edges: [] };
+          }
+        }
+        const { error } = await supabase
+          .from(op.table)
+          .upsert(payload, { onConflict: "project_id" });
+        throwIfSupabaseError(error, `upsert ${op.table} id=${op.id}`);
+      }
+      return;
+    }
 
     switch (op.op) {
       case "PUT": {
@@ -533,6 +594,50 @@ export class SupabaseConnector {
         break;
       }
     }
+  }
+
+  /**
+   * Remap a horizon_views row with a legacy non-uuid id (e.g. "seed-term")
+   * onto a fresh uuid, preserving the view. The poisoned PUT op is purged
+   * via batch.complete(); the new row re-enters the queue with a valid id
+   * and the stale DELETE for the old id is skipped by the uuid guard.
+   */
+  private async remapHorizonViewId(
+    database: AbstractPowerSyncDatabase,
+    oldId: string,
+  ): Promise<void> {
+    const row = await database.getOptional<Record<string, unknown>>(
+      `SELECT * FROM horizon_views WHERE id = ?`,
+      [oldId],
+    );
+    if (!row) return;
+    const newId = newHorizonViewId();
+    const now = new Date().toISOString();
+    await database.writeTransaction(async (tx) => {
+      await tx.execute(
+        `INSERT OR IGNORE INTO horizon_views (id, user_id, name, primary_scheme, description, column_order, tiebreakers, splits, sort_by, is_builtin, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [
+          newId,
+          row.user_id,
+          row.name,
+          row.primary_scheme,
+          (row.description as string) ?? "",
+          (row.column_order as string) ?? "[]",
+          (row.tiebreakers as string) ?? "[]",
+          row.splits,
+          row.sort_by,
+          (row.is_builtin as number) ?? 0,
+          (row.created_at as string) ?? now,
+          now,
+        ],
+      );
+      await tx.execute(
+        `UPDATE horizon_prefs SET default_view_id = ?, updated_at = ? WHERE default_view_id = ?`,
+        [newId, now, oldId],
+      );
+      await tx.execute(`DELETE FROM horizon_views WHERE id = ?`, [oldId]);
+    });
+    console.warn(`[QuickNote:sql] remapped horizon_views id=${oldId} -> ${newId}`);
   }
 
   /**

@@ -15,11 +15,14 @@ import {
   horizonViewToRow,
   parseSecondaryMapText,
   planLegacyImport,
+  horizonLensSeedId,
   rowToHorizonView,
   sanitizeView,
+  withServerCompatibleId,
   type HorizonView,
   type HorizonViewRow,
 } from "@/lib/horizonViews";
+import { DEFAULT_LENSES } from "@/lib/horizonLenses";
 
 interface HorizonPrefsRow {
   id: string;
@@ -66,6 +69,7 @@ export function useHorizonPrefs() {
   const db = usePowerSync();
   const userId = user?.id ?? "";
   const importAttempted = useRef(false);
+  const lensSeedAttempted = useRef(false);
   const setUiPrefs = useUiPrefsStore((s) => s.set);
 
   const { data: viewRows, isLoading: viewsLoading } = useQuery<Record<string, unknown>>(
@@ -146,14 +150,18 @@ export function useHorizonPrefs() {
             const row = horizonViewToRow(view, user.id);
             const now = new Date().toISOString();
             await tx.execute(
-              `INSERT OR IGNORE INTO horizon_views (id, user_id, name, primary_scheme, splits, sort_by, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)`,
+              `INSERT OR IGNORE INTO horizon_views (id, user_id, name, primary_scheme, description, column_order, tiebreakers, splits, sort_by, is_builtin, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
               [
                 row.id,
                 row.user_id,
                 row.name,
                 row.primary_scheme,
+                row.description,
+                row.column_order,
+                row.tiebreakers,
                 row.splits,
                 row.sort_by,
+                row.is_builtin ? 1 : 0,
                 now,
                 now,
               ],
@@ -182,6 +190,44 @@ export function useHorizonPrefs() {
     })();
   }, [user, isLoading, views, defaultViewId, defaultLensId, secondaryMap, db, setUiPrefs]);
 
+  // Seed the 6 built-in lenses into horizon_views on first load
+  // (idempotent INSERT OR IGNORE; never overwrites user edits). Deterministic
+  // uuidv5 ids per user+lens key so every device converges.
+  useEffect(() => {
+    if (!user || isLoading || lensSeedAttempted.current) return;
+    lensSeedAttempted.current = true;
+    const now = new Date().toISOString();
+    void (async () => {
+      try {
+        await db.writeTransaction(async (tx) => {
+          for (const lens of DEFAULT_LENSES) {
+            await tx.execute(
+              `INSERT OR IGNORE INTO horizon_views (id, user_id, name, primary_scheme, description, column_order, tiebreakers, splits, sort_by, is_builtin, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+              [
+                horizonLensSeedId(user.id, lens.id),
+                user.id,
+                lens.name,
+                lens.primaryScheme,
+                lens.description ?? "",
+                JSON.stringify(lens.columnOrder),
+                JSON.stringify(lens.tiebreakers),
+                "{}",
+                "manual",
+                1,
+                now,
+                now,
+              ],
+            );
+          }
+        });
+      } catch {
+        // Older local DBs may lack the new columns until the PowerSync
+        // schema migrates: seeding retries on the next mount.
+        lensSeedAttempted.current = false;
+      }
+    })();
+  }, [user, isLoading, db, lensSeedAttempted]);
+
   const ensurePrefsRow = useCallback(async () => {
     if (!user) return;
     await db.execute(
@@ -190,19 +236,83 @@ export function useHorizonPrefs() {
     );
   }, [db, user]);
 
+  /**
+   * Upsert a view row. PowerSync exposes synced tables to app code as VIEWS
+   * (backed by ps_data__* tables with INSTEAD OF triggers), and SQLite
+   * refuses to plan a true UPSERT (`ON CONFLICT ... DO UPDATE`) against a
+   * view ("cannot UPSERT a view"). So: UPDATE first, INSERT OR IGNORE when
+   * nothing matched — the same pattern the rest of the codebase uses.
+   */
+  const upsertViewRow = useCallback(
+    async (
+      tx: { execute: (sql: string, params: unknown[]) => Promise<{ rowsAffected: number }> },
+      row: HorizonViewRow,
+      now: string,
+    ) => {
+      const updated = await tx.execute(
+        `UPDATE horizon_views SET user_id = ?, name = ?, primary_scheme = ?, description = ?, column_order = ?, tiebreakers = ?, splits = ?, sort_by = ?, is_builtin = ?, updated_at = ? WHERE id = ?`,
+        [
+          row.user_id,
+          row.name,
+          row.primary_scheme,
+          row.description,
+          row.column_order,
+          row.tiebreakers,
+          row.splits,
+          row.sort_by,
+          row.is_builtin ? 1 : 0,
+          now,
+          row.id,
+        ],
+      );
+      if (updated.rowsAffected === 0) {
+        await tx.execute(
+          `INSERT OR IGNORE INTO horizon_views (id, user_id, name, primary_scheme, description, column_order, tiebreakers, splits, sort_by, is_builtin, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+          [
+            row.id,
+            row.user_id,
+            row.name,
+            row.primary_scheme,
+            row.description,
+            row.column_order,
+            row.tiebreakers,
+            row.splits,
+            row.sort_by,
+            row.is_builtin ? 1 : 0,
+            now,
+            now,
+          ],
+        );
+      }
+    },
+    [],
+  );
+
   const saveView = useCallback(
     async (view: HorizonView) => {
       const clean = sanitizeView(view);
       if (!clean || !user) return;
-      const row = horizonViewToRow(clean, user.id);
+      // Legacy views may carry human-readable ids ("seed-term") that the
+      // server uuid PK rejects: remap once, replacing the old local row.
+      const compatible = withServerCompatibleId(clean);
+      const row = horizonViewToRow(compatible, user.id);
       const now = new Date().toISOString();
-      await db.execute(
-        `INSERT INTO horizon_views (id, user_id, name, primary_scheme, splits, sort_by, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)
-         ON CONFLICT(id) DO UPDATE SET name = excluded.name, primary_scheme = excluded.primary_scheme, splits = excluded.splits, sort_by = excluded.sort_by, updated_at = excluded.updated_at`,
-        [row.id, row.user_id, row.name, row.primary_scheme, row.splits, row.sort_by, now, now],
-      );
+      if (compatible.id !== clean.id) {
+        await db.writeTransaction(async (tx) => {
+          await upsertViewRow(tx, row, now);
+          await tx.execute(
+            `UPDATE horizon_prefs SET default_view_id = ?, updated_at = ? WHERE default_view_id = ?`,
+            [compatible.id, now, clean.id],
+          );
+          await tx.execute(`DELETE FROM horizon_views WHERE id = ?`, [clean.id]);
+        });
+        return;
+      }
+      await db.writeTransaction(async (tx) => {
+        await upsertViewRow(tx, row, now);
+      });
     },
-    [db, user],
+    [db, user, upsertViewRow],
   );
 
   const deleteView = useCallback(

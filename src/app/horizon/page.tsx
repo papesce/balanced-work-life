@@ -18,6 +18,7 @@ import { UndoBar } from "@/components/shared/UndoBar";
 import { QuickAddInput } from "@/components/timeline/QuickAddInput";
 import { HorizonTree } from "@/components/horizon/HorizonTree";
 import { HorizonViewSwitcher } from "@/components/horizon/HorizonViewSwitcher";
+import { LensEditPanel } from "@/components/horizon/LensEditPanel";
 import { type PriorityValue } from "@/components/shared/PriorityChip";
 import { TypePicker } from "@/components/brainstorm/TypePicker";
 import { TypeFilterPicker } from "@/components/shared/TypeFilterPicker";
@@ -37,7 +38,13 @@ import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 import { useLens, ColumnShell, UNCLASSIFIED, groupKeyOf, type LensColumn } from "@/components/lens";
 import { groupTreesByLens, groupSecondaryByLens } from "@/lib/horizonGrouping";
 import { getHiddenProjectIds } from "@/lib/horizonProjectVisibility";
-import { applyViewToSecondaryMap, type HorizonView } from "@/lib/horizonViews";
+import {
+  applyViewToSecondaryMap,
+  newHorizonViewId,
+  snapshotSplits,
+  viewColumnKey,
+  type HorizonView,
+} from "@/lib/horizonViews";
 import { DEFAULT_LENSES, buildLensComparator, type HorizonLensDef } from "@/lib/horizonLenses";
 
 const ACTIVE_STATUSES = new Set(["draft", "planned", "in_progress", "scheduled"]);
@@ -236,6 +243,58 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
     if (lensParam && DEFAULT_LENSES.some((l) => l.id === lensParam)) return "priority";
     return "manual";
   });
+
+  // ---- Below-header lens edit session ----
+  // The edit icon on a lens row closes the menu and opens an editor panel
+  // below the header (name, description, primary). Per-column splits edit
+  // directly on each primary box header. Changes apply live on the board;
+  // Save persists them, Cancel restores the snapshot taken when the
+  // session started.
+  const [menuEditingId, setMenuEditingId] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState("");
+  const [draftDescription, setDraftDescription] = useState("");
+  const [nameAutoFocus, setNameAutoFocus] = useState(false);
+  const [editSnapshot, setEditSnapshot] = useState<{
+    lensKey: string;
+    sortBy: "manual" | "priority";
+    secondaryMapJson: string;
+    name: string;
+    description: string;
+    activeViewId: string | null;
+  } | null>(null);
+
+  /** Built-in lenses with user-edited names/descriptions overlaid from the
+   *  seeded rows (matched by primary scheme). Selection stays id-based. */
+  const displayLenses = useMemo(
+    () =>
+      DEFAULT_LENSES.map((l) => {
+        const override = views.find((v) => v.is_builtin && v.primary === l.primaryScheme);
+        return {
+          id: l.id,
+          name: override?.name ?? l.name,
+          description: override?.description ?? l.description,
+          primaryScheme: l.primaryScheme,
+        };
+      }),
+    [views],
+  );
+
+  const orderedSchemes = useMemo(
+    () => [...schemes].sort((a, b) => a.sort_order - b.sort_order),
+    [schemes],
+  );
+
+  /** Group-by options for the edit panel: default lenses by lens name,
+   *  then schemes without a default lens (synthesized) by scheme label. */
+  const primaryOptions = useMemo(() => {
+    const lensed = new Set(displayLenses.map((lens) => lens.primaryScheme));
+    return [
+      ...displayLenses.map((lens) => ({ value: lens.primaryScheme, label: lens.name })),
+      ...orderedSchemes
+        .filter((scheme) => !lensed.has(scheme.key))
+        .map((scheme) => ({ value: scheme.key, label: scheme.label })),
+    ];
+  }, [displayLenses, orderedSchemes]);
 
   /** Active lens scheme; unknown keys fall back to Term. */
   const {
@@ -520,8 +579,68 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
     setUnclassifiedExpanded(!unclassifiedExpanded);
   };
 
+  const hasUnsavedEdits = useMemo(() => {
+    if (menuEditingId == null || !editSnapshot) return false;
+    if (draftName.trim() !== editSnapshot.name) return true;
+    if (draftDescription !== editSnapshot.description) return true;
+    if (lensKey !== editSnapshot.lensKey) return true;
+    if (sortBy !== editSnapshot.sortBy) return true;
+    if ((activeViewId ?? null) !== editSnapshot.activeViewId) return true;
+    return JSON.stringify(secondaryMap) !== editSnapshot.secondaryMapJson;
+  }, [
+    menuEditingId,
+    editSnapshot,
+    draftName,
+    draftDescription,
+    lensKey,
+    sortBy,
+    activeViewId,
+    secondaryMap,
+  ]);
+
+  /** Leave the edit session, restoring the snapshot. Returns false when the
+   *  user backs out of the discard confirm, so callers can abort. */
+  const leaveEditSession = useCallback(() => {
+    if (menuEditingId == null) return true;
+    if (hasUnsavedEdits) {
+      const discard = window.confirm("Discard your unsaved lens changes and leave the editor?");
+      if (!discard) return false;
+    }
+    if (editSnapshot) {
+      setLensKey(editSnapshot.lensKey);
+      setPrefs({ horizonLens: editSnapshot.lensKey });
+      setSortBy(editSnapshot.sortBy);
+      try {
+        const restored = JSON.parse(editSnapshot.secondaryMapJson) as SecondaryLensMap;
+        setSecondaryMap(restored);
+        void prefs.setSecondaryMap(restored);
+      } catch {
+        // Corrupt snapshot (shouldn't happen): keep the live map.
+      }
+      setActiveViewId(editSnapshot.activeViewId);
+      setPrefs({
+        horizonActiveViewId: editSnapshot.activeViewId,
+        horizonLensId: editSnapshot.activeViewId ? null : undefined,
+      });
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("lens", editSnapshot.lensKey);
+      params.delete("horizon");
+      router.replace(`/horizon?${params.toString()}`, { scroll: false });
+      // An abandoned empty slot (never named) is removed again.
+      if (editSnapshot.name === "") {
+        const stale = views.find((v) => v.id === menuEditingId && !v.is_builtin);
+        if (stale && stale.name === "Untitled lens") void prefs.deleteView(stale.id);
+      }
+    }
+    setMenuEditingId(null);
+    setEditSnapshot(null);
+    setNameAutoFocus(false);
+    return true;
+  }, [menuEditingId, hasUnsavedEdits, editSnapshot, views, setPrefs, prefs, searchParams, router]);
+
   const handleSelectView = useCallback(
     (id: string) => {
+      if (!leaveEditSession()) return;
       const view = views.find((v) => v.id === id);
       if (!view) return;
       setSecondaryMap((prev) => {
@@ -539,32 +658,12 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
       params.delete("horizon");
       router.replace(`/horizon?${params.toString()}`, { scroll: false });
     },
-    [views, searchParams, router, setPrefs, prefs],
-  );
-
-  const handleSaveView = useCallback(
-    (view: HorizonView) => {
-      void prefs.saveView(view);
-      setLensKey(view.primary);
-      setPrefs({ horizonLens: view.primary });
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("lens", view.primary);
-      params.delete("horizon");
-      router.replace(`/horizon?${params.toString()}`, { scroll: false });
-      setSecondaryMap((prev) => {
-        const next = applyViewToSecondaryMap(view, prev);
-        void prefs.setSecondaryMap(next);
-        return next;
-      });
-      setSortBy(view.sortBy ?? "manual");
-      setActiveViewId(view.id);
-      setPrefs({ horizonActiveViewId: view.id, horizonLensId: null });
-    },
-    [searchParams, router, setPrefs, prefs],
+    [views, searchParams, router, setPrefs, prefs, leaveEditSession],
   );
 
   const handleSelectLens = useCallback(
     (next: HorizonLensDef) => {
+      if (!leaveEditSession()) return;
       // Selecting a built-in lens always uses lens order; saved views keep
       // their own sortBy.
       setSortBy("priority");
@@ -580,7 +679,7 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
       params.delete("horizon");
       router.replace(`/horizon?${params.toString()}`, { scroll: false });
     },
-    [searchParams, router, setPrefs],
+    [searchParams, router, setPrefs, leaveEditSession],
   );
 
   const handleDeleteView = useCallback(
@@ -619,6 +718,230 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
   );
 
   const activeView = views.find((v) => v.id === activeViewId) ?? null;
+
+  // ---- Below-header edit session targets ----
+  const activeDisplayLens =
+    !activeView && !lensSynthesized ? (displayLenses.find((l) => l.id === lens.id) ?? null) : null;
+  /** The saved view under edit, if the session targets one (built-in lenses
+   *  are id-addressed and keep their grouping fixed). */
+  const editingTargetView =
+    menuEditingId != null
+      ? (views.find((v) => v.id === menuEditingId && !v.is_builtin) ?? null)
+      : null;
+  const primaryLocked = menuEditingId == null || editingTargetView == null;
+
+  /** Start a below-header edit session for a lens row (built-in id or
+   *  view id). The lens is activated first so criteria changes preview
+   *  live. An in-progress session is left (with confirm) first. */
+  const handleStartMenuEdit = useCallback(
+    (id: string) => {
+      if (!leaveEditSession()) return;
+      const view = views.find((v) => v.id === id && !v.is_builtin) ?? null;
+      if (view) {
+        const merged = applyViewToSecondaryMap(view, secondaryMap);
+        setSecondaryMap(merged);
+        void prefs.setSecondaryMap(merged);
+        setActiveViewId(id);
+        setPrefs({ horizonActiveViewId: id, horizonLensId: null });
+        setSortBy(view.sortBy ?? "manual");
+        setLensKey(view.primary);
+        setPrefs({ horizonLens: view.primary });
+        setDraftName(view.name);
+        setDraftDescription(view.description);
+        setEditSnapshot({
+          lensKey: view.primary,
+          sortBy: view.sortBy ?? "manual",
+          secondaryMapJson: JSON.stringify(merged),
+          name: view.name.trim(),
+          description: view.description,
+          activeViewId: id,
+        });
+      } else {
+        const def =
+          DEFAULT_LENSES.find((l) => l.id === id) ??
+          DEFAULT_LENSES.find((l) => l.primaryScheme === id) ??
+          null;
+        if (!def) return;
+        setSortBy("priority");
+        setLensKey(def.primaryScheme);
+        setPrefs({
+          horizonLens: def.primaryScheme,
+          horizonLensId: def.id,
+          horizonActiveViewId: null,
+        });
+        setActiveViewId(null);
+        const override = views.find((v) => v.is_builtin && v.primary === def.primaryScheme);
+        const name = override?.name ?? def.name;
+        const description = override?.description ?? def.description ?? "";
+        setDraftName(name);
+        setDraftDescription(description);
+        setEditSnapshot({
+          lensKey: def.primaryScheme,
+          sortBy: "priority",
+          secondaryMapJson: JSON.stringify(secondaryMap),
+          name: name.trim(),
+          description,
+          activeViewId: null,
+        });
+      }
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("horizon");
+      router.replace(`/horizon?${params.toString()}`, { scroll: false });
+      setMenuEditingId(id);
+      setNameAutoFocus(true);
+    },
+    [views, secondaryMap, prefs, setPrefs, searchParams, router, leaveEditSession],
+  );
+
+  /** Create lens: an empty slot (untitled row) selected at once, with the
+   *  name input focused so the user names it right away. */
+  const handleCreateLens = useCallback(() => {
+    if (!leaveEditSession()) return;
+    const created: HorizonView = {
+      id: newHorizonViewId(),
+      name: "Untitled lens",
+      description: "",
+      primary: lensKey,
+      column_order: [],
+      tiebreakers: [],
+      splits: snapshotSplits(
+        columns.map((c) => c.key),
+        secondaryKeyOf,
+      ),
+      sortBy,
+      is_builtin: false,
+    };
+    void prefs.saveView(created);
+    setActiveViewId(created.id);
+    setPrefs({ horizonActiveViewId: created.id, horizonLensId: null });
+    // Empty name draft = the "empty slot": Save stays disabled until named.
+    setDraftName("");
+    setDraftDescription("");
+    setEditSnapshot({
+      lensKey,
+      sortBy,
+      secondaryMapJson: JSON.stringify(secondaryMap),
+      name: "",
+      description: "",
+      activeViewId: created.id,
+    });
+    setMenuEditingId(created.id);
+    setNameAutoFocus(true);
+  }, [lensKey, sortBy, secondaryMap, columns, secondaryKeyOf, prefs, setPrefs, leaveEditSession]);
+
+  const handleSaveLensEdits = useCallback(() => {
+    if (menuEditingId == null) return;
+    const trimmed = draftName.trim();
+    if (!trimmed) return;
+    const splits = snapshotSplits(
+      columns.map((c) => c.key),
+      secondaryKeyOf,
+    );
+    const target = views.find((v) => v.id === menuEditingId && !v.is_builtin) ?? null;
+    if (target) {
+      const updated: HorizonView = {
+        ...target,
+        name: trimmed,
+        description: draftDescription,
+        primary: lensKey,
+        splits,
+        sortBy,
+      };
+      void prefs.saveView(updated);
+      setActiveViewId(updated.id);
+      setPrefs({ horizonActiveViewId: updated.id, horizonLensId: null });
+    } else {
+      const builtin =
+        DEFAULT_LENSES.find((l) => l.id === menuEditingId) ??
+        (!lensSynthesized ? (DEFAULT_LENSES.find((l) => l.id === lens.id) ?? null) : null);
+      const seeded =
+        builtin?.primaryScheme === lensKey
+          ? (views.find((v) => v.is_builtin && v.primary === builtin.primaryScheme) ?? null)
+          : null;
+      if (seeded) {
+        const updated: HorizonView = {
+          ...seeded,
+          name: trimmed,
+          description: draftDescription,
+          splits,
+          sortBy,
+        };
+        void prefs.saveView(updated);
+      } else {
+        // Synthesized scheme lens: fork into a new saved lens so
+        // id-addressed built-ins keep their grouping.
+        const created: HorizonView = {
+          id: newHorizonViewId(),
+          name: trimmed,
+          description: draftDescription,
+          primary: lensKey,
+          column_order: [],
+          tiebreakers: [],
+          splits,
+          sortBy,
+          is_builtin: false,
+        };
+        void prefs.saveView(created);
+        setActiveViewId(created.id);
+        setPrefs({ horizonActiveViewId: created.id, horizonLensId: null });
+      }
+    }
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("lens", lensKey);
+    params.delete("horizon");
+    router.replace(`/horizon?${params.toString()}`, { scroll: false });
+    setMenuEditingId(null);
+    setEditSnapshot(null);
+    setNameAutoFocus(false);
+  }, [
+    menuEditingId,
+    draftName,
+    draftDescription,
+    columns,
+    secondaryKeyOf,
+    lensKey,
+    sortBy,
+    views,
+    lensSynthesized,
+    lens,
+    prefs,
+    setPrefs,
+    searchParams,
+    router,
+  ]);
+
+  const handlePrimaryChangeLive = useCallback(
+    (scheme: string) => {
+      if (menuEditingId == null || primaryLocked) return;
+      setLensKey(scheme);
+      setPrefs({ horizonLens: scheme });
+      // Detach from the saved view: the board no longer matches it.
+      setActiveViewId(null);
+      setPrefs({ horizonActiveViewId: null });
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("lens", scheme);
+      params.delete("horizon");
+      router.replace(`/horizon?${params.toString()}`, { scroll: false });
+    },
+    [menuEditingId, primaryLocked, setPrefs, searchParams, router],
+  );
+
+  const handleSplitChangeLive = useCallback(
+    (colKey: string | null, value: string | null) => {
+      if (menuEditingId == null || !activeScheme || colKey == null) return;
+      const primaryKey = activeScheme.key;
+      const groupKey = viewColumnKey(colKey);
+      setSecondaryMap((prev) => {
+        const next = {
+          ...prev,
+          [primaryKey]: { ...(prev[primaryKey] ?? {}), [groupKey]: value },
+        };
+        void prefs.setSecondaryMap(next);
+        return next;
+      });
+    },
+    [menuEditingId, activeScheme, prefs],
+  );
 
   // Sync lens from ?lens= (deep links, global search). Accepts both scheme
   // keys and built-in lens ids; the URL keeps carrying the scheme key.
@@ -780,12 +1103,34 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
         />
       </div>
     );
+    // While an edit session is active, each primary box carries its
+    // Split control in the top-right corner (unclassified is never split).
+    const splitSelect =
+      menuEditingId != null && col.key !== null ? (
+        <select
+          value={secondaryKeyOf(col.key) ?? ""}
+          onChange={(event) => handleSplitChangeLive(col.key, event.target.value || null)}
+          title="Split this group into sub-groups"
+          aria-label={`Split ${col.label} by`}
+          className="max-w-40 rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+        >
+          <option value="">No split</option>
+          {orderedSchemes
+            .filter((scheme) => scheme.key !== lensKey)
+            .map((scheme) => (
+              <option key={scheme.key} value={scheme.key}>
+                {scheme.label}
+              </option>
+            ))}
+        </select>
+      ) : undefined;
     if (isCollapsedStrip) return body;
     return (
       <ColumnShell
         label={col.label}
         count={nodes.length}
         collapseControl={collapseControl}
+        headerActions={splitSelect}
         footer={
           !secondaryKey ? (
             <RootAddInput label={col.label} onAdd={handleAdd(col.key)} suggestFrom={ideas} />
@@ -803,17 +1148,17 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
         views={views}
         activeViewId={activeViewId}
         defaultViewId={defaultViewId}
-        lenses={DEFAULT_LENSES}
+        lenses={displayLenses}
         activeLensId={!activeView && !lensSynthesized ? lens.id : null}
         defaultLensId={defaultLensId}
         schemes={schemes}
-        columnKeys={columns.map((column) => column.key)}
         onSelect={handleSelectView}
-        onSave={handleSaveView}
         onDelete={handleDeleteView}
         onToggleDefault={handleToggleDefaultView}
         onSelectLens={handleSelectLens}
         onToggleDefaultLens={handleToggleDefaultLens}
+        onCreateLens={handleCreateLens}
+        onStartEdit={handleStartMenuEdit}
       />
       <button
         type="button"
@@ -888,13 +1233,31 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
     </>
   );
 
+  const titleName =
+    menuEditingId != null && draftName.trim()
+      ? draftName.trim()
+      : (activeView?.name ?? activeDisplayLens?.name ?? lens?.name);
   return (
     <AppShell
-      title={
-        activeView ? `Horizon · ${activeView.name}` : lens ? `Horizon · ${lens.name}` : "Horizon"
-      }
+      title={titleName ? `Horizon · ${titleName}` : "Horizon"}
       headerStartActions={headerStartActions}
     >
+      {menuEditingId != null && (
+        <LensEditPanel
+          draftName={draftName}
+          draftDescription={draftDescription}
+          onDraftNameChange={setDraftName}
+          onDraftDescriptionChange={setDraftDescription}
+          primaryOptions={primaryOptions}
+          livePrimary={lensKey}
+          onPrimaryChange={handlePrimaryChangeLive}
+          primaryLocked={primaryLocked}
+          hasUnsavedEdits={hasUnsavedEdits}
+          nameAutoFocus={nameAutoFocus}
+          onSave={handleSaveLensEdits}
+          onCancel={leaveEditSession}
+        />
+      )}
       <UndoBar undoAction={undoAction} onUndo={() => void handleUndo()} onDismiss={clearUndo} />
 
       {/* Mobile tab bar */}

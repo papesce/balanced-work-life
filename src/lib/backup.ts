@@ -13,7 +13,13 @@ import {
   TaskTag,
 } from "@/lib/types";
 import type { SecondaryLensMap } from "@/lib/storage";
-import { parseSecondaryMapText, sanitizeView, horizonPrefsId } from "@/lib/horizonViews";
+import {
+  parseSecondaryMapText,
+  parseSplitsText,
+  sanitizeView,
+  horizonPrefsId,
+  withServerCompatibleId,
+} from "@/lib/horizonViews";
 import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 
 export interface BackupTaskTag extends TaskTag {
@@ -30,8 +36,12 @@ export interface BackupHorizonView {
   id: string;
   name: string;
   primary_scheme: string;
+  description?: string;
+  column_order?: string;
+  tiebreakers?: string;
   splits: string;
   sort_by: string;
+  is_builtin?: boolean | number;
 }
 
 export interface BackupHorizonPrefs {
@@ -140,7 +150,7 @@ export async function buildBackupData(
       user.id,
     ]),
     db.getAll<BackupHorizonView>(
-      "SELECT id, name, primary_scheme, splits, sort_by FROM horizon_views WHERE user_id = ?",
+      "SELECT id, name, primary_scheme, description, column_order, tiebreakers, splits, sort_by, is_builtin FROM horizon_views WHERE user_id = ?",
       [user.id],
     ),
     db.getAll<BackupHorizonPrefs>(
@@ -255,38 +265,55 @@ export async function restoreHorizonViews(
   db: AbstractPowerSyncDatabase,
   userId: string,
   views: BackupHorizonView[],
-): Promise<number> {
+): Promise<{ count: number; idMap: Map<string, string> }> {
   const clean = views
     .map((v) =>
       sanitizeView({
         id: v.id,
         name: v.name,
         primary: v.primary_scheme,
-        splits: parseSecondaryMapText(v.splits),
+        description: v.description ?? "",
+        column_order: v.column_order ?? "[]",
+        tiebreakers: v.tiebreakers ?? "[]",
+        splits: parseSplitsText(v.splits),
         sortBy: v.sort_by,
+        is_builtin: v.is_builtin === true || v.is_builtin === 1,
       }),
     )
-    .filter((v) => v !== null);
-  if (clean.length === 0) return 0;
+    .filter((v) => v !== null)
+    // Old backups (or legacy localStorage) may carry human-readable ids like
+    // "seed-term": remap to uuids so the server upsert (uuid PK) accepts them.
+    .map((v) => withServerCompatibleId(v));
+  if (clean.length === 0) return { count: 0, idMap: new Map() };
+  const idMap = new Map<string, string>();
+  views.forEach((v, i) => {
+    if (typeof v?.id === "string" && clean[i] && v.id !== clean[i].id) {
+      idMap.set(v.id, clean[i].id);
+    }
+  });
   const now = new Date().toISOString();
   await db.writeTransaction(async (tx) => {
     for (const v of clean) {
       await tx.execute(
-        `INSERT OR IGNORE INTO horizon_views (id, user_id, name, primary_scheme, splits, sort_by, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)`,
+        `INSERT OR IGNORE INTO horizon_views (id, user_id, name, primary_scheme, description, column_order, tiebreakers, splits, sort_by, is_builtin, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
           v.id,
           userId,
           v.name,
           v.primary,
+          v.description ?? "",
+          JSON.stringify(v.column_order ?? []),
+          JSON.stringify(v.tiebreakers ?? []),
           JSON.stringify(v.splits ?? {}),
           v.sortBy ?? "manual",
+          v.is_builtin ? 1 : 0,
           now,
           now,
         ],
       );
     }
   });
-  return clean.length;
+  return { count: clean.length, idMap };
 }
 
 /**
@@ -301,7 +328,11 @@ export async function restoreHorizonLensConfig(
   data: Pick<BackupData, "horizonViews" | "horizonPrefs" | "lensPrefs">,
 ): Promise<string[]> {
   const restored: string[] = [];
-  const viewsImported = await restoreHorizonViews(db, userId, data.horizonViews ?? []);
+  const { count: viewsImported, idMap: remappedIds } = await restoreHorizonViews(
+    db,
+    userId,
+    data.horizonViews ?? [],
+  );
   if (viewsImported > 0) restored.push(`horizon_views:${viewsImported}`);
   const existingViews = await db.getAll<Record<string, unknown>>(
     `SELECT id FROM horizon_views WHERE user_id = ? LIMIT 1`,
@@ -323,7 +354,11 @@ export async function restoreHorizonLensConfig(
     Object.keys(secondaryMap).length > 0;
   if (!hasContent) return restored;
   // Only adopt a default view that actually exists (restored above or local).
+  // Remapped legacy ids (e.g. "seed-term" -> uuid) follow the new id.
   let defaultViewId = data.horizonPrefs?.default_view_id ?? null;
+  if (defaultViewId && remappedIds.has(defaultViewId)) {
+    defaultViewId = remappedIds.get(defaultViewId)!;
+  }
   if (defaultViewId && existingViews.length === 0 && viewsImported === 0) defaultViewId = null;
   if (defaultViewId) {
     const found = await db.getOptional<Record<string, unknown>>(
