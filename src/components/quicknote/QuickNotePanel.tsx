@@ -69,6 +69,7 @@ const CaptureStatusDot = memo(function CaptureStatusDot() {
 export function QuickNotePanel() {
   const {
     openNotes,
+    note,
     selectedNote,
     selectNote,
     createNote,
@@ -129,12 +130,26 @@ export function QuickNotePanel() {
     try {
       setMenuOpen(false);
       setDiscardArmed(false);
+      // Discard targets the live/editing note. Resolve the survivor from the
+      // pre-delete list: the note sliding into the discarded row's position
+      // (next-older), falling back to the newer neighbor at the list end.
+      const discardedId = note?.id ?? null;
+      const idx = discardedId ? openNotes.findIndex((n) => n.id === discardedId) : -1;
+      const next =
+        idx >= 0
+          ? (openNotes[idx + 1] ?? openNotes[idx - 1] ?? null)
+          : (openNotes.find((n) => n.id !== discardedId) ?? null);
       await discardNote();
-      await closePanel();
+      // Keep the panel open on the next note; close only when none remain.
+      if (!next) {
+        await closePanel();
+      } else {
+        await selectNote(next.id);
+      }
     } finally {
       setDiscarding(false);
     }
-  }, [discardArmed, discarding, discardNote, closePanel]);
+  }, [discardArmed, discarding, note, openNotes, selectNote, discardNote, closePanel]);
 
   const closeMenu = useCallback(() => {
     setMenuOpen(false);

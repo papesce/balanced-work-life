@@ -10,8 +10,10 @@ import {
   Pencil,
   Eye,
   CornerDownRight,
+  IndentDecrease,
 } from "lucide-react";
 import { Idea, IdeaLink, IdeaType, LinkType, Tag } from "@/lib/types";
+import { topLevelSortOrder } from "@/lib/ideaTreeMove";
 import { LinkPanel } from "@/components/shared/LinkPanel";
 import { MoveIdeaPanel } from "@/components/brainstorm/MoveIdeaPanel";
 import { SchedulePicker } from "@/components/brainstorm/SchedulePicker";
@@ -136,6 +138,11 @@ export function IdeaActionMenu({
     await onMove(idea.id, newParentId, newSortOrder);
   };
 
+  const handleMakeTopLevel = async () => {
+    await onMove(idea.id, null, topLevelSortOrder(allIdeas, idea.id));
+    handleMoved(null);
+  };
+
   const handleMoved = (parentIdToExpand: string | null) => {
     if (onMoved) onMoved(parentIdToExpand);
   };
@@ -234,6 +241,19 @@ export function IdeaActionMenu({
             >
               <ArrowUpDown size={12} strokeWidth={1.5} />
               Move…
+            </button>
+          )}
+          {!hidden.includes("move") && idea.parent_id != null && (
+            <button
+              onClick={() => {
+                setShowMenu(false);
+                void handleMakeTopLevel();
+              }}
+              title="Remove from its parent and move to the top level"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+            >
+              <IndentDecrease size={12} strokeWidth={1.5} />
+              Make top-level
             </button>
           )}
           {!hidden.includes("attach") && (

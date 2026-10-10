@@ -3,7 +3,7 @@
 import { useMemo, useState, useRef, useCallback } from "react";
 import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { EyeOff, Tag } from "lucide-react";
+import { Tag } from "lucide-react";
 import { useIdeas, type CreateIdeaPosition } from "@/hooks/useIdeas";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
@@ -18,6 +18,7 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { HorizonColumn } from "@/components/horizon/HorizonColumn";
 import { RootAddInput } from "@/components/horizon/RootAddInput";
 import { HorizonViewSwitcher } from "@/components/horizon/HorizonViewSwitcher";
+import { HorizonFiltersMenu } from "@/components/horizon/HorizonFiltersMenu";
 import { LensEditPanel } from "@/components/horizon/LensEditPanel";
 import { type PriorityValue } from "@/components/shared/PriorityChip";
 import { TypeFilterPicker } from "@/components/shared/TypeFilterPicker";
@@ -38,6 +39,7 @@ import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 import { UNCLASSIFIED, groupKeyOf, type LensColumn } from "@/components/lens";
 import { groupTreesByLens, groupSecondaryByLens } from "@/lib/horizonGrouping";
 import { getHiddenProjectIds } from "@/lib/horizonProjectVisibility";
+import { filterUncommitted, isCommitted } from "@/lib/horizonScope";
 import { type HorizonLensDef } from "@/lib/horizonLenses";
 
 const ACTIVE_STATUSES = new Set(["draft", "planned", "in_progress", "scheduled"]);
@@ -47,8 +49,10 @@ function buildFilteredTree(
   collapsedIds: Set<string>,
   hideClosed: boolean,
   hideProjectsWithTasks: boolean,
+  hideCommitted: boolean,
 ): IdeaNode[] {
   let pool = hideClosed ? ideas.filter((i) => ACTIVE_STATUSES.has(i.status)) : ideas;
+  if (hideCommitted) pool = filterUncommitted(pool);
   if (hideProjectsWithTasks) {
     const hidden = getHiddenProjectIds(pool, ideas);
     if (hidden.size > 0) pool = pool.filter((i) => !hidden.has(i.id));
@@ -126,6 +130,7 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
   const [typePickerPos, setTypePickerPos] = useState<{ top: number; left: number } | null>(null);
   const cardMode = useUiPrefsStore((s) => s.cardMode);
   const hideProjectsWithTasks = useUiPrefsStore((s) => s.horizonHideProjectsWithTasks);
+  const hideCommittedPref = useUiPrefsStore((s) => s.horizonHideCommitted);
   const unclassifiedExpanded = useUiPrefsStore((s) => s.horizonUnclassifiedExpanded);
   const setPrefs = useUiPrefsStore((s) => s.set);
   const setCardMode = (v: boolean | ((p: boolean) => boolean)) =>
@@ -307,9 +312,21 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
     });
   };
 
+  // Lenses that opt into committed work (e.g. "Ready to move") bypass the
+  // Hide committed filter so e.g. ready_to_complete stays visible there.
+  const lensIncludesCommitted = lens.includeCommitted === true;
+  const effectiveHideCommitted = hideCommittedPref && !lensIncludesCommitted;
+
   const allTreeNodes = useMemo(
-    () => buildFilteredTree(ideas, collapsedIds, hideClosed, hideProjectsWithTasks),
-    [ideas, collapsedIds, hideClosed, hideProjectsWithTasks],
+    () =>
+      buildFilteredTree(
+        ideas,
+        collapsedIds,
+        hideClosed,
+        hideProjectsWithTasks,
+        effectiveHideCommitted,
+      ),
+    [ideas, collapsedIds, hideClosed, hideProjectsWithTasks, effectiveHideCommitted],
   );
 
   const priorityOf = useCallback(
@@ -483,6 +500,9 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
     if (idea && !ACTIVE_STATUSES.has(idea.status)) {
       setHideClosed(false);
     }
+    if (idea && isCommitted(idea) && effectiveHideCommitted) {
+      setPrefs({ horizonHideCommitted: false });
+    }
     if (idea && idea.type) {
       setTypeFilter([]);
     }
@@ -521,7 +541,15 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
       });
     }, 400);
     return () => clearTimeout(timer);
-  }, [highlightId, loading, updateParams, valueOf, setPrefs, hideProjectsWithTasks]);
+  }, [
+    highlightId,
+    loading,
+    updateParams,
+    valueOf,
+    setPrefs,
+    hideProjectsWithTasks,
+    effectiveHideCommitted,
+  ]);
 
   if (loading || classificationsLoading) {
     return (
@@ -626,32 +654,18 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
         onCreateLens={createLens}
         onStartEdit={startMenuEdit}
       />
-      <button
-        type="button"
-        onClick={() => setHideClosed((v) => !v)}
-        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-          hideClosed
-            ? "border-indigo-300 bg-white text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
-            : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
-        }`}
-      >
-        <EyeOff size={12} />
-        <span className="hidden sm:inline">Hide closed</span>
-      </button>
-      <button
-        type="button"
-        onClick={() => setPrefs({ horizonHideProjectsWithTasks: !hideProjectsWithTasks })}
-        title="Hide projects that have a visible task (tasks show on their own with the project breadcrumb)"
-        aria-pressed={hideProjectsWithTasks}
-        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-          hideProjectsWithTasks
-            ? "border-indigo-300 bg-white text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
-            : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
-        }`}
-      >
-        <EyeOff size={12} />
-        <span className="hidden sm:inline">Hide projects with visible tasks</span>
-      </button>
+      <HorizonFiltersMenu
+        hideClosed={hideClosed}
+        onToggleHideClosed={() => setHideClosed((v) => !v)}
+        hideCommitted={hideCommittedPref}
+        onToggleHideCommitted={() => setPrefs({ horizonHideCommitted: !hideCommittedPref })}
+        committedLocked={lensIncludesCommitted}
+        committedLockedHint="This lens always shows committed work (scheduled, in-progress)"
+        hideProjectsWithTasks={hideProjectsWithTasks}
+        onToggleHideProjectsWithTasks={() =>
+          setPrefs({ horizonHideProjectsWithTasks: !hideProjectsWithTasks })
+        }
+      />
       <div className="relative">
         <button
           type="button"

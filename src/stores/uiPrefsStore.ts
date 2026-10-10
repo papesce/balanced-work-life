@@ -23,6 +23,7 @@ interface UiPrefsState {
   projectsUnclassifiedExpanded: boolean;
   horizonUnclassifiedExpanded: boolean;
   horizonHideProjectsWithTasks: boolean;
+  horizonHideCommitted: boolean;
   cardMode: boolean;
   sidebarCollapsed: boolean | null;
   plannerHideCompleted: boolean;
@@ -60,6 +61,7 @@ export const useUiPrefsStore = create<UiPrefsState>()(
       projectsUnclassifiedExpanded: true,
       horizonUnclassifiedExpanded: false,
       horizonHideProjectsWithTasks: true,
+      horizonHideCommitted: true,
       cardMode: false,
       sidebarCollapsed: null,
       plannerHideCompleted: true,
@@ -77,6 +79,7 @@ export const useUiPrefsStore = create<UiPrefsState>()(
         projectsUnclassifiedExpanded: s.projectsUnclassifiedExpanded,
         horizonUnclassifiedExpanded: s.horizonUnclassifiedExpanded,
         horizonHideProjectsWithTasks: s.horizonHideProjectsWithTasks,
+        horizonHideCommitted: s.horizonHideCommitted,
         cardMode: s.cardMode,
         sidebarCollapsed: s.sidebarCollapsed,
         plannerHideCompleted: s.plannerHideCompleted,

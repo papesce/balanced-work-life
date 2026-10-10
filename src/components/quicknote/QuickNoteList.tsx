@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { FileText, Plus } from "lucide-react";
 import { useQuickNoteData, type QuickNotePanelMode } from "@/contexts/QuickNoteContext";
-import { parseNoteLines, formatAge } from "@/lib/quickNotes";
+import { parseNoteLines, unresolvedNonEmptyCount, formatAge } from "@/lib/quickNotes";
 import { QuickNote } from "@/lib/types";
 
 function getPreview(text: string): string {
@@ -37,10 +37,9 @@ function NoteRow({
   const preview = useMemo(() => getPreview(note.text), [note.text]);
   const age = useMemo(() => formatAge(note.created_at, "short"), [note.created_at]);
   const timestamp = useMemo(() => formatTimestamp(note.created_at), [note.created_at]);
-  const unresolvedCount = useMemo(
-    () => parseNoteLines(note.text).filter((l) => !l.resolved && l.text.trim() !== "").length,
-    [note.text],
-  );
+  // Actionable unresolved lines only — the same predicate the FAB badge
+  // and chip counts use, so every quick-note number agrees.
+  const unresolvedCount = useMemo(() => unresolvedNonEmptyCount(note.text), [note.text]);
 
   return (
     <button

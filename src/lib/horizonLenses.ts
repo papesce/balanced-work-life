@@ -18,6 +18,10 @@ export interface HorizonLensDef {
    *  "unclassified" for the null column). A user-set per-column Split
    *  overrides these; an explicit "None" (null) disables ordering. */
   defaultSplits: Record<string, string | null>;
+  /** When true, this lens always includes committed work (scheduled,
+   *  in-progress, dated) even while the board's Hide committed filter is
+   *  on. Only the "Ready to move" lens sets this. */
+  includeCommitted?: boolean;
 }
 
 /** Default secondary scheme for every column of a lens: all listed values
@@ -69,6 +73,7 @@ export const DEFAULT_LENSES: HorizonLensDef[] = [
     name: "Ready to move",
     description: "What is ready to advance or finish",
     primaryScheme: "attention",
+    includeCommitted: true,
     columnOrder: ["ready_to_complete", "about_to_start", "ready_to_start", "dont_forget_about"],
     defaultSplits: splitsForAll(
       ["ready_to_complete", "about_to_start", "ready_to_start", "dont_forget_about"],
