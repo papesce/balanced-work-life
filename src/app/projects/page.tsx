@@ -78,7 +78,7 @@ export default function ProjectsPage() {
   const [titleEditing, setTitleEditing] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   // Detail-local filters (list filters don't leak into detail).
-  const [detailHideCompleted, setDetailHideCompleted] = useState(false);
+  const detailHideCompleted = useUiPrefsStore((s) => s.projectsDetailHideCompleted);
   const [detailView, setDetailView] = useState<"list" | "workflow">("list");
 
   const ideasHook = useIdeas({ scope: "all" });
@@ -444,12 +444,28 @@ export default function ProjectsPage() {
       <AppShell
         title={selectedProject.text || "Untitled project"}
         headerStartActions={
-          <button
-            onClick={() => handleSelect(null)}
-            className="toolbar-btn flex items-center gap-1.5"
-          >
-            <ArrowLeft size={14} /> Back
-          </button>
+          <>
+            <button
+              onClick={() => handleSelect(null)}
+              className="toolbar-btn flex items-center gap-1.5"
+            >
+              <ArrowLeft size={14} /> Back
+            </button>
+            <button
+              type="button"
+              onClick={() => setPrefs({ projectsDetailHideCompleted: !detailHideCompleted })}
+              aria-pressed={detailHideCompleted}
+              title="Hide completed tasks"
+              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                detailHideCompleted
+                  ? "border-indigo-300 bg-white text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
+                  : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
+              }`}
+            >
+              <span className="hidden sm:inline">Hide completed</span>
+              <span className="sm:hidden">Hide done</span>
+            </button>
+          </>
         }
         headerActions={
           <div className="flex items-center gap-2">
@@ -598,18 +614,6 @@ export default function ProjectsPage() {
               <ListTree size={12} /> Back to project root
             </button>
           )}
-        </div>
-
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-gray-400">
-            <input
-              type="checkbox"
-              checked={detailHideCompleted}
-              onChange={(e) => setDetailHideCompleted(e.target.checked)}
-              className="rounded"
-            />
-            Hide completed
-          </label>
         </div>
 
         {detailView === "workflow" ? (

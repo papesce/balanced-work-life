@@ -21,6 +21,7 @@ interface UiPrefsState {
   /** Currently active saved Horizon view id (local device state). */
   horizonActiveViewId: string | null;
   projectsUnclassifiedExpanded: boolean;
+  projectsDetailHideCompleted: boolean;
   horizonUnclassifiedExpanded: boolean;
   horizonHideProjectsWithTasks: boolean;
   horizonHideCommitted: boolean;
@@ -59,6 +60,7 @@ export const useUiPrefsStore = create<UiPrefsState>()(
       horizonLensId: null,
       horizonActiveViewId: null,
       projectsUnclassifiedExpanded: true,
+      projectsDetailHideCompleted: true,
       horizonUnclassifiedExpanded: false,
       horizonHideProjectsWithTasks: true,
       horizonHideCommitted: true,
@@ -77,6 +79,7 @@ export const useUiPrefsStore = create<UiPrefsState>()(
         horizonLensId: s.horizonLensId,
         horizonActiveViewId: s.horizonActiveViewId,
         projectsUnclassifiedExpanded: s.projectsUnclassifiedExpanded,
+        projectsDetailHideCompleted: s.projectsDetailHideCompleted,
         horizonUnclassifiedExpanded: s.horizonUnclassifiedExpanded,
         horizonHideProjectsWithTasks: s.horizonHideProjectsWithTasks,
         horizonHideCommitted: s.horizonHideCommitted,
