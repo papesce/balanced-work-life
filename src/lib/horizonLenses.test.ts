@@ -3,8 +3,6 @@ import assert from "node:assert/strict";
 import {
   DEFAULT_LENSES,
   buildLensColumns,
-  buildLensComparator,
-  compareByTiebreakers,
   resolveLens,
   type LensSchemeInfo,
 } from "@/lib/horizonLenses";
@@ -37,7 +35,7 @@ const SCHEMES: LensSchemeInfo[] = [
 ];
 
 describe("DEFAULT_LENSES table", () => {
-  it("ships the six lenses with names, descriptions, columns and tiebreakers", () => {
+  it("ships the six lenses with names, descriptions, columns and default splits", () => {
     assert.deepEqual(
       DEFAULT_LENSES.map((l) => [l.id, l.name, l.description, l.primaryScheme]),
       [
@@ -59,20 +57,20 @@ describe("DEFAULT_LENSES table", () => {
       "next_year",
       "later",
     ]);
-    assert.deepEqual(byId.get("closest")!.tiebreakers, [
-      { scheme: "nnl", direction: "asc" },
-      { scheme: "priority", direction: "asc" },
-    ]);
-    assert.deepEqual(byId.get("easiest")!.tiebreakers, [{ scheme: "priority", direction: "asc" }]);
-    assert.deepEqual(byId.get("matters")!.tiebreakers, [
-      { scheme: "priority", direction: "asc" },
-      { scheme: "when", direction: "asc" },
-    ]);
-    assert.deepEqual(byId.get("ready")!.tiebreakers, [{ scheme: "effort", direction: "asc" }]);
-    assert.deepEqual(byId.get("looking-ahead")!.tiebreakers, [
-      { scheme: "priority", direction: "asc" },
-    ]);
-    assert.deepEqual(byId.get("payoff")!.tiebreakers, [{ scheme: "effort", direction: "asc" }]);
+    // Each lens defaults every column (incl. unclassified) to one
+    // secondary scheme that preserves the old tiebreaker ordering.
+    const expectSplits = (id: string, scheme: string) => {
+      const splits = byId.get(id)!.defaultSplits;
+      assert.ok(Object.keys(splits).length > 0, id);
+      assert.deepEqual(new Set(Object.values(splits)), new Set([scheme]), id);
+      assert.equal(splits["unclassified"], scheme, `${id} unclassified`);
+    };
+    expectSplits("closest", "nnl");
+    expectSplits("easiest", "priority");
+    expectSplits("matters", "priority");
+    expectSplits("ready", "effort");
+    expectSplits("looking-ahead", "priority");
+    expectSplits("payoff", "effort");
   });
 });
 
@@ -95,94 +93,18 @@ describe("resolveLens", () => {
     assert.equal(lens.id, "looking-ahead");
   });
 
-  it("synthesizes legacy nnl/priority with scheme order + priority tiebreaker", () => {
+  it("synthesizes legacy nnl/priority with scheme order and no default splits", () => {
     for (const key of ["nnl", "priority"]) {
       const { lens, synthesized } = resolveLens(key, SCHEMES);
       assert.equal(synthesized, true);
       assert.deepEqual(lens.columnOrder, SCHEMES.find((s) => s.key === key)!.options);
       assert.equal(lens.name, SCHEMES.find((s) => s.key === key)!.label);
-      assert.deepEqual(lens.tiebreakers, [{ scheme: "priority", direction: "asc" }]);
+      assert.deepEqual(lens.defaultSplits, {});
     }
   });
 
   it("falls back to the term lens for unknown keys", () => {
     assert.equal(resolveLens("nope", SCHEMES).lens.id, "looking-ahead");
-  });
-});
-
-describe("compareByTiebreakers", () => {
-  const rankOf = (scheme: string, ideaId: string): number | null => {
-    const table: Record<string, Record<string, number>> = {
-      priority: { a: 0, b: 1 },
-      nnl: { a: 1, b: 0 },
-    };
-    return table[scheme]?.[ideaId] ?? null;
-  };
-  const sortOrderOf = (ideaId: string): number => ({ a: 2, b: 1, c: 0 })[ideaId] ?? 9;
-
-  it("orders asc by scheme rank", () => {
-    const cmp = (x: string, y: string) =>
-      compareByTiebreakers([{ scheme: "priority", direction: "asc" }], rankOf, sortOrderOf, x, y);
-    assert.ok(cmp("a", "b") < 0);
-    assert.ok(cmp("b", "a") > 0);
-  });
-
-  it("orders desc by reversed scheme rank", () => {
-    const cmp = (x: string, y: string) =>
-      compareByTiebreakers([{ scheme: "priority", direction: "desc" }], rankOf, sortOrderOf, x, y);
-    assert.ok(cmp("a", "b") > 0);
-    assert.ok(cmp("b", "a") < 0);
-  });
-
-  it("sorts unvalued last regardless of direction", () => {
-    for (const direction of ["asc", "desc"] as const) {
-      const cmp = (x: string, y: string) =>
-        compareByTiebreakers([{ scheme: "priority", direction }], rankOf, sortOrderOf, x, y);
-      assert.ok(cmp("a", "c") < 0, direction);
-      assert.ok(cmp("c", "a") > 0, direction);
-    }
-  });
-
-  it("falls through tiebreakers then sort_order", () => {
-    // a and b tie on nnl? No: nnl a=1, b=0 -> b first. Use unknown scheme first.
-    const cmp = (x: string, y: string) =>
-      compareByTiebreakers(
-        [
-          { scheme: "missing", direction: "asc" },
-          { scheme: "priority", direction: "asc" },
-        ],
-        rankOf,
-        sortOrderOf,
-        x,
-        y,
-      );
-    assert.ok(cmp("a", "b") < 0);
-    // Both unvalued in every tiebreaker -> sort_order fallback (c=0 before b=1).
-    const bothNull = () => null;
-    assert.ok(
-      compareByTiebreakers(
-        [{ scheme: "priority", direction: "asc" }],
-        bothNull,
-        sortOrderOf,
-        "c",
-        "b",
-      ) < 0,
-    );
-  });
-});
-
-describe("buildLensComparator", () => {
-  it("ranks by scheme option order with unvalued last and sort_order fallback", () => {
-    const lens = DEFAULT_LENSES.find((l) => l.id === "easiest")!;
-    const order = new Map([["priority", ["high", "medium", "low"]]]);
-    const values: Record<string, string | null> = { a: "low", b: null, c: "high" };
-    const cmp = buildLensComparator(
-      lens,
-      order,
-      (id) => values[id] ?? null,
-      () => 0,
-    );
-    assert.deepEqual(["a", "b", "c"].sort(cmp), ["c", "a", "b"]);
   });
 });
 

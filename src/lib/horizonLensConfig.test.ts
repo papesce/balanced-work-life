@@ -7,7 +7,6 @@ import {
   parseSecondaryMapText,
   parseSplitsText,
   parseStringArrayText,
-  parseTiebreakersText,
   planLegacyImport,
   rowToHorizonView,
   sanitizeView,
@@ -20,7 +19,6 @@ describe("rowToHorizonView", () => {
       name: "Attention",
       primary_scheme: "attention",
       splits: JSON.stringify({ short: "priority", unclassified: null }),
-      sort_by: "priority",
     });
     assert.deepEqual(view, {
       id: "v1",
@@ -28,9 +26,7 @@ describe("rowToHorizonView", () => {
       primary: "attention",
       description: "",
       column_order: [],
-      tiebreakers: [],
       splits: { short: "priority", unclassified: null },
-      sortBy: "priority",
       is_builtin: false,
     });
   });
@@ -41,7 +37,6 @@ describe("rowToHorizonView", () => {
       name: "Bad",
       primary_scheme: "term",
       splits: "not-json{{{",
-      sort_by: "manual",
     });
     assert.deepEqual(view?.splits, {});
   });
@@ -53,14 +48,13 @@ describe("rowToHorizonView", () => {
       name: "Double",
       primary_scheme: "term",
       splits: JSON.stringify(inner),
-      sort_by: "manual",
     });
     assert.deepEqual(view?.splits, { short: "priority" });
   });
 
   it("rejects rows with missing id/name/primary", () => {
     assert.equal(
-      rowToHorizonView({ id: "", name: "x", primary_scheme: "term", splits: "{}", sort_by: null }),
+      rowToHorizonView({ id: "", name: "x", primary_scheme: "term", splits: "{}" }),
       null,
     );
     assert.equal(
@@ -69,10 +63,29 @@ describe("rowToHorizonView", () => {
         name: "  ",
         primary_scheme: "term",
         splits: "{}",
-        sort_by: null,
       }),
       null,
     );
+  });
+
+  it("ignores removed fields (tiebreakers, sort_by) from old rows", () => {
+    const view = rowToHorizonView({
+      id: "v-old-fields",
+      name: "Old",
+      primary_scheme: "term",
+      splits: "{}",
+      tiebreakers: JSON.stringify([{ scheme: "effort", direction: "asc" }]),
+      sort_by: "priority",
+    } as never);
+    assert.deepEqual(view, {
+      id: "v-old-fields",
+      name: "Old",
+      primary: "term",
+      description: "",
+      column_order: [],
+      splits: {},
+      is_builtin: false,
+    });
   });
 
   it("round-trips through horizonViewToRow", () => {
@@ -81,33 +94,30 @@ describe("rowToHorizonView", () => {
       name: "R",
       primary: "term",
       splits: { short: "priority" },
-      sortBy: "manual",
     })!;
     const row = horizonViewToRow(view, "u1");
     assert.equal(row.primary_scheme, "term");
     assert.deepEqual(JSON.parse(row.splits!), { short: "priority" });
-    assert.deepEqual(rowToHorizonView({ ...row, sort_by: row.sort_by }), view);
+    assert.deepEqual(rowToHorizonView(row), view);
   });
 });
 
 describe("editable lens fields", () => {
-  it("round-trips description, column order, tiebreakers and builtin flag", () => {
+  it("round-trips description, column order, splits and builtin flag", () => {
     const view = sanitizeView({
       id: "v9",
       name: "Payoff",
       primary: "impact",
       description: "What adds the most value",
       column_order: ["high", "medium", "low"],
-      tiebreakers: [{ scheme: "effort", direction: "asc" }],
-      splits: {},
-      sortBy: "manual",
+      splits: { high: "effort" },
       is_builtin: true,
     })!;
     const row = horizonViewToRow(view, "u1");
     assert.equal(row.description, "What adds the most value");
     assert.deepEqual(JSON.parse(row.column_order!), ["high", "medium", "low"]);
-    assert.deepEqual(JSON.parse(row.tiebreakers!), [{ scheme: "effort", direction: "asc" }]);
-    assert.deepEqual(rowToHorizonView({ ...row, sort_by: row.sort_by }), view);
+    assert.deepEqual(JSON.parse(row.splits!), { high: "effort" });
+    assert.deepEqual(rowToHorizonView(row), view);
   });
 
   it("defaults new fields for rows written before the migration", () => {
@@ -116,21 +126,14 @@ describe("editable lens fields", () => {
       name: "Old",
       primary_scheme: "term",
       splits: "{}",
-      sort_by: "manual",
     });
     assert.deepEqual(view?.description, "");
     assert.deepEqual(view?.column_order, []);
-    assert.deepEqual(view?.tiebreakers, []);
     assert.equal(view?.is_builtin, false);
   });
 
-  it("drops invalid tiebreaker entries, never throws", () => {
-    assert.deepEqual(parseTiebreakersText("garbage"), []);
+  it("drops invalid string-array entries, never throws", () => {
     assert.deepEqual(parseStringArrayText("garbage"), []);
-    assert.deepEqual(
-      parseTiebreakersText([{ scheme: "effort", direction: "desc" }, { nope: 1 }, null]),
-      [{ scheme: "effort", direction: "desc" }],
-    );
   });
 
   it("seed ids are deterministic uuids per user+lens", () => {
@@ -180,8 +183,8 @@ describe("planLegacyImport", () => {
   const UUID_V1 = "11111111-1111-4111-8111-111111111111";
   const UUID_V2 = "22222222-2222-4222-8222-222222222222";
   const legacyViews = [
-    { id: UUID_V1, name: "One", primary: "term", splits: {}, sortBy: "manual" },
-    { id: UUID_V2, name: "Two", primary: "priority", splits: { short: "nnl" }, sortBy: "priority" },
+    { id: UUID_V1, name: "One", primary: "term", splits: {} },
+    { id: UUID_V2, name: "Two", primary: "priority", splits: { short: "nnl" } },
     { id: "bad", name: "  ", primary: "term", splits: {} },
   ];
 

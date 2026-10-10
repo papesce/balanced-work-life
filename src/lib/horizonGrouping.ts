@@ -2,7 +2,6 @@
 
 import type { IdeaNode } from "@/lib/types";
 import { groupKeyOf } from "@/components/lens/lensUtils";
-import { priorityRank, type PriorityValue } from "@/components/shared/PriorityChip";
 
 export interface PromotedChildRef {
   id: string;
@@ -18,11 +17,14 @@ export interface PromotedChildRef {
  * Only the top-most differently-classified descendant is promoted; its own
  * unclassified (or same-column) children travel with it.
  */
+/**
+ * In-column order is always manual sort_order: classification-driven order
+ * comes from each column's secondary split (subgroup order), never from a
+ * lens-level comparator.
+ */
 export function groupTreesByLens(
   allTreeNodes: IdeaNode[],
   valueOf: (ideaId: string) => string | null,
-  priorityOf: (ideaId: string) => PriorityValue,
-  compare?: (aId: string, bId: string) => number,
 ): { grouped: Record<string, IdeaNode[]>; promotedByParent: Map<string, PromotedChildRef[]> } {
   const grouped: Record<string, IdeaNode[]> = {};
   const promotedByParent = new Map<string, PromotedChildRef[]>();
@@ -50,14 +52,7 @@ export function groupTreesByLens(
     (grouped[k] ??= []).push(process(node, k));
   }
   for (const key of Object.keys(grouped)) {
-    grouped[key].sort((a, b) => {
-      // Injected lens-tiebreaker comparator; without one, fall back to the
-      // legacy priority-then-manual order.
-      if (compare) return compare(a.id, b.id);
-      const rankDiff = priorityRank(priorityOf(a.id)) - priorityRank(priorityOf(b.id));
-      if (rankDiff !== 0) return rankDiff;
-      return a.sort_order - b.sort_order;
-    });
+    grouped[key].sort((a, b) => a.sort_order - b.sort_order);
   }
   return { grouped, promotedByParent };
 }

@@ -126,9 +126,7 @@ export const HorizonViewsTable = new Table(
     primary_scheme: column.text,
     description: column.text,
     column_order: column.text,
-    tiebreakers: column.text,
     splits: column.text,
-    sort_by: column.text,
     is_builtin: column.integer,
     created_at: column.text,
     updated_at: column.text,
@@ -615,7 +613,7 @@ export class SupabaseConnector {
     const now = new Date().toISOString();
     await database.writeTransaction(async (tx) => {
       await tx.execute(
-        `INSERT OR IGNORE INTO horizon_views (id, user_id, name, primary_scheme, description, column_order, tiebreakers, splits, sort_by, is_builtin, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+        `INSERT OR IGNORE INTO horizon_views (id, user_id, name, primary_scheme, description, column_order, splits, is_builtin, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)`,
         [
           newId,
           row.user_id,
@@ -623,9 +621,7 @@ export class SupabaseConnector {
           row.primary_scheme,
           (row.description as string) ?? "",
           (row.column_order as string) ?? "[]",
-          (row.tiebreakers as string) ?? "[]",
           row.splits,
-          row.sort_by,
           (row.is_builtin as number) ?? 0,
           (row.created_at as string) ?? now,
           now,

@@ -150,7 +150,7 @@ export function useHorizonPrefs() {
             const row = horizonViewToRow(view, user.id);
             const now = new Date().toISOString();
             await tx.execute(
-              `INSERT OR IGNORE INTO horizon_views (id, user_id, name, primary_scheme, description, column_order, tiebreakers, splits, sort_by, is_builtin, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+              `INSERT OR IGNORE INTO horizon_views (id, user_id, name, primary_scheme, description, column_order, splits, is_builtin, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)`,
               [
                 row.id,
                 row.user_id,
@@ -158,9 +158,7 @@ export function useHorizonPrefs() {
                 row.primary_scheme,
                 row.description,
                 row.column_order,
-                row.tiebreakers,
                 row.splits,
-                row.sort_by,
                 row.is_builtin ? 1 : 0,
                 now,
                 now,
@@ -202,7 +200,7 @@ export function useHorizonPrefs() {
         await db.writeTransaction(async (tx) => {
           for (const lens of DEFAULT_LENSES) {
             await tx.execute(
-              `INSERT OR IGNORE INTO horizon_views (id, user_id, name, primary_scheme, description, column_order, tiebreakers, splits, sort_by, is_builtin, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+              `INSERT OR IGNORE INTO horizon_views (id, user_id, name, primary_scheme, description, column_order, splits, is_builtin, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)`,
               [
                 horizonLensSeedId(user.id, lens.id),
                 user.id,
@@ -210,9 +208,7 @@ export function useHorizonPrefs() {
                 lens.primaryScheme,
                 lens.description ?? "",
                 JSON.stringify(lens.columnOrder),
-                JSON.stringify(lens.tiebreakers),
-                "{}",
-                "manual",
+                JSON.stringify(lens.defaultSplits),
                 1,
                 now,
                 now,
@@ -250,16 +246,14 @@ export function useHorizonPrefs() {
       now: string,
     ) => {
       const updated = await tx.execute(
-        `UPDATE horizon_views SET user_id = ?, name = ?, primary_scheme = ?, description = ?, column_order = ?, tiebreakers = ?, splits = ?, sort_by = ?, is_builtin = ?, updated_at = ? WHERE id = ?`,
+        `UPDATE horizon_views SET user_id = ?, name = ?, primary_scheme = ?, description = ?, column_order = ?, splits = ?, is_builtin = ?, updated_at = ? WHERE id = ?`,
         [
           row.user_id,
           row.name,
           row.primary_scheme,
           row.description,
           row.column_order,
-          row.tiebreakers,
           row.splits,
-          row.sort_by,
           row.is_builtin ? 1 : 0,
           now,
           row.id,
@@ -267,7 +261,7 @@ export function useHorizonPrefs() {
       );
       if (updated.rowsAffected === 0) {
         await tx.execute(
-          `INSERT OR IGNORE INTO horizon_views (id, user_id, name, primary_scheme, description, column_order, tiebreakers, splits, sort_by, is_builtin, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+          `INSERT OR IGNORE INTO horizon_views (id, user_id, name, primary_scheme, description, column_order, splits, is_builtin, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)`,
           [
             row.id,
             row.user_id,
@@ -275,9 +269,7 @@ export function useHorizonPrefs() {
             row.primary_scheme,
             row.description,
             row.column_order,
-            row.tiebreakers,
             row.splits,
-            row.sort_by,
             row.is_builtin ? 1 : 0,
             now,
             now,

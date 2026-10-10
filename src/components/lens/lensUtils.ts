@@ -1,15 +1,13 @@
 "use client";
 
 import type { ClassificationOption, ClassificationScheme, IdeaClassification } from "@/lib/types";
+import type { LensColumn } from "@/lib/horizonLenses";
 
 /** Sentinel record key for the explicit unclassified group. */
 export const UNCLASSIFIED = "unclassified";
 
 /** A lens column: an option value, or null for the unclassified group. */
-export interface LensColumn {
-  key: string | null;
-  label: string;
-}
+export type { LensColumn };
 
 /** Record key for a value: the option value, or the unclassified sentinel. */
 export function groupKeyOf(value: string | null): string {
@@ -49,4 +47,12 @@ export function optionsForScheme(
     .filter((o) => o.scheme_id === schemeId)
     .sort((a, b) => a.sort_order - b.sort_order)
     .map((o) => ({ value: o.value, label: o.label }));
+}
+
+/** Option values of one scheme, ordered by sort_order. */
+export function optionValuesForScheme(
+  classificationOptions: ClassificationOption[],
+  schemeId: string,
+): string[] {
+  return optionsForScheme(classificationOptions, schemeId).map((o) => o.value);
 }

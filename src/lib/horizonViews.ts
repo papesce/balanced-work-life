@@ -1,5 +1,6 @@
 import { v5 as uuidv5 } from "uuid";
 import type { SecondaryLensMap } from "@/lib/storage";
+import { groupKeyOf } from "@/components/lens/lensUtils";
 
 export const HORIZON_VIEWS_KEY = "horizon-views-v1";
 export const HORIZON_ACTIVE_VIEW_KEY = "horizon-active-view-id";
@@ -9,7 +10,7 @@ export const HORIZON_SECONDARY_MAP_KEY = "horizon-secondary-map";
 
 /** Column key used in splits: option value, or "unclassified" for the null column. */
 export function viewColumnKey(colKey: string | null): string {
-  return colKey ?? "unclassified";
+  return groupKeyOf(colKey);
 }
 
 export interface HorizonView {
@@ -21,60 +22,43 @@ export interface HorizonView {
   description: string;
   /** Column order: JSON array of option values defining column sort. */
   column_order: string[];
-  /** Tiebreakers: JSON array of {scheme, direction} for in-column sorting. */
-  tiebreakers: { scheme: string; direction: "asc" | "desc" }[];
-  /** Column group key -> secondary scheme key (null = no split). */
+  /** Column group key -> secondary scheme key (null = no split). In-column
+   *  order comes from this secondary scheme; there is no separate sort. */
   splits: Record<string, string | null>;
-  /** Sort items within each group. */
-  sortBy?: "manual" | "priority";
   /** Is this a built-in lens (seeded from constants) vs user-created. */
   is_builtin: boolean;
+}
+
+/** Decode a payload that may be a JSON string (possibly double-encoded by a
+ *  legacy upload), an already-parsed value, or garbage. Returns `undefined`
+ *  for empty/garbage input so callers can fall back to their empty value. */
+function decodeJsonValue(raw: unknown): unknown {
+  let value = raw;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return undefined;
+    try {
+      value = JSON.parse(trimmed);
+    } catch {
+      return undefined;
+    }
+    if (typeof value === "string") {
+      try {
+        value = JSON.parse(value);
+      } catch {
+        return undefined;
+      }
+    }
+  }
+  return value;
 }
 
 /** Parse a JSON-text string array (DB TEXT column) or an already-parsed
  *  array. Invalid input falls back to []. */
 export function parseStringArrayText(raw: unknown): string[] {
-  let value = raw;
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (trimmed === "") return [];
-    try {
-      value = JSON.parse(trimmed);
-    } catch {
-      return [];
-    }
-  }
+  const value = decodeJsonValue(raw);
   if (!Array.isArray(value)) return [];
   return value.filter((v): v is string => typeof v === "string");
-}
-
-export interface HorizonTiebreaker {
-  scheme: string;
-  direction: "asc" | "desc";
-}
-
-/** Parse a JSON-text tiebreaker array or an already-parsed array.
- *  Invalid entries are dropped; invalid input falls back to []. */
-export function parseTiebreakersText(raw: unknown): HorizonTiebreaker[] {
-  let value = raw;
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (trimmed === "") return [];
-    try {
-      value = JSON.parse(trimmed);
-    } catch {
-      return [];
-    }
-  }
-  if (!Array.isArray(value)) return [];
-  const out: HorizonTiebreaker[] = [];
-  for (const item of value) {
-    if (!item || typeof item !== "object") continue;
-    const t = item as Record<string, unknown>;
-    if (typeof t.scheme !== "string" || !t.scheme) continue;
-    out.push({ scheme: t.scheme, direction: t.direction === "desc" ? "desc" : "asc" });
-  }
-  return out;
 }
 
 /** Deterministic horizon_views row id for a seeded built-in lens, per user
@@ -89,12 +73,12 @@ export function sanitizeView(raw: unknown): HorizonView | null {
   if (typeof v.id !== "string" || !v.id) return null;
   if (typeof v.name !== "string" || !v.name.trim()) return null;
   if (typeof v.primary !== "string" || !v.primary) return null;
-  // description / column_order / tiebreakers / is_builtin are optional for
+  // description / column_order / is_builtin are optional for
   // backward compatibility with rows written before the editable-lens
-  // migration — missing values fall back to empty defaults.
+  // migration — missing values fall back to empty defaults. Removed
+  // fields (tiebreakers, sortBy) are simply ignored.
   const description = typeof v.description === "string" ? v.description : "";
   const columnOrder = parseStringArrayText(v.column_order ?? v.columnOrder ?? []);
-  const tiebreakers = parseTiebreakersText(v.tiebreakers ?? []);
   const splits: Record<string, string | null> = {};
   const rawSplits = v.splits;
   if (rawSplits && typeof rawSplits === "object") {
@@ -109,9 +93,7 @@ export function sanitizeView(raw: unknown): HorizonView | null {
     primary: v.primary,
     description,
     column_order: columnOrder,
-    tiebreakers,
     splits,
-    sortBy: v.sortBy === "priority" ? "priority" : "manual",
     is_builtin: isBuiltin,
   };
 }
@@ -125,23 +107,7 @@ export function horizonPrefsId(userId: string): string {
  *  column, possibly double-encoded by a legacy upload), an already-parsed
  *  object, or garbage. Invalid or empty input falls back to {}. */
 export function parseSplitsText(raw: unknown): Record<string, string | null> {
-  let value = raw;
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (trimmed === "") return {};
-    try {
-      value = JSON.parse(trimmed);
-      if (typeof value === "string") {
-        try {
-          value = JSON.parse(value);
-        } catch {
-          return {};
-        }
-      }
-    } catch {
-      return {};
-    }
-  }
+  const value = decodeJsonValue(raw);
   if (!value || typeof value !== "object") return {};
   const out: Record<string, string | null> = {};
   for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
@@ -153,23 +119,7 @@ export function parseSplitsText(raw: unknown): Record<string, string | null> {
 /** Defensive parse of the secondary-map TEXT column. Same shape rules as the
  *  old localStorage reader: per-primary maps of value -> scheme key | null. */
 export function parseSecondaryMapText(raw: unknown): SecondaryLensMap {
-  let value: unknown = raw;
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (trimmed === "") return {};
-    try {
-      value = JSON.parse(trimmed);
-      if (typeof value === "string") {
-        try {
-          value = JSON.parse(value);
-        } catch {
-          return {};
-        }
-      }
-    } catch {
-      return {};
-    }
-  }
+  const value: unknown = decodeJsonValue(raw);
   if (!value || typeof value !== "object") return {};
   const clean: SecondaryLensMap = {};
   for (const [primaryKey, perValue] of Object.entries(value as Record<string, unknown>)) {
@@ -190,9 +140,7 @@ export interface HorizonViewRow {
   primary_scheme: string;
   description?: string | null;
   column_order?: string | null;
-  tiebreakers?: string | null;
   splits: string | null;
-  sort_by: string | null;
   is_builtin?: boolean | number | null;
 }
 
@@ -206,9 +154,7 @@ export function rowToHorizonView(row: HorizonViewRow): HorizonView | null {
     primary: row.primary_scheme,
     description: row.description ?? "",
     column_order: row.column_order ?? "[]",
-    tiebreakers: row.tiebreakers ?? "[]",
     splits: parseSplitsText(row.splits),
-    sortBy: row.sort_by === "priority" ? "priority" : "manual",
     is_builtin: row.is_builtin === true || row.is_builtin === 1,
   });
 }
@@ -222,9 +168,7 @@ export function horizonViewToRow(view: HorizonView, userId: string): HorizonView
     primary_scheme: view.primary,
     description: view.description ?? "",
     column_order: JSON.stringify(view.column_order ?? []),
-    tiebreakers: JSON.stringify(view.tiebreakers ?? []),
     splits: JSON.stringify(view.splits ?? {}),
-    sort_by: view.sortBy === "priority" ? "priority" : "manual",
     is_builtin: view.is_builtin ?? false,
   };
 }
@@ -288,23 +232,6 @@ export function planLegacyImport(
   return { viewsToInsert, adoptDefault, adoptSecondaryMap };
 }
 
-/** Short summary for view lists, e.g. "Term · split: Priority (3)". */
-export function summarizeHorizonView(
-  view: HorizonView,
-  labelOf: (schemeKey: string) => string | null,
-): string {
-  const primary = labelOf(view.primary) ?? view.primary;
-  const secondaries = Object.values(view.splits).filter(
-    (s): s is string => typeof s === "string" && s.length > 0,
-  );
-  const sort = view.sortBy === "priority" ? " · priority" : "";
-  if (secondaries.length === 0) return `${primary} · no splits${sort}`;
-  const distinct = [...new Set(secondaries.map((s) => labelOf(s) ?? s))];
-  if (distinct.length === 1)
-    return `${primary} · split: ${distinct[0]} (${secondaries.length})${sort}`;
-  return `${primary} · ${secondaries.length} splits${sort}`;
-}
-
 /** Merge a view's splits into the secondary map under its primary scheme. */
 export function applyViewToSecondaryMap(
   view: HorizonView,
@@ -323,24 +250,6 @@ export function snapshotSplits(
     splits[viewColumnKey(key)] = secondaryKeyOf(key) ?? null;
   }
   return splits;
-}
-
-/** True when the live lens/splits differ from the view definition. */
-export function isViewDirty(
-  view: HorizonView,
-  lensKey: string,
-  columnKeys: (string | null)[],
-  secondaryKeyOf: (colKey: string | null) => string | null,
-  sortBy: "manual" | "priority" = "manual",
-): boolean {
-  if (view.primary !== lensKey) return true;
-  if ((view.sortBy ?? "manual") !== sortBy) return true;
-  for (const key of columnKeys) {
-    const live = secondaryKeyOf(key) ?? null;
-    const saved = view.splits[viewColumnKey(key)] ?? null;
-    if (live !== saved) return true;
-  }
-  return false;
 }
 
 export function newHorizonViewId(): string {

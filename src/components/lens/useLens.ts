@@ -43,10 +43,30 @@ export function useLens({
 
   const schemeByKey = useMemo(() => new Map(schemes.map((s) => [s.key, s])), [schemes]);
 
-  /** Active lens scheme; unknown keys fall back to Term. */
+  /**
+   * Resolved presentation lens for the active key. Accepts both lens ids
+   * and scheme keys; legacy keys resolve to the equivalent default lens,
+   * keys without one (nnl, priority) synthesize today's behavior exactly.
+   * Column order comes from the lens; Unclassified behavior is unchanged.
+   */
+  const { lens, synthesized: lensSynthesized } = useMemo(() => {
+    const infos = schemes.map((s) => ({
+      key: s.key,
+      label: s.label,
+      options: optionsForScheme(classificationOptions, s.id).map((o) => o.value),
+    }));
+    return resolveLens(lensKey, infos);
+  }, [schemes, classificationOptions, lensKey]);
+
+  /** Active lens scheme, resolved from the lens — never from the raw key,
+   *  which may be a built-in lens id rather than a scheme key. Unknown
+   *  keys fall back to Term. */
   const activeScheme = useMemo(
-    () => schemes.find((s) => s.key === lensKey) ?? schemes.find((s) => s.key === "term") ?? null,
-    [schemes, lensKey],
+    () =>
+      schemes.find((s) => s.key === lens.primaryScheme) ??
+      schemes.find((s) => s.key === "term") ??
+      null,
+    [schemes, lens],
   );
 
   const optionsBySchemeId = useMemo(() => {
@@ -61,21 +81,6 @@ export function useLens({
   }, [classificationOptions]);
 
   const custom = customs?.[lensKey];
-
-  /**
-   * Resolved presentation lens for the active scheme key. Accepts both lens
-   * ids and scheme keys; legacy keys resolve to the equivalent default lens,
-   * keys without one (nnl, priority) synthesize today's behavior exactly.
-   * Column order comes from the lens; Unclassified behavior is unchanged.
-   */
-  const { lens, synthesized: lensSynthesized } = useMemo(() => {
-    const infos = schemes.map((s) => ({
-      key: s.key,
-      label: s.label,
-      options: optionsForScheme(classificationOptions, s.id).map((o) => o.value),
-    }));
-    return resolveLens(lensKey, infos);
-  }, [schemes, classificationOptions, lensKey]);
 
   const lensForColumns: HorizonLensDef | null = custom ? null : lens;
 

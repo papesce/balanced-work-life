@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Bookmark, Check, ChevronDown, Pencil, Plus, Star } from "lucide-react";
 import { FloatingPanel } from "@/components/shared/FloatingPanel";
 import type { ClassificationScheme } from "@/lib/types";
@@ -61,6 +61,28 @@ export function HorizonViewSwitcher({
 
   const userViews = useMemo(() => views.filter((v) => !v.is_builtin), [views]);
 
+  // Scroll affordance: the list (max-h-72, overflow-y-auto) hides saved
+  // lenses below the fold. Track whether more content sits below the
+  // viewport to paint a bottom fade hint, and bring the active row into
+  // view when the menu opens.
+  const listRef = useRef<HTMLDivElement>(null);
+  const activeRowRef = useRef<HTMLDivElement>(null);
+  const [canScrollDown, setCanScrollDown] = useState(false);
+
+  const updateScrollHint = () => {
+    const el = listRef.current;
+    if (!el) return;
+    setCanScrollDown(el.scrollHeight - el.scrollTop - el.clientHeight > 4);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    updateScrollHint();
+    // With block:"nearest" this only scrolls when the active row is
+    // actually out of view (e.g. a saved lens below the fold).
+    activeRowRef.current?.scrollIntoView({ block: "nearest" });
+  }, [open]);
+
   const close = () => setOpen(false);
 
   return (
@@ -87,126 +109,151 @@ export function HorizonViewSwitcher({
           onClose={close}
           className="w-[min(26rem,calc(100vw-1rem))] overflow-hidden rounded-xl border border-black/10 bg-white shadow-xl dark:border-white/10 dark:bg-gray-900"
         >
-          <div className="max-h-72 overflow-y-auto p-2">
-            {lenses.map((lens) => (
-              <div
-                key={lens.id}
-                className={`group flex items-center gap-1 rounded-lg px-2 py-2 ${lens.id === activeLensId && !active ? "bg-violet-50 dark:bg-violet-900/20" : "hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"}`}
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    // Selection semantics stay id-based; the live lens
-                    // definition always comes from the constants.
-                    const def =
-                      DEFAULT_LENSES.find((l) => l.id === lens.id) ??
-                      DEFAULT_LENSES.find((l) => l.primaryScheme === lens.primaryScheme) ??
-                      DEFAULT_LENSES[0];
-                    onSelectLens(def);
-                    setOpen(false);
-                  }}
-                  title={lens.description}
-                  className="min-w-0 flex-1 text-left text-xs font-semibold text-gray-700 dark:text-gray-200"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <span className="truncate">{lens.name}</span>
-                    {lens.id === activeLensId && !active && (
-                      <Check size={12} className="text-violet-600" />
-                    )}
-                  </span>
-                  {lens.description && (
-                    <span className="mt-0.5 block truncate text-[10px] font-normal text-gray-400">
-                      {lens.description}
-                    </span>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onStartEdit(lens.id);
-                    setOpen(false);
-                  }}
-                  aria-label={`Edit ${lens.name}`}
-                  title="Edit lens"
-                  className="rounded p-1.5 text-gray-400 opacity-0 group-hover:opacity-100 hover:text-violet-600"
-                >
-                  <Pencil size={13} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onToggleDefaultLens(lens.id)}
-                  aria-label={
-                    defaultLensId === lens.id ? "Remove default lens" : "Set default lens"
-                  }
-                  title={defaultLensId === lens.id ? "Default lens" : "Set as default"}
-                  className={`rounded p-1.5 ${defaultLensId === lens.id ? "text-amber-500" : "text-gray-400 opacity-0 group-hover:opacity-100"}`}
-                >
-                  <Star size={13} className={defaultLensId === lens.id ? "fill-amber-400" : ""} />
-                </button>
-              </div>
-            ))}
-            {userViews.length === 0 && (
-              <p className="px-3 py-3 text-xs text-gray-500">
-                No saved lenses yet. Create one to choose grouping and priority order.
+          <div className="relative">
+            <div ref={listRef} onScroll={updateScrollHint} className="max-h-72 overflow-y-auto p-2">
+              <p className="sticky top-0 z-10 bg-white px-3 pt-1 pb-1.5 text-[10px] font-bold tracking-wider text-gray-400 uppercase dark:bg-gray-900 dark:text-gray-500">
+                Built-in lenses
               </p>
-            )}
-            {userViews.map((view) => (
+              {lenses.map((lens) => {
+                const isActiveLens = lens.id === activeLensId && !active;
+                return (
+                  <div
+                    key={lens.id}
+                    ref={isActiveLens ? activeRowRef : undefined}
+                    className={`group flex items-center gap-1 rounded-lg px-2 py-2 ${isActiveLens ? "bg-violet-50 dark:bg-violet-900/20" : "hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"}`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Selection semantics stay id-based; the live lens
+                        // definition always comes from the constants.
+                        const def =
+                          DEFAULT_LENSES.find((l) => l.id === lens.id) ??
+                          DEFAULT_LENSES.find((l) => l.primaryScheme === lens.primaryScheme) ??
+                          DEFAULT_LENSES[0];
+                        onSelectLens(def);
+                        setOpen(false);
+                      }}
+                      title={lens.description}
+                      className="min-w-0 flex-1 text-left text-xs font-semibold text-gray-700 dark:text-gray-200"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span className="truncate">{lens.name}</span>
+                        {lens.id === activeLensId && !active && (
+                          <Check size={12} className="text-violet-600" />
+                        )}
+                      </span>
+                      {lens.description && (
+                        <span className="mt-0.5 block truncate text-[10px] font-normal text-gray-400">
+                          {lens.description}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onStartEdit(lens.id);
+                        setOpen(false);
+                      }}
+                      aria-label={`Edit ${lens.name}`}
+                      title="Edit lens"
+                      className="rounded p-1.5 text-gray-400 opacity-0 group-hover:opacity-100 hover:text-violet-600"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onToggleDefaultLens(lens.id)}
+                      aria-label={
+                        defaultLensId === lens.id ? "Remove default lens" : "Set default lens"
+                      }
+                      title={defaultLensId === lens.id ? "Default lens" : "Set as default"}
+                      className={`rounded p-1.5 ${defaultLensId === lens.id ? "text-amber-500" : "text-gray-400 opacity-0 group-hover:opacity-100"}`}
+                    >
+                      <Star
+                        size={13}
+                        className={defaultLensId === lens.id ? "fill-amber-400" : ""}
+                      />
+                    </button>
+                  </div>
+                );
+              })}
+              <p className="sticky top-0 z-10 bg-white px-3 pt-2 pb-1.5 text-[10px] font-bold tracking-wider text-gray-400 uppercase dark:bg-gray-900 dark:text-gray-500">
+                My lenses{userViews.length > 0 ? ` (${userViews.length})` : ""}
+              </p>
+              {userViews.length === 0 && (
+                <p className="px-3 py-3 text-xs text-gray-500">
+                  No saved lenses yet. Create one to choose grouping and priority order.
+                </p>
+              )}
+              {userViews.map((view) => (
+                <div
+                  key={view.id}
+                  ref={view.id === activeViewId ? activeRowRef : undefined}
+                  className={`group flex items-center gap-1 rounded-lg px-2 py-2 ${view.id === activeViewId ? "bg-violet-50 dark:bg-violet-900/20" : "hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"}`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSelect(view.id);
+                      setOpen(false);
+                    }}
+                    className="min-w-0 flex-1 text-left text-xs font-semibold text-gray-700 dark:text-gray-200"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span className="truncate">{view.name}</span>
+                      {view.id === activeViewId && <Check size={12} className="text-violet-600" />}
+                    </span>
+                    <span className="mt-0.5 block truncate text-[10px] font-normal text-gray-400">
+                      {orderedSchemes.find((scheme) => scheme.key === view.primary)?.label ??
+                        view.primary}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onStartEdit(view.id);
+                      setOpen(false);
+                    }}
+                    aria-label={`Edit ${view.name}`}
+                    title="Edit lens"
+                    className="rounded p-1.5 text-gray-400 opacity-0 group-hover:opacity-100 hover:text-violet-600"
+                  >
+                    <Pencil size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onToggleDefault(view.id)}
+                    aria-label={
+                      defaultViewId === view.id ? "Remove default lens" : "Set default lens"
+                    }
+                    title={defaultViewId === view.id ? "Default lens" : "Set as default"}
+                    className={`rounded p-1.5 ${defaultViewId === view.id ? "text-amber-500" : "text-gray-400 opacity-0 group-hover:opacity-100"}`}
+                  >
+                    <Star size={13} className={defaultViewId === view.id ? "fill-amber-400" : ""} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(view.id)}
+                    aria-label={`Delete ${view.name}`}
+                    title="Delete lens"
+                    className="rounded p-1.5 text-gray-400 opacity-0 group-hover:opacity-100 hover:text-red-500"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+            {canScrollDown && (
               <div
-                key={view.id}
-                className={`group flex items-center gap-1 rounded-lg px-2 py-2 ${view.id === activeViewId ? "bg-violet-50 dark:bg-violet-900/20" : "hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"}`}
+                aria-hidden
+                className="pointer-events-none absolute inset-x-2 bottom-0 flex h-10 items-end justify-center bg-gradient-to-t from-white via-white/80 to-transparent pb-1 dark:from-gray-900 dark:via-gray-900/80"
               >
-                <button
-                  type="button"
-                  onClick={() => {
-                    onSelect(view.id);
-                    setOpen(false);
-                  }}
-                  className="min-w-0 flex-1 text-left text-xs font-semibold text-gray-700 dark:text-gray-200"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <span className="truncate">{view.name}</span>
-                    {view.id === activeViewId && <Check size={12} className="text-violet-600" />}
-                  </span>
-                  <span className="mt-0.5 block truncate text-[10px] font-normal text-gray-400">
-                    {orderedSchemes.find((scheme) => scheme.key === view.primary)?.label ??
-                      view.primary}
-                    {view.sortBy === "priority" ? " · lens order" : " · manual order"}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onStartEdit(view.id);
-                    setOpen(false);
-                  }}
-                  aria-label={`Edit ${view.name}`}
-                  title="Edit lens"
-                  className="rounded p-1.5 text-gray-400 opacity-0 group-hover:opacity-100 hover:text-violet-600"
-                >
-                  <Pencil size={13} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onToggleDefault(view.id)}
-                  aria-label={
-                    defaultViewId === view.id ? "Remove default lens" : "Set default lens"
-                  }
-                  title={defaultViewId === view.id ? "Default lens" : "Set as default"}
-                  className={`rounded p-1.5 ${defaultViewId === view.id ? "text-amber-500" : "text-gray-400 opacity-0 group-hover:opacity-100"}`}
-                >
-                  <Star size={13} className={defaultViewId === view.id ? "fill-amber-400" : ""} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDelete(view.id)}
-                  aria-label={`Delete ${view.name}`}
-                  title="Delete lens"
-                  className="rounded p-1.5 text-gray-400 opacity-0 group-hover:opacity-100 hover:text-red-500"
-                >
-                  ×
-                </button>
+                <span className="animate-bounce text-[10px] font-semibold text-violet-500">
+                  more below ↓
+                </span>
               </div>
-            ))}
+            )}
           </div>
           <div className="border-t border-black/5 p-2 dark:border-white/5">
             <button

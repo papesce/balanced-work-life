@@ -1,14 +1,10 @@
 /**
  * Horizon lenses: a lens is a presentation overlay on top of a
  * classification scheme. Schemes stay the data; the lens adds a
- * human-friendly name, an explicit column order and tiebreakers that order
- * items inside each column. Built-in lenses are code constants (no DB).
+ * human-friendly name, an explicit column order and a default secondary
+ * (split) scheme per column that orders/group items inside each column.
+ * Built-in lenses are code constants (no DB).
  */
-
-export interface LensTiebreaker {
-  scheme: string;
-  direction: "asc" | "desc";
-}
 
 export interface HorizonLensDef {
   id: string;
@@ -18,7 +14,18 @@ export interface HorizonLensDef {
   primaryScheme: string;
   /** Option values in explicit column order. */
   columnOrder: string[];
-  tiebreakers: LensTiebreaker[];
+  /** Default secondary scheme per column group key (column option value, or
+   *  "unclassified" for the null column). A user-set per-column Split
+   *  overrides these; an explicit "None" (null) disables ordering. */
+  defaultSplits: Record<string, string | null>;
+}
+
+/** Default secondary scheme for every column of a lens: all listed values
+ *  plus "unclassified" resolve to the same secondary scheme. */
+function splitsForAll(order: string[], scheme: string): Record<string, string | null> {
+  const out: Record<string, string | null> = {};
+  for (const k of [...order, "unclassified"]) out[k] = scheme;
+  return out;
 }
 
 export const DEFAULT_LENSES: HorizonLensDef[] = [
@@ -36,10 +43,10 @@ export const DEFAULT_LENSES: HorizonLensDef[] = [
       "next_year",
       "later",
     ],
-    tiebreakers: [
-      { scheme: "nnl", direction: "asc" },
-      { scheme: "priority", direction: "asc" },
-    ],
+    defaultSplits: splitsForAll(
+      ["this_week", "next_week", "this_month", "next_month", "this_year", "next_year", "later"],
+      "nnl",
+    ),
   },
   {
     id: "easiest",
@@ -47,7 +54,7 @@ export const DEFAULT_LENSES: HorizonLensDef[] = [
     description: "What I can resolve with little effort",
     primaryScheme: "effort",
     columnOrder: ["quick", "focused", "substantial", "deep", "epic"],
-    tiebreakers: [{ scheme: "priority", direction: "asc" }],
+    defaultSplits: splitsForAll(["quick", "focused", "substantial", "deep", "epic"], "priority"),
   },
   {
     id: "matters",
@@ -55,10 +62,7 @@ export const DEFAULT_LENSES: HorizonLensDef[] = [
     description: "What I can't skip",
     primaryScheme: "moscow",
     columnOrder: ["must", "should", "could", "wont"],
-    tiebreakers: [
-      { scheme: "priority", direction: "asc" },
-      { scheme: "when", direction: "asc" },
-    ],
+    defaultSplits: splitsForAll(["must", "should", "could", "wont"], "priority"),
   },
   {
     id: "ready",
@@ -66,7 +70,10 @@ export const DEFAULT_LENSES: HorizonLensDef[] = [
     description: "What is ready to advance or finish",
     primaryScheme: "attention",
     columnOrder: ["ready_to_complete", "about_to_start", "ready_to_start", "dont_forget_about"],
-    tiebreakers: [{ scheme: "effort", direction: "asc" }],
+    defaultSplits: splitsForAll(
+      ["ready_to_complete", "about_to_start", "ready_to_start", "dont_forget_about"],
+      "effort",
+    ),
   },
   {
     id: "looking-ahead",
@@ -74,7 +81,7 @@ export const DEFAULT_LENSES: HorizonLensDef[] = [
     description: "Short, medium and long term",
     primaryScheme: "term",
     columnOrder: ["short", "medium", "long"],
-    tiebreakers: [{ scheme: "priority", direction: "asc" }],
+    defaultSplits: splitsForAll(["short", "medium", "long"], "priority"),
   },
   {
     id: "payoff",
@@ -82,7 +89,7 @@ export const DEFAULT_LENSES: HorizonLensDef[] = [
     description: "What adds the most value",
     primaryScheme: "impact",
     columnOrder: ["high", "medium", "low"],
-    tiebreakers: [{ scheme: "effort", direction: "asc" }],
+    defaultSplits: splitsForAll(["high", "medium", "low"], "effort"),
   },
 ];
 
@@ -96,8 +103,8 @@ export interface LensSchemeInfo {
 /**
  * Resolve any scheme key or lens id to a lens definition. A default lens
  * whose primaryScheme matches wins (first match); otherwise a synthesized
- * lens preserves today's behavior exactly (scheme order + priority
- * tiebreaker). Unknown keys fall back to the term lens. Synthesized lenses
+ * lens preserves today's behavior exactly (scheme order, no default
+ * splits). Unknown keys fall back to the term lens. Synthesized lenses
  * are reachable via deep links and saved views but never listed.
  */
 export function resolveLens(
@@ -116,13 +123,24 @@ export function resolveLens(
         name: scheme.label,
         primaryScheme: scheme.key,
         columnOrder: [...scheme.options],
-        tiebreakers: [{ scheme: "priority", direction: "asc" }],
+        defaultSplits: {},
       },
       synthesized: true,
     };
   }
-  const term = DEFAULT_LENSES.find((l) => l.primaryScheme === "term")!;
+  const term = DEFAULT_LENSES.find((l) => l.primaryScheme === "term") ?? DEFAULT_LENSES[0];
+  if (!term) throw new Error("DEFAULT_LENSES must define at least one lens");
   return { lens: term, synthesized: false };
+}
+
+/**
+ * Normalize a ?lens= value (or stored key) to a primary scheme key: scheme
+ * keys pass through, built-in lens ids map to their primary scheme, unknown
+ * values pass through for the Term fallback in useLens.
+ */
+export function primarySchemeForKey(key: string, schemeKeys: Set<string>): string {
+  if (schemeKeys.has(key)) return key;
+  return DEFAULT_LENSES.find((l) => l.id === key)?.primaryScheme ?? key;
 }
 
 export interface LensColumn {
@@ -150,50 +168,4 @@ export function buildLensColumns(
     })),
     { key: null, label: "Unclassified" },
   ];
-}
-
-/**
- * Compare two items by the lens tiebreakers. rankOf returns the option index
- * within the scheme order, or null when the item has no value. Unvalued
- * items sort LAST regardless of direction; ties fall back to sort_order.
- */
-export function compareByTiebreakers(
-  tiebreakers: LensTiebreaker[],
-  rankOf: (scheme: string, ideaId: string) => number | null,
-  sortOrderOf: (ideaId: string) => number,
-  aId: string,
-  bId: string,
-): number {
-  for (const t of tiebreakers) {
-    const aRank = rankOf(t.scheme, aId);
-    const bRank = rankOf(t.scheme, bId);
-    if (aRank == null && bRank == null) continue;
-    // Unvalued sorts last regardless of direction.
-    if (aRank == null) return 1;
-    if (bRank == null) return -1;
-    if (aRank !== bRank) return t.direction === "asc" ? aRank - bRank : bRank - aRank;
-  }
-  return sortOrderOf(aId) - sortOrderOf(bId);
-}
-
-/**
- * Build the per-column comparator for a lens from live classification data.
- * optionOrderByScheme maps scheme key -> option values in scheme order;
- * valueOf maps `${ideaId}::${schemeKey}` -> option value (or null).
- */
-export function buildLensComparator(
-  lens: HorizonLensDef,
-  optionOrderByScheme: Map<string, string[]>,
-  valueOf: (ideaId: string, schemeKey: string) => string | null,
-  sortOrderOf: (ideaId: string) => number,
-): (aId: string, bId: string) => number {
-  const rankOf = (scheme: string, ideaId: string): number | null => {
-    const order = optionOrderByScheme.get(scheme);
-    if (!order) return null;
-    const value = valueOf(ideaId, scheme);
-    if (value == null) return null;
-    const idx = order.indexOf(value);
-    return idx === -1 ? null : idx;
-  };
-  return (aId, bId) => compareByTiebreakers(lens.tiebreakers, rankOf, sortOrderOf, aId, bId);
 }

@@ -38,9 +38,7 @@ export interface BackupHorizonView {
   primary_scheme: string;
   description?: string;
   column_order?: string;
-  tiebreakers?: string;
   splits: string;
-  sort_by: string;
   is_builtin?: boolean | number;
 }
 
@@ -66,7 +64,7 @@ export interface BackupData {
   horizonPrefs: BackupHorizonPrefs | null;
 }
 
-export const BACKUP_VERSION = 4;
+export const BACKUP_VERSION = 5;
 
 export function isValidBackup(data: unknown): data is BackupData {
   if (!data || typeof data !== "object") return false;
@@ -150,7 +148,7 @@ export async function buildBackupData(
       user.id,
     ]),
     db.getAll<BackupHorizonView>(
-      "SELECT id, name, primary_scheme, description, column_order, tiebreakers, splits, sort_by, is_builtin FROM horizon_views WHERE user_id = ?",
+      "SELECT id, name, primary_scheme, description, column_order, splits, is_builtin FROM horizon_views WHERE user_id = ?",
       [user.id],
     ),
     db.getAll<BackupHorizonPrefs>(
@@ -274,9 +272,7 @@ export async function restoreHorizonViews(
         primary: v.primary_scheme,
         description: v.description ?? "",
         column_order: v.column_order ?? "[]",
-        tiebreakers: v.tiebreakers ?? "[]",
         splits: parseSplitsText(v.splits),
-        sortBy: v.sort_by,
         is_builtin: v.is_builtin === true || v.is_builtin === 1,
       }),
     )
@@ -295,7 +291,7 @@ export async function restoreHorizonViews(
   await db.writeTransaction(async (tx) => {
     for (const v of clean) {
       await tx.execute(
-        `INSERT OR IGNORE INTO horizon_views (id, user_id, name, primary_scheme, description, column_order, tiebreakers, splits, sort_by, is_builtin, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+        `INSERT OR IGNORE INTO horizon_views (id, user_id, name, primary_scheme, description, column_order, splits, is_builtin, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)`,
         [
           v.id,
           userId,
@@ -303,9 +299,7 @@ export async function restoreHorizonViews(
           v.primary,
           v.description ?? "",
           JSON.stringify(v.column_order ?? []),
-          JSON.stringify(v.tiebreakers ?? []),
           JSON.stringify(v.splits ?? {}),
-          v.sortBy ?? "manual",
           v.is_builtin ? 1 : 0,
           now,
           now,
