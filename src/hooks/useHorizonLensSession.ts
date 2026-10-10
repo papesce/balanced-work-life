@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ClassificationScheme } from "@/lib/types";
 import type { SecondaryLensMap } from "@/lib/storage";
 import {
@@ -59,6 +59,10 @@ export function useHorizonLensSession({
   const [draftName, setDraftName] = useState("");
   const [draftDescription, setDraftDescription] = useState("");
   const [nameAutoFocus, setNameAutoFocus] = useState(false);
+  /** Resolver for the in-flight leave confirm; the dialog (rendered by the
+   *  page from `leaveConfirmOpen`) settles the `leaveEditSession` promise. */
+  const pendingLeaveRef = useRef<((discard: boolean) => void) | null>(null);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [editSnapshot, setEditSnapshot] = useState<{
     lensKey: string;
     secondaryMapJson: string;
@@ -114,14 +118,9 @@ export function useHorizonLensSession({
     secondaryMap,
   ]);
 
-  /** Leave the edit session, restoring the snapshot. Returns false when the
-   *  user backs out of the discard confirm, so callers can abort. */
-  const leaveEditSession = useCallback(() => {
-    if (menuEditingId == null) return true;
-    if (hasUnsavedEdits) {
-      const discard = window.confirm("Discard your unsaved lens changes and leave the editor?");
-      if (!discard) return false;
-    }
+  /** Revert live state to the session snapshot and close the session. */
+  const performLeave = useCallback(() => {
+    if (menuEditingId == null) return;
     if (editSnapshot) {
       persistLensKey(editSnapshot.lensKey);
       try {
@@ -144,10 +143,8 @@ export function useHorizonLensSession({
     setMenuEditingId(null);
     setEditSnapshot(null);
     setNameAutoFocus(false);
-    return true;
   }, [
     menuEditingId,
-    hasUnsavedEdits,
     editSnapshot,
     views,
     setPrefs,
@@ -158,12 +155,49 @@ export function useHorizonLensSession({
     prefs,
   ]);
 
+  /** Leave the edit session, restoring the snapshot. When there are unsaved
+   *  edits the page's ConfirmDialog asks first; resolves false when the
+   *  user backs out, so callers can abort. */
+  const leaveEditSession = useCallback(async (): Promise<boolean> => {
+    if (menuEditingId == null) return true;
+    if (hasUnsavedEdits) {
+      const discard = await new Promise<boolean>((resolve) => {
+        pendingLeaveRef.current = resolve;
+        setLeaveConfirmOpen(true);
+      });
+      if (!discard) return false;
+    }
+    performLeave();
+    return true;
+  }, [menuEditingId, hasUnsavedEdits, performLeave]);
+
+  const confirmLeave = useCallback(() => {
+    pendingLeaveRef.current?.(true);
+    pendingLeaveRef.current = null;
+    setLeaveConfirmOpen(false);
+  }, []);
+
+  const cancelLeave = useCallback(() => {
+    pendingLeaveRef.current?.(false);
+    pendingLeaveRef.current = null;
+    setLeaveConfirmOpen(false);
+  }, []);
+
+  // Safety: never leave a caller awaiting a dialog that unmounted.
+  useEffect(
+    () => () => {
+      pendingLeaveRef.current?.(false);
+      pendingLeaveRef.current = null;
+    },
+    [],
+  );
+
   /** Start a below-header edit session for a lens row (built-in id or
    *  view id). The lens is activated first so criteria changes preview
    *  live. An in-progress session is left (with confirm) first. */
   const startMenuEdit = useCallback(
-    (id: string) => {
-      if (!leaveEditSession()) return;
+    async (id: string) => {
+      if (!(await leaveEditSession())) return;
       const view = views.find((v) => v.id === id && !v.is_builtin) ?? null;
       if (view) {
         const merged = applyViewToSecondaryMap(view, secondaryMap);
@@ -225,8 +259,8 @@ export function useHorizonLensSession({
 
   /** Create lens: an empty slot (untitled row) selected at once, with the
    *  name input focused so the user names it right away. */
-  const createLens = useCallback(() => {
-    if (!leaveEditSession()) return;
+  const createLens = useCallback(async () => {
+    if (!(await leaveEditSession())) return;
     const created: HorizonView = {
       id: newHorizonViewId(),
       name: "Untitled lens",
@@ -374,6 +408,9 @@ export function useHorizonLensSession({
     primaryLocked,
     hasUnsavedEdits,
     leaveEditSession,
+    leaveConfirmOpen,
+    confirmLeave,
+    cancelLeave,
     startMenuEdit,
     createLens,
     saveLensEdits,

@@ -14,6 +14,7 @@ import { getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
 import { buildTree as buildTreeGeneric } from "@/components/tree/buildTree";
 import { AppShell } from "@/components/AppShell";
 import { UndoBar } from "@/components/shared/UndoBar";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { HorizonColumn } from "@/components/horizon/HorizonColumn";
 import { RootAddInput } from "@/components/horizon/RootAddInput";
 import { HorizonViewSwitcher } from "@/components/horizon/HorizonViewSwitcher";
@@ -196,6 +197,9 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
     primaryLocked,
     hasUnsavedEdits,
     leaveEditSession,
+    leaveConfirmOpen,
+    confirmLeave,
+    cancelLeave,
     startMenuEdit,
     createLens,
     saveLensEdits,
@@ -440,16 +444,16 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
   // Selection actions are guarded by the edit session: switching lens/view
   // mid-edit asks to discard first.
   const handleSelectView = useCallback(
-    (id: string) => {
-      if (!leaveEditSession()) return;
+    async (id: string) => {
+      if (!(await leaveEditSession())) return;
       selectView(id);
     },
     [leaveEditSession, selectView],
   );
 
   const handleSelectLens = useCallback(
-    (next: HorizonLensDef) => {
-      if (!leaveEditSession()) return;
+    async (next: HorizonLensDef) => {
+      if (!(await leaveEditSession())) return;
       selectLens(next);
     },
     [leaveEditSession, selectLens],
@@ -717,9 +721,18 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
           hasUnsavedEdits={hasUnsavedEdits}
           nameAutoFocus={nameAutoFocus}
           onSave={saveLensEdits}
-          onCancel={leaveEditSession}
+          onCancel={() => void leaveEditSession()}
         />
       )}
+      <ConfirmDialog
+        open={leaveConfirmOpen}
+        title="Discard lens changes?"
+        body="Discard your unsaved lens changes and leave the editor?"
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
+      />
       <UndoBar undoAction={undoAction} onUndo={() => void handleUndo()} onDismiss={clearUndo} />
 
       {/* Mobile tab bar */}
