@@ -73,6 +73,10 @@ interface IdeaTreeProps {
   hideDeferred: boolean;
   /** Ids already triaged into Horizon — hidden, ancestors kept. */
   hideInHorizonIds?: Set<string>;
+  /** Generic counterpart (e.g. pathed ids for the unpathed-only view). */
+  hideIds?: Set<string>;
+  /** Path titles per task id; renders small path chips in each row. */
+  pathChipsForIdea?: (ideaId: string) => string[];
   typeFilter?: IdeaType[];
   focusedId: string | null;
   onFocus: (id: string | null) => void;
@@ -151,6 +155,8 @@ export function IdeaTree({
   hideCompleted,
   hideDeferred,
   hideInHorizonIds,
+  hideIds,
+  pathChipsForIdea,
   typeFilter,
   focusedId,
   onFocus,
@@ -168,6 +174,7 @@ export function IdeaTree({
       hideCompleted,
       hideDeferred,
       hideInHorizonIds,
+      hideIds,
       typeFilter,
     });
 
@@ -218,6 +225,7 @@ export function IdeaTree({
     hideCompleted,
     hideDeferred,
     hideInHorizonIds,
+    hideIds,
     typeFilter,
     showToday,
     focusedId,
@@ -298,6 +306,15 @@ export function IdeaTree({
             )}
             <StatusPillSlot node={node} onUpdate={updateIdea} />
             <LinkCountBadge nodeId={node.id} links={links} />
+            {pathChipsForIdea?.(node.id).map((title) => (
+              <span
+                key={title}
+                title={`In path: ${title}`}
+                className="max-w-[110px] truncate rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-500/20 dark:text-violet-300"
+              >
+                {title}
+              </span>
+            ))}
             <ScheduleChip node={node} todayString={todayString} />
             {focusedId !== node.id && (
               <button

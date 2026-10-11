@@ -49,8 +49,8 @@ import { UndoBar } from "@/components/shared/UndoBar";
 import { IdeaActionMenu } from "@/components/shared/IdeaActionMenu";
 import { ValueHelpInfo } from "@/components/shared/ValueHelpInfo";
 import { hintForValue } from "@/lib/classificationHelp";
-import { useProjectWorkflow } from "@/hooks/useProjectWorkflow";
-import { ProjectWorkflowCanvas } from "@/components/projects/ProjectWorkflowView";
+import { ProjectPathsTab } from "@/components/projects/ProjectPathsTab";
+import { usePathMembership } from "@/hooks/usePathMembership";
 
 export default function ProjectsPage() {
   const searchParams = useSearchParams();
@@ -79,12 +79,14 @@ export default function ProjectsPage() {
   const [titleDraft, setTitleDraft] = useState("");
   // Detail-local filters (list filters don't leak into detail).
   const detailHideCompleted = useUiPrefsStore((s) => s.projectsDetailHideCompleted);
-  const [detailView, setDetailView] = useState<"list" | "workflow">("list");
+  const [detailView, setDetailView] = useState<"list" | "paths">("list");
+  const [unpathedOnly, setUnpathedOnly] = useState(false);
 
   const ideasHook = useIdeas({ scope: "all" });
   const linksHook = useIdeaLinks();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
+  const membership = usePathMembership(selectedId ?? "");
   const { openNotes } = useNotes();
   const {
     schemes,
@@ -100,7 +102,6 @@ export default function ProjectsPage() {
       if (selectedId && deletedIds.has(selectedId)) handleSelect(null);
     },
   });
-  const workflowState = useProjectWorkflow(selectedId ?? "");
   const {
     createIdea,
     updateIdea,
@@ -146,6 +147,7 @@ export default function ProjectsPage() {
     // Project navigation resets local focus + detail filters.
     setFocusedId(null);
     setTitleEditing(false);
+    setUnpathedOnly(false);
     const params = new URLSearchParams(searchParams.toString());
     if (id) params.set("projectId", id);
     else params.delete("projectId");
@@ -371,6 +373,15 @@ export default function ProjectsPage() {
     [selectedId, ideasHook.ideas],
   );
 
+  const pathedIds = useMemo(
+    () => new Set(membership.titlesByIdea.keys()),
+    [membership.titlesByIdea],
+  );
+  const unpathedCount = useMemo(
+    () => projectTasks.filter((t) => !pathedIds.has(t.id)).length,
+    [projectTasks, pathedIds],
+  );
+
   /** Single UI entry for "new editable row": expand parent, select + edit the draft. */
   const spawnEditable = (id: string, parentId: string | null) => {
     if (parentId) ideasHook.expandIdea(parentId);
@@ -465,6 +476,21 @@ export default function ProjectsPage() {
               <span className="hidden sm:inline">Hide completed</span>
               <span className="sm:hidden">Hide done</span>
             </button>
+            {detailView === "list" && unpathedCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setUnpathedOnly((v) => !v)}
+                aria-pressed={unpathedOnly}
+                title="Show only tasks that belong to no path"
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                  unpathedOnly
+                    ? "border-indigo-300 bg-white text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
+                    : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
+                }`}
+              >
+                Unpathed ({unpathedCount})
+              </button>
+            )}
           </>
         }
         headerActions={
@@ -481,11 +507,11 @@ export default function ProjectsPage() {
                 List
               </button>
               <button
-                onClick={() => setDetailView("workflow")}
-                aria-pressed={detailView === "workflow"}
-                className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${detailView === "workflow" ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300" : "text-gray-500"}`}
+                onClick={() => setDetailView("paths")}
+                aria-pressed={detailView === "paths"}
+                className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${detailView === "paths" ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300" : "text-gray-500"}`}
               >
-                Workflow
+                Paths
               </button>
             </div>
             <button
@@ -616,12 +642,11 @@ export default function ProjectsPage() {
           )}
         </div>
 
-        {detailView === "workflow" ? (
-          <ProjectWorkflowCanvas
+        {detailView === "paths" ? (
+          <ProjectPathsTab
+            projectId={selectedProject.id}
             tasks={projectTasks}
             links={linksHook.links}
-            workflow={workflowState.workflow}
-            onSaveWorkflow={workflowState.save}
             tagsForTask={taskTagsHook.getTagsForIdea}
             onUpdateTask={updateIdea}
             onOpenNotes={openNotes}
@@ -666,6 +691,8 @@ export default function ProjectsPage() {
             hideClosed={false}
             hideCompleted={detailHideCompleted}
             hideDeferred={false}
+            hideIds={unpathedOnly ? pathedIds : undefined}
+            pathChipsForIdea={(id) => membership.titlesByIdea.get(id) ?? []}
             focusedId={focusedId ?? selectedId}
             onFocus={(id) => setFocusedId(id === selectedId ? null : id)}
             cardMode={false}

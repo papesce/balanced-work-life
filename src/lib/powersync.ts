@@ -145,12 +145,26 @@ export const HorizonPrefsTable = new Table(
   { indexes: {} },
 );
 
-export const ProjectWorkflowsTable = new Table(
+export const PathsTable = new Table(
   {
     user_id: column.text,
     project_id: column.text,
-    document: column.text,
+    title: column.text,
+    sort_order: column.integer,
+    created_at: column.text,
     updated_at: column.text,
+  },
+  { indexes: {} },
+);
+
+export const PathItemsTable = new Table(
+  {
+    user_id: column.text,
+    path_id: column.text,
+    idea_id: column.text,
+    x: column.real,
+    y: column.real,
+    created_at: column.text,
   },
   { indexes: {} },
 );
@@ -166,7 +180,8 @@ export const AppSchema = new Schema({
   idea_classifications: IdeaClassificationsTable,
   horizon_views: HorizonViewsTable,
   horizon_prefs: HorizonPrefsTable,
-  project_workflows: ProjectWorkflowsTable,
+  paths: PathsTable,
+  path_items: PathItemsTable,
 });
 
 // Allowlist of tables the connector knows how to upload. An unknown op.table
@@ -184,7 +199,8 @@ const KNOWN_UPLOAD_TABLES: ReadonlySet<string> = new Set([
   "idea_classifications",
   "horizon_views",
   "horizon_prefs",
-  "project_workflows",
+  "paths",
+  "path_items",
 ]);
 
 export class SupabaseConnector {
@@ -464,12 +480,50 @@ export class SupabaseConnector {
       switch (op.op) {
         case "PUT":
         case "PATCH": {
+          // Same partial-PATCH hazard as path_items: opData may omit
+          // user_id/idea_id/scheme_id, tripping RLS 42501. Upload full row.
+          const current = await database.getOptional<Record<string, unknown>>(
+            `SELECT * FROM idea_classifications WHERE id = ?`,
+            [op.id],
+          );
+          if (!current) return;
           const { error } = await supabase
             .from(op.table)
             .upsert(
-              { id: op.id, ...(op.opData as Record<string, unknown>) },
+              { ...(current as Record<string, unknown>) },
               { onConflict: "idea_id,scheme_id" },
             );
+          throwIfSupabaseError(error, `upsert ${op.table} id=${op.id}`);
+          break;
+        }
+        case "DELETE": {
+          const { error } = await supabase.from(op.table).delete().eq("id", op.id);
+          throwIfSupabaseError(error, `delete ${op.table} id=${op.id}`);
+          break;
+        }
+      }
+      return;
+    }
+    if (op.table === "path_items") {
+      // Unique by (path_id, idea_id), not just id: addItem is idempotent
+      // locally, but a stale row from another device can carry a different
+      // id for the same pair. Upsert on the real unique key so the newer
+      // value wins instead of erroring with 23505 and wedging the queue.
+      switch (op.op) {
+        case "PUT":
+        case "PATCH": {
+          // PATCH opData only carries changed columns (e.g. {x, y}) — no
+          // user_id/path_id/idea_id. Upserting that partial payload violates
+          // NOT NULL and the RLS WITH CHECK (auth.uid() = user_id) with
+          // 42501. Upload the full current local row instead.
+          const current = await database.getOptional<Record<string, unknown>>(
+            `SELECT * FROM path_items WHERE id = ?`,
+            [op.id],
+          );
+          if (!current) return;
+          const { error } = await supabase
+            .from(op.table)
+            .upsert({ ...(current as Record<string, unknown>) }, { onConflict: "path_id,idea_id" });
           throwIfSupabaseError(error, `upsert ${op.table} id=${op.id}`);
           break;
         }
@@ -541,31 +595,6 @@ export class SupabaseConnector {
           throwIfSupabaseError(error, `delete ${op.table} id=${op.id}`);
           break;
         }
-      }
-      return;
-    }
-    if (op.table === "project_workflows") {
-      const current = await database.getOptional<Record<string, unknown>>(
-        `SELECT * FROM project_workflows WHERE id = ?`,
-        [op.id],
-      );
-      if (!current && op.op !== "DELETE") return;
-      if (op.op === "DELETE") {
-        const { error } = await supabase.from(op.table).delete().eq("id", op.id);
-        throwIfSupabaseError(error, `delete ${op.table} id=${op.id}`);
-      } else {
-        const payload = { ...(current as Record<string, unknown>) };
-        if (typeof payload.document === "string") {
-          try {
-            payload.document = JSON.parse(payload.document) as unknown;
-          } catch {
-            payload.document = { version: 1, nodes: [], edges: [] };
-          }
-        }
-        const { error } = await supabase
-          .from(op.table)
-          .upsert(payload, { onConflict: "project_id" });
-        throwIfSupabaseError(error, `upsert ${op.table} id=${op.id}`);
       }
       return;
     }

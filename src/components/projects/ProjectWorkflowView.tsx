@@ -20,8 +20,9 @@ import "@xyflow/react/dist/style.css";
 import dagre from "dagre";
 import { Plus, X } from "lucide-react";
 import type { Idea, IdeaLink, IdeaStatus, Tag } from "@/lib/types";
+import type { PathItem, PathPosition } from "@/lib/paths";
+import { isReady, pathProgress, wouldCreateCycle } from "@/lib/paths";
 import { NODE_WIDTH, WorkflowTaskNode, type WorkflowTaskNodeData } from "./WorkflowTaskNode";
-import { wouldCreateWorkflowCycle, type ProjectWorkflow } from "@/lib/projectWorkflow";
 
 const nodeTypes = { workflowTask: WorkflowTaskNode };
 const NODE_HEIGHT = 120;
@@ -29,14 +30,20 @@ const NODE_HEIGHT = 120;
 interface Props {
   tasks: Idea[];
   links: IdeaLink[];
-  workflow: ProjectWorkflow;
-  onSaveWorkflow: (workflow: ProjectWorkflow) => Promise<void>;
+  items: PathItem[];
+  onAddItem: (ideaId: string, x: number, y: number) => Promise<void>;
+  onRemoveItem: (ideaId: string) => Promise<void>;
+  onMoveItems: (positions: PathPosition[]) => Promise<void>;
   tagsForTask: (id: string) => Tag[];
   onUpdateTask: (id: string, updates: Partial<Idea>) => Promise<void>;
   onOpenNotes: (id: string) => void;
   onCreateLink: (sourceId: string, targetId: string, type: "depends_on") => Promise<string>;
   onDeleteLink: (id: string) => Promise<void>;
   onAddStep: () => Promise<string | null>;
+  /** True when both tasks co-occur in some other path (for the delete-everywhere notice). */
+  isPairInAnotherPath?: (aIdeaId: string, bIdeaId: string) => boolean;
+  /** Mirrors the project "Hide completed" toggle: hides completed nodes on the canvas. */
+  hideCompleted?: boolean;
 }
 
 type FlowNode = Node<WorkflowTaskNodeData>;
@@ -44,14 +51,18 @@ type FlowNode = Node<WorkflowTaskNodeData>;
 export function ProjectWorkflowView({
   tasks,
   links,
-  workflow,
-  onSaveWorkflow,
+  items,
+  onAddItem,
+  onRemoveItem,
+  onMoveItems,
   tagsForTask,
   onUpdateTask,
   onOpenNotes,
   onCreateLink,
   onDeleteLink,
   onAddStep,
+  isPairInAnotherPath,
+  hideCompleted,
 }: Props) {
   const [nodes, setNodes] = useState<FlowNode[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -63,9 +74,31 @@ export function ProjectWorkflowView({
 
   const taskMap = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
   const placedIds = useMemo(
-    () => new Set(workflow.nodes.map((n) => n.taskId).filter((id) => taskMap.has(id))),
-    [workflow.nodes, taskMap],
+    () => new Set(items.map((n) => n.idea_id).filter((id) => taskMap.has(id))),
+    [items, taskMap],
   );
+  const statusById = useMemo(
+    () => new Map(tasks.map((t) => [t.id, { status: t.status }])),
+    [tasks],
+  );
+  const dependsLinks = useMemo(() => links.filter((l) => l.link_type === "depends_on"), [links]);
+  // Derived progress over all members (never persisted) — live-updates with task status.
+  const progress = useMemo(() => pathProgress(items, statusById), [items, statusById]);
+  // Derived per-node states (never persisted).
+  const nodeDerived = useMemo(() => {
+    const map = new Map<string, { ready: boolean; done: boolean }>();
+    for (const id of placedIds) {
+      const task = taskMap.get(id);
+      if (!task) continue;
+      const done = task.status === "completed" || task.status === "cancelled";
+      map.set(id, { ready: !done && isReady(task, dependsLinks, statusById), done });
+    }
+    return map;
+  }, [placedIds, taskMap, dependsLinks, statusById]);
+  const visibleIds = useMemo(() => {
+    if (!hideCompleted) return placedIds;
+    return new Set([...placedIds].filter((id) => taskMap.get(id)?.status !== "completed"));
+  }, [placedIds, taskMap, hideCompleted]);
   // Count how many edges touch each task ID (source or target) — used for tray badges.
   const edgeTaskCount = useMemo(() => {
     const counts = new Map<string, number>();
@@ -83,23 +116,23 @@ export function ProjectWorkflowView({
     [onUpdateTask],
   );
 
-  const savePlacement = useCallback(
+  const savePositions = useCallback(
     (nextNodes: FlowNode[]) => {
-      const doc: ProjectWorkflow = {
-        version: 1,
-        nodes: nextNodes.map((n) => ({ taskId: n.id, position: n.position })),
-        edges: [],
-      };
-      void onSaveWorkflow(doc).catch(() => setMessage("Could not save canvas. Try again."));
+      const positions: PathPosition[] = nextNodes.map((n) => ({
+        ideaId: n.id,
+        x: n.position.x,
+        y: n.position.y,
+      }));
+      void onMoveItems(positions).catch(() => setMessage("Could not save canvas. Try again."));
     },
-    [onSaveWorkflow],
+    [onMoveItems],
   );
 
-  // Canvas membership is user-controlled and persisted in the workflow document.
+  // Canvas membership is user-controlled and persisted in path_items.
   // Edges reflect depends_on links between placed steps only.
   useEffect(() => {
-    const savedPositions = new Map(workflow.nodes.map((n) => [n.taskId, n.position]));
-    const nextNodes: FlowNode[] = [...placedIds].map((id, i) => ({
+    const savedPositions = new Map(items.map((n) => [n.idea_id, { x: n.x, y: n.y }]));
+    const nextNodes: FlowNode[] = [...visibleIds].map((id, i) => ({
       id,
       type: "workflowTask",
       position: savedPositions.get(id) ?? {
@@ -110,6 +143,8 @@ export function ProjectWorkflowView({
       data: {
         idea: taskMap.get(id)!,
         tags: tagsForTask(id),
+        isReady: nodeDerived.get(id)?.ready ?? false,
+        isDone: nodeDerived.get(id)?.done ?? false,
         onUpdateStatus: handleUpdateStatus,
         onOpenTask: onOpenNotes,
       },
@@ -134,7 +169,7 @@ export function ProjectWorkflowView({
         })),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workflow, taskMap, links]);
+  }, [items, taskMap, links, visibleIds, nodeDerived]);
 
   // Fit view on mount only; manual canvas, no auto re-fit while arranging.
   useEffect(() => {
@@ -144,14 +179,16 @@ export function ProjectWorkflowView({
 
   const handleNodesChange = useCallback(
     (changes: NodeChange<FlowNode>[]) => {
-      setNodes((current) => {
-        const next = applyNodeChanges(changes, current) as FlowNode[];
-        // Delete key removes the step from the canvas only — the task and its links stay intact.
-        if (changes.some((c) => c.type === "remove")) savePlacement(next);
-        return next;
-      });
+      const removedIds = changes
+        .filter((c) => c.type === "remove")
+        .map((c) => (c as { id: string }).id);
+      setNodes((current) => applyNodeChanges(changes, current) as FlowNode[]);
+      // Delete key removes the step from the path only — the task and its links stay intact.
+      for (const id of removedIds) {
+        void onRemoveItem(id).catch(() => setMessage("Could not remove step. Try again."));
+      }
     },
-    [savePlacement],
+    [onRemoveItem],
   );
 
   const handleEdgesChange = useCallback(
@@ -160,12 +197,20 @@ export function ProjectWorkflowView({
         for (const change of changes) {
           if (change.type !== "remove") continue;
           const edge = current.find((e) => e.id === (change as { id: string }).id);
-          if (edge) void onDeleteLink(edge.id).catch(() => setMessage("Could not remove link."));
+          if (!edge) continue;
+          const shared =
+            isPairInAnotherPath?.(edge.source, edge.target) ||
+            isPairInAnotherPath?.(edge.target, edge.source);
+          void onDeleteLink(edge.id)
+            .then(() => {
+              if (shared) setMessage("Dependency removed everywhere, not just in this path.");
+            })
+            .catch(() => setMessage("Could not remove link."));
         }
         return applyEdgeChanges(changes, current);
       });
     },
-    [onDeleteLink],
+    [onDeleteLink, isPairInAnotherPath],
   );
 
   const onConnect = useCallback(
@@ -173,7 +218,7 @@ export function ProjectWorkflowView({
       if (!connection.source || !connection.target) return;
       if (connection.source === connection.target) return;
       const current = edges.map(({ id, source, target }) => ({ id, source, target }));
-      if (wouldCreateWorkflowCycle(current, connection.source, connection.target)) {
+      if (wouldCreateCycle(current, connection.source, connection.target)) {
         setMessage("That connection would create a cycle.");
         return;
       }
@@ -191,34 +236,47 @@ export function ProjectWorkflowView({
 
   const placeTask = useCallback(
     (taskId: string, position?: { x: number; y: number }) => {
+      const task = taskMap.get(taskId);
+      if (!task) return;
+      const pos = position ?? {
+        x: 80 + (nodes.length % 3) * 260,
+        y: 70 + Math.floor(nodes.length / 3) * 160,
+      };
       setNodes((current) => {
         if (current.some((n) => n.id === taskId)) return current;
-        const task = taskMap.get(taskId);
-        if (!task) return current;
-        const next: FlowNode[] = [
+        return [
           ...current,
           {
             id: taskId,
             type: "workflowTask",
-            position: position ?? {
-              x: 80 + (current.length % 3) * 260,
-              y: 70 + Math.floor(current.length / 3) * 160,
-            },
+            position: pos,
             style: { width: NODE_WIDTH },
             data: {
               idea: task,
               tags: tagsForTask(taskId),
+              isReady: isReady(task, dependsLinks, statusById),
+              isDone: task.status === "completed" || task.status === "cancelled",
               onUpdateStatus: handleUpdateStatus,
               onOpenTask: onOpenNotes,
             },
           },
         ];
-        savePlacement(next);
-        return next;
       });
+      void onAddItem(taskId, pos.x, pos.y).catch(() =>
+        setMessage("Could not add step. Try again."),
+      );
       setSelectedId(taskId);
     },
-    [taskMap, tagsForTask, handleUpdateStatus, onOpenNotes, savePlacement],
+    [
+      taskMap,
+      nodes.length,
+      tagsForTask,
+      handleUpdateStatus,
+      onOpenNotes,
+      onAddItem,
+      dependsLinks,
+      statusById,
+    ],
   );
 
   const handleAddStep = useCallback(async () => {
@@ -239,13 +297,11 @@ export function ProjectWorkflowView({
 
   const removeSelected = useCallback(() => {
     if (!selectedId) return;
-    setNodes((current) => {
-      const next = current.filter((n) => n.id !== selectedId);
-      savePlacement(next);
-      return next;
-    });
+    const id = selectedId;
+    setNodes((current) => current.filter((n) => n.id !== id));
+    void onRemoveItem(id).catch(() => setMessage("Could not remove step. Try again."));
     setSelectedId(null);
-  }, [selectedId, savePlacement]);
+  }, [selectedId, onRemoveItem]);
 
   const autoLayout = useCallback(() => {
     setNodes((current) => {
@@ -265,20 +321,15 @@ export function ProjectWorkflowView({
             ? { ...n, position: { x: point.x - NODE_WIDTH / 2, y: point.y - NODE_HEIGHT / 2 } }
             : n;
         });
-        savePlacement(next);
+        savePositions(next);
         return currentEdges;
       });
       return current;
     });
     requestAnimationFrame(() => flow.fitView({ padding: 0.2, duration: 250 }));
-  }, [flow, savePlacement]);
+  }, [flow, savePositions]);
 
   const available = useMemo(() => tasks.filter((t) => !placedIds.has(t.id)), [tasks, placedIds]);
-
-  const dragTask = (event: React.DragEvent, taskId: string) => {
-    event.dataTransfer.setData("application/project-task", taskId);
-    event.dataTransfer.effectAllowed = "move";
-  };
 
   const dropTask = (event: React.DragEvent) => {
     event.preventDefault();
@@ -291,6 +342,12 @@ export function ProjectWorkflowView({
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-700">
         <div className="flex items-center gap-1">
+          <span
+            className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+            title="Completed or cancelled steps out of all steps in this path"
+          >
+            {progress.done}/{progress.total} done
+          </span>
           <button
             onClick={() => setTrayOpen((v) => !v)}
             className="rounded-lg px-2.5 py-1.5 text-xs font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -315,7 +372,7 @@ export function ProjectWorkflowView({
               onClick={removeSelected}
               className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
             >
-              Remove from canvas
+              Remove from path
             </button>
           )}
         </div>
@@ -327,6 +384,11 @@ export function ProjectWorkflowView({
           <Plus size={13} /> {adding ? "Adding…" : "+ Add step"}
         </button>
       </div>
+      {placedIds.size > 8 && (
+        <p className="border-b border-gray-200 px-3 py-1.5 text-[11px] text-gray-400 dark:border-gray-700">
+          This path is getting large — consider splitting into another path or a sub-project.
+        </p>
+      )}
       {trayOpen && (
         <div className="border-b border-gray-200 dark:border-gray-700">
           <div className="px-3 pt-2 text-[11px] font-bold text-gray-500">
@@ -334,29 +396,39 @@ export function ProjectWorkflowView({
             <span className="ml-1 font-normal">· drag onto the canvas or press Add</span>
           </div>
           <div className="flex gap-2 overflow-x-auto p-3">
-            {available.map((task) => (
-              <div
-                key={task.id}
-                className="flex w-48 shrink-0 cursor-grab items-center gap-2 rounded-lg border border-gray-200 px-2 py-2 text-xs hover:border-violet-300 hover:bg-violet-50 active:cursor-grabbing dark:border-gray-700 dark:hover:bg-violet-950/30"
-              >
-                <span className="min-w-0 flex-1 truncate">{task.text || "Untitled task"}</span>
-                <span
-                  className="-top-right absolute flex h-5 w-5 items-center justify-center rounded bg-violet-500 text-xs text-[8px] font-medium text-white"
-                  title="Connected steps"
+            {available.map((task) => {
+              const count = edgeTaskCount.get(task.id) ?? 0;
+              return (
+                <div
+                  key={task.id}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("application/project-task", task.id);
+                    e.dataTransfer.effectAllowed = "move";
+                  }}
+                  className="flex w-48 shrink-0 cursor-grab items-center gap-2 rounded-lg border border-gray-200 px-2 py-2 text-xs hover:border-violet-300 hover:bg-violet-50 active:cursor-grabbing dark:border-gray-700 dark:hover:bg-violet-950/30"
                 >
-                  {(edgeTaskCount.get(task.id) ?? 0) > 0 ? (edgeTaskCount.get(task.id) ?? 0) : ""}
-                </span>
-                <button
-                  onClick={() => placeTask(task.id)}
-                  className="shrink-0 rounded-lg border border-violet-200 px-2 py-0.5 font-semibold text-violet-600 hover:bg-violet-100"
-                >
-                  Add
-                </button>
-              </div>
-            ))}
+                  <span className="min-w-0 flex-1 truncate">{task.text || "Untitled task"}</span>
+                  {count > 0 && (
+                    <span
+                      title={`${count} connected step${count === 1 ? "" : "s"}`}
+                      className="shrink-0 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-500/20 dark:text-violet-300"
+                    >
+                      {count}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => placeTask(task.id)}
+                    className="shrink-0 rounded-lg border border-violet-200 px-2 py-0.5 font-semibold text-violet-600 hover:bg-violet-100"
+                  >
+                    Add
+                  </button>
+                </div>
+              );
+            })}
             {available.length === 0 && (
               <p className="w-full py-2 text-center text-[11px] text-gray-400">
-                Every task in this project is already on the canvas.
+                Every task in this project is already in this path.
               </p>
             )}
           </div>
@@ -376,7 +448,7 @@ export function ProjectWorkflowView({
           onConnect={onConnect}
           onNodeClick={(_, node) => setSelectedId(node.id)}
           onPaneClick={() => setSelectedId(null)}
-          onNodeDragStop={(_, __, nextNodes) => savePlacement(nextNodes as FlowNode[])}
+          onNodeDragStop={(_, __, nextNodes) => savePositions(nextNodes as FlowNode[])}
           fitView
           minZoom={0.25}
           maxZoom={1.5}
@@ -395,7 +467,7 @@ export function ProjectWorkflowView({
         {nodes.length === 0 && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-center">
             <div className="max-w-xs rounded-xl bg-white/90 p-5 shadow dark:bg-gray-800/90">
-              <p className="text-sm font-semibold">This canvas is empty</p>
+              <p className="text-sm font-semibold">This path is empty</p>
               <p className="mt-1 text-xs text-gray-500">
                 Add the steps you want here, then connect them in the order they happen.
               </p>

@@ -5,7 +5,14 @@ import type { ClassificationOption, ClassificationScheme, IdeaClassification } f
 import type { SecondaryLensMap } from "@/lib/storage";
 import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 import { useLens } from "@/components/lens";
-import { DEFAULT_LENSES, primarySchemeForKey, type HorizonLensDef } from "@/lib/horizonLenses";
+import { optionsForScheme } from "@/components/lens/lensUtils";
+import { orderTrail } from "@/components/lens/lensUtils";
+import {
+  DEFAULT_LENSES,
+  buildLensColumns,
+  primarySchemeForKey,
+  type HorizonLensDef,
+} from "@/lib/horizonLenses";
 import { applyViewToSecondaryMap, type HorizonView } from "@/lib/horizonViews";
 import type { UseHorizonPrefsResult } from "@/hooks/useHorizonPrefs";
 
@@ -68,19 +75,26 @@ export function useHorizonSelection({
       : dbSecondaryMap,
   );
   /** Built-in lenses with user-edited names/descriptions overlaid from the
-   *  seeded rows (matched by primary scheme). Selection stays id-based. */
+   *  seeded rows (matched by primary scheme). Selection stays id-based.
+   *  orderTrail is the read-only primary column order ("A → B → C"). */
   const displayLenses = useMemo(
     () =>
       DEFAULT_LENSES.map((l) => {
         const override = views.find((v) => v.is_builtin && v.primary === l.primaryScheme);
+        const schemeOptions = optionsForScheme(
+          classificationOptions,
+          schemes.find((s) => s.key === l.primaryScheme)?.id ?? "",
+        );
+        const cols = buildLensColumns(l, schemeOptions);
         return {
           id: l.id,
           name: override?.name ?? l.name,
           description: override?.description ?? l.description,
           primaryScheme: l.primaryScheme,
+          orderTrail: orderTrail(cols.filter((c) => c.key !== null).map((c) => c.label)),
         };
       }),
-    [views],
+    [views, schemes, classificationOptions],
   );
 
   /** Active lens scheme; unknown keys fall back to Term. */

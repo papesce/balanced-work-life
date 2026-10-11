@@ -11,6 +11,8 @@ interface ColumnShellProps {
   collapseControl?: ReactNode;
   /** Extra content right after the label (e.g. an explainer ⓘ for the column value). */
   labelSuffix?: ReactNode;
+  /** Read-only meta right-aligned next to the count (e.g. "Split: Effort"). */
+  headerMeta?: ReactNode;
   /** Footer content (e.g. quick-add input). */
   footer?: ReactNode;
   children: ReactNode;
@@ -23,6 +25,7 @@ export function ColumnShell({
   headerActions,
   collapseControl,
   labelSuffix,
+  headerMeta,
   footer,
   children,
 }: ColumnShellProps) {
@@ -36,6 +39,7 @@ export function ColumnShell({
         </span>
         <span className="flex items-center gap-2">
           {headerActions}
+          {headerMeta}
           <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-[11px] font-semibold text-gray-400 dark:bg-white/[0.06] dark:text-gray-500">
             {count}
           </span>

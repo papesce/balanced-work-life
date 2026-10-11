@@ -56,3 +56,13 @@ export function optionValuesForScheme(
 ): string[] {
   return optionsForScheme(classificationOptions, schemeId).map((o) => o.value);
 }
+
+/** Read-only order trail: "A → B → C". Empty list renders as "". */
+export function orderTrail(labels: string[]): string {
+  return labels.join(" → ");
+}
+
+/** Ranked primary trail: "1 A → 2 B → 3 C". Empty list renders as "". */
+export function rankedTrail(labels: string[]): string {
+  return labels.map((label, i) => `${i + 1} ${label}`).join(" → ");
+}

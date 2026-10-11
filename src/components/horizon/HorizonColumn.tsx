@@ -18,6 +18,10 @@ interface HorizonColumnProps {
   onSplitChange: (colKey: string | null, value: string | null) => void;
   footer?: ReactNode;
   treeProps: HorizonTreeProps;
+  /** Read-only split classification name (e.g. "Effort"), shown as "Split: Effort". */
+  secondarySplitName?: string | null;
+  /** Master toggle for classification-order hints. */
+  showClassificationOrder?: boolean;
 }
 
 /** One Horizon board column: header shell (+ Split select while editing)
@@ -34,6 +38,8 @@ export function HorizonColumn({
   onSplitChange,
   footer,
   treeProps,
+  secondarySplitName,
+  showClassificationOrder = true,
 }: HorizonColumnProps) {
   const isCollapsedStrip = col.key === null && !unclassifiedExpanded;
   const body = (
@@ -80,6 +86,16 @@ export function HorizonColumn({
       collapseControl={collapseControl}
       headerActions={splitSelect}
       footer={footer}
+      headerMeta={
+        showClassificationOrder && secondarySplitName ? (
+          <span
+            className="text-[11px] font-normal whitespace-nowrap text-gray-400 dark:text-gray-500"
+            title={`Split by ${secondarySplitName}`}
+          >
+            Split: {secondarySplitName}
+          </span>
+        ) : undefined
+      }
     >
       {body}
     </ColumnShell>

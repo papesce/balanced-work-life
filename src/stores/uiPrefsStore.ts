@@ -25,10 +25,13 @@ interface UiPrefsState {
   horizonUnclassifiedExpanded: boolean;
   horizonHideProjectsWithTasks: boolean;
   horizonHideCommitted: boolean;
+  horizonShowClassificationOrder: boolean;
   cardMode: boolean;
   sidebarCollapsed: boolean | null;
   plannerHideCompleted: boolean;
   timelinePrefs: TimelinePrefs | null;
+  /** Last selected path id per project (local device state). */
+  projectLastPath: Record<string, string>;
   set: (partial: Partial<UiPrefsState>) => void;
 }
 
@@ -64,10 +67,12 @@ export const useUiPrefsStore = create<UiPrefsState>()(
       horizonUnclassifiedExpanded: false,
       horizonHideProjectsWithTasks: true,
       horizonHideCommitted: true,
+      horizonShowClassificationOrder: true,
       cardMode: false,
       sidebarCollapsed: null,
       plannerHideCompleted: true,
       timelinePrefs: null,
+      projectLastPath: {},
       set: (partial) => set(partial),
     }),
     {
@@ -83,10 +88,12 @@ export const useUiPrefsStore = create<UiPrefsState>()(
         horizonUnclassifiedExpanded: s.horizonUnclassifiedExpanded,
         horizonHideProjectsWithTasks: s.horizonHideProjectsWithTasks,
         horizonHideCommitted: s.horizonHideCommitted,
+        horizonShowClassificationOrder: s.horizonShowClassificationOrder,
         cardMode: s.cardMode,
         sidebarCollapsed: s.sidebarCollapsed,
         plannerHideCompleted: s.plannerHideCompleted,
         timelinePrefs: s.timelinePrefs,
+        projectLastPath: s.projectLastPath,
       }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<UiPrefsState>;

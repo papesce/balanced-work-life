@@ -13,6 +13,8 @@ export interface DisplayLens {
   name: string;
   description?: string;
   primaryScheme: string;
+  /** Read-only primary column order trail ("A → B → C"). */
+  orderTrail?: string;
 }
 
 interface HorizonViewSwitcherProps {
@@ -32,6 +34,9 @@ interface HorizonViewSwitcherProps {
   onCreateLens: () => void;
   /** Editing happens in the below-header panel; this opens the session. */
   onStartEdit: (id: string) => void;
+  /** When true, show the read-only primary order trail under each lens. */
+  showClassificationOrder?: boolean;
+  onToggleShowClassificationOrder?: () => void;
 }
 
 export function HorizonViewSwitcher({
@@ -49,6 +54,8 @@ export function HorizonViewSwitcher({
   onToggleDefaultLens,
   onCreateLens,
   onStartEdit,
+  showClassificationOrder = true,
+  onToggleShowClassificationOrder,
 }: HorizonViewSwitcherProps) {
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
@@ -85,6 +92,11 @@ export function HorizonViewSwitcher({
 
   const close = () => setOpen(false);
 
+  // Pill shows the lens name only; the primary scheme is surfaced inside
+  // the menu rows ("Primary: X") when the order toggle is on.
+  const activeBaseName = active?.name ?? activeLens?.name ?? null;
+  const pillLabel = activeBaseName ?? "Choose lens";
+
   return (
     <div>
       <button
@@ -95,20 +107,43 @@ export function HorizonViewSwitcher({
           setOpen((value) => !value);
         }}
         className="flex items-center gap-1.5 rounded-full border border-violet-300 bg-violet-50 px-2.5 py-1.5 text-xs font-semibold text-violet-700 dark:border-violet-500/50 dark:bg-violet-900/20 dark:text-violet-300"
-        title="Choose or manage Horizon lenses"
+        title={pillLabel === "Choose lens" ? "Choose or manage Horizon lenses" : pillLabel}
       >
         <Bookmark size={12} />
-        <span className="max-w-[140px] truncate">
-          {active?.name ?? activeLens?.name ?? "Choose lens"}
-        </span>
+        <span className="max-w-[220px] truncate">{pillLabel}</span>
         <ChevronDown size={12} className="opacity-60" />
       </button>
       {open && anchor && (
         <FloatingPanel
           anchor={anchor}
           onClose={close}
-          className="w-[min(26rem,calc(100vw-1rem))] overflow-hidden rounded-xl border border-black/10 bg-white shadow-xl dark:border-white/10 dark:bg-gray-900"
+          className="relative w-[min(26rem,calc(100vw-1rem))] overflow-hidden rounded-xl border border-black/10 bg-white shadow-xl dark:border-white/10 dark:bg-gray-900"
         >
+          {onToggleShowClassificationOrder && (
+            <button
+              type="button"
+              onClick={onToggleShowClassificationOrder}
+              aria-pressed={showClassificationOrder}
+              aria-label="Show classification order"
+              title={
+                showClassificationOrder
+                  ? "Hide classification order (primary trails in menu, order line in header, secondary hints)"
+                  : "Show classification order (primary trails in menu, order line in header, secondary hints)"
+              }
+              className="absolute top-2.5 right-3 z-20 flex items-center rounded-full p-1 text-gray-300 transition hover:text-violet-500 dark:text-gray-600 dark:hover:text-violet-400"
+            >
+              <span
+                aria-hidden
+                className={`flex h-[18px] w-7 items-center rounded-full px-0.5 transition-colors ${
+                  showClassificationOrder
+                    ? "justify-end bg-violet-500"
+                    : "justify-start bg-gray-300 dark:bg-gray-700"
+                }`}
+              >
+                <span className="h-3.5 w-3.5 rounded-full bg-white shadow" />
+              </span>
+            </button>
+          )}
           <div className="relative">
             <div ref={listRef} onScroll={updateScrollHint} className="max-h-72 overflow-y-auto p-2">
               <p className="sticky top-0 z-10 bg-white px-3 pt-1 pb-1.5 text-[10px] font-bold tracking-wider text-gray-400 uppercase dark:bg-gray-900 dark:text-gray-500">
@@ -146,6 +181,16 @@ export function HorizonViewSwitcher({
                       {lens.description && (
                         <span className="mt-0.5 block truncate text-[10px] font-normal text-gray-400">
                           {lens.description}
+                        </span>
+                      )}
+                      {showClassificationOrder && (
+                        <span
+                          className="mt-0.5 block truncate text-[10px] font-normal text-violet-400 dark:text-violet-500"
+                          title={lens.orderTrail ? `Order: ${lens.orderTrail}` : undefined}
+                        >
+                          Primary:{" "}
+                          {orderedSchemes.find((s) => s.key === lens.primaryScheme)?.label ??
+                            lens.primaryScheme}
                         </span>
                       )}
                     </button>

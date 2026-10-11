@@ -233,6 +233,18 @@ body {
   }
 }
 
+/* React Flow canvas chrome (project paths): light defaults come from
+   @xyflow/react; these keep Controls, MiniMap and the dot grid at home
+   in both themes. */
+.react-flow__controls {
+  border-radius: 8px;
+  overflow: hidden;
+}
+.react-flow__minimap {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
 /* Resizable right column */
 @media (min-width: 1024px) {
   .resizable-right-col {
@@ -501,5 +513,35 @@ body {
     color: #ffffff;
     background: #7c3aed;
     border-color: #6d28d9;
+  }
+
+  /* React Flow canvas chrome follows the dark theme instead of staying white. */
+  .react-flow__controls {
+    box-shadow: 0 0 2px 1px rgba(255, 255, 255, 0.08);
+  }
+
+  .react-flow__controls-button {
+    background: #1e1e30;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .react-flow__controls-button:hover {
+    background: #2a2a40;
+  }
+
+  .react-flow__controls-button svg {
+    fill: #d1d5db;
+  }
+
+  .react-flow__minimap-mask {
+    fill: rgba(11, 11, 20, 0.7);
+  }
+
+  .react-flow__minimap-node {
+    fill: #4b5563;
+  }
+
+  .react-flow__background-pattern circle {
+    fill: rgba(255, 255, 255, 0.08);
   }
 }

@@ -10,6 +10,10 @@ export interface WorkflowTaskNodeData {
   idea: Idea;
   tags: Tag[];
   isProject?: boolean;
+  /** Derived (never persisted): all depends_on prerequisites satisfied. */
+  isReady?: boolean;
+  /** Derived (never persisted): status is completed or cancelled. */
+  isDone?: boolean;
   onUpdateStatus?: (id: string, status: IdeaStatus) => void;
   onOpenTask?: (id: string) => void;
   [key: string]: unknown;
@@ -18,7 +22,8 @@ export interface WorkflowTaskNodeData {
 export const NODE_WIDTH = 240;
 
 function WorkflowTaskNodeComponent({ data, selected }: NodeProps) {
-  const { idea, tags, isProject, onUpdateStatus, onOpenTask } = data as WorkflowTaskNodeData;
+  const { idea, tags, isProject, isReady, isDone, onUpdateStatus, onOpenTask } =
+    data as WorkflowTaskNodeData;
   const [expanded, setExpanded] = useState(false);
   const area = tags[0]?.area;
 
@@ -45,10 +50,17 @@ function WorkflowTaskNodeComponent({ data, selected }: NodeProps) {
       <Handle type="target" position={Position.Left} className="!h-2.5 !w-2.5 !bg-violet-500" />
       <div
         onClick={() => setExpanded((v) => !v)}
-        className={`border-border w-[240px] cursor-pointer rounded-xl bg-white/10 backdrop-blur-sm dark:border-gray-700 dark:bg-gray-900/10 ${selected ? "border-violet-500 ring-2 ring-violet-500/20" : "border-gray-200 dark:border-gray-700"}`}
+        className={`border-border w-[240px] cursor-pointer rounded-xl bg-white/10 backdrop-blur-sm dark:border-gray-700 dark:bg-gray-900/10 ${selected ? "border-violet-500 ring-2 ring-violet-500/20" : isReady ? "border-emerald-400 ring-2 ring-emerald-500/20" : "border-gray-200 dark:border-gray-700"} ${isDone ? "opacity-60" : ""}`}
       >
-        <div className="mb-2 line-clamp-2 text-xs font-semibold text-gray-800 dark:text-gray-100">
-          {idea.text || "Untitled task"}
+        <div className="mb-2 flex items-start justify-between gap-2">
+          <span className="line-clamp-2 text-xs font-semibold text-gray-800 dark:text-gray-100">
+            {idea.text || "Untitled task"}
+          </span>
+          {isReady && (
+            <span className="shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+              Ready
+            </span>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
           <select

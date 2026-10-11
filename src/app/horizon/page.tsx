@@ -131,6 +131,7 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
   const cardMode = useUiPrefsStore((s) => s.cardMode);
   const hideProjectsWithTasks = useUiPrefsStore((s) => s.horizonHideProjectsWithTasks);
   const hideCommittedPref = useUiPrefsStore((s) => s.horizonHideCommitted);
+  const showClassificationOrder = useUiPrefsStore((s) => s.horizonShowClassificationOrder ?? true);
   const unclassifiedExpanded = useUiPrefsStore((s) => s.horizonUnclassifiedExpanded);
   const setPrefs = useUiPrefsStore((s) => s.set);
   const setCardMode = (v: boolean | ((p: boolean) => boolean)) =>
@@ -174,7 +175,6 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
     secondaryValueOf,
     displayLenses,
     activeView,
-    activeDisplayLens,
     selectView,
     selectLens,
     deleteView,
@@ -551,6 +551,7 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
     effectiveHideCommitted,
   ]);
 
+  // Primary-only order hint (read-only): "Attention: 1 Ready to complete → 2 …".
   if (loading || classificationsLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -569,6 +570,8 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
           label: o.label,
         })) as { key: string; label: string }[])
       : [];
+    // Read-only split classification name for this column (values omitted).
+    const secondarySplitName = secondaryScheme?.label ?? null;
     return (
       <HorizonColumn
         col={col}
@@ -579,6 +582,8 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
         secondaryKey={secondaryKey}
         splitOptions={splitSchemeOptions}
         onSplitChange={splitChangeLive}
+        secondarySplitName={secondarySplitName}
+        showClassificationOrder={showClassificationOrder}
         footer={
           !secondaryKey ? (
             <RootAddInput label={col.label} onAdd={handleAdd(col.key)} suggestFrom={ideas} />
@@ -653,6 +658,10 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
         onToggleDefaultLens={toggleDefaultLens}
         onCreateLens={createLens}
         onStartEdit={startMenuEdit}
+        showClassificationOrder={showClassificationOrder}
+        onToggleShowClassificationOrder={() =>
+          setPrefs({ horizonShowClassificationOrder: !showClassificationOrder })
+        }
       />
       <HorizonFiltersMenu
         hideClosed={hideClosed}
@@ -713,15 +722,8 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
     </>
   );
 
-  const titleName =
-    menuEditingId != null && draftName.trim()
-      ? draftName.trim()
-      : (activeView?.name ?? activeDisplayLens?.name ?? lens?.name);
   return (
-    <AppShell
-      title={titleName ? `Horizon · ${titleName}` : "Horizon"}
-      headerStartActions={headerStartActions}
-    >
+    <AppShell title="Horizon" headerStartActions={headerStartActions}>
       {menuEditingId != null && (
         <LensEditPanel
           draftName={draftName}

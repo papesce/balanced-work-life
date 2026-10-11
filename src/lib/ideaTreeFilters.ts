@@ -40,6 +40,8 @@ export function filterIdeaTree(
     typeFilter?: IdeaType[];
     /** Ids already triaged into Horizon (have ≥1 classification). Hidden, but their ancestors are kept so unclassified descendants stay reachable. */
     hideInHorizonIds?: Set<string>;
+    /** Generic counterpart to hideInHorizonIds (e.g. pathed tasks for the unpathed-only view). */
+    hideIds?: Set<string>;
   } = {},
 ): IdeaNode[] {
   const {
@@ -49,10 +51,12 @@ export function filterIdeaTree(
     hideDeferred = false,
     typeFilter,
     hideInHorizonIds,
+    hideIds,
   } = options;
 
   const hasTypeFilter = typeFilter && typeFilter.length > 0;
   const hasHorizonFilter = !!hideInHorizonIds && hideInHorizonIds.size > 0;
+  const hasHideIdsFilter = !!hideIds && hideIds.size > 0;
 
   if (
     !search.trim() &&
@@ -60,11 +64,13 @@ export function filterIdeaTree(
     !hideCompleted &&
     !hideDeferred &&
     !hasTypeFilter &&
-    !hasHorizonFilter
+    !hasHorizonFilter &&
+    !hasHideIdsFilter
   )
     return tree;
 
-  const hasHideFilters = hideClosed || hideCompleted || hideDeferred || hasHorizonFilter;
+  const hasHideFilters =
+    hideClosed || hideCompleted || hideDeferred || hasHorizonFilter || hasHideIdsFilter;
   const ideaMap = new Map(ideas.map((i) => [i.id, i]));
 
   const hidePassedIds = new Set<string>();
@@ -80,13 +86,13 @@ export function filterIdeaTree(
       if (hideDeferred && idea.status === "deferred") passes = false;
       if (passes) hidePassedIds.add(idea.id);
     }
-    if (hasHorizonFilter) {
+    if (hasHorizonFilter || hasHideIdsFilter) {
       const statusPassedIds = new Set(hidePassedIds);
       for (const id of statusPassedIds) {
-        if (hideInHorizonIds!.has(id)) hidePassedIds.delete(id);
+        if (hideInHorizonIds?.has(id) || hideIds?.has(id)) hidePassedIds.delete(id);
       }
-      // Keep ancestors of visible ideas so classified parents don't orphan
-      // their unclassified descendants. Only ancestors that pass the status
+      // Keep ancestors of visible ideas so hidden parents don't orphan
+      // their visible descendants. Only ancestors that pass the status
       // filters are kept, preserving the existing drop-subtree semantics.
       for (const id of [...hidePassedIds]) {
         let cur = ideaMap.get(id);
