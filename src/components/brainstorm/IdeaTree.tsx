@@ -81,6 +81,12 @@ interface IdeaTreeProps {
   focusedId: string | null;
   onFocus: (id: string | null) => void;
   cardMode?: boolean;
+  /** Compact rows for narrow panes: hides type/area chips, keeps path chips. */
+  compact?: boolean;
+  /** Opt-in "add to path" handle (project split view); forwarded to TreeView. */
+  onAddToPath?: (id: string) => void;
+  isInPath?: (id: string) => boolean;
+  pathAddDisabled?: boolean;
 }
 
 function getAncestorIds(ideaId: string, ideas: Idea[]): Set<string> {
@@ -161,6 +167,10 @@ export function IdeaTree({
   focusedId,
   onFocus,
   cardMode,
+  compact = false,
+  onAddToPath,
+  isInPath,
+  pathAddDisabled,
 }: IdeaTreeProps) {
   const todayString = getToday();
   const [revealTarget, setRevealTarget] = useState<Idea | null>(null);
@@ -282,6 +292,10 @@ export function IdeaTree({
         }}
         disableInsert={Boolean(search.trim()) || editMode === "view"}
         cardMode={cardMode}
+        compact={compact}
+        onAddToPath={onAddToPath}
+        isInPath={isInPath}
+        pathAddDisabled={pathAddDisabled}
         labelClassName={labelClassName}
         renderLeading={(node) => (
           <StatusIconSlot node={node} onMarkDone={onMarkDone} onMarkUndone={onMarkUndone} />
@@ -293,8 +307,8 @@ export function IdeaTree({
               onClick={() => openNotes(node.id)}
               size={11}
             />
-            {showType && <TypePillSlot node={node} onUpdate={updateIdea} />}
-            {showArea && (
+            {showType && !compact && <TypePillSlot node={node} onUpdate={updateIdea} />}
+            {showArea && !compact && (
               <TagChipsSlot
                 node={node}
                 allTags={allTags}

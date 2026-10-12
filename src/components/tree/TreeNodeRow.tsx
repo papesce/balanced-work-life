@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { ChevronDown, ChevronRight, GripVertical, Plus } from "lucide-react";
+import { ArrowRightToLine, ChevronDown, ChevronRight, GripVertical, Plus } from "lucide-react";
 import { useTree, useTreeDndState } from "./context";
 import { TreeComposer } from "./TreeComposer";
 import type { CreateIdeaPosition, DropZone, TreeItem, TreeNode } from "./types";
@@ -376,6 +376,59 @@ export function TreeNodeRow<T extends TreeItem>({
                 <GripVertical size={14} strokeWidth={1.5} />
               </span>
             )}
+
+            {/* Add-to-path handle (opt-in, project split view only). Native
+            HTML5 drag with the same payload as the canvas tray; the @dnd-kit
+            grip above stays exclusively for reordering. */}
+            {options.onAddToPath &&
+              (() => {
+                const inPath = options.isInPath?.(node.id) ?? false;
+                const noPath = options.pathAddDisabled ?? false;
+                const disabled = inPath || noPath;
+                return (
+                  <span
+                    role="button"
+                    tabIndex={disabled ? -1 : 0}
+                    aria-disabled={disabled}
+                    aria-label={
+                      inPath
+                        ? `Already in path: ${label || "item"}`
+                        : `Add ${label || "item"} to path`
+                    }
+                    title={
+                      inPath
+                        ? "Already in this path"
+                        : noPath
+                          ? "Select or create a path first"
+                          : "Drag onto the canvas, or click to add to the path"
+                    }
+                    draggable={!disabled}
+                    onDragStart={(e) => {
+                      e.stopPropagation();
+                      e.dataTransfer.setData("application/project-task", node.id);
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!disabled) options.onAddToPath!(node.id);
+                    }}
+                    onKeyDown={(e) => {
+                      if ((e.key === "Enter" || e.key === " ") && !disabled) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        options.onAddToPath!(node.id);
+                      }
+                    }}
+                    className={`flex flex-shrink-0 items-center select-none ${
+                      disabled
+                        ? "cursor-not-allowed text-gray-200 opacity-40 dark:text-gray-700"
+                        : "cursor-grab text-violet-300 hover:text-violet-600 active:cursor-grabbing dark:text-gray-600 dark:hover:text-violet-400"
+                    }`}
+                  >
+                    <ArrowRightToLine size={14} strokeWidth={1.5} />
+                  </span>
+                );
+              })()}
 
             {options.renderLeading?.(node)}
 

@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   ChevronDown,
   ChevronUp,
+  ChevronsLeft,
+  ChevronsRight,
   FolderKanban,
   Plus,
   FileText,
@@ -14,6 +16,7 @@ import {
   X,
   ListTree,
 } from "lucide-react";
+import { Group, Panel, Separator } from "react-resizable-panels";
 import { useClassifications } from "@/hooks/useClassifications";
 import {
   AREA_DOT_COLORS,
@@ -49,8 +52,10 @@ import { UndoBar } from "@/components/shared/UndoBar";
 import { IdeaActionMenu } from "@/components/shared/IdeaActionMenu";
 import { ValueHelpInfo } from "@/components/shared/ValueHelpInfo";
 import { hintForValue } from "@/lib/classificationHelp";
-import { ProjectPathsTab } from "@/components/projects/ProjectPathsTab";
+import { ProjectPathsTab, type PathCanvasApi } from "@/components/projects/ProjectPathsTab";
 import { usePathMembership } from "@/hooks/usePathMembership";
+import { clampSplitRatio, resolveEffectiveMode, SPLIT_MIN_WIDTH } from "@/lib/projectSplit";
+import type { ProjectViewMode } from "@/stores/uiPrefsStore";
 
 export default function ProjectsPage() {
   const searchParams = useSearchParams();
@@ -79,8 +84,66 @@ export default function ProjectsPage() {
   const [titleDraft, setTitleDraft] = useState("");
   // Detail-local filters (list filters don't leak into detail).
   const detailHideCompleted = useUiPrefsStore((s) => s.projectsDetailHideCompleted);
-  const [detailView, setDetailView] = useState<"list" | "paths">("list");
+  // Split-view layout: persisted mode + ratio; narrow screens force one pane.
+  const projectViewMode = useUiPrefsStore((s) => s.projectViewMode);
+  const projectSplitRatio = useUiPrefsStore((s) => s.projectSplitRatio);
+  const [viewportWidth, setViewportWidth] = useState<number>(() =>
+    typeof window !== "undefined" ? window.innerWidth : SPLIT_MIN_WIDTH,
+  );
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const isNarrow = viewportWidth < SPLIT_MIN_WIDTH;
+  const effectiveMode = resolveEffectiveMode(projectViewMode, viewportWidth);
   const [unpathedOnly, setUnpathedOnly] = useState(false);
+  // Canvas entry point reported by ProjectPathsTab (selected path + add).
+  const [canvasApi, setCanvasApi] = useState<PathCanvasApi | null>(null);
+  const handleCanvasApi = useCallback((api: PathCanvasApi | null) => setCanvasApi(api), []);
+  const handleAddToPath = useCallback(
+    (id: string) => {
+      void canvasApi?.addToPath(id);
+    },
+    [canvasApi],
+  );
+  const isInPath = useCallback((id: string) => canvasApi?.placedIds.has(id) ?? false, [canvasApi]);
+  // Bumped after divider drags / collapses so the canvas re-fits its viewport.
+  const [fitTick, setFitTick] = useState(0);
+  const fitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bumpFit = useCallback(() => {
+    if (fitTimer.current) clearTimeout(fitTimer.current);
+    fitTimer.current = setTimeout(() => setFitTick((t) => t + 1), 200);
+  }, []);
+  useEffect(
+    () => () => {
+      if (fitTimer.current) clearTimeout(fitTimer.current);
+    },
+    [],
+  );
+  const ratioTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (ratioTimer.current) clearTimeout(ratioTimer.current);
+    },
+    [],
+  );
+  const handleListResize = useCallback(
+    (size: { asPercentage: number }) => {
+      const next = clampSplitRatio(Math.round(size.asPercentage));
+      if (ratioTimer.current) clearTimeout(ratioTimer.current);
+      ratioTimer.current = setTimeout(() => setPrefs({ projectSplitRatio: next }), 400);
+      bumpFit();
+    },
+    [bumpFit, setPrefs],
+  );
+  const setViewMode = useCallback(
+    (mode: ProjectViewMode) => {
+      setPrefs({ projectViewMode: mode });
+      bumpFit();
+    },
+    [bumpFit, setPrefs],
+  );
 
   const ideasHook = useIdeas({ scope: "all" });
   const linksHook = useIdeaLinks();
@@ -451,9 +514,75 @@ export default function ProjectsPage() {
 
   // Detail view — focused project tree
   if (selectedId && selectedProject) {
+    const listPane = (
+      <IdeaTree
+        tree={ideasHook.tree}
+        ideas={ideasHook.ideas}
+        links={linksHook.links}
+        scope="all"
+        createIdea={createIdea}
+        updateIdea={updateIdea}
+        deleteIdea={deleteIdea}
+        moveIdea={moveIdea}
+        onCreateParent={createParentAndMove}
+        toggleCollapse={ideasHook.toggleCollapse}
+        expandIdea={ideasHook.expandIdea}
+        onCreateLink={createLink}
+        onDeleteLink={deleteLink}
+        onMarkDone={markDone}
+        onMarkUndone={markUndone}
+        onSchedule={scheduleIdea}
+        allTags={tagsHook.tags}
+        getTagsForIdea={taskTagsHook.getTagsForIdea}
+        onAddTag={taskTagsHook.addTagToTask}
+        onRemoveTag={taskTagsHook.removeTagFromTask}
+        onCreateTag={tagsHook.createTag}
+        search=""
+        showType={showType}
+        showArea={showArea}
+        editMode="edit"
+        editingId={editingId}
+        setEditingId={setEditingId}
+        selectedId={selectedTreeId}
+        setSelectedId={setSelectedTreeId}
+        composing={composing}
+        setComposing={setComposing}
+        showToday={false}
+        hideClosed={false}
+        hideCompleted={detailHideCompleted}
+        hideDeferred={false}
+        hideIds={unpathedOnly ? pathedIds : undefined}
+        pathChipsForIdea={(id) => membership.titlesByIdea.get(id) ?? []}
+        focusedId={focusedId ?? selectedId}
+        onFocus={(id) => setFocusedId(id === selectedId ? null : id)}
+        cardMode={false}
+        compact={effectiveMode === "split"}
+        onAddToPath={effectiveMode === "split" ? handleAddToPath : undefined}
+        isInPath={isInPath}
+        pathAddDisabled={!canvasApi?.selectedPathId}
+      />
+    );
+    const pathsPane = (
+      <ProjectPathsTab
+        projectId={selectedProject.id}
+        tasks={projectTasks}
+        links={linksHook.links}
+        tagsForTask={taskTagsHook.getTagsForIdea}
+        onUpdateTask={updateIdea}
+        onOpenNotes={openNotes}
+        onCreateLink={(s, t, type) => createLink(s, t, type)}
+        onDeleteLink={deleteLink}
+        onAddStep={() => actions.addTask(selectedId ?? "")}
+        showTray={effectiveMode === "paths"}
+        fillHeight={effectiveMode === "split"}
+        fitTick={fitTick}
+        onCanvasApi={handleCanvasApi}
+      />
+    );
     return (
       <AppShell
         title={selectedProject.text || "Untitled project"}
+        fullWidth
         headerStartActions={
           <>
             <button
@@ -476,7 +605,7 @@ export default function ProjectsPage() {
               <span className="hidden sm:inline">Hide completed</span>
               <span className="sm:hidden">Hide done</span>
             </button>
-            {detailView === "list" && unpathedCount > 0 && (
+            {effectiveMode !== "paths" && unpathedCount > 0 && (
               <button
                 type="button"
                 onClick={() => setUnpathedOnly((v) => !v)}
@@ -500,16 +629,25 @@ export default function ProjectsPage() {
               aria-label="Project view"
             >
               <button
-                onClick={() => setDetailView("list")}
-                aria-pressed={detailView === "list"}
-                className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${detailView === "list" ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300" : "text-gray-500"}`}
+                onClick={() => setViewMode("list")}
+                aria-pressed={effectiveMode === "list"}
+                className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${effectiveMode === "list" ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300" : "text-gray-500"}`}
               >
                 List
               </button>
+              {!isNarrow && (
+                <button
+                  onClick={() => setViewMode("split")}
+                  aria-pressed={effectiveMode === "split"}
+                  className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${effectiveMode === "split" ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300" : "text-gray-500"}`}
+                >
+                  Split
+                </button>
+              )}
               <button
-                onClick={() => setDetailView("paths")}
-                aria-pressed={detailView === "paths"}
-                className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${detailView === "paths" ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300" : "text-gray-500"}`}
+                onClick={() => setViewMode("paths")}
+                aria-pressed={effectiveMode === "paths"}
+                className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${effectiveMode === "paths" ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300" : "text-gray-500"}`}
               >
                 Paths
               </button>
@@ -642,61 +780,62 @@ export default function ProjectsPage() {
           )}
         </div>
 
-        {detailView === "paths" ? (
-          <ProjectPathsTab
-            projectId={selectedProject.id}
-            tasks={projectTasks}
-            links={linksHook.links}
-            tagsForTask={taskTagsHook.getTagsForIdea}
-            onUpdateTask={updateIdea}
-            onOpenNotes={openNotes}
-            onCreateLink={(s, t, type) => createLink(s, t, type)}
-            onDeleteLink={deleteLink}
-            onAddStep={() => actions.addTask(selectedId ?? "")}
-          />
+        {effectiveMode === "split" ? (
+          <Group
+            orientation="horizontal"
+            className="flex h-[calc(100dvh-300px)] min-h-[560px] w-full"
+          >
+            <Panel
+              id="project-list"
+              defaultSize={`${clampSplitRatio(projectSplitRatio)}%`}
+              minSize="25%"
+              onResize={handleListResize}
+              className="min-w-0"
+            >
+              <div className="flex h-full min-h-0 flex-col">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h3 className="text-xs font-bold tracking-wide text-gray-500 uppercase dark:text-gray-400">
+                    Tasks
+                  </h3>
+                  <button
+                    onClick={() => setViewMode("paths")}
+                    title="Collapse list, show paths only"
+                    aria-label="Collapse list, show paths only"
+                    className="rounded-lg p-1.5 text-gray-400 hover:bg-black/5 hover:text-violet-600"
+                  >
+                    <ChevronsLeft size={14} />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto pr-2">{listPane}</div>
+              </div>
+            </Panel>
+            <Separator
+              className="mx-1 w-2 shrink-0 cursor-col-resize rounded-full bg-gray-200 transition-colors hover:bg-violet-300 focus-visible:bg-violet-400 focus-visible:outline-none dark:bg-gray-700 dark:hover:bg-violet-700"
+              aria-label="Resize list and paths panes"
+            />
+            <Panel id="project-paths" minSize="30%" className="min-w-0">
+              <div className="flex h-full min-h-0 flex-col">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h3 className="text-xs font-bold tracking-wide text-gray-500 uppercase dark:text-gray-400">
+                    Paths
+                  </h3>
+                  <button
+                    onClick={() => setViewMode("list")}
+                    title="Collapse paths, show list only"
+                    aria-label="Collapse paths, show list only"
+                    className="rounded-lg p-1.5 text-gray-400 hover:bg-black/5 hover:text-violet-600"
+                  >
+                    <ChevronsRight size={14} />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto">{pathsPane}</div>
+              </div>
+            </Panel>
+          </Group>
+        ) : effectiveMode === "paths" ? (
+          pathsPane
         ) : (
-          <IdeaTree
-            tree={ideasHook.tree}
-            ideas={ideasHook.ideas}
-            links={linksHook.links}
-            scope="all"
-            createIdea={createIdea}
-            updateIdea={updateIdea}
-            deleteIdea={deleteIdea}
-            moveIdea={moveIdea}
-            onCreateParent={createParentAndMove}
-            toggleCollapse={ideasHook.toggleCollapse}
-            expandIdea={ideasHook.expandIdea}
-            onCreateLink={createLink}
-            onDeleteLink={deleteLink}
-            onMarkDone={markDone}
-            onMarkUndone={markUndone}
-            onSchedule={scheduleIdea}
-            allTags={tagsHook.tags}
-            getTagsForIdea={taskTagsHook.getTagsForIdea}
-            onAddTag={taskTagsHook.addTagToTask}
-            onRemoveTag={taskTagsHook.removeTagFromTask}
-            onCreateTag={tagsHook.createTag}
-            search=""
-            showType={showType}
-            showArea={showArea}
-            editMode="edit"
-            editingId={editingId}
-            setEditingId={setEditingId}
-            selectedId={selectedTreeId}
-            setSelectedId={setSelectedTreeId}
-            composing={composing}
-            setComposing={setComposing}
-            showToday={false}
-            hideClosed={false}
-            hideCompleted={detailHideCompleted}
-            hideDeferred={false}
-            hideIds={unpathedOnly ? pathedIds : undefined}
-            pathChipsForIdea={(id) => membership.titlesByIdea.get(id) ?? []}
-            focusedId={focusedId ?? selectedId}
-            onFocus={(id) => setFocusedId(id === selectedId ? null : id)}
-            cardMode={false}
-          />
+          listPane
         )}
         {completionEffects && hasAnyEffects(completionEffects.effects) && (
           <div className="mt-4">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useQuery } from "@powersync/react";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,6 +22,22 @@ interface Props {
   onCreateLink: (sourceId: string, targetId: string, type: "depends_on") => Promise<string>;
   onDeleteLink: (id: string) => Promise<void>;
   onAddStep: () => Promise<string | null>;
+  /** False in split mode: the List pane replaces the "Project tasks" strip. */
+  showTray?: boolean;
+  /** Fill the parent pane height instead of the fixed 600px canvas. */
+  fillHeight?: boolean;
+  /** Bump to re-fit the canvas viewport after the host pane resizes. */
+  fitTick?: number;
+  /** Reports the selected path + add entry point so the List pane can add steps. */
+  onCanvasApi?: (api: PathCanvasApi | null) => void;
+}
+
+/** Minimal canvas entry point consumed by the List pane (split mode). */
+export interface PathCanvasApi {
+  selectedPathId: string | null;
+  placedIds: Set<string>;
+  /** Adds a task to the selected path; false when there is no selected path. */
+  addToPath: (ideaId: string) => Promise<boolean>;
 }
 
 export function ProjectPathsTab({
@@ -34,6 +50,10 @@ export function ProjectPathsTab({
   onCreateLink,
   onDeleteLink,
   onAddStep,
+  showTray = true,
+  fillHeight = false,
+  fitTick = 0,
+  onCanvasApi,
 }: Props) {
   const { user } = useAuth();
   const { paths, loading, createPath, renamePath, deletePath } = usePaths(projectId);
@@ -76,6 +96,42 @@ export function ProjectPathsTab({
 
   const selectedPath = paths.find((p) => p.id === selectedId) ?? null;
   const itemsHook = usePathItems(selectedId ?? "");
+
+  // Canvas API for the List pane: which tasks are already placed + how to
+  // add one without drop coordinates (grid fallback, user can rearrange).
+  // NOTE: itemsHook returns a fresh object every render, so nothing derived
+  // from it is referentially stable. Propagate the api only when its content
+  // (selected path / placed ids) actually changes — otherwise the parent
+  // setState would loop forever (max update depth).
+  const placedIds = useMemo(
+    () => new Set(itemsHook.items.map((n) => n.idea_id)),
+    [itemsHook.items],
+  );
+  const placedKey = useMemo(() => [...placedIds].sort().join(","), [placedIds]);
+  const lastReportedKey = useRef<string | null>(null);
+  useEffect(() => {
+    const key = `${selectedId ?? ""}|${placedKey}`;
+    if (lastReportedKey.current === key) return;
+    lastReportedKey.current = key;
+    const api: PathCanvasApi = {
+      selectedPathId: selectedId,
+      placedIds,
+      addToPath: async (ideaId: string) => {
+        if (!selectedId) return false;
+        const n = itemsHook.items.length;
+        await itemsHook.addItem(ideaId, 80 + (n % 3) * 260, 70 + Math.floor(n / 3) * 160);
+        return true;
+      },
+    };
+    onCanvasApi?.(api);
+  });
+  useEffect(() => {
+    // Clear the List pane's entry point when this tab unmounts.
+    return () => {
+      lastReportedKey.current = null;
+      onCanvasApi?.(null);
+    };
+  }, [onCanvasApi]);
 
   // All items across this project's paths (for the shared-dependency notice).
   const userId = user?.id ?? "";
@@ -262,6 +318,9 @@ export function ProjectPathsTab({
           onAddStep={onAddStep}
           isPairInAnotherPath={isPairInAnotherPath}
           hideCompleted={hideCompleted}
+          showTray={showTray}
+          fillHeight={fillHeight}
+          fitTick={fitTick}
         />
       )}
 

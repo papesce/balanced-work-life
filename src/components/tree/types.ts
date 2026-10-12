@@ -111,6 +111,18 @@ export interface TreeOptions<T extends TreeItem> {
   indentSize?: number;
   /** Renders each row as a card instead of a compact label row. */
   cardMode?: boolean;
+  /** Compact row for narrow panes: hides secondary trailing chips. */
+  compact?: boolean;
+  /**
+   * Opt-in "add to path" entry point (project split view). Renders a
+   * native-HTML5 drag handle next to the reorder grip; @dnd-kit reorder
+   * behavior is unchanged.
+   */
+  onAddToPath?: (id: string) => void;
+  /** True when the node is already placed in the selected path (dims handle). */
+  isInPath?: (id: string) => boolean;
+  /** True when there is no selected path (dims handle, click is a no-op). */
+  pathAddDisabled?: boolean;
   /** Hides the "+" add-child button and the hover insertion bands. */
   disableInsert?: boolean;
   /** When false, clicking a selected row's label selects instead of entering edit mode. Defaults to true. */

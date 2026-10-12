@@ -6,6 +6,8 @@ import { STORAGE_KEYS, readRawString } from "@/lib/storage";
 
 export const UI_PREFS_KEY = "bwl-ui-prefs-v1";
 
+export type ProjectViewMode = "split" | "list" | "paths";
+
 interface TimelinePrefs {
   filter: string;
   preset: string;
@@ -36,6 +38,10 @@ interface UiPrefsState {
   timelinePrefs: TimelinePrefs | null;
   /** Last selected path id per project (local device state). */
   projectLastPath: Record<string, string>;
+  /** Project detail layout: split list+paths, or a single pane. */
+  projectViewMode: ProjectViewMode;
+  /** List-pane width in split mode, as a percentage (10–80). */
+  projectSplitRatio: number;
   set: (partial: Partial<UiPrefsState>) => void;
 }
 
@@ -79,6 +85,8 @@ export const useUiPrefsStore = create<UiPrefsState>()(
       plannerHideCompleted: true,
       timelinePrefs: null,
       projectLastPath: {},
+      projectViewMode: "split",
+      projectSplitRatio: 35,
       set: (partial) => set(partial),
     }),
     {
@@ -101,6 +109,8 @@ export const useUiPrefsStore = create<UiPrefsState>()(
         plannerHideCompleted: s.plannerHideCompleted,
         timelinePrefs: s.timelinePrefs,
         projectLastPath: s.projectLastPath,
+        projectViewMode: s.projectViewMode,
+        projectSplitRatio: s.projectSplitRatio,
       }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<UiPrefsState> & { horizonHideCommitted?: boolean };

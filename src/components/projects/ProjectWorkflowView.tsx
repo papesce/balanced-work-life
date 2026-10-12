@@ -44,6 +44,12 @@ interface Props {
   isPairInAnotherPath?: (aIdeaId: string, bIdeaId: string) => boolean;
   /** Mirrors the project "Hide completed" toggle: hides completed nodes on the canvas. */
   hideCompleted?: boolean;
+  /** Show the "Project tasks" strip above the canvas. False in split mode (List is the source). */
+  showTray?: boolean;
+  /** Bump to re-fit the viewport after the pane resizes or collapses. */
+  fitTick?: number;
+  /** Fill the parent pane height instead of the fixed 600px canvas. */
+  fillHeight?: boolean;
 }
 
 type FlowNode = Node<WorkflowTaskNodeData>;
@@ -63,6 +69,9 @@ export function ProjectWorkflowView({
   onAddStep,
   isPairInAnotherPath,
   hideCompleted,
+  showTray = true,
+  fitTick = 0,
+  fillHeight = false,
 }: Props) {
   const [nodes, setNodes] = useState<FlowNode[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -176,6 +185,13 @@ export function ProjectWorkflowView({
     requestAnimationFrame(() => flow.fitView({ padding: 0.2, duration: 250 }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Re-fit after the host pane resizes/collapses (split-view divider drags).
+  useEffect(() => {
+    if (fitTick === 0) return;
+    requestAnimationFrame(() => flow.fitView({ padding: 0.2, duration: 250 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitTick]);
 
   const handleNodesChange = useCallback(
     (changes: NodeChange<FlowNode>[]) => {
@@ -339,7 +355,11 @@ export function ProjectWorkflowView({
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+    <div
+      className={`overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 ${
+        fillHeight ? "flex h-full min-h-[480px] flex-col" : ""
+      }`}
+    >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-700">
         <div className="flex items-center gap-1">
           <span
@@ -348,12 +368,14 @@ export function ProjectWorkflowView({
           >
             {progress.done}/{progress.total} done
           </span>
-          <button
-            onClick={() => setTrayOpen((v) => !v)}
-            className="rounded-lg px-2.5 py-1.5 text-xs font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
-          >
-            {trayOpen ? "Hide tasks" : `Show tasks (${available.length})`}
-          </button>
+          {showTray && (
+            <button
+              onClick={() => setTrayOpen((v) => !v)}
+              className="rounded-lg px-2.5 py-1.5 text-xs font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
+            >
+              {trayOpen ? "Hide tasks" : `Show tasks (${available.length})`}
+            </button>
+          )}
           <button
             onClick={autoLayout}
             disabled={!nodes.length}
@@ -389,7 +411,7 @@ export function ProjectWorkflowView({
           This path is getting large — consider splitting into another path or a sub-project.
         </p>
       )}
-      {trayOpen && (
+      {showTray && trayOpen && (
         <div className="border-b border-gray-200 dark:border-gray-700">
           <div className="px-3 pt-2 text-[11px] font-bold text-gray-500">
             Project tasks <span className="font-normal text-gray-400">({available.length})</span>
@@ -435,7 +457,9 @@ export function ProjectWorkflowView({
         </div>
       )}
       <div
-        className="relative h-[600px] min-h-[560px] w-full"
+        className={
+          fillHeight ? "relative min-h-0 w-full flex-1" : "relative h-[600px] min-h-[560px] w-full"
+        }
         onDragOver={(e) => e.preventDefault()}
         onDrop={dropTask}
       >
