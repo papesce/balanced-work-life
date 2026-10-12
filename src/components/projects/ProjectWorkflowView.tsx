@@ -44,8 +44,6 @@ interface Props {
   isPairInAnotherPath?: (aIdeaId: string, bIdeaId: string) => boolean;
   /** Mirrors the project "Hide completed" toggle: hides completed nodes on the canvas. */
   hideCompleted?: boolean;
-  /** Show the "Project tasks" strip above the canvas. False in split mode (List is the source). */
-  showTray?: boolean;
   /** Bump to re-fit the viewport after the pane resizes or collapses. */
   fitTick?: number;
   /** Fill the parent pane height instead of the fixed 600px canvas. */
@@ -69,7 +67,6 @@ export function ProjectWorkflowView({
   onAddStep,
   isPairInAnotherPath,
   hideCompleted,
-  showTray = true,
   fitTick = 0,
   fillHeight = false,
 }: Props) {
@@ -77,7 +74,6 @@ export function ProjectWorkflowView({
   const [edges, setEdges] = useState<Edge[]>([]);
   const [message, setMessage] = useState("");
   const [adding, setAdding] = useState(false);
-  const [trayOpen, setTrayOpen] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const flow = useReactFlow();
 
@@ -108,16 +104,6 @@ export function ProjectWorkflowView({
     if (!hideCompleted) return placedIds;
     return new Set([...placedIds].filter((id) => taskMap.get(id)?.status !== "completed"));
   }, [placedIds, taskMap, hideCompleted]);
-  // Count how many edges touch each task ID (source or target) — used for tray badges.
-  const edgeTaskCount = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const edge of links.filter((l) => l.link_type === "depends_on")) {
-      counts.set(edge.source_id, (counts.get(edge.source_id) ?? 0) + 1);
-      counts.set(edge.target_id, (counts.get(edge.target_id) ?? 0) + 1);
-    }
-    return counts;
-  }, [links]);
-
   const handleUpdateStatus = useCallback(
     (id: string, status: IdeaStatus) => {
       void onUpdateTask(id, { status }).catch(() => setMessage("Could not update status."));
@@ -345,8 +331,6 @@ export function ProjectWorkflowView({
     requestAnimationFrame(() => flow.fitView({ padding: 0.2, duration: 250 }));
   }, [flow, savePositions]);
 
-  const available = useMemo(() => tasks.filter((t) => !placedIds.has(t.id)), [tasks, placedIds]);
-
   const dropTask = (event: React.DragEvent) => {
     event.preventDefault();
     const taskId = event.dataTransfer.getData("application/project-task");
@@ -368,14 +352,6 @@ export function ProjectWorkflowView({
           >
             {progress.done}/{progress.total} done
           </span>
-          {showTray && (
-            <button
-              onClick={() => setTrayOpen((v) => !v)}
-              className="rounded-lg px-2.5 py-1.5 text-xs font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
-            >
-              {trayOpen ? "Hide tasks" : `Show tasks (${available.length})`}
-            </button>
-          )}
           <button
             onClick={autoLayout}
             disabled={!nodes.length}
@@ -411,54 +387,11 @@ export function ProjectWorkflowView({
           This path is getting large — consider splitting into another path or a sub-project.
         </p>
       )}
-      {showTray && trayOpen && (
-        <div className="border-b border-gray-200 dark:border-gray-700">
-          <div className="px-3 pt-2 text-[11px] font-bold text-gray-500">
-            Project tasks <span className="font-normal text-gray-400">({available.length})</span>
-            <span className="ml-1 font-normal">· drag onto the canvas or press Add</span>
-          </div>
-          <div className="flex gap-2 overflow-x-auto p-3">
-            {available.map((task) => {
-              const count = edgeTaskCount.get(task.id) ?? 0;
-              return (
-                <div
-                  key={task.id}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData("application/project-task", task.id);
-                    e.dataTransfer.effectAllowed = "move";
-                  }}
-                  className="flex w-48 shrink-0 cursor-grab items-center gap-2 rounded-lg border border-gray-200 px-2 py-2 text-xs hover:border-violet-300 hover:bg-violet-50 active:cursor-grabbing dark:border-gray-700 dark:hover:bg-violet-950/30"
-                >
-                  <span className="min-w-0 flex-1 truncate">{task.text || "Untitled task"}</span>
-                  {count > 0 && (
-                    <span
-                      title={`${count} connected step${count === 1 ? "" : "s"}`}
-                      className="shrink-0 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-500/20 dark:text-violet-300"
-                    >
-                      {count}
-                    </span>
-                  )}
-                  <button
-                    onClick={() => placeTask(task.id)}
-                    className="shrink-0 rounded-lg border border-violet-200 px-2 py-0.5 font-semibold text-violet-600 hover:bg-violet-100"
-                  >
-                    Add
-                  </button>
-                </div>
-              );
-            })}
-            {available.length === 0 && (
-              <p className="w-full py-2 text-center text-[11px] text-gray-400">
-                Every task in this project is already in this path.
-              </p>
-            )}
-          </div>
-        </div>
-      )}
       <div
         className={
-          fillHeight ? "relative min-h-0 w-full flex-1" : "relative h-[600px] min-h-[560px] w-full"
+          fillHeight
+            ? "relative min-h-[400px] w-full flex-1"
+            : "relative h-[600px] min-h-[560px] w-full"
         }
         onDragOver={(e) => e.preventDefault()}
         onDrop={dropTask}

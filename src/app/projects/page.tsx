@@ -573,7 +573,6 @@ export default function ProjectsPage() {
         onCreateLink={(s, t, type) => createLink(s, t, type)}
         onDeleteLink={deleteLink}
         onAddStep={() => actions.addTask(selectedId ?? "")}
-        showTray={effectiveMode === "paths"}
         fillHeight={effectiveMode === "split"}
         fitTick={fitTick}
         onCanvasApi={handleCanvasApi}
@@ -828,7 +827,7 @@ export default function ProjectsPage() {
                     <ChevronsRight size={14} />
                   </button>
                 </div>
-                <div className="min-h-0 flex-1 overflow-y-auto">{pathsPane}</div>
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{pathsPane}</div>
               </div>
             </Panel>
           </Group>

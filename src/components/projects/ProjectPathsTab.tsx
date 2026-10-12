@@ -22,8 +22,6 @@ interface Props {
   onCreateLink: (sourceId: string, targetId: string, type: "depends_on") => Promise<string>;
   onDeleteLink: (id: string) => Promise<void>;
   onAddStep: () => Promise<string | null>;
-  /** False in split mode: the List pane replaces the "Project tasks" strip. */
-  showTray?: boolean;
   /** Fill the parent pane height instead of the fixed 600px canvas. */
   fillHeight?: boolean;
   /** Bump to re-fit the canvas viewport after the host pane resizes. */
@@ -50,7 +48,6 @@ export function ProjectPathsTab({
   onCreateLink,
   onDeleteLink,
   onAddStep,
-  showTray = true,
   fillHeight = false,
   fitTick = 0,
   onCanvasApi,
@@ -214,7 +211,7 @@ export function ProjectPathsTab({
   }
 
   return (
-    <div className="space-y-3">
+    <div className={fillHeight ? "flex h-full min-h-0 flex-col space-y-3" : "space-y-3"}>
       <div className="flex flex-wrap items-center gap-1.5">
         {paths.map((p) => (
           <span key={p.id} className="flex items-center">
@@ -302,6 +299,27 @@ export function ProjectPathsTab({
             Create a path to arrange a subset of this project&apos;s tasks in execution order.
           </p>
         </div>
+      ) : fillHeight ? (
+        <div className="min-h-0 flex-1">
+          <ProjectWorkflowCanvas
+            tasks={tasks}
+            links={links}
+            items={itemsHook.items}
+            onAddItem={(ideaId, x, y) => itemsHook.addItem(ideaId, x, y)}
+            onRemoveItem={(ideaId) => itemsHook.removeItem(ideaId)}
+            onMoveItems={(positions) => itemsHook.moveItems(positions)}
+            tagsForTask={tagsForTask}
+            onUpdateTask={onUpdateTask}
+            onOpenNotes={onOpenNotes}
+            onCreateLink={onCreateLink}
+            onDeleteLink={onDeleteLink}
+            onAddStep={onAddStep}
+            isPairInAnotherPath={isPairInAnotherPath}
+            hideCompleted={hideCompleted}
+            fillHeight={fillHeight}
+            fitTick={fitTick}
+          />
+        </div>
       ) : (
         <ProjectWorkflowCanvas
           tasks={tasks}
@@ -318,8 +336,7 @@ export function ProjectPathsTab({
           onAddStep={onAddStep}
           isPairInAnotherPath={isPairInAnotherPath}
           hideCompleted={hideCompleted}
-          showTray={showTray}
-          fillHeight={fillHeight}
+          fillHeight={false}
           fitTick={fitTick}
         />
       )}
