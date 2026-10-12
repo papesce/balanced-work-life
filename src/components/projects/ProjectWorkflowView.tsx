@@ -45,6 +45,8 @@ interface Props {
   isPairInAnotherPath?: (aIdeaId: string, bIdeaId: string) => boolean;
   /** Mirrors the project "Hide completed" toggle: hides completed nodes on the canvas. */
   hideCompleted?: boolean;
+  /** Mirrors the project "Hide closed" toggle: hides completed/cancelled/missed/archived nodes. */
+  hideClosed?: boolean;
   /** Bump to re-fit the viewport after the pane resizes or collapses. */
   fitTick?: number;
   /** Fill the parent pane height instead of the fixed 600px canvas. */
@@ -68,6 +70,7 @@ export function ProjectWorkflowView({
   onAddStep,
   isPairInAnotherPath,
   hideCompleted,
+  hideClosed,
   fitTick = 0,
   fillHeight = false,
 }: Props) {
@@ -105,9 +108,16 @@ export function ProjectWorkflowView({
     return map;
   }, [placedIds, taskMap, dependsLinks, statusById]);
   const visibleIds = useMemo(() => {
+    if (hideClosed)
+      return new Set(
+        [...placedIds].filter((id) => {
+          const s = taskMap.get(id)?.status;
+          return s !== "completed" && s !== "cancelled" && s !== "missed" && s !== "archived";
+        }),
+      );
     if (!hideCompleted) return placedIds;
     return new Set([...placedIds].filter((id) => taskMap.get(id)?.status !== "completed"));
-  }, [placedIds, taskMap, hideCompleted]);
+  }, [placedIds, taskMap, hideCompleted, hideClosed]);
   const handleUpdateStatus = useCallback(
     (id: string, status: IdeaStatus) => {
       void onUpdateTask(id, { status }).catch(() => setMessage("Could not update status."));

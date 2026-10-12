@@ -53,6 +53,7 @@ import { IdeaActionMenu } from "@/components/shared/IdeaActionMenu";
 import { ValueHelpInfo } from "@/components/shared/ValueHelpInfo";
 import { hintForValue } from "@/lib/classificationHelp";
 import { ProjectPathsTab, type PathCanvasApi } from "@/components/projects/ProjectPathsTab";
+import { ProjectFiltersMenu } from "@/components/projects/ProjectFiltersMenu";
 import { usePathMembership } from "@/hooks/usePathMembership";
 import { clampSplitRatio, resolveEffectiveMode, SPLIT_MIN_WIDTH } from "@/lib/projectSplit";
 import type { ProjectViewMode } from "@/stores/uiPrefsStore";
@@ -84,6 +85,7 @@ export default function ProjectsPage() {
   const [titleDraft, setTitleDraft] = useState("");
   // Detail-local filters (list filters don't leak into detail).
   const detailHideCompleted = useUiPrefsStore((s) => s.projectsDetailHideCompleted);
+  const detailHideClosed = useUiPrefsStore((s) => s.projectsDetailHideClosed);
   // Split-view layout: persisted mode + ratio; narrow screens force one pane.
   const projectViewMode = useUiPrefsStore((s) => s.projectViewMode);
   const projectSplitRatio = useUiPrefsStore((s) => s.projectSplitRatio);
@@ -548,7 +550,7 @@ export default function ProjectsPage() {
         composing={composing}
         setComposing={setComposing}
         showToday={false}
-        hideClosed={false}
+        hideClosed={detailHideClosed}
         hideCompleted={detailHideCompleted}
         hideDeferred={false}
         hideIds={unpathedOnly ? pathedIds : undefined}
@@ -576,6 +578,7 @@ export default function ProjectsPage() {
         fillHeight={effectiveMode === "split"}
         fitTick={fitTick}
         onCanvasApi={handleCanvasApi}
+        hideClosed={detailHideClosed}
       />
     );
     return (
@@ -590,20 +593,14 @@ export default function ProjectsPage() {
             >
               <ArrowLeft size={14} /> Back
             </button>
-            <button
-              type="button"
-              onClick={() => setPrefs({ projectsDetailHideCompleted: !detailHideCompleted })}
-              aria-pressed={detailHideCompleted}
-              title="Hide completed tasks"
-              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-                detailHideCompleted
-                  ? "border-indigo-300 bg-white text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
-                  : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
-              }`}
-            >
-              <span className="hidden sm:inline">Hide completed</span>
-              <span className="sm:hidden">Hide done</span>
-            </button>
+            <ProjectFiltersMenu
+              hideClosed={detailHideClosed}
+              onToggleHideClosed={() => setPrefs({ projectsDetailHideClosed: !detailHideClosed })}
+              hideCompleted={detailHideCompleted}
+              onToggleHideCompleted={() =>
+                setPrefs({ projectsDetailHideCompleted: !detailHideCompleted })
+              }
+            />
             {effectiveMode !== "paths" && unpathedCount > 0 && (
               <button
                 type="button"

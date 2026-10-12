@@ -28,6 +28,8 @@ interface Props {
   fitTick?: number;
   /** Reports the selected path + add entry point so the List pane can add steps. */
   onCanvasApi?: (api: PathCanvasApi | null) => void;
+  /** Hide closed (terminal) tasks on the canvas. Falls back to the persisted pref. */
+  hideClosed?: boolean;
 }
 
 /** Minimal canvas entry point consumed by the List pane (split mode). */
@@ -51,11 +53,14 @@ export function ProjectPathsTab({
   fillHeight = false,
   fitTick = 0,
   onCanvasApi,
+  hideClosed: hideClosedProp,
 }: Props) {
   const { user } = useAuth();
   const { paths, loading, createPath, renamePath, deletePath } = usePaths(projectId);
   const projectLastPath = useUiPrefsStore((s) => s.projectLastPath);
   const hideCompleted = useUiPrefsStore((s) => s.projectsDetailHideCompleted);
+  const hideClosedStore = useUiPrefsStore((s) => s.projectsDetailHideClosed);
+  const hideClosed = hideClosedProp ?? hideClosedStore;
   const setPrefs = useUiPrefsStore((s) => s.set);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -316,6 +321,7 @@ export function ProjectPathsTab({
             onAddStep={onAddStep}
             isPairInAnotherPath={isPairInAnotherPath}
             hideCompleted={hideCompleted}
+            hideClosed={hideClosed}
             fillHeight={fillHeight}
             fitTick={fitTick}
           />
@@ -336,6 +342,7 @@ export function ProjectPathsTab({
           onAddStep={onAddStep}
           isPairInAnotherPath={isPairInAnotherPath}
           hideCompleted={hideCompleted}
+          hideClosed={hideClosed}
           fillHeight={false}
           fitTick={fitTick}
         />

@@ -24,6 +24,7 @@ interface UiPrefsState {
   horizonActiveViewId: string | null;
   projectsUnclassifiedExpanded: boolean;
   projectsDetailHideCompleted: boolean;
+  projectsDetailHideClosed: boolean;
   horizonUnclassifiedExpanded: boolean;
   horizonHideProjectsWithTasks: boolean;
   horizonHideCommitted: boolean;
@@ -74,6 +75,7 @@ export const useUiPrefsStore = create<UiPrefsState>()(
       horizonActiveViewId: null,
       projectsUnclassifiedExpanded: true,
       projectsDetailHideCompleted: true,
+      projectsDetailHideClosed: true,
       horizonUnclassifiedExpanded: false,
       horizonHideProjectsWithTasks: true,
       horizonHideCommitted: true,
@@ -99,6 +101,7 @@ export const useUiPrefsStore = create<UiPrefsState>()(
         horizonActiveViewId: s.horizonActiveViewId,
         projectsUnclassifiedExpanded: s.projectsUnclassifiedExpanded,
         projectsDetailHideCompleted: s.projectsDetailHideCompleted,
+        projectsDetailHideClosed: s.projectsDetailHideClosed,
         horizonUnclassifiedExpanded: s.horizonUnclassifiedExpanded,
         horizonHideProjectsWithTasks: s.horizonHideProjectsWithTasks,
         horizonHideUpcomingCommitted: s.horizonHideUpcomingCommitted,
@@ -117,6 +120,14 @@ export const useUiPrefsStore = create<UiPrefsState>()(
         // First run: no persisted slice yet → seed from legacy per-key entries.
         const legacy = readLegacy();
         const merged = { ...current, ...legacy, ...p };
+        // One-time migration: Hide closed defaults to the existing Hide completed
+        // value so users who already hid completed keep cancelled/missed/archived hidden too.
+        if (
+          (p as Partial<UiPrefsState>).projectsDetailHideClosed === undefined &&
+          p.projectsDetailHideCompleted !== undefined
+        ) {
+          merged.projectsDetailHideClosed = p.projectsDetailHideCompleted;
+        }
         // One-time migration from the single Hide committed toggle (removed):
         // hiding everything maps to both new toggles on, showing maps to both off.
         if (
