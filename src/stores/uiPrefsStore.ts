@@ -43,6 +43,8 @@ interface UiPrefsState {
   projectViewMode: ProjectViewMode;
   /** List-pane width in split mode, as a percentage (10–80). */
   projectSplitRatio: number;
+  /** Global header search: whether done (completed/cancelled/missed/archived) ideas are included. */
+  globalSearchIncludeDone: boolean;
   set: (partial: Partial<UiPrefsState>) => void;
 }
 
@@ -89,6 +91,7 @@ export const useUiPrefsStore = create<UiPrefsState>()(
       projectLastPath: {},
       projectViewMode: "split",
       projectSplitRatio: 35,
+      globalSearchIncludeDone: true,
       set: (partial) => set(partial),
     }),
     {
@@ -114,6 +117,7 @@ export const useUiPrefsStore = create<UiPrefsState>()(
         projectLastPath: s.projectLastPath,
         projectViewMode: s.projectViewMode,
         projectSplitRatio: s.projectSplitRatio,
+        globalSearchIncludeDone: s.globalSearchIncludeDone,
       }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<UiPrefsState> & { horizonHideCommitted?: boolean };

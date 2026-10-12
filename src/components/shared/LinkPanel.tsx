@@ -17,6 +17,8 @@ interface LinkPanelProps {
   onClose: () => void;
   /** When set, renders in a FloatingPanel portal (FLOATING layer) so the panel paints above drawers/menus. */
   fixedPosition?: FloatingAnchor;
+  /** When true, renders inline in normal flow (e.g. inside DetailsDrawer) — no portal, no absolute positioning. */
+  inline?: boolean;
 }
 
 export function LinkPanel({
@@ -28,6 +30,7 @@ export function LinkPanel({
   onDeleteLink,
   onClose,
   fixedPosition,
+  inline = false,
 }: LinkPanelProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [selectedType, setSelectedType] = useState<LinkType>("related_to");
@@ -41,12 +44,15 @@ export function LinkPanel({
   useEffect(() => {
     // FloatingPanel owns outside-click/Escape/scroll handling when portaled.
     if (fixedPosition) return;
+    // Inline mode lives inside the drawer: the drawer owns outside-click and
+    // Escape (inner Escape closes the panel first via onKeyDown below).
+    if (inline) return;
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [onClose, fixedPosition]);
+  }, [onClose, fixedPosition, inline]);
 
   const ideaLinks = links.filter((l) => l.source_id === ideaId || l.target_id === ideaId);
 
@@ -145,6 +151,23 @@ export function LinkPanel({
       {panelContent}
     </div>
   );
+
+  if (inline)
+    return (
+      <div
+        ref={ref}
+        onKeyDown={(e) => {
+          // Close just the panel; stopPropagation keeps the drawer open.
+          if (e.key === "Escape") {
+            e.stopPropagation();
+            onClose();
+          }
+        }}
+        className="mt-1 w-full rounded-xl border border-black/10 bg-white/80 p-3 dark:border-white/10 dark:bg-gray-800/60"
+      >
+        {panelContent}
+      </div>
+    );
 
   if (fixedPosition)
     return (

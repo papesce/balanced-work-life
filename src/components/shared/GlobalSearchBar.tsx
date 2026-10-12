@@ -35,6 +35,7 @@ import {
 import { useClassifications } from "@/hooks/useClassifications";
 import { subscribeGlobalSearch } from "@/lib/globalSearchBus";
 import { FloatingPanel } from "@/components/shared/FloatingPanel";
+import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 
 const VIEW_ICON: Record<RevealView, React.ReactNode> = {
   planner: <LayoutDashboard size={12} strokeWidth={1.5} />,
@@ -66,7 +67,8 @@ export function GlobalSearchBar() {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [includeDone, setIncludeDone] = useState(true);
+  const includeDone = useUiPrefsStore((s) => s.globalSearchIncludeDone);
+  const setPrefs = useUiPrefsStore((s) => s.set);
   const [dropPos, setDropPos] = useState<{ top: number; left: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -289,7 +291,7 @@ export function GlobalSearchBar() {
                 type="checkbox"
                 checked={includeDone}
                 onChange={(e) => {
-                  setIncludeDone(e.target.checked);
+                  setPrefs({ globalSearchIncludeDone: e.target.checked });
                   setActiveIndex(0);
                   setExpandedId(null);
                 }}

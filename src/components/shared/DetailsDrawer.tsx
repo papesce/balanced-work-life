@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { LAYER_MODAL } from "@/lib/layers";
 import { useRouter } from "next/navigation";
@@ -79,8 +79,6 @@ export function DetailsDrawer({
   const { schemes, options, getOptionForIdea, setClassification } = useClassifications();
   const { links, createLink, deleteLink } = useIdeaLinks();
   const [showLinkPanel, setShowLinkPanel] = useState(false);
-  const linkButtonRef = useRef<HTMLButtonElement>(null);
-  const [linkPanelPos, setLinkPanelPos] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -96,11 +94,19 @@ export function DetailsDrawer({
   useEffect(() => {
     if (!ideaId) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      // Inner panel handles its own Escape via stopPropagation, but as a
+      // fallback close just the panel first so the drawer stays open.
+      if (e.key === "Escape") {
+        if (showLinkPanel) {
+          setShowLinkPanel(false);
+          return;
+        }
+        onClose();
+      }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [ideaId, onClose]);
+  }, [ideaId, onClose, showLinkPanel]);
 
   const ancestors = useMemo(() => {
     if (!idea) return [];
@@ -264,27 +270,15 @@ export function DetailsDrawer({
                     Related
                   </p>
                   <button
-                    ref={linkButtonRef}
-                    onClick={() => {
-                      if (showLinkPanel) {
-                        setShowLinkPanel(false);
-                        return;
-                      }
-                      const rect = linkButtonRef.current?.getBoundingClientRect();
-                      if (rect)
-                        setLinkPanelPos({
-                          top: rect.bottom + 4,
-                          left: Math.max(8, rect.right - 440),
-                        });
-                      setShowLinkPanel(true);
-                    }}
+                    onClick={() => setShowLinkPanel((v) => !v)}
+                    aria-expanded={showLinkPanel}
                     className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold text-indigo-500 hover:bg-indigo-50/50 dark:hover:bg-indigo-500/10"
                   >
                     <Link2 size={10} strokeWidth={1.5} />
                     Link…
                   </button>
                 </div>
-                {showLinkPanel && idea && linkPanelPos && (
+                {showLinkPanel && idea && (
                   <LinkPanel
                     ideaId={idea.id}
                     ideas={ideas}
@@ -292,7 +286,7 @@ export function DetailsDrawer({
                     onCreateLink={createLink}
                     onDeleteLink={deleteLink}
                     onClose={() => setShowLinkPanel(false)}
-                    fixedPosition={linkPanelPos}
+                    inline
                   />
                 )}
                 {linkedGroups.length === 0 && !showLinkPanel ? (
