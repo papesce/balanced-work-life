@@ -3,16 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, ArrowLeft, X } from "lucide-react";
 import { Idea, IdeaLink, LinkType, Tag } from "@/lib/types";
+import { LINK_TYPES } from "@/lib/linkTypes";
 import { IdeaSearchPicker } from "@/components/brainstorm/IdeaSearchPicker";
 import { FloatingPanel, type FloatingAnchor } from "@/components/shared/FloatingPanel";
-
-const LINK_TYPES: { value: LinkType; label: string }[] = [
-  { value: "unblocks", label: "Unblocks" },
-  { value: "contributes_to", label: "Contributes to" },
-  { value: "depends_on", label: "Depends on" },
-  { value: "related_to", label: "Related to" },
-  { value: "part_of", label: "Part of" },
-];
 
 interface LinkPanelProps {
   ideaId: string;

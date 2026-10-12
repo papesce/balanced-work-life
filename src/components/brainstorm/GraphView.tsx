@@ -15,6 +15,7 @@ import "@xyflow/react/dist/style.css";
 import dagre from "dagre";
 import { Idea, IdeaLink } from "@/lib/types";
 import { getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
+import { LINK_TYPE_LABELS } from "@/lib/linkTypes";
 import { GraphIdeaNode, type GraphIdeaNodeData } from "./GraphIdeaNode";
 
 interface GraphViewProps {
@@ -23,14 +24,6 @@ interface GraphViewProps {
   focusedId?: string | null;
   onNodeDoubleClick?: (ideaId: string) => void;
 }
-
-const LINK_TYPE_LABELS: Record<string, string> = {
-  unblocks: "unblocks",
-  contributes_to: "contributes to",
-  depends_on: "depends on",
-  related_to: "related",
-  part_of: "part of",
-};
 
 const nodeTypes = { ideaNode: GraphIdeaNode };
 

@@ -10,7 +10,7 @@ import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 import { deserializePathItem } from "@/lib/paths";
 import { ProjectWorkflowCanvas } from "./ProjectWorkflowView";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import type { Idea, IdeaLink, Tag } from "@/lib/types";
+import type { Idea, IdeaLink, LinkType, Tag } from "@/lib/types";
 
 interface Props {
   projectId: string;
@@ -19,7 +19,7 @@ interface Props {
   tagsForTask: (id: string) => Tag[];
   onUpdateTask: (id: string, updates: Partial<Idea>) => Promise<void>;
   onOpenNotes: (id: string) => void;
-  onCreateLink: (sourceId: string, targetId: string, type: "depends_on") => Promise<string>;
+  onCreateLink: (sourceId: string, targetId: string, type: LinkType) => Promise<string>;
   onDeleteLink: (id: string) => Promise<void>;
   onAddStep: () => Promise<string | null>;
   /** Fill the parent pane height instead of the fixed 600px canvas. */

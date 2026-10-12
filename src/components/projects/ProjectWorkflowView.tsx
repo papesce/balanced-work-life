@@ -19,9 +19,10 @@ import {
 import "@xyflow/react/dist/style.css";
 import dagre from "dagre";
 import { Plus, X } from "lucide-react";
-import type { Idea, IdeaLink, IdeaStatus, Tag } from "@/lib/types";
+import type { Idea, IdeaLink, IdeaStatus, LinkType, Tag } from "@/lib/types";
 import type { PathItem, PathPosition } from "@/lib/paths";
 import { isReady, pathProgress, wouldCreateCycle } from "@/lib/paths";
+import { LINK_EDGE_STYLE, LINK_TYPES, LINK_TYPE_LABELS } from "@/lib/linkTypes";
 import { NODE_WIDTH, WorkflowTaskNode, type WorkflowTaskNodeData } from "./WorkflowTaskNode";
 
 const nodeTypes = { workflowTask: WorkflowTaskNode };
@@ -37,7 +38,7 @@ interface Props {
   tagsForTask: (id: string) => Tag[];
   onUpdateTask: (id: string, updates: Partial<Idea>) => Promise<void>;
   onOpenNotes: (id: string) => void;
-  onCreateLink: (sourceId: string, targetId: string, type: "depends_on") => Promise<string>;
+  onCreateLink: (sourceId: string, targetId: string, type: LinkType) => Promise<string>;
   onDeleteLink: (id: string) => Promise<void>;
   onAddStep: () => Promise<string | null>;
   /** True when both tasks co-occur in some other path (for the delete-everywhere notice). */
@@ -75,6 +76,9 @@ export function ProjectWorkflowView({
   const [message, setMessage] = useState("");
   const [adding, setAdding] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [pending, setPending] = useState<{ visualSource: string; visualTarget: string } | null>(
+    null,
+  );
   const flow = useReactFlow();
 
   const taskMap = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
@@ -124,7 +128,9 @@ export function ProjectWorkflowView({
   );
 
   // Canvas membership is user-controlled and persisted in path_items.
-  // Edges reflect depends_on links between placed steps only.
+  // Edges reflect all link types between placed steps; the arrow always
+  // points in workflow direction (prerequisite -> dependent) so that
+  // `depends_on` links are flipped (source depends on target).
   useEffect(() => {
     const savedPositions = new Map(items.map((n) => [n.idea_id, { x: n.x, y: n.y }]));
     const nextNodes: FlowNode[] = [...visibleIds].map((id, i) => ({
@@ -149,19 +155,32 @@ export function ProjectWorkflowView({
     const placed = new Set(nextNodes.map((n) => n.id));
     setEdges(
       links
-        .filter(
-          (l) => l.link_type === "depends_on" && placed.has(l.source_id) && placed.has(l.target_id),
-        )
-        .map((l) => ({
-          id: l.id,
-          // depends_on: source depends on target => target is the prerequisite.
-          source: l.target_id,
-          target: l.source_id,
-          type: "smoothstep",
-          animated: false,
-          style: { stroke: "#8b5cf6", strokeWidth: 2 },
-          markerEnd: { type: "arrowclosed" as const },
-        })),
+        .filter((l) => placed.has(l.source_id) && placed.has(l.target_id))
+        .map((l) => {
+          // depends_on: source depends on target => arrow target -> source.
+          // All other types: arrow follows stored direction so the label reads naturally.
+          const visual =
+            l.link_type === "depends_on"
+              ? { source: l.target_id, target: l.source_id }
+              : { source: l.source_id, target: l.target_id };
+          const style = LINK_EDGE_STYLE[l.link_type] ?? LINK_EDGE_STYLE.related_to;
+          return {
+            id: l.id,
+            source: visual.source,
+            target: visual.target,
+            type: "smoothstep",
+            animated: style.animated ?? false,
+            label: LINK_TYPE_LABELS[l.link_type] ?? l.link_type,
+            labelStyle: { fontSize: 10, fill: style.stroke },
+            labelBgStyle: { fill: "white", fillOpacity: 0.9 },
+            style: {
+              stroke: style.stroke,
+              strokeWidth: 2,
+              ...(style.dashed ? { strokeDasharray: "5 5" } : {}),
+            },
+            markerEnd: { type: "arrowclosed" as const },
+          };
+        }),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, taskMap, links, visibleIds, nodeDerived]);
@@ -225,15 +244,31 @@ export function ProjectWorkflowView({
         return;
       }
       if (current.some((e) => e.source === connection.source && e.target === connection.target)) {
-        return;
+        setMessage("Those steps are already linked — pick a type to add another relationship.");
       }
-      // Workflow source -> target means target depends on source.
-      void onCreateLink(connection.target, connection.source, "depends_on").catch(() =>
+      // Option B: ask for the relationship type on every connect.
+      setPending({ visualSource: connection.source, visualTarget: connection.target });
+      setMessage("");
+    },
+    [edges],
+  );
+
+  const confirmPendingLink = useCallback(
+    (linkType: LinkType) => {
+      if (!pending) return;
+      const { visualSource, visualTarget } = pending;
+      // Keep the canvas arrow (prerequisite -> dependent) for ordering types:
+      // depends_on is stored flipped (target depends on source);
+      // every other type follows the drawn direction.
+      const [storeSource, storeTarget] =
+        linkType === "depends_on" ? [visualTarget, visualSource] : [visualSource, visualTarget];
+      setPending(null);
+      void onCreateLink(storeSource, storeTarget, linkType).catch(() =>
         setMessage("Could not create link."),
       );
       setMessage("");
     },
-    [edges, onCreateLink],
+    [pending, onCreateLink],
   );
 
   const placeTask = useCallback(
@@ -436,6 +471,36 @@ export function ProjectWorkflowView({
             {message}
             <button className="ml-2" onClick={() => setMessage("")} aria-label="Dismiss">
               <X size={12} />
+            </button>
+          </div>
+        )}
+        {pending && (
+          <div className="absolute top-3 left-1/2 w-[min(420px,90%)] -translate-x-1/2 rounded-xl border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-700 dark:bg-gray-800">
+            <p className="text-xs font-semibold">
+              Link “{taskMap.get(pending.visualSource)?.text ?? "step"}” → “
+              {taskMap.get(pending.visualTarget)?.text ?? "step"}” as…
+            </p>
+            <p className="mt-0.5 text-[11px] text-gray-500">
+              Arrow stays in the drawn direction; “Depends on” is stored flipped (target depends on
+              source).
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {LINK_TYPES.map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => confirmPendingLink(value)}
+                  title={LINK_TYPE_LABELS[value]}
+                  className="rounded-lg border border-black/10 px-2.5 py-1.5 text-xs font-medium hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 dark:border-white/10 dark:hover:border-violet-500/40 dark:hover:bg-violet-500/10"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setPending(null)}
+              className="mt-2 text-[11px] text-gray-400 hover:text-gray-600"
+            >
+              Cancel
             </button>
           </div>
         )}
