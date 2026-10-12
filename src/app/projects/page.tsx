@@ -54,6 +54,7 @@ import { ValueHelpInfo } from "@/components/shared/ValueHelpInfo";
 import { hintForValue } from "@/lib/classificationHelp";
 import { ProjectPathsTab, type PathCanvasApi } from "@/components/projects/ProjectPathsTab";
 import { ProjectFiltersMenu } from "@/components/projects/ProjectFiltersMenu";
+import { TaskComposer } from "@/components/shared/TaskComposer";
 import { usePathMembership } from "@/hooks/usePathMembership";
 import { clampSplitRatio, resolveEffectiveMode, SPLIT_MIN_WIDTH } from "@/lib/projectSplit";
 import type { ProjectViewMode } from "@/stores/uiPrefsStore";
@@ -454,10 +455,32 @@ export default function ProjectsPage() {
     setEditingId(id);
   };
 
-  const handleAddTask = async () => {
+  /** Inline composer submit: create with text directly under focus (or project root). */
+  const handleComposerAdd = async (text: string) => {
+    const parentId = focusedId ?? selectedId;
+    if (!parentId) return;
+    const id = await actions.createIdea(text, parentId, "bottom", {
+      type: "task",
+      status: "draft",
+    });
+    if (id) {
+      ideasHook.expandIdea(parentId);
+      setSelectedTreeId(id);
+    }
+  };
+
+  /** Paths-mode composer: create with text under the project, then place on the selected path. */
+  const handleComposerAddToPath = async (text: string) => {
     if (!selectedId) return;
-    const id = await actions.addTask(selectedId);
-    if (id) spawnEditable(id, selectedId);
+    const id = await actions.createIdea(text, selectedId, "bottom", {
+      type: "task",
+      status: "draft",
+    });
+    if (id) {
+      ideasHook.expandIdea(selectedId);
+      if (canvasApi?.selectedPathId) await canvasApi.addToPath(id);
+      setSelectedTreeId(id);
+    }
   };
 
   const handleAddProject = async () => {
@@ -516,53 +539,71 @@ export default function ProjectsPage() {
 
   // Detail view — focused project tree
   if (selectedId && selectedProject) {
+    const composerParent = focusedId
+      ? (ideasHook.ideas.find((i) => i.id === focusedId) ?? null)
+      : null;
     const listPane = (
-      <IdeaTree
-        tree={ideasHook.tree}
-        ideas={ideasHook.ideas}
-        links={linksHook.links}
-        scope="all"
-        createIdea={createIdea}
-        updateIdea={updateIdea}
-        deleteIdea={deleteIdea}
-        moveIdea={moveIdea}
-        onCreateParent={createParentAndMove}
-        toggleCollapse={ideasHook.toggleCollapse}
-        expandIdea={ideasHook.expandIdea}
-        onCreateLink={createLink}
-        onDeleteLink={deleteLink}
-        onMarkDone={markDone}
-        onMarkUndone={markUndone}
-        onSchedule={scheduleIdea}
-        allTags={tagsHook.tags}
-        getTagsForIdea={taskTagsHook.getTagsForIdea}
-        onAddTag={taskTagsHook.addTagToTask}
-        onRemoveTag={taskTagsHook.removeTagFromTask}
-        onCreateTag={tagsHook.createTag}
-        search=""
-        showType={showType}
-        showArea={showArea}
-        editMode="edit"
-        editingId={editingId}
-        setEditingId={setEditingId}
-        selectedId={selectedTreeId}
-        setSelectedId={setSelectedTreeId}
-        composing={composing}
-        setComposing={setComposing}
-        showToday={false}
-        hideClosed={detailHideClosed}
-        hideCompleted={detailHideCompleted}
-        hideDeferred={false}
-        hideIds={unpathedOnly ? pathedIds : undefined}
-        pathChipsForIdea={(id) => membership.titlesByIdea.get(id) ?? []}
-        focusedId={focusedId ?? selectedId}
-        onFocus={(id) => setFocusedId(id === selectedId ? null : id)}
-        cardMode={false}
-        compact={effectiveMode === "split"}
-        onAddToPath={effectiveMode === "split" ? handleAddToPath : undefined}
-        isInPath={isInPath}
-        pathAddDisabled={!canvasApi?.selectedPathId}
-      />
+      <div className="flex min-h-0 flex-col">
+        <div className="sticky top-0 z-10 bg-white pb-2 dark:bg-gray-950">
+          <TaskComposer
+            variant="tree"
+            placeholder={
+              composerParent
+                ? `+ Add subtask to ${composerParent.text || "untitled"}…`
+                : "+ Add task…"
+            }
+            onCreate={handleComposerAdd}
+            suggestFrom={ideasHook.ideas}
+            currentView="projects"
+          />
+        </div>
+        <IdeaTree
+          tree={ideasHook.tree}
+          ideas={ideasHook.ideas}
+          links={linksHook.links}
+          scope="all"
+          createIdea={createIdea}
+          updateIdea={updateIdea}
+          deleteIdea={deleteIdea}
+          moveIdea={moveIdea}
+          onCreateParent={createParentAndMove}
+          toggleCollapse={ideasHook.toggleCollapse}
+          expandIdea={ideasHook.expandIdea}
+          onCreateLink={createLink}
+          onDeleteLink={deleteLink}
+          onMarkDone={markDone}
+          onMarkUndone={markUndone}
+          onSchedule={scheduleIdea}
+          allTags={tagsHook.tags}
+          getTagsForIdea={taskTagsHook.getTagsForIdea}
+          onAddTag={taskTagsHook.addTagToTask}
+          onRemoveTag={taskTagsHook.removeTagFromTask}
+          onCreateTag={tagsHook.createTag}
+          search=""
+          showType={showType}
+          showArea={showArea}
+          editMode="edit"
+          editingId={editingId}
+          setEditingId={setEditingId}
+          selectedId={selectedTreeId}
+          setSelectedId={setSelectedTreeId}
+          composing={composing}
+          setComposing={setComposing}
+          showToday={false}
+          hideClosed={detailHideClosed}
+          hideCompleted={detailHideCompleted}
+          hideDeferred={false}
+          hideIds={unpathedOnly ? pathedIds : undefined}
+          pathChipsForIdea={(id) => membership.titlesByIdea.get(id) ?? []}
+          focusedId={focusedId ?? selectedId}
+          onFocus={(id) => setFocusedId(id === selectedId ? null : id)}
+          cardMode={false}
+          compact={effectiveMode === "split"}
+          onAddToPath={effectiveMode === "split" ? handleAddToPath : undefined}
+          isInPath={isInPath}
+          pathAddDisabled={!canvasApi?.selectedPathId}
+        />
+      </div>
     );
     const pathsPane = (
       <ProjectPathsTab
@@ -574,7 +615,6 @@ export default function ProjectsPage() {
         onOpenNotes={openNotes}
         onCreateLink={(s, t, type) => createLink(s, t, type)}
         onDeleteLink={deleteLink}
-        onAddStep={() => actions.addTask(selectedId ?? "")}
         fillHeight={effectiveMode === "split"}
         fitTick={fitTick}
         onCanvasApi={handleCanvasApi}
@@ -665,12 +705,6 @@ export default function ProjectsPage() {
               {selectedProject.notes?.trim() ? (
                 <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" aria-hidden />
               ) : null}
-            </button>
-            <button
-              onClick={handleAddTask}
-              className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-violet-700"
-            >
-              <Plus size={13} /> Add task
             </button>
           </div>
         }
@@ -829,7 +863,16 @@ export default function ProjectsPage() {
             </Panel>
           </Group>
         ) : effectiveMode === "paths" ? (
-          pathsPane
+          <div className="flex min-h-0 flex-col gap-2">
+            <TaskComposer
+              variant="tree"
+              placeholder="+ Add task to this path…"
+              onCreate={handleComposerAddToPath}
+              suggestFrom={ideasHook.ideas}
+              currentView="projects"
+            />
+            {pathsPane}
+          </div>
         ) : (
           listPane
         )}

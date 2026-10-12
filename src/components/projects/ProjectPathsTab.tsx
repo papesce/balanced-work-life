@@ -21,7 +21,6 @@ interface Props {
   onOpenNotes: (id: string) => void;
   onCreateLink: (sourceId: string, targetId: string, type: LinkType) => Promise<string>;
   onDeleteLink: (id: string) => Promise<void>;
-  onAddStep: () => Promise<string | null>;
   /** Fill the parent pane height instead of the fixed 600px canvas. */
   fillHeight?: boolean;
   /** Bump to re-fit the canvas viewport after the host pane resizes. */
@@ -49,7 +48,6 @@ export function ProjectPathsTab({
   onOpenNotes,
   onCreateLink,
   onDeleteLink,
-  onAddStep,
   fillHeight = false,
   fitTick = 0,
   onCanvasApi,
@@ -318,7 +316,6 @@ export function ProjectPathsTab({
             onOpenNotes={onOpenNotes}
             onCreateLink={onCreateLink}
             onDeleteLink={onDeleteLink}
-            onAddStep={onAddStep}
             isPairInAnotherPath={isPairInAnotherPath}
             hideCompleted={hideCompleted}
             hideClosed={hideClosed}
@@ -339,7 +336,6 @@ export function ProjectPathsTab({
           onOpenNotes={onOpenNotes}
           onCreateLink={onCreateLink}
           onDeleteLink={onDeleteLink}
-          onAddStep={onAddStep}
           isPairInAnotherPath={isPairInAnotherPath}
           hideCompleted={hideCompleted}
           hideClosed={hideClosed}

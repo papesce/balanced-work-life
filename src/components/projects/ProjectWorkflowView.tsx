@@ -18,7 +18,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import dagre from "dagre";
-import { Plus, X } from "lucide-react";
+import { X } from "lucide-react";
 import type { Idea, IdeaLink, IdeaStatus, LinkType, Tag } from "@/lib/types";
 import type { PathItem, PathPosition } from "@/lib/paths";
 import { isReady, pathProgress, wouldCreateCycle } from "@/lib/paths";
@@ -40,7 +40,6 @@ interface Props {
   onOpenNotes: (id: string) => void;
   onCreateLink: (sourceId: string, targetId: string, type: LinkType) => Promise<string>;
   onDeleteLink: (id: string) => Promise<void>;
-  onAddStep: () => Promise<string | null>;
   /** True when both tasks co-occur in some other path (for the delete-everywhere notice). */
   isPairInAnotherPath?: (aIdeaId: string, bIdeaId: string) => boolean;
   /** Mirrors the project "Hide completed" toggle: hides completed nodes on the canvas. */
@@ -67,7 +66,6 @@ export function ProjectWorkflowView({
   onOpenNotes,
   onCreateLink,
   onDeleteLink,
-  onAddStep,
   isPairInAnotherPath,
   hideCompleted,
   hideClosed,
@@ -77,7 +75,6 @@ export function ProjectWorkflowView({
   const [nodes, setNodes] = useState<FlowNode[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [message, setMessage] = useState("");
-  const [adding, setAdding] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pending, setPending] = useState<{ visualSource: string; visualTarget: string } | null>(
     null,
@@ -326,22 +323,6 @@ export function ProjectWorkflowView({
     ],
   );
 
-  const handleAddStep = useCallback(async () => {
-    setAdding(true);
-    try {
-      const id = await onAddStep();
-      if (id) {
-        placeTask(id);
-        setMessage("");
-        requestAnimationFrame(() => flow.fitView({ padding: 0.2, duration: 250 }));
-      }
-    } catch {
-      setMessage("Could not add step. Try again.");
-    } finally {
-      setAdding(false);
-    }
-  }, [onAddStep, placeTask, flow]);
-
   const removeSelected = useCallback(() => {
     if (!selectedId) return;
     const id = selectedId;
@@ -419,13 +400,6 @@ export function ProjectWorkflowView({
             </button>
           )}
         </div>
-        <button
-          onClick={() => void handleAddStep()}
-          disabled={adding}
-          className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-50"
-        >
-          <Plus size={13} /> {adding ? "Adding…" : "+ Add step"}
-        </button>
       </div>
       {placedIds.size > 8 && (
         <p className="border-b border-gray-200 px-3 py-1.5 text-[11px] text-gray-400 dark:border-gray-700">
@@ -471,7 +445,8 @@ export function ProjectWorkflowView({
             <div className="max-w-xs rounded-xl bg-white/90 p-5 shadow dark:bg-gray-800/90">
               <p className="text-sm font-semibold">This path is empty</p>
               <p className="mt-1 text-xs text-gray-500">
-                Add the steps you want here, then connect them in the order they happen.
+                Drag tasks from the TASKS list onto the canvas, then connect them in the order they
+                happen.
               </p>
             </div>
           </div>
