@@ -72,13 +72,6 @@ describe("DEFAULT_LENSES table", () => {
     expectSplits("looking-ahead", "priority");
     expectSplits("payoff", "effort");
   });
-
-  it("only the ready lens includes committed work", () => {
-    assert.equal(DEFAULT_LENSES.find((l) => l.id === "ready")!.includeCommitted, true);
-    for (const l of DEFAULT_LENSES.filter((l) => l.id !== "ready")) {
-      assert.ok(!l.includeCommitted, l.id);
-    }
-  });
 });
 
 describe("resolveLens", () => {

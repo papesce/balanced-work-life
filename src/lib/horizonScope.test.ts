@@ -1,6 +1,14 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { filterUncommitted, isCommitted, isUncommitted } from "@/lib/horizonScope";
+import {
+  filterOutOverdue,
+  filterOutUpcoming,
+  filterUncommitted,
+  isCommitted,
+  isOverdueCommitted,
+  isUncommitted,
+  isUpcomingCommitted,
+} from "@/lib/horizonScope";
 import type { Idea, IdeaStatus } from "@/lib/types";
 
 let n = 0;
@@ -66,6 +74,65 @@ describe("isUncommitted / isCommitted", () => {
   });
 });
 
+describe("isOverdueCommitted / isUpcomingCommitted", () => {
+  const today = "2026-10-11";
+  it("past-dated items are overdue, whatever the status", () => {
+    for (const status of ["draft", "planned", "scheduled", "in_progress"] as IdeaStatus[]) {
+      const i = idea({ id: `i-${status}-past`, status, scheduled_date: "2026-10-10" });
+      assert.equal(isOverdueCommitted(i, today), true, status);
+      assert.equal(isUpcomingCommitted(i, today), false, status);
+    }
+  });
+
+  it("today and future dates are upcoming, not overdue", () => {
+    for (const date of ["2026-10-11", "2026-10-12"]) {
+      const i = idea({ id: `i-${date}`, status: "planned", scheduled_date: date });
+      assert.equal(isOverdueCommitted(i, today), false, date);
+      assert.equal(isUpcomingCommitted(i, today), true, date);
+    }
+  });
+
+  it("undated in-progress and scheduled items are upcoming", () => {
+    for (const status of ["scheduled", "in_progress"] as IdeaStatus[]) {
+      const i = idea({ id: `i-${status}`, status });
+      assert.equal(isOverdueCommitted(i, today), false, status);
+      assert.equal(isUpcomingCommitted(i, today), true, status);
+    }
+  });
+
+  it("uncommitted items are neither overdue nor upcoming", () => {
+    for (const status of ["draft", "planned"] as IdeaStatus[]) {
+      const i = idea({ id: `i-${status}`, status });
+      assert.equal(isOverdueCommitted(i, today), false, status);
+      assert.equal(isUpcomingCommitted(i, today), false, status);
+    }
+  });
+});
+
+describe("filterOutUpcoming / filterOutOverdue", () => {
+  const today = "2026-10-11";
+  it("upcoming filter keeps overdue and uncommitted", () => {
+    const overdue = idea({ id: "overdue", status: "planned", scheduled_date: "2026-10-10" });
+    const todayItem = idea({ id: "today", status: "planned", scheduled_date: today });
+    const future = idea({ id: "future", status: "draft", scheduled_date: "2026-10-12" });
+    const active = idea({ id: "active", status: "in_progress" });
+    const draft = idea({ id: "draft", status: "draft" });
+    assert.deepEqual(
+      filterOutUpcoming([overdue, todayItem, future, active, draft], today).map((i) => i.id),
+      ["overdue", "draft"],
+    );
+  });
+
+  it("overdue filter keeps upcoming and uncommitted", () => {
+    const overdue = idea({ id: "overdue", status: "planned", scheduled_date: "2026-10-10" });
+    const todayItem = idea({ id: "today", status: "planned", scheduled_date: today });
+    const draft = idea({ id: "draft", status: "draft" });
+    assert.deepEqual(
+      filterOutOverdue([overdue, todayItem, draft], today).map((i) => i.id),
+      ["today", "draft"],
+    );
+  });
+});
 describe("filterUncommitted", () => {
   it("keeps only the future decisions", () => {
     const draft = idea({ id: "draft", status: "draft" });

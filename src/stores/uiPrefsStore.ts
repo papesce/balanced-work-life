@@ -25,6 +25,10 @@ interface UiPrefsState {
   horizonUnclassifiedExpanded: boolean;
   horizonHideProjectsWithTasks: boolean;
   horizonHideCommitted: boolean;
+  /** Hide upcoming / in-motion committed work (dated today+, undated in-progress). */
+  horizonHideUpcomingCommitted: boolean;
+  /** Hide overdue committed work (dated before today). Off surfaces past-due for rescheduling. */
+  horizonHideOverdueCommitted: boolean;
   horizonShowClassificationOrder: boolean;
   cardMode: boolean;
   sidebarCollapsed: boolean | null;
@@ -67,6 +71,8 @@ export const useUiPrefsStore = create<UiPrefsState>()(
       horizonUnclassifiedExpanded: false,
       horizonHideProjectsWithTasks: true,
       horizonHideCommitted: true,
+      horizonHideUpcomingCommitted: true,
+      horizonHideOverdueCommitted: false,
       horizonShowClassificationOrder: true,
       cardMode: false,
       sidebarCollapsed: null,
@@ -87,7 +93,8 @@ export const useUiPrefsStore = create<UiPrefsState>()(
         projectsDetailHideCompleted: s.projectsDetailHideCompleted,
         horizonUnclassifiedExpanded: s.horizonUnclassifiedExpanded,
         horizonHideProjectsWithTasks: s.horizonHideProjectsWithTasks,
-        horizonHideCommitted: s.horizonHideCommitted,
+        horizonHideUpcomingCommitted: s.horizonHideUpcomingCommitted,
+        horizonHideOverdueCommitted: s.horizonHideOverdueCommitted,
         horizonShowClassificationOrder: s.horizonShowClassificationOrder,
         cardMode: s.cardMode,
         sidebarCollapsed: s.sidebarCollapsed,
@@ -96,10 +103,21 @@ export const useUiPrefsStore = create<UiPrefsState>()(
         projectLastPath: s.projectLastPath,
       }),
       merge: (persisted, current) => {
-        const p = (persisted ?? {}) as Partial<UiPrefsState>;
+        const p = (persisted ?? {}) as Partial<UiPrefsState> & { horizonHideCommitted?: boolean };
         // First run: no persisted slice yet → seed from legacy per-key entries.
         const legacy = readLegacy();
-        return { ...current, ...legacy, ...p };
+        const merged = { ...current, ...legacy, ...p };
+        // One-time migration from the single Hide committed toggle (removed):
+        // hiding everything maps to both new toggles on, showing maps to both off.
+        if (
+          p.horizonHideUpcomingCommitted === undefined &&
+          p.horizonHideOverdueCommitted === undefined &&
+          p.horizonHideCommitted !== undefined
+        ) {
+          merged.horizonHideUpcomingCommitted = p.horizonHideCommitted;
+          merged.horizonHideOverdueCommitted = p.horizonHideCommitted;
+        }
+        return merged;
       },
     },
   ),

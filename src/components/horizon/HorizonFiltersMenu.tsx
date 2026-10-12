@@ -9,18 +9,16 @@ interface FilterRow {
   label: string;
   description: string;
   checked: boolean;
-  disabled?: boolean;
   onToggle: () => void;
 }
 
 interface HorizonFiltersMenuProps {
   hideClosed: boolean;
   onToggleHideClosed: () => void;
-  hideCommitted: boolean;
-  onToggleHideCommitted: () => void;
-  /** True when the active lens always shows committed work (e.g. "Ready to move"). */
-  committedLocked: boolean;
-  committedLockedHint: string;
+  hideUpcoming: boolean;
+  onToggleHideUpcoming: () => void;
+  hideOverdue: boolean;
+  onToggleHideOverdue: () => void;
   hideProjectsWithTasks: boolean;
   onToggleHideProjectsWithTasks: () => void;
 }
@@ -32,10 +30,10 @@ interface HorizonFiltersMenuProps {
 export function HorizonFiltersMenu({
   hideClosed,
   onToggleHideClosed,
-  hideCommitted,
-  onToggleHideCommitted,
-  committedLocked,
-  committedLockedHint,
+  hideUpcoming,
+  onToggleHideUpcoming,
+  hideOverdue,
+  onToggleHideOverdue,
   hideProjectsWithTasks,
   onToggleHideProjectsWithTasks,
 }: HorizonFiltersMenuProps) {
@@ -51,14 +49,18 @@ export function HorizonFiltersMenu({
       onToggle: onToggleHideClosed,
     },
     {
-      key: "committed",
-      label: "Hide committed",
-      description: committedLocked
-        ? committedLockedHint
-        : "Hide scheduled, in-progress and dated items",
-      checked: hideCommitted,
-      disabled: committedLocked,
-      onToggle: onToggleHideCommitted,
+      key: "upcoming",
+      label: "Hide upcoming",
+      description: "Hide tasks dated today or later, plus in-progress work",
+      checked: hideUpcoming,
+      onToggle: onToggleHideUpcoming,
+    },
+    {
+      key: "overdue",
+      label: "Hide overdue",
+      description: "Hide past-due tasks; off surfaces them for rescheduling",
+      checked: hideOverdue,
+      onToggle: onToggleHideOverdue,
     },
     {
       key: "projects",
@@ -102,14 +104,8 @@ export function HorizonFiltersMenu({
               key={row.key}
               type="button"
               onClick={row.onToggle}
-              disabled={row.disabled}
               aria-pressed={row.checked}
-              title={row.disabled ? row.description : undefined}
-              className={`flex w-full items-start gap-2 px-2.5 py-1.5 text-left ${
-                row.disabled
-                  ? "cursor-not-allowed opacity-50"
-                  : "hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
-              }`}
+              className="flex w-full items-start gap-2 px-2.5 py-1.5 text-left hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
             >
               <span
                 className={`mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border ${

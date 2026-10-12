@@ -39,7 +39,12 @@ import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 import { UNCLASSIFIED, groupKeyOf, type LensColumn } from "@/components/lens";
 import { groupTreesByLens, groupSecondaryByLens } from "@/lib/horizonGrouping";
 import { getHiddenProjectIds } from "@/lib/horizonProjectVisibility";
-import { filterUncommitted, isCommitted } from "@/lib/horizonScope";
+import {
+  filterOutOverdue,
+  filterOutUpcoming,
+  isOverdueCommitted,
+  isUpcomingCommitted,
+} from "@/lib/horizonScope";
 import { type HorizonLensDef } from "@/lib/horizonLenses";
 
 const ACTIVE_STATUSES = new Set(["draft", "planned", "in_progress", "scheduled"]);
@@ -49,10 +54,12 @@ function buildFilteredTree(
   collapsedIds: Set<string>,
   hideClosed: boolean,
   hideProjectsWithTasks: boolean,
-  hideCommitted: boolean,
+  hideUpcoming: boolean,
+  hideOverdue: boolean,
 ): IdeaNode[] {
   let pool = hideClosed ? ideas.filter((i) => ACTIVE_STATUSES.has(i.status)) : ideas;
-  if (hideCommitted) pool = filterUncommitted(pool);
+  if (hideUpcoming) pool = filterOutUpcoming(pool);
+  if (hideOverdue) pool = filterOutOverdue(pool);
   if (hideProjectsWithTasks) {
     const hidden = getHiddenProjectIds(pool, ideas);
     if (hidden.size > 0) pool = pool.filter((i) => !hidden.has(i.id));
@@ -130,7 +137,8 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
   const [typePickerPos, setTypePickerPos] = useState<{ top: number; left: number } | null>(null);
   const cardMode = useUiPrefsStore((s) => s.cardMode);
   const hideProjectsWithTasks = useUiPrefsStore((s) => s.horizonHideProjectsWithTasks);
-  const hideCommittedPref = useUiPrefsStore((s) => s.horizonHideCommitted);
+  const hideUpcomingPref = useUiPrefsStore((s) => s.horizonHideUpcomingCommitted);
+  const hideOverduePref = useUiPrefsStore((s) => s.horizonHideOverdueCommitted);
   const showClassificationOrder = useUiPrefsStore((s) => s.horizonShowClassificationOrder ?? true);
   const unclassifiedExpanded = useUiPrefsStore((s) => s.horizonUnclassifiedExpanded);
   const setPrefs = useUiPrefsStore((s) => s.set);
@@ -312,11 +320,6 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
     });
   };
 
-  // Lenses that opt into committed work (e.g. "Ready to move") bypass the
-  // Hide committed filter so e.g. ready_to_complete stays visible there.
-  const lensIncludesCommitted = lens.includeCommitted === true;
-  const effectiveHideCommitted = hideCommittedPref && !lensIncludesCommitted;
-
   const allTreeNodes = useMemo(
     () =>
       buildFilteredTree(
@@ -324,9 +327,10 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
         collapsedIds,
         hideClosed,
         hideProjectsWithTasks,
-        effectiveHideCommitted,
+        hideUpcomingPref,
+        hideOverduePref,
       ),
-    [ideas, collapsedIds, hideClosed, hideProjectsWithTasks, effectiveHideCommitted],
+    [ideas, collapsedIds, hideClosed, hideProjectsWithTasks, hideUpcomingPref, hideOverduePref],
   );
 
   const priorityOf = useCallback(
@@ -500,8 +504,11 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
     if (idea && !ACTIVE_STATUSES.has(idea.status)) {
       setHideClosed(false);
     }
-    if (idea && isCommitted(idea) && effectiveHideCommitted) {
-      setPrefs({ horizonHideCommitted: false });
+    if (idea && isUpcomingCommitted(idea) && hideUpcomingPref) {
+      setPrefs({ horizonHideUpcomingCommitted: false });
+    }
+    if (idea && isOverdueCommitted(idea) && hideOverduePref) {
+      setPrefs({ horizonHideOverdueCommitted: false });
     }
     if (idea && idea.type) {
       setTypeFilter([]);
@@ -548,7 +555,8 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
     valueOf,
     setPrefs,
     hideProjectsWithTasks,
-    effectiveHideCommitted,
+    hideUpcomingPref,
+    hideOverduePref,
   ]);
 
   // Primary-only order hint (read-only): "Attention: 1 Ready to complete → 2 …".
@@ -666,10 +674,10 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
       <HorizonFiltersMenu
         hideClosed={hideClosed}
         onToggleHideClosed={() => setHideClosed((v) => !v)}
-        hideCommitted={hideCommittedPref}
-        onToggleHideCommitted={() => setPrefs({ horizonHideCommitted: !hideCommittedPref })}
-        committedLocked={lensIncludesCommitted}
-        committedLockedHint="This lens always shows committed work (scheduled, in-progress)"
+        hideUpcoming={hideUpcomingPref}
+        onToggleHideUpcoming={() => setPrefs({ horizonHideUpcomingCommitted: !hideUpcomingPref })}
+        hideOverdue={hideOverduePref}
+        onToggleHideOverdue={() => setPrefs({ horizonHideOverdueCommitted: !hideOverduePref })}
         hideProjectsWithTasks={hideProjectsWithTasks}
         onToggleHideProjectsWithTasks={() =>
           setPrefs({ horizonHideProjectsWithTasks: !hideProjectsWithTasks })
