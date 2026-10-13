@@ -2,17 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  ArrowLeft,
-  ChevronsLeft,
-  ChevronsRight,
-  Plus,
-  FileText,
-  Pencil,
-  Check,
-  X,
-  ListTree,
-} from "lucide-react";
+import { ChevronsLeft, ChevronsRight, Plus } from "lucide-react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import { useClassifications } from "@/hooks/useClassifications";
 import { TERMINAL_STATUSES } from "@/lib/constants";
@@ -22,7 +12,6 @@ import { buildLensColumns, resolveLens } from "@/lib/horizonLenses";
 import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 import { AppShell } from "@/components/AppShell";
 import { IdeaTree } from "@/components/brainstorm/IdeaTree";
-import { BrainstormBreadcrumb } from "@/components/brainstorm/BrainstormBreadcrumb";
 import { useNotes } from "@/contexts/NotesContext";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
@@ -38,9 +27,13 @@ import { LinkedEffectsReveal } from "@/components/shared/LinkedEffectsReveal";
 import { UndoBar } from "@/components/shared/UndoBar";
 import { hintForValue } from "@/lib/classificationHelp";
 import { ProjectCard } from "@/components/projects/ProjectCard";
+import {
+  ProjectDetailActions,
+  ProjectDetailStartActions,
+  ProjectDetailTop,
+} from "@/components/projects/ProjectDetailHeader";
 import { ProjectListView } from "@/components/projects/ProjectListView";
 import { ProjectPathsTab, type PathCanvasApi } from "@/components/projects/ProjectPathsTab";
-import { ProjectFiltersMenu } from "@/components/projects/ProjectFiltersMenu";
 import { TaskComposer } from "@/components/shared/TaskComposer";
 import { usePathMembership } from "@/hooks/usePathMembership";
 import { clampSplitRatio, resolveEffectiveMode, SPLIT_MIN_WIDTH } from "@/lib/projectSplit";
@@ -727,194 +720,63 @@ export default function ProjectsPage() {
         hideClosed={detailHideClosed}
       />
     );
+    const detailStat = statOf(selectedProject.id);
+    const detailNext = detailStat.nextId
+      ? (ideasHook.ideas.find((i) => i.id === detailStat.nextId) ?? null)
+      : null;
+    const detailFocusedIdea = focusedId
+      ? (ideasHook.ideas.find((i) => i.id === focusedId) ?? selectedProject)
+      : selectedProject;
     return (
       <AppShell
         title={selectedProject.text || "Untitled project"}
         fullWidth
         headerStartActions={
-          <>
-            <button
-              onClick={() => handleSelect(null)}
-              className="toolbar-btn flex items-center gap-1.5"
-            >
-              <ArrowLeft size={14} /> Back
-            </button>
-            <ProjectFiltersMenu
-              hideClosed={detailHideClosed}
-              onToggleHideClosed={() => setPrefs({ projectsDetailHideClosed: !detailHideClosed })}
-              hideCompleted={detailHideCompleted}
-              onToggleHideCompleted={() =>
-                setPrefs({ projectsDetailHideCompleted: !detailHideCompleted })
-              }
-            />
-            {effectiveMode !== "paths" && unpathedCount > 0 && (
-              <button
-                type="button"
-                onClick={() => setUnpathedOnly((v) => !v)}
-                aria-pressed={unpathedOnly}
-                title="Show only tasks that belong to no path"
-                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-                  unpathedOnly
-                    ? "border-indigo-300 bg-white text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
-                    : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
-                }`}
-              >
-                Unpathed ({unpathedCount})
-              </button>
-            )}
-          </>
+          <ProjectDetailStartActions
+            detailHideClosed={detailHideClosed}
+            detailHideCompleted={detailHideCompleted}
+            effectiveMode={effectiveMode}
+            unpathedCount={unpathedCount}
+            unpathedOnly={unpathedOnly}
+            onBack={() => handleSelect(null)}
+            onToggleHideClosed={() => setPrefs({ projectsDetailHideClosed: !detailHideClosed })}
+            onToggleHideCompleted={() =>
+              setPrefs({ projectsDetailHideCompleted: !detailHideCompleted })
+            }
+            onToggleUnpathedOnly={() => setUnpathedOnly((v) => !v)}
+          />
         }
         headerActions={
-          <div className="flex items-center gap-2">
-            <div
-              className="flex rounded-xl border border-gray-200 p-0.5 dark:border-gray-700"
-              aria-label="Project view"
-            >
-              <button
-                onClick={() => setViewMode("list")}
-                aria-pressed={effectiveMode === "list"}
-                className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${effectiveMode === "list" ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300" : "text-gray-500"}`}
-              >
-                List
-              </button>
-              {!isNarrow && (
-                <button
-                  onClick={() => setViewMode("split")}
-                  aria-pressed={effectiveMode === "split"}
-                  className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${effectiveMode === "split" ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300" : "text-gray-500"}`}
-                >
-                  Split
-                </button>
-              )}
-              <button
-                onClick={() => setViewMode("paths")}
-                aria-pressed={effectiveMode === "paths"}
-                className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${effectiveMode === "paths" ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300" : "text-gray-500"}`}
-              >
-                Paths
-              </button>
-            </div>
-            <button
-              onClick={() => openNotes(selectedId)}
-              className="toolbar-btn flex items-center gap-1.5"
-              title={selectedProject.notes?.trim() ? "Edit project details" : "Add project details"}
-              aria-label={
-                selectedProject.notes?.trim() ? "Edit project details" : "Add project details"
-              }
-            >
-              <FileText
-                size={14}
-                strokeWidth={selectedProject.notes?.trim() ? 2 : 1.5}
-                className={selectedProject.notes?.trim() ? "text-indigo-500" : ""}
-              />
-              Details
-              {selectedProject.notes?.trim() ? (
-                <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" aria-hidden />
-              ) : null}
-            </button>
-          </div>
+          <ProjectDetailActions
+            project={selectedProject}
+            effectiveMode={effectiveMode}
+            isNarrow={isNarrow}
+            onViewModeChange={setViewMode}
+            onOpenDetails={() => openNotes(selectedId)}
+          />
         }
       >
-        {breadcrumbChain.length > 0 && (
-          <div className="mb-3">
-            <BrainstormBreadcrumb
-              chain={breadcrumbChain}
-              focused={
-                focusedId
-                  ? (ideasHook.ideas.find((i) => i.id === focusedId) ?? selectedProject)
-                  : selectedProject
-              }
-              onSelect={(id) => setFocusedId(id === selectedId ? null : id)}
-            />
-          </div>
-        )}
-
-        {/* Editable project title — click to rename without leaving the view */}
-        <div className="mb-2 flex items-center gap-2">
-          {titleEditing ? (
-            <span className="flex min-w-0 flex-1 items-center gap-1.5">
-              <input
-                autoFocus
-                value={titleDraft}
-                onChange={(e) => setTitleDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void commitTitleRename();
-                  if (e.key === "Escape") setTitleEditing(false);
-                }}
-                onBlur={() => void commitTitleRename()}
-                aria-label="Rename project"
-                className="min-w-0 flex-1 rounded-lg border border-violet-300 bg-white px-2 py-1 text-lg font-bold focus:ring-2 focus:ring-violet-500/30 focus:outline-none dark:border-violet-700 dark:bg-gray-800"
-              />
-              <button
-                onClick={() => void commitTitleRename()}
-                aria-label="Save project name"
-                className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50"
-              >
-                <Check size={15} />
-              </button>
-              <button
-                onClick={() => setTitleEditing(false)}
-                aria-label="Cancel rename"
-                className="rounded-lg p-1.5 text-gray-400 hover:bg-black/5"
-              >
-                <X size={15} />
-              </button>
-            </span>
-          ) : (
-            <>
-              <h2 className="min-w-0 flex-1 truncate text-lg font-bold text-gray-900 dark:text-gray-100">
-                {selectedProject.text || "Untitled project"}
-              </h2>
-              <button
-                onClick={() => {
-                  setTitleDraft(selectedProject.text);
-                  setTitleEditing(true);
-                }}
-                title="Rename project"
-                aria-label="Rename project"
-                className="rounded-lg p-1.5 text-gray-400 hover:bg-black/5 hover:text-violet-600"
-              >
-                <Pencil size={14} />
-              </button>
-            </>
-          )}
-        </div>
-
-        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-          <span className="capitalize">{selectedProject.status.replace("_", " ")}</span>
-          <span>·</span>
-          <span>{statOf(selectedProject.id).direct} tasks</span>
-          {(() => {
-            const stat = statOf(selectedProject.id);
-            const next = stat.nextId
-              ? (ideasHook.ideas.find((i) => i.id === stat.nextId) ?? null)
-              : null;
-            return (
-              <>
-                <span>·</span>
-                <span>
-                  {stat.done}/{stat.total} done
-                </span>
-                {next && (
-                  <>
-                    <span>·</span>
-                    <span className="truncate font-semibold text-violet-600">
-                      Next: {next.text || "Untitled"}
-                    </span>
-                  </>
-                )}
-              </>
-            );
-          })()}
-          {focusedId && (
-            <button
-              onClick={() => setFocusedId(null)}
-              className="toolbar-btn flex items-center gap-1"
-            >
-              <ListTree size={12} /> Back to project root
-            </button>
-          )}
-        </div>
+        <ProjectDetailTop
+          project={selectedProject}
+          focusedIdea={detailFocusedIdea}
+          breadcrumbChain={breadcrumbChain}
+          focusedId={focusedId}
+          titleEditing={titleEditing}
+          titleDraft={titleDraft}
+          directCount={detailStat.direct}
+          doneCount={detailStat.done}
+          totalCount={detailStat.total}
+          nextText={detailNext?.text || null}
+          onSelectBreadcrumb={(id) => setFocusedId(id === selectedId ? null : id)}
+          onTitleDraftChange={setTitleDraft}
+          onCommitTitleRename={() => void commitTitleRename()}
+          onCancelTitleEdit={() => setTitleEditing(false)}
+          onStartTitleEdit={() => {
+            setTitleDraft(selectedProject.text);
+            setTitleEditing(true);
+          }}
+          onBackToRoot={() => setFocusedId(null)}
+        />
 
         {effectiveMode === "split" ? (
           <Group
