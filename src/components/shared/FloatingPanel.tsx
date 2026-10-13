@@ -66,7 +66,14 @@ export function FloatingPanel({
 
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        // Coexisting floating panels (e.g. a submenu flyout next to its
+        // parent menu) live in sibling portals — interacting with one must
+        // not dismiss the other.
+        const target = e.target as Element | null;
+        if (target instanceof Element && target.closest("[data-floating-panel]")) return;
+        onClose();
+      }
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -91,6 +98,7 @@ export function FloatingPanel({
   return createPortal(
     <div
       ref={ref}
+      data-floating-panel="true"
       style={{
         position: "fixed",
         top: pos?.top ?? anchor.top,

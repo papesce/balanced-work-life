@@ -108,6 +108,7 @@ export function MoveIdeaPanel({
         excludeIds={excludedIds}
         getTagsForIdea={getTagsForIdea}
         emptyLabel="No valid ideas"
+        excludeDone={variant === "attach"}
         showCreateOption={!!onCreateParent}
         defaultCreateType={getDefaultParentType(idea.type)}
         onCreateNew={onCreateParent ? handleCreateParent : undefined}

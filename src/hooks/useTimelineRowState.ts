@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type KeyboardEvent } from "react";
+import type { FloatingAnchor } from "@/components/shared/FloatingPanel";
 import type { Idea, IdeaStatus } from "@/lib/types";
 import { applyStatusTransition } from "@/lib/tasks/statusTransition";
 
@@ -49,8 +50,8 @@ export function useTimelineRowState({
     null,
   );
   const [tagPickerPos, setTagPickerPos] = useState<{ top: number; left: number } | null>(null);
-  const [linkPanelPos, setLinkPanelPos] = useState<{ top: number; left: number } | null>(null);
-  const [attachPos, setAttachPos] = useState<{ top: number; left: number } | null>(null);
+  const [linkPanelPos, setLinkPanelPos] = useState<FloatingAnchor | null>(null);
+  const [attachPos, setAttachPos] = useState<FloatingAnchor | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(task.text);
 

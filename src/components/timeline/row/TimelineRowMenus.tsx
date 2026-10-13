@@ -97,7 +97,13 @@ export function TimelineRowMenus({
                     <button
                       onClick={(e) => {
                         const rect = e.currentTarget.getBoundingClientRect();
-                        ui.setAttachPos({ top: rect.bottom + 4, left: rect.left });
+                        // Flyout to the left of the row so the wide picker
+                        // never lands below the menu near the viewport edge.
+                        ui.setAttachPos({
+                          top: rect.top - 4,
+                          right: window.innerWidth - rect.left + 8,
+                        });
+                        ui.setShowLinkPanel(false);
                         ui.setShowAttachPanel((v) => !v);
                       }}
                       className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
@@ -131,7 +137,11 @@ export function TimelineRowMenus({
                     <button
                       onClick={(e) => {
                         const rect = e.currentTarget.getBoundingClientRect();
-                        ui.setLinkPanelPos({ top: rect.bottom + 4, left: rect.left });
+                        ui.setLinkPanelPos({
+                          top: rect.top - 4,
+                          right: window.innerWidth - rect.left + 8,
+                        });
+                        ui.setShowAttachPanel(false);
                         ui.setShowLinkPanel((v) => !v);
                       }}
                       className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"

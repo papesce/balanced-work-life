@@ -77,7 +77,10 @@ export function PlannerRowMenus({
                     <button
                       onClick={(e) => {
                         const rect = e.currentTarget.getBoundingClientRect();
-                        ui.setAttachPos({ top: rect.bottom + 4, left: rect.left });
+                        ui.setAttachPos({
+                          top: rect.bottom + 4,
+                          right: window.innerWidth - rect.right,
+                        });
                         ui.setShowMenu(false);
                         ui.setShowAttachPanel(true);
                       }}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type KeyboardEvent } from "react";
+import type { FloatingAnchor } from "@/components/shared/FloatingPanel";
 import type { Idea, IdeaStatus, Tag } from "@/lib/types";
 import { applyStatusTransition } from "@/lib/tasks/statusTransition";
 
@@ -56,11 +57,11 @@ export function usePlannerRowState({
   const [timeMenuPos, setTimeMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAttachPanel, setShowAttachPanel] = useState(false);
-  const [attachPos, setAttachPos] = useState<{ top: number; left: number } | null>(null);
+  const [attachPos, setAttachPos] = useState<FloatingAnchor | null>(null);
   const [revealPos, setRevealPos] = useState<{ top: number; right: number } | null>(null);
   const [showReveal, setShowReveal] = useState(false);
   const [showLinkPanel, setShowLinkPanel] = useState(false);
-  const [linkPanelPos, setLinkPanelPos] = useState<{ top: number; left: number } | null>(null);
+  const [linkPanelPos, setLinkPanelPos] = useState<FloatingAnchor | null>(null);
 
   useDismissOnScrollResize(showMenu, setShowMenu);
   useDismissOnScrollResize(showStatusPicker, setShowStatusPicker);
