@@ -1,12 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useClassifications } from "@/hooks/useClassifications";
-import { TERMINAL_STATUSES } from "@/lib/constants";
-import { priorityRank, type PriorityValue } from "@/components/shared/PriorityChip";
-import { groupKeyOf, optionsForScheme } from "@/components/lens";
-import { buildLensColumns, resolveLens } from "@/lib/horizonLenses";
 import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 import { AppShell } from "@/components/AppShell";
 import { useNotes } from "@/contexts/NotesContext";
@@ -15,10 +10,11 @@ import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { useProjectActions } from "@/hooks/useProjectActions";
-import { useProjectLookups } from "@/stores/projectLookups";
+import { useProjectsDerived } from "@/hooks/useProjectsDerived";
+import { useProjectsSelection } from "@/hooks/useProjectsSelection";
+import { useProjectsSplit } from "@/hooks/useProjectsSplit";
 import { useProjectTreeStore } from "@/stores/projectTreeStore";
-import { Idea, Tag, type IdeaNode } from "@/lib/types";
-import { getAncestorChain } from "@/lib/ideaTreeFocus";
+import { Idea, Tag } from "@/lib/types";
 import { hintForValue } from "@/lib/classificationHelp";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import {
@@ -29,23 +25,14 @@ import {
 import { ProjectDetailView } from "@/components/projects/ProjectDetailView";
 import { ProjectTasksPane } from "@/components/projects/ProjectTasksPane";
 import { ProjectListView } from "@/components/projects/ProjectListView";
-import type { PathCanvasApi } from "@/components/projects/ProjectPathsTab";
 import { usePathMembership } from "@/hooks/usePathMembership";
-import { clampSplitRatio, resolveEffectiveMode, SPLIT_MIN_WIDTH } from "@/lib/projectSplit";
-import type { ProjectViewMode } from "@/stores/uiPrefsStore";
 
 export default function ProjectsPage() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const initialProjectId = searchParams.get("projectId");
   const [hideCompleted, setHideCompleted] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"all" | "open">("open");
-  const [selectedId, setSelectedId] = useState<string | null>(initialProjectId);
   const lensKey = useUiPrefsStore((s) => s.projectsLens);
   const unclassifiedExpanded = useUiPrefsStore((s) => s.projectsUnclassifiedExpanded);
   const setPrefs = useUiPrefsStore((s) => s.set);
-  // Detail focus is local-only (subtree re-root); selectedId stays the project in URL.
-  const [focusedId, setFocusedId] = useState<string | null>(null);
   // Expandable cards: which projects show inline tasks in list view.
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   // Inline rename (card title + detail header).
@@ -56,71 +43,39 @@ export default function ProjectsPage() {
   // Detail-local filters (list filters don't leak into detail).
   const detailHideCompleted = useUiPrefsStore((s) => s.projectsDetailHideCompleted);
   const detailHideClosed = useUiPrefsStore((s) => s.projectsDetailHideClosed);
-  // Split-view layout: persisted mode + ratio; narrow screens force one pane.
-  const projectViewMode = useUiPrefsStore((s) => s.projectViewMode);
-  const projectSplitRatio = useUiPrefsStore((s) => s.projectSplitRatio);
-  const [viewportWidth, setViewportWidth] = useState<number>(() =>
-    typeof window !== "undefined" ? window.innerWidth : SPLIT_MIN_WIDTH,
-  );
-  useEffect(() => {
-    const onResize = () => setViewportWidth(window.innerWidth);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-  const isNarrow = viewportWidth < SPLIT_MIN_WIDTH;
-  const effectiveMode = resolveEffectiveMode(projectViewMode, viewportWidth);
-  const [unpathedOnly, setUnpathedOnly] = useState(false);
-  // Canvas entry point reported by ProjectPathsTab (selected path + add).
-  const [canvasApi, setCanvasApi] = useState<PathCanvasApi | null>(null);
-  const handleCanvasApi = useCallback((api: PathCanvasApi | null) => setCanvasApi(api), []);
-  const handleAddToPath = useCallback(
-    (id: string) => {
-      void canvasApi?.addToPath(id);
-    },
-    [canvasApi],
-  );
-  const isInPath = useCallback((id: string) => canvasApi?.placedIds.has(id) ?? false, [canvasApi]);
-  // Bumped after divider drags / collapses so the canvas re-fits its viewport.
-  const [fitTick, setFitTick] = useState(0);
-  const fitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const bumpFit = useCallback(() => {
-    if (fitTimer.current) clearTimeout(fitTimer.current);
-    fitTimer.current = setTimeout(() => setFitTick((t) => t + 1), 200);
-  }, []);
-  useEffect(
-    () => () => {
-      if (fitTimer.current) clearTimeout(fitTimer.current);
-    },
-    [],
-  );
-  const ratioTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (ratioTimer.current) clearTimeout(ratioTimer.current);
-    },
-    [],
-  );
-  const handleListResize = useCallback(
-    (size: { asPercentage: number }) => {
-      const next = clampSplitRatio(Math.round(size.asPercentage));
-      if (ratioTimer.current) clearTimeout(ratioTimer.current);
-      ratioTimer.current = setTimeout(() => setPrefs({ projectSplitRatio: next }), 400);
-      bumpFit();
-    },
-    [bumpFit, setPrefs],
-  );
-  const setViewMode = useCallback(
-    (mode: ProjectViewMode) => {
-      setPrefs({ projectViewMode: mode });
-      bumpFit();
-    },
-    [bumpFit, setPrefs],
-  );
+  const {
+    projectSplitRatio,
+    isNarrow,
+    effectiveMode,
+    canvasApi,
+    handleCanvasApi,
+    handleAddToPath,
+    isInPath,
+    fitTick,
+    handleListResize,
+    setViewMode,
+  } = useProjectsSplit();
 
   const ideasHook = useIdeas({ scope: "all" });
   const linksHook = useIdeaLinks();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
+  const {
+    selectedId,
+    focusedId,
+    setFocusedId,
+    unpathedOnly,
+    setUnpathedOnly,
+    handleSelect,
+    breadcrumbChain,
+    focusRootId,
+  } = useProjectsSelection({
+    ideas: ideasHook.ideas,
+    loading: ideasHook.loading,
+    expandIdea: ideasHook.expandIdea,
+    setHideCompleted,
+    setStatusFilter,
+  });
   const membership = usePathMembership(selectedId ?? "");
   const { openNotes } = useNotes();
   const {
@@ -177,146 +132,32 @@ export default function ProjectsPage() {
     depth: number;
   } | null>(null);
 
-  const handleSelect = (id: string | null) => {
-    setSelectedId(id);
-    // Project navigation resets local focus + detail filters.
-    setFocusedId(null);
-    setTitleEditing(false);
-    setUnpathedOnly(false);
-    const params = new URLSearchParams(searchParams.toString());
-    if (id) params.set("projectId", id);
-    else params.delete("projectId");
-    const qs = params.toString();
-    router.replace(qs ? `/projects?${qs}` : "/projects", { scroll: false });
-    if (id) ideasHook.expandIdea(id);
-  };
-
-  useEffect(() => {
-    const pid = searchParams.get("projectId");
-    if (pid !== selectedId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- sync URL to state
-      setSelectedId(pid);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
-
-  // Handle highlight deep-link: auto-select containing project and pulse highlight
-  useEffect(() => {
-    const highlightId = searchParams.get("highlight");
-    if (!highlightId || ideasHook.loading) return;
-    const idea = ideasHook.ideas.find((i) => i.id === highlightId);
-    if (!idea) return;
-    // Guarantee the highlight target stays visible in the project list.
-    if ((TERMINAL_STATUSES as readonly string[]).includes(idea.status)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- highlight deep-link syncs selection + lifts hiding filters
-      setHideCompleted(false);
-      setStatusFilter("all");
-    }
-    const byId = new Map(ideasHook.ideas.map((i) => [i.id, i]));
-    let projectId: string | null = null;
-    if (idea.type === "project") projectId = idea.id;
-    else {
-      let cur: Idea | undefined = idea;
-      while (cur?.parent_id) {
-        const parent = byId.get(cur.parent_id);
-        if (!parent) break;
-        if (parent.type === "project") {
-          projectId = parent.id;
-          break;
-        }
-        cur = parent;
-      }
-    }
-    if (projectId) {
-      if (projectId !== selectedId) {
-        setSelectedId(projectId);
-        ideasHook.expandIdea(projectId);
-      }
-      ideasHook.expandIdea(highlightId);
-      // Expand all ancestors so highlighted node is visible
-      const chain = getAncestorChain(highlightId, ideasHook.ideas);
-      for (const anc of chain) ideasHook.expandIdea(anc.id);
-    }
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const el = document.getElementById(`idea-${highlightId}`);
-        if (el) {
-          el.classList.add("highlight-pulse");
-          setTimeout(() => el.classList.remove("highlight-pulse"), 1600);
-        }
-      });
-    });
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("highlight");
-    if (projectId) params.set("projectId", projectId);
-    const qs = params.toString();
-    router.replace(qs ? `/projects?${qs}` : "/projects", { scroll: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, ideasHook.loading]);
-
-  useEffect(() => {
-    if (selectedId && !ideasHook.loading && !ideasHook.ideas.some((i) => i.id === selectedId)) {
-      handleSelect(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ideasHook.ideas, ideasHook.loading]);
-
-  // Ensure the selected project is expanded so its tasks render even when it
-  // sits nested (default collapse depth would otherwise hide its children).
-  useEffect(() => {
-    if (selectedId && !ideasHook.loading) {
-      ideasHook.expandIdea(selectedId);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, ideasHook.loading]);
-
-  const projects = useMemo(
-    () => ideasHook.ideas.filter((i) => i.type === "project"),
-    [ideasHook.ideas],
-  );
-
-  const { columns, valueOf, valuesBySchemeKey } = useProjectLookups(
+  const {
+    columns,
+    valueOf,
+    priorityOf,
+    visibleProjects,
+    groupedProjects,
+    handleLensChange,
+    lensTabs,
+    selectedProject,
+    projectTasks,
+    pathedIds,
+    unpathedCount,
+    detailLens,
+    groupedForest,
+  } = useProjectsDerived({
+    ideas: ideasHook.ideas,
+    tree: ideasHook.tree,
     taskTagsHook,
-    { schemes, options: classificationOptions, classifications },
+    classifications: { schemes, options: classificationOptions, classifications },
     lensKey,
-  );
-
-  const priorityOf = useCallback(
-    (ideaId: string): PriorityValue =>
-      (valuesBySchemeKey.get("priority")?.get(ideaId) ?? null) as PriorityValue,
-    [valuesBySchemeKey],
-  );
-
-  const visibleProjects = useMemo(() => {
-    let list = projects;
-    if (statusFilter === "open") {
-      list = list.filter((p) => !(TERMINAL_STATUSES as readonly string[]).includes(p.status));
-    }
-    if (hideCompleted) {
-      list = list.filter((p) => p.status !== "completed");
-    }
-    return [...list].sort((a, b) => {
-      const rankDiff = priorityRank(priorityOf(a.id)) - priorityRank(priorityOf(b.id));
-      if (rankDiff !== 0) return rankDiff;
-      return b.updated_at.localeCompare(a.updated_at);
-    });
-  }, [projects, statusFilter, hideCompleted, priorityOf]);
-
-  const groupedProjects = useMemo(() => {
-    const grouped = new Map<string | null, Idea[]>();
-    for (const p of visibleProjects) {
-      const key = valueOf(p.id);
-      const list = grouped.get(key) ?? [];
-      list.push(p);
-      grouped.set(key, list);
-    }
-    return grouped;
-  }, [visibleProjects, valueOf]);
-
-  const handleLensChange = (key: string) => {
-    if (key === lensKey) return;
-    setPrefs({ projectsLens: key });
-  };
+    statusFilter,
+    hideCompleted,
+    membershipTitles: membership.titlesByIdea,
+    selectedId,
+    focusRootId,
+  });
 
   const handleSetClassification = async (id: string, value: string | null) => {
     if (lensKey === "area") return;
@@ -369,99 +210,7 @@ export default function ProjectsPage() {
     }
   };
 
-  const lensTabs = useMemo(() => {
-    const tabs: { key: string; label: string }[] = schemes
-      .filter((s) => ["term", "nnl", "moscow", "priority", "attention"].includes(s.key))
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .map((s) => ({ key: s.key, label: s.key === "term" ? "Horizon" : s.label }));
-    return [...tabs, { key: "area", label: "Area" }];
-  }, [schemes]);
-
-  const selectedProject = useMemo(
-    () => (selectedId ? (ideasHook.ideas.find((i) => i.id === selectedId) ?? null) : null),
-    [ideasHook.ideas, selectedId],
-  );
-
-  const projectTasks = useMemo(() => {
-    if (!selectedProject) return [];
-    const children = new Map<string, Idea[]>();
-    for (const idea of ideasHook.ideas) {
-      if (!idea.parent_id) continue;
-      const group = children.get(idea.parent_id) ?? [];
-      group.push(idea);
-      children.set(idea.parent_id, group);
-    }
-    const result: Idea[] = [];
-    const stack = [...(children.get(selectedProject.id) ?? [])];
-    while (stack.length) {
-      const task = stack.pop()!;
-      result.push(task);
-      stack.push(...(children.get(task.id) ?? []));
-    }
-    return result;
-  }, [ideasHook.ideas, selectedProject]);
-
-  const breadcrumbChain = useMemo(
-    () => (selectedId ? getAncestorChain(selectedId, ideasHook.ideas) : []),
-    [selectedId, ideasHook.ideas],
-  );
-
-  const pathedIds = useMemo(
-    () => new Set(membership.titlesByIdea.keys()),
-    [membership.titlesByIdea],
-  );
-  const unpathedCount = useMemo(
-    () => projectTasks.filter((t) => !pathedIds.has(t.id)).length,
-    [projectTasks, pathedIds],
-  );
-
-  // Detail TASKS grouping (Option A): bucket the focus-root's direct-child
-  // subtrees by a user-picked classification scheme. Subtrees travel intact
-  // with their top-level parent — no Horizon-style promotion.
   const tasksGroupBy = useUiPrefsStore((s) => s.projectTasksGroupBy);
-  const detailLens = useMemo(() => {
-    if (!tasksGroupBy) return null;
-    const infos = schemes.map((s) => ({
-      key: s.key,
-      label: s.label,
-      options: optionsForScheme(classificationOptions, s.id).map((o) => o.value),
-    }));
-    const { lens } = resolveLens(tasksGroupBy, infos);
-    const scheme =
-      schemes.find((s) => s.key === lens.primaryScheme) ??
-      schemes.find((s) => s.key === tasksGroupBy) ??
-      null;
-    if (!scheme) return null;
-    const columns = buildLensColumns(lens, optionsForScheme(classificationOptions, scheme.id));
-    const inner = valuesBySchemeKey.get(scheme.key);
-    return { scheme, columns, valueOf: (id: string) => inner?.get(id) ?? null };
-  }, [tasksGroupBy, schemes, classificationOptions, valuesBySchemeKey]);
-
-  const focusRootId = focusedId ?? selectedId;
-  const focusForest: IdeaNode[] = useMemo(() => {
-    if (!focusRootId) return [];
-    const findNode = (nodes: IdeaNode[]): IdeaNode | null => {
-      for (const n of nodes) {
-        if (n.id === focusRootId) return n;
-        const found = findNode(n.children);
-        if (found) return found;
-      }
-      return null;
-    };
-    return findNode(ideasHook.tree)?.children ?? [];
-  }, [ideasHook.tree, focusRootId]);
-
-  const groupedForest = useMemo(() => {
-    if (!detailLens) return null;
-    const grouped = new Map<string, IdeaNode[]>();
-    for (const node of focusForest) {
-      const key = groupKeyOf(detailLens.valueOf(node.id));
-      const list = grouped.get(key) ?? [];
-      list.push(node);
-      grouped.set(key, list);
-    }
-    return grouped;
-  }, [detailLens, focusForest]);
 
   /** Single UI entry for "new editable row": expand parent, select + edit the draft. */
   const spawnEditable = (id: string, parentId: string | null) => {
