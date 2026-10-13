@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronsLeft, ChevronsRight, Plus } from "lucide-react";
-import { Group, Panel, Separator } from "react-resizable-panels";
 import { useClassifications } from "@/hooks/useClassifications";
 import { TERMINAL_STATUSES } from "@/lib/constants";
 import { priorityRank, type PriorityValue } from "@/components/shared/PriorityChip";
@@ -11,7 +9,6 @@ import { groupKeyOf, optionsForScheme } from "@/components/lens";
 import { buildLensColumns, resolveLens } from "@/lib/horizonLenses";
 import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 import { AppShell } from "@/components/AppShell";
-import { IdeaTree } from "@/components/brainstorm/IdeaTree";
 import { useNotes } from "@/contexts/NotesContext";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
@@ -22,9 +19,6 @@ import { useProjectLookups } from "@/stores/projectLookups";
 import { useProjectTreeStore } from "@/stores/projectTreeStore";
 import { Idea, Tag, type IdeaNode } from "@/lib/types";
 import { getAncestorChain } from "@/lib/ideaTreeFocus";
-import { hasAnyEffects } from "@/lib/linkEffects";
-import { LinkedEffectsReveal } from "@/components/shared/LinkedEffectsReveal";
-import { UndoBar } from "@/components/shared/UndoBar";
 import { hintForValue } from "@/lib/classificationHelp";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import {
@@ -32,9 +26,10 @@ import {
   ProjectDetailStartActions,
   ProjectDetailTop,
 } from "@/components/projects/ProjectDetailHeader";
+import { ProjectDetailView } from "@/components/projects/ProjectDetailView";
+import { ProjectTasksPane } from "@/components/projects/ProjectTasksPane";
 import { ProjectListView } from "@/components/projects/ProjectListView";
-import { ProjectPathsTab, type PathCanvasApi } from "@/components/projects/ProjectPathsTab";
-import { TaskComposer } from "@/components/shared/TaskComposer";
+import type { PathCanvasApi } from "@/components/projects/ProjectPathsTab";
 import { usePathMembership } from "@/hooks/usePathMembership";
 import { clampSplitRatio, resolveEffectiveMode, SPLIT_MIN_WIDTH } from "@/lib/projectSplit";
 import type { ProjectViewMode } from "@/stores/uiPrefsStore";
@@ -623,103 +618,6 @@ export default function ProjectsPage() {
     const groupSchemeOptions = [...schemes]
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((s) => ({ key: s.key, label: s.label }));
-    const listPane = (
-      <div className="flex min-h-0 flex-col">
-        <div className="sticky top-0 z-10 bg-white pb-2 dark:bg-gray-950">
-          <TaskComposer
-            variant="tree"
-            placeholder={
-              composerParent
-                ? `+ Add subtask to ${composerParent.text || "untitled"}…`
-                : "+ Add task…"
-            }
-            onCreate={handleComposerAdd}
-            suggestFrom={ideasHook.ideas}
-            currentView="projects"
-          />
-          <div className="mt-1.5 flex items-center gap-1.5">
-            <label
-              htmlFor="tasks-group-by"
-              className="text-[11px] font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500"
-            >
-              Group
-            </label>
-            <select
-              id="tasks-group-by"
-              value={tasksGroupBy ?? ""}
-              onChange={(e) => setPrefs({ projectTasksGroupBy: e.target.value || null })}
-              aria-label="Group tasks by classification"
-              className="rounded-lg border border-gray-200 bg-gray-100 px-1.5 py-1 text-xs font-semibold text-gray-600 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-300"
-            >
-              <option value="">Manual</option>
-              {groupSchemeOptions.map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        {!detailLens || !groupedForest ? (
-          <IdeaTree
-            tree={ideasHook.tree}
-            {...sharedTreeProps}
-            hideIds={unpathedOnly ? pathedIds : undefined}
-            focusedId={focusedId ?? selectedId}
-          />
-        ) : (
-          <div className="flex flex-col gap-4">
-            {detailLens.columns.map((col) => {
-              const forest = groupedForest.get(groupKeyOf(col.key)) ?? [];
-              if (forest.length === 0) return null;
-              return (
-                <section key={groupKeyOf(col.key)} aria-label={col.label}>
-                  <div className="mb-1 flex items-center gap-2">
-                    <h4 className="text-xs font-bold tracking-wide text-gray-500 uppercase dark:text-gray-400">
-                      {col.label}
-                    </h4>
-                    <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[11px] font-semibold text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-                      {forest.length}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => void handleAddTaskInGroup(col.key)}
-                      title={`Add task to ${col.label}`}
-                      aria-label={`Add task to ${col.label}`}
-                      className="rounded-lg p-1 text-gray-400 hover:bg-black/5 hover:text-violet-600"
-                    >
-                      <Plus size={13} />
-                    </button>
-                  </div>
-                  <IdeaTree
-                    tree={forest}
-                    {...sharedTreeProps}
-                    hideIds={unpathedOnly ? pathedIds : undefined}
-                    focusedId={null}
-                  />
-                </section>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-    const pathsPane = (
-      <ProjectPathsTab
-        projectId={selectedProject.id}
-        tasks={projectTasks}
-        links={linksHook.links}
-        tagsForTask={taskTagsHook.getTagsForIdea}
-        onUpdateTask={updateIdea}
-        onOpenNotes={openNotes}
-        onCreateLink={(s, t, type) => createLink(s, t, type)}
-        onDeleteLink={deleteLink}
-        fillHeight={effectiveMode === "split"}
-        fitTick={fitTick}
-        onCanvasApi={handleCanvasApi}
-        hideClosed={detailHideClosed}
-      />
-    );
     const detailStat = statOf(selectedProject.id);
     const detailNext = detailStat.nextId
       ? (ideasHook.ideas.find((i) => i.id === detailStat.nextId) ?? null)
@@ -778,83 +676,51 @@ export default function ProjectsPage() {
           onBackToRoot={() => setFocusedId(null)}
         />
 
-        {effectiveMode === "split" ? (
-          <Group
-            orientation="horizontal"
-            className="flex h-[calc(100dvh-300px)] min-h-[560px] w-full"
-          >
-            <Panel
-              id="project-list"
-              defaultSize={`${clampSplitRatio(projectSplitRatio)}%`}
-              minSize="25%"
-              onResize={handleListResize}
-              className="min-w-0"
-            >
-              <div className="flex h-full min-h-0 flex-col">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="text-xs font-bold tracking-wide text-gray-500 uppercase dark:text-gray-400">
-                    Tasks
-                  </h3>
-                  <button
-                    onClick={() => setViewMode("paths")}
-                    title="Collapse list, show paths only"
-                    aria-label="Collapse list, show paths only"
-                    className="rounded-lg p-1.5 text-gray-400 hover:bg-black/5 hover:text-violet-600"
-                  >
-                    <ChevronsLeft size={14} />
-                  </button>
-                </div>
-                <div className="min-h-0 flex-1 overflow-y-auto pr-2">{listPane}</div>
-              </div>
-            </Panel>
-            <Separator
-              className="mx-1 w-2 shrink-0 cursor-col-resize rounded-full bg-gray-200 transition-colors hover:bg-violet-300 focus-visible:bg-violet-400 focus-visible:outline-none dark:bg-gray-700 dark:hover:bg-violet-700"
-              aria-label="Resize list and paths panes"
+        <ProjectDetailView
+          effectiveMode={effectiveMode}
+          projectSplitRatio={projectSplitRatio}
+          listPane={
+            <ProjectTasksPane
+              tree={ideasHook.tree}
+              treeProps={sharedTreeProps}
+              composerParentText={composerParent ? composerParent.text || "untitled" : null}
+              suggestIdeas={ideasHook.ideas}
+              onComposerAdd={(text) => void handleComposerAdd(text)}
+              tasksGroupBy={tasksGroupBy}
+              groupSchemeOptions={groupSchemeOptions}
+              onGroupByChange={(v) => setPrefs({ projectTasksGroupBy: v })}
+              groupColumns={detailLens?.columns ?? null}
+              groupValueOf={detailLens ? detailLens.valueOf : null}
+              groupedForest={groupedForest}
+              hideIds={unpathedOnly ? pathedIds : undefined}
+              focusId={focusedId ?? selectedId}
+              onAddTaskInGroup={(value) => void handleAddTaskInGroup(value)}
             />
-            <Panel id="project-paths" minSize="30%" className="min-w-0">
-              <div className="flex h-full min-h-0 flex-col">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="text-xs font-bold tracking-wide text-gray-500 uppercase dark:text-gray-400">
-                    Paths
-                  </h3>
-                  <button
-                    onClick={() => setViewMode("list")}
-                    title="Collapse paths, show list only"
-                    aria-label="Collapse paths, show list only"
-                    className="rounded-lg p-1.5 text-gray-400 hover:bg-black/5 hover:text-violet-600"
-                  >
-                    <ChevronsRight size={14} />
-                  </button>
-                </div>
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{pathsPane}</div>
-              </div>
-            </Panel>
-          </Group>
-        ) : effectiveMode === "paths" ? (
-          <div className="flex min-h-0 flex-col gap-2">
-            <TaskComposer
-              variant="tree"
-              placeholder="+ Add task to this path…"
-              onCreate={handleComposerAddToPath}
-              suggestFrom={ideasHook.ideas}
-              currentView="projects"
-            />
-            {pathsPane}
-          </div>
-        ) : (
-          listPane
-        )}
-        {completionEffects && hasAnyEffects(completionEffects.effects) && (
-          <div className="mt-4">
-            <LinkedEffectsReveal
-              effects={completionEffects.effects}
-              completedText={completionEffects.completedText}
-              onClose={() => setCompletionEffects(null)}
-            />
-          </div>
-        )}
-
-        <UndoBar undoAction={undoAction} onUndo={handleUndo} onDismiss={clearUndo} />
+          }
+          paths={{
+            projectId: selectedProject.id,
+            tasks: projectTasks,
+            links: linksHook.links,
+            tagsForTask: taskTagsHook.getTagsForIdea,
+            onUpdateTask: updateIdea,
+            onOpenNotes: openNotes,
+            onCreateLink: (s, t, type) => createLink(s, t, type),
+            onDeleteLink: deleteLink,
+            fillHeight: effectiveMode === "split",
+            fitTick,
+            onCanvasApi: handleCanvasApi,
+            hideClosed: detailHideClosed,
+          }}
+          suggestIdeas={ideasHook.ideas}
+          onComposerAddToPath={(text) => void handleComposerAddToPath(text)}
+          onListResize={handleListResize}
+          onViewModeChange={setViewMode}
+          completionEffects={completionEffects}
+          onCloseEffects={() => setCompletionEffects(null)}
+          undoAction={undoAction}
+          onUndo={handleUndo}
+          onDismissUndo={clearUndo}
+        />
       </AppShell>
     );
   }
