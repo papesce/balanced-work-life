@@ -4,10 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
-  ChevronUp,
   ChevronsLeft,
   ChevronsRight,
-  FolderKanban,
   Plus,
   FileText,
   Pencil,
@@ -19,7 +17,7 @@ import { Group, Panel, Separator } from "react-resizable-panels";
 import { useClassifications } from "@/hooks/useClassifications";
 import { TERMINAL_STATUSES } from "@/lib/constants";
 import { priorityRank, type PriorityValue } from "@/components/shared/PriorityChip";
-import { ColumnShell, groupKeyOf, optionsForScheme } from "@/components/lens";
+import { groupKeyOf, optionsForScheme } from "@/components/lens";
 import { buildLensColumns, resolveLens } from "@/lib/horizonLenses";
 import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 import { AppShell } from "@/components/AppShell";
@@ -38,10 +36,10 @@ import { getAncestorChain } from "@/lib/ideaTreeFocus";
 import { hasAnyEffects } from "@/lib/linkEffects";
 import { LinkedEffectsReveal } from "@/components/shared/LinkedEffectsReveal";
 import { UndoBar } from "@/components/shared/UndoBar";
-import { ValueHelpInfo } from "@/components/shared/ValueHelpInfo";
 import { hintForValue } from "@/lib/classificationHelp";
-import { ProjectPathsTab, type PathCanvasApi } from "@/components/projects/ProjectPathsTab";
 import { ProjectCard } from "@/components/projects/ProjectCard";
+import { ProjectListView } from "@/components/projects/ProjectListView";
+import { ProjectPathsTab, type PathCanvasApi } from "@/components/projects/ProjectPathsTab";
 import { ProjectFiltersMenu } from "@/components/projects/ProjectFiltersMenu";
 import { TaskComposer } from "@/components/shared/TaskComposer";
 import { usePathMembership } from "@/hooks/usePathMembership";
@@ -1057,168 +1055,28 @@ export default function ProjectsPage() {
     );
   };
 
-  const renderColumn = (value: string | null, label: string) => {
-    const list = groupedProjects.get(value) ?? [];
-    const isUnclassified = value === null;
-    if (isUnclassified && !unclassifiedExpanded) {
-      return (
-        <div key="unclassified-collapsed" className="glass-card rounded-2xl">
-          <div className="flex w-full items-center justify-between gap-2 px-4 py-3">
-            <button
-              onClick={() => {
-                setPrefs({ projectsUnclassifiedExpanded: true });
-              }}
-              className="flex flex-1 items-center justify-between text-sm font-semibold text-gray-500"
-            >
-              <span>Unclassified · {list.length} for triage</span>
-              <ChevronUp size={14} className="rotate-180" />
-            </button>
-            <ValueHelpInfo
-              lensKey={lensKey}
-              schemeLabel={lensTabs.find((t) => t.key === lensKey)?.label ?? "Group"}
-              columns={columns}
-              current={null}
-              onlyValue={null}
-            />
-          </div>
-        </div>
-      );
-    }
-    const collapseControl = isUnclassified ? (
-      <button
-        onClick={() => {
-          setPrefs({ projectsUnclassifiedExpanded: false });
-        }}
-        title="Collapse unclassified section"
-        aria-label="Collapse unclassified section"
-        className="rounded p-0.5 text-gray-400 hover:text-gray-600"
-      >
-        <ChevronUp size={14} />
-      </button>
-    ) : undefined;
-    return (
-      <ColumnShell
-        key={groupKeyOf(value)}
-        label={label}
-        count={list.length}
-        collapseControl={collapseControl}
-        labelSuffix={
-          <ValueHelpInfo
-            lensKey={lensKey}
-            schemeLabel={lensTabs.find((t) => t.key === lensKey)?.label ?? "Group"}
-            columns={columns}
-            current={null}
-            onlyValue={value}
-          />
-        }
-      >
-        <div className="space-y-2 p-3">
-          {list.length === 0 ? (
-            <p className="px-2 py-4 text-center text-xs text-gray-400 italic">No projects</p>
-          ) : (
-            list.map(renderProjectCard)
-          )}
-          <button
-            onClick={() => void handleAddProjectInGroup(value)}
-            className="w-full rounded-xl border border-dashed border-black/10 px-3 py-2 text-xs font-semibold text-gray-400 transition hover:border-violet-300 hover:text-violet-600 dark:border-white/10"
-          >
-            + Add to {label}
-          </button>
-        </div>
-      </ColumnShell>
-    );
-  };
-
-  const listHeaderStartActions = (
-    <>
-      <label
-        className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-100 py-1.5 pr-2.5 pl-3 text-xs font-semibold text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
-        title="Project grouping"
-      >
-        <span className="hidden sm:inline">By</span>
-        <select
-          value={lensKey}
-          onChange={(e) => handleLensChange(e.target.value)}
-          aria-label="Group projects by"
-          className="cursor-pointer bg-transparent font-semibold outline-none"
-        >
-          {lensTabs.map((t) => (
-            <option key={t.key} value={t.key}>
-              {t.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <div className="flex gap-1">
-        <button
-          type="button"
-          onClick={() => setStatusFilter("open")}
-          aria-pressed={statusFilter === "open"}
-          className={`toolbar-btn ${statusFilter === "open" ? "toolbar-btn--accent" : ""}`}
-        >
-          Open
-        </button>
-        <button
-          type="button"
-          onClick={() => setStatusFilter("all")}
-          aria-pressed={statusFilter === "all"}
-          className={`toolbar-btn ${statusFilter === "all" ? "toolbar-btn--accent" : ""}`}
-        >
-          All
-        </button>
-      </div>
-      <button
-        type="button"
-        onClick={() => setHideCompleted((v) => !v)}
-        aria-pressed={hideCompleted}
-        title="Hide completed projects"
-        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-          hideCompleted
-            ? "border-indigo-300 bg-white text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
-            : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
-        }`}
-      >
-        <span className="hidden sm:inline">Hide completed</span>
-        <span className="sm:hidden">Hide done</span>
-      </button>
-    </>
-  );
-
   return (
-    <AppShell
-      title="Projects"
-      headerStartActions={listHeaderStartActions}
-      headerActions={
-        <button
-          onClick={handleAddProject}
-          className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-violet-700"
-        >
-          <Plus size={13} /> New project
-        </button>
+    <ProjectListView
+      columns={columns}
+      groupedProjects={groupedProjects}
+      visibleCount={visibleProjects.length}
+      lensKey={lensKey}
+      lensTabs={lensTabs}
+      statusFilter={statusFilter}
+      hideCompleted={hideCompleted}
+      unclassifiedExpanded={unclassifiedExpanded}
+      undoAction={undoAction}
+      renderCard={renderProjectCard}
+      onLensChange={handleLensChange}
+      onStatusFilterChange={setStatusFilter}
+      onToggleHideCompleted={() => setHideCompleted((v) => !v)}
+      onToggleUnclassifiedExpanded={(expanded) =>
+        setPrefs({ projectsUnclassifiedExpanded: expanded })
       }
-    >
-      <div className="mx-auto max-w-2xl space-y-4">
-        <p className="text-xs text-gray-400">
-          {visibleProjects.length} project{visibleProjects.length !== 1 ? "s" : ""}
-        </p>
-
-        {visibleProjects.length === 0 ? (
-          <div className="py-16 text-center text-gray-400">
-            <FolderKanban size={28} className="mx-auto mb-3 opacity-30" />
-            <p className="text-sm font-semibold">No projects found</p>
-            <p className="mt-1 text-xs">
-              Create a project in Brainstorm with type &quot;project&quot;
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {columns.map((col) => renderColumn(col.key, col.label))}
-            {lensKey === "area" && renderColumn(null, "Unclassified")}
-          </div>
-        )}
-
-        <UndoBar undoAction={undoAction} onUndo={handleUndo} onDismiss={clearUndo} />
-      </div>
-    </AppShell>
+      onAddProject={() => void handleAddProject()}
+      onAddProjectInGroup={(value) => void handleAddProjectInGroup(value)}
+      onUndo={handleUndo}
+      onDismissUndo={clearUndo}
+    />
   );
 }
