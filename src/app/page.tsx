@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback, useRef, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Sparkles, Layers, Clock, BarChart3, EyeOff, Eye } from "lucide-react";
+import { Layers, Clock, BarChart3 } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useClassifications } from "@/hooks/useClassifications";
@@ -10,31 +10,22 @@ import { priorityRank } from "@/components/shared/PriorityChip";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { AppShell } from "@/components/AppShell";
-import { BalanceRing } from "@/components/BalanceRing";
-import { Idea, LifeArea, Tag, getAreasForIdea } from "@/lib/types";
+import { LifeArea, getAreasForIdea } from "@/lib/types";
 import { getToday } from "@/lib/dateUtils";
 import { DateNav } from "@/components/planner/DateNav";
-import { AreaFilters } from "@/components/planner/AreaFilters";
-import { DayslotTimeline } from "@/components/planner/DayslotTimeline";
-import { AreaTaskGroup } from "@/components/planner/AreaTaskGroup";
 import { UndoBar } from "@/components/shared/UndoBar";
-import { NotesIndicator } from "@/components/shared/NotesIndicator";
-import { AREA_DOT_COLORS, AREA_ORDER, AREA_LABELS } from "@/lib/constants";
-import {
-  computeReschedulePatch,
-  getDayOccurrences,
-  getTriageMeta,
-  DayOccurrence,
-  RescheduleAction,
-} from "@/lib/tasks/rescheduleTask";
 import { useUndoAction } from "@/lib/tasks/undo";
-import { useNotes } from "@/contexts/NotesContext";
-import { QuickNoteChip } from "@/components/quicknote/QuickNoteChip";
-import { formatDayLabel } from "@/components/planner/plannerUtils";
 import { PlannerDndProvider } from "@/components/planner/PlannerDnd";
-import { minutesToTimeString } from "@/components/planner/dayslotAdapter";
-import { STORAGE_KEYS, loadAreaTargets, readRawString, writeRawString } from "@/lib/storage";
+import {
+  PlannerAgendaColumn,
+  PlannerLeftColumn,
+  PlannerScheduleColumn,
+} from "@/components/planner/PlannerColumns";
+import { loadAreaTargets } from "@/lib/storage";
 import { useUiPrefsStore } from "@/stores/uiPrefsStore";
+import { usePlannerActions } from "@/hooks/usePlannerActions";
+import { usePlannerDay } from "@/hooks/usePlannerDay";
+import { useResizableColumn } from "@/hooks/useResizableColumn";
 
 export default function DailyPlannerPage() {
   return (
@@ -119,274 +110,50 @@ function DailyPlannerInner() {
   const [activeMobileTab, setActiveMobileTab] = useState<"tasks" | "schedule" | "balance">("tasks");
   const [targets] = useState<Record<LifeArea, number>>(() => loadAreaTargets());
   const [showDateInput, setShowDateInput] = useState(false);
-  const [rightColWidth, setRightColWidth] = useState<number>(() => {
-    const saved = readRawString(STORAGE_KEYS.plannerRightColWidth);
-    if (saved) {
-      const n = parseInt(saved, 10);
-      if (!isNaN(n) && n >= 320 && n <= 600) return n;
-    }
-    return 360;
-  });
-  const rightColWidthRef = useRef(rightColWidth);
-  useEffect(() => {
-    rightColWidthRef.current = rightColWidth;
-  });
+  const { rightColWidth, handleResizeStart } = useResizableColumn();
 
   const { undoAction, registerUndo, clearUndo, handleUndo } = useUndoAction();
 
-  const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startWidth = rightColWidthRef.current;
-
-    const onMouseMove = (e: MouseEvent) => {
-      const delta = startX - e.clientX;
-      const newWidth = Math.min(Math.max(startWidth + delta, 320), 600);
-      setRightColWidth(newWidth);
-    };
-    const onMouseUp = () => {
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      writeRawString(STORAGE_KEYS.plannerRightColWidth, String(rightColWidthRef.current));
-    };
-
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-  }, []);
-
   const today = getToday();
 
-  const taskIdeas = useMemo(() => ideas.filter((i) => i.type === "task"), [ideas]);
-  const scheduledTaskIdeas = useMemo(
-    () => taskIdeas.filter((i) => i.status !== "completed" && i.status !== "archived"),
-    [taskIdeas],
-  );
+  const {
+    pendingOnDate,
+    scheduledOnDate,
+    visibleDoneOnDate,
+    deferredOnDate,
+    allTasksForTimeline,
+    areaTaskCounts,
+    balanceRingCounts,
+    dayIsEmpty,
+    pendingByArea,
+    doneByArea,
+  } = usePlannerDay({
+    ideas,
+    activeDate,
+    today,
+    hideCompleted,
+    getTagsForIdea: taskTagsHook.getTagsForIdea,
+  });
 
-  const doneOnDate = useMemo(
-    () => taskIdeas.filter((i) => i.status === "completed" && i.scheduled_date === activeDate),
-    [taskIdeas, activeDate],
-  );
-
-  const visibleDoneOnDate = useMemo(
-    () => (hideCompleted ? [] : doneOnDate),
-    [doneOnDate, hideCompleted],
-  );
-
-  const pendingOnDate = useMemo(
-    () => scheduledTaskIdeas.filter((i) => i.scheduled_date === activeDate && !i.scheduled_time),
-    [scheduledTaskIdeas, activeDate],
-  );
-
-  const scheduledOnDate = useMemo(
-    () => scheduledTaskIdeas.filter((i) => i.scheduled_date === activeDate && !!i.scheduled_time),
-    [scheduledTaskIdeas, activeDate],
-  );
-
-  const deferredOnDate = useMemo(
-    () => getDayOccurrences(taskIdeas, activeDate, today).filter((o) => o.isHistorical),
-    [taskIdeas, activeDate, today],
-  );
-
-  const allTasksForTimeline = useMemo(
-    () => [...pendingOnDate, ...scheduledOnDate, ...doneOnDate],
-    [pendingOnDate, scheduledOnDate, doneOnDate],
-  );
-
-  const areaTaskCounts = useMemo(() => {
-    const counts: Record<LifeArea, { pending: number; scheduled: number; done: number }> = {
-      work: { pending: 0, scheduled: 0, done: 0 },
-      health: { pending: 0, scheduled: 0, done: 0 },
-      relationships: { pending: 0, scheduled: 0, done: 0 },
-      growth: { pending: 0, scheduled: 0, done: 0 },
-      finances: { pending: 0, scheduled: 0, done: 0 },
-      life: { pending: 0, scheduled: 0, done: 0 },
-    };
-    const duration = (t: Idea) => t.duration_minutes ?? 30;
-    for (const t of pendingOnDate) {
-      const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(t.id));
-      const effectiveAreas = areas.length > 0 ? areas : (["life"] as LifeArea[]);
-      for (const a of effectiveAreas) counts[a].pending += duration(t);
-    }
-    for (const t of scheduledOnDate) {
-      const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(t.id));
-      const effectiveAreas = areas.length > 0 ? areas : (["life"] as LifeArea[]);
-      for (const a of effectiveAreas) counts[a].scheduled += duration(t);
-    }
-    for (const t of doneOnDate) {
-      const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(t.id));
-      const effectiveAreas = areas.length > 0 ? areas : (["life"] as LifeArea[]);
-      for (const a of effectiveAreas) counts[a].done += duration(t);
-    }
-    return counts;
-  }, [pendingOnDate, scheduledOnDate, doneOnDate, taskTagsHook]);
-
-  const balanceRingCounts = useMemo(() => {
-    const counts: Record<LifeArea, number> = {
-      work: 0,
-      health: 0,
-      relationships: 0,
-      growth: 0,
-      finances: 0,
-      life: 0,
-    };
-    for (const area of AREA_ORDER)
-      counts[area] =
-        areaTaskCounts[area].pending + areaTaskCounts[area].scheduled + areaTaskCounts[area].done;
-    return counts;
-  }, [areaTaskCounts]);
-
-  const dayIsEmpty =
-    pendingOnDate.length === 0 && scheduledOnDate.length === 0 && doneOnDate.length === 0;
-
-  const visibleAreas = selectedArea ? [selectedArea] : AREA_ORDER;
-
-  // Per-area groupings shared by the render loop and the dnd-kit provider
-  // (reorder + drop-target resolution).
-  const pendingByArea = useMemo(() => {
-    const grouped = Object.fromEntries(AREA_ORDER.map((a) => [a, [] as Idea[]])) as Record<
-      LifeArea,
-      Idea[]
-    >;
-    for (const t of [...pendingOnDate, ...scheduledOnDate]) {
-      const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(t.id));
-      const effective = areas.length === 0 ? (["life"] as LifeArea[]) : areas;
-      for (const a of effective) grouped[a].push(t);
-    }
-    return grouped;
-  }, [pendingOnDate, scheduledOnDate, taskTagsHook]);
-
-  const doneByArea = useMemo(() => {
-    const grouped = Object.fromEntries(AREA_ORDER.map((a) => [a, [] as Idea[]])) as Record<
-      LifeArea,
-      Idea[]
-    >;
-    for (const t of visibleDoneOnDate) {
-      const areas = getAreasForIdea(taskTagsHook.getTagsForIdea(t.id));
-      const effective = areas.length === 0 ? (["life"] as LifeArea[]) : areas;
-      for (const a of effective) grouped[a].push(t);
-    }
-    return grouped;
-  }, [visibleDoneOnDate, taskTagsHook]);
-
-  const handleAddToArea = async (text: string, area: LifeArea) => {
-    const id = await createIdea(text, null, "bottom", {
-      type: "task",
-      scheduled_date: activeDate,
-      status: "planned",
-      productivity_signal: null,
-    });
-    // Auto-tag with the system tag for this area (created on demand if missing)
-    if (id) {
-      const systemTag = await tagsHook.getOrCreateSystemTag(area);
-      if (systemTag) await taskTagsHook.addTagToTask(id, systemTag);
-    }
-  };
-
-  const handleMoveTaskBetweenAreas = async (
-    taskId: string,
-    fromArea: LifeArea,
-    toArea: LifeArea,
-  ) => {
-    const sourceTag = tagsHook.tags.find((t) => t.is_system && t.area === fromArea);
-    if (sourceTag) await taskTagsHook.removeTagFromTask(taskId, sourceTag.id).catch(() => {});
-    const targetTag = await tagsHook.getOrCreateSystemTag(toArea);
-    if (targetTag) await taskTagsHook.addTagToTask(taskId, targetTag).catch(() => {});
-  };
-
-  const handleAttach = useCallback(
-    async (taskId: string, parentId: string) => {
-      await updateIdea(taskId, { parent_id: parentId });
-    },
-    [updateIdea],
-  );
-
-  const handleDndMoveBetweenAreas = async (
-    taskId: string,
-    fromArea: LifeArea,
-    toArea: LifeArea,
-    insertBeforeId: string | null,
-  ) => {
-    await handleMoveTaskBetweenAreas(taskId, fromArea, toArea);
-    if (insertBeforeId) {
-      const ids = pendingByArea[toArea].map((t) => t.id).filter((id) => id !== taskId);
-      const idx = ids.indexOf(insertBeforeId);
-      if (idx === -1) ids.push(taskId);
-      else ids.splice(idx, 0, taskId);
-      await reorderTasks(ids);
-    }
-  };
-
-  const handleScheduleFromDrop = (taskId: string, startMinute: number) => {
-    void updateIdea(taskId, {
-      scheduled_time: minutesToTimeString(startMinute),
-      status: "scheduled",
-    });
-  };
-
-  const handleSortInArea = (_area: LifeArea, taskIds: string[]) => {
-    void reorderTasks(taskIds);
-  };
-
-  const handleCreateScheduledTask = async (
-    text: string,
-    time: string,
-    area?: LifeArea,
-    tag?: Tag,
-  ) => {
-    const id = await createIdea(text, null, "bottom", {
-      type: "task",
-      scheduled_date: activeDate,
-      scheduled_time: time,
-      status: "scheduled",
-      productivity_signal: null,
-    });
-    if (id && area) {
-      const systemTag = await tagsHook.getOrCreateSystemTag(area);
-      if (systemTag) await taskTagsHook.addTagToTask(id, systemTag);
-    }
-    if (id && tag && !tag.is_system) {
-      await taskTagsHook.addTagToTask(id, tag);
-    }
-  };
-
-  const handleReschedule = useCallback(
-    async (id: string, action: RescheduleAction) => {
-      const idea = ideas.find((i) => i.id === id);
-      if (!idea) return;
-      const patch = computeReschedulePatch(idea, action);
-      await updateIdea(id, patch);
-    },
-    [ideas, updateIdea],
-  );
-
-  const handleDeleteTask = useCallback(
-    async (id: string) => {
-      const collectSubtree = (rootId: string): Set<string> => {
-        const ids = new Set<string>();
-        const walk = (nodeId: string) => {
-          ids.add(nodeId);
-          ideas.filter((i) => i.parent_id === nodeId).forEach((child) => walk(child.id));
-        };
-        walk(rootId);
-        return ids;
-      };
-      const deletedIds = collectSubtree(id);
-      const deletedIdeas = ideas.filter((i) => deletedIds.has(i.id));
-      await deleteIdea(id);
-      if (deletedIdeas.length === 0) return;
-      registerUndo({
-        label: deletedIdeas.length > 1 ? "Tasks deleted" : "Task deleted",
-        run: async () => {
-          await restoreIdeas(deletedIdeas);
-        },
-      });
-    },
-    [ideas, deleteIdea, restoreIdeas, registerUndo],
-  );
+  const {
+    handleAddToArea,
+    handleMoveTaskBetweenAreas,
+    handleAttach,
+    handleDndMoveBetweenAreas,
+    handleScheduleFromDrop,
+    handleSortInArea,
+    handleCreateScheduledTask,
+    handleReschedule,
+    handleDeleteTask,
+  } = usePlannerActions({
+    ideas,
+    ideasApi: { createIdea, updateIdea, deleteIdea, restoreIdeas, reorderTasks },
+    activeDate,
+    tagsHook,
+    taskTagsHook,
+    registerUndo,
+    pendingByArea,
+  });
 
   if (loading) {
     return (
@@ -448,114 +215,52 @@ function DailyPlannerInner() {
         onSchedule={handleScheduleFromDrop}
       >
         <div className="flex flex-col gap-5 md:flex-row">
-          {/* LEFT COLUMN */}{" "}
-          <div
-            className={`w-full flex-shrink-0 space-y-4 md:w-[260px] ${activeMobileTab === "balance" ? "block" : "hidden md:block"} md:sticky md:top-[53px] md:self-start`}
-          >
-            <BalanceRing
-              counts={balanceRingCounts}
-              modeLabel="Work-Life Balance Ring"
-              statLabel="Total Minutes"
-              statSub="scheduled today"
-            />
-            <AreaFilters
-              areaTaskCounts={areaTaskCounts}
-              selectedArea={selectedArea}
-              onSelectArea={(area) => setSelectedArea(selectedArea === area ? null : area)}
-              targets={targets}
-            />
-          </div>
-          {/* MIDDLE COLUMN */}
-          <div
-            className={`min-w-0 flex-1 space-y-4 ${activeMobileTab === "tasks" ? "block" : "hidden md:block"}`}
-          >
-            <div className="glass-card flex items-center justify-between gap-4 rounded-2xl border border-black/5 p-4 dark:border-white/5">
-              <div className="flex flex-col">
-                <h2 className="text-xs font-bold text-gray-700 dark:text-gray-200">
-                  {selectedArea ? `${AREA_LABELS[selectedArea]} Focus` : "Today's Agenda"}
-                </h2>
-                <p className="mt-0.5 text-[10px] font-medium text-gray-400 dark:text-gray-500">
-                  {pendingOnDate.length + scheduledOnDate.length} pending tasks ·{" "}
-                  {visibleDoneOnDate.length} completed
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <QuickNoteChip />
-                <button
-                  onClick={() => {
-                    const next = !hideCompleted;
-                    setPrefs({ plannerHideCompleted: next });
-                  }}
-                  className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-gray-100 px-3 py-1.5 text-[11px] font-bold text-gray-600 transition-all hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-                >
-                  {hideCompleted ? <Eye size={12} /> : <EyeOff size={12} />}
-                  <span>{hideCompleted ? "Show Done" : "Hide Done"}</span>
-                </button>
-                {pendingOnDate.length > 0 && (
-                  <button
-                    onClick={() => smartSortTasks(pendingOnDate, priorityRankOf)}
-                    className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-violet-50 px-3 py-1.5 text-[11px] font-bold text-violet-600 transition-all hover:bg-violet-100 dark:bg-violet-950/20 dark:text-violet-400 dark:hover:bg-violet-900/30"
-                    title="Prioritize tasks by priority score"
-                  >
-                    <Sparkles size={12} />
-                    <span>Smart Sort</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {deferredOnDate.length > 0 && (
-              <DeferredOnDateSection
-                occurrences={deferredOnDate}
-                today={today}
-                getTagsForIdea={taskTagsHook.getTagsForIdea}
-              />
-            )}
-
-            <div className="space-y-4">
-              {visibleAreas.map((area) => {
-                const pending = pendingByArea[area];
-                const done = doneByArea[area];
-                if (
-                  pending.length === 0 &&
-                  done.length === 0 &&
-                  selectedArea !== area &&
-                  !dayIsEmpty
-                )
-                  return null;
-                return (
-                  <AreaTaskGroup
-                    key={area}
-                    area={area}
-                    pendingTasks={pending}
-                    doneTasks={done}
-                    onDone={markDone}
-                    onUndone={markUndone}
-                    onUpdate={updateIdea}
-                    onReschedule={handleReschedule}
-                    onDelete={handleDeleteTask}
-                    onAddTask={handleAddToArea}
-                    onMoveTaskBetweenAreas={handleMoveTaskBetweenAreas}
-                    getTagsForIdea={taskTagsHook.getTagsForIdea}
-                    allTags={tagsHook.tags}
-                    onCreateTag={tagsHook.createTag}
-                    onAddTag={async (ideaId, tag) => {
-                      await taskTagsHook.addTagToTask(ideaId, tag);
-                    }}
-                    onRemoveTag={async (ideaId, tagId) => {
-                      await taskTagsHook.removeTagFromTask(ideaId, tagId);
-                    }}
-                    onUndoAction={registerUndo}
-                    onAttach={handleAttach}
-                    allIdeas={ideas}
-                    links={linksHook.links}
-                    onCreateLink={linksHook.createLink}
-                    onDeleteLink={linksHook.deleteLink}
-                  />
-                );
-              })}
-            </div>
-          </div>
+          <PlannerLeftColumn
+            balanceRingCounts={balanceRingCounts}
+            areaTaskCounts={areaTaskCounts}
+            selectedArea={selectedArea}
+            onSelectArea={setSelectedArea}
+            targets={targets}
+            activeMobileTab={activeMobileTab}
+          />
+          <PlannerAgendaColumn
+            selectedArea={selectedArea}
+            pendingCount={pendingOnDate.length}
+            scheduledCount={scheduledOnDate.length}
+            completedCount={visibleDoneOnDate.length}
+            hideCompleted={hideCompleted}
+            onToggleHideCompleted={() => setPrefs({ plannerHideCompleted: !hideCompleted })}
+            canSmartSort={pendingOnDate.length > 0}
+            onSmartSort={() => smartSortTasks(pendingOnDate, priorityRankOf)}
+            deferredOccurrences={deferredOnDate}
+            today={today}
+            getTagsForIdea={taskTagsHook.getTagsForIdea}
+            pendingByArea={pendingByArea}
+            doneByArea={doneByArea}
+            dayIsEmpty={dayIsEmpty}
+            activeMobileTab={activeMobileTab}
+            onDone={markDone}
+            onUndone={markUndone}
+            onUpdate={updateIdea}
+            onReschedule={handleReschedule}
+            onDelete={handleDeleteTask}
+            onAddTask={handleAddToArea}
+            onMoveTaskBetweenAreas={handleMoveTaskBetweenAreas}
+            allTags={tagsHook.tags}
+            onCreateTag={tagsHook.createTag}
+            onAddTag={async (ideaId, tag) => {
+              await taskTagsHook.addTagToTask(ideaId, tag);
+            }}
+            onRemoveTag={async (ideaId, tagId) => {
+              await taskTagsHook.removeTagFromTask(ideaId, tagId);
+            }}
+            onUndoAction={registerUndo}
+            onAttach={handleAttach}
+            allIdeas={ideas}
+            links={linksHook.links}
+            onCreateLink={linksHook.createLink}
+            onDeleteLink={linksHook.deleteLink}
+          />
           {/* RESIZE HANDLE */}
           <div
             onMouseDown={handleResizeStart}
@@ -567,137 +272,34 @@ function DailyPlannerInner() {
               <div className="h-[3px] w-[3px] rounded-full bg-gray-400 group-hover:bg-violet-400 dark:bg-gray-500" />
             </div>
           </div>
-          {/* RIGHT COLUMN */}
-          <div
-            style={{ "--right-col-width": `${rightColWidth}px` } as React.CSSProperties}
-            className={`resizable-right-col flex w-full flex-shrink-0 flex-col gap-4 ${
-              activeMobileTab === "schedule" ? "block" : "hidden lg:flex"
-            }`}
-          >
-            <div className="min-h-[400px] flex-1">
-              <DayslotTimeline
-                activeDate={activeDate}
-                allTasks={allTasksForTimeline}
-                onUpdateTask={updateIdea}
-                onCreateTask={handleCreateScheduledTask}
-                getTagsForIdea={taskTagsHook.getTagsForIdea}
-                tags={tagsHook.tags}
-                selectedArea={selectedArea}
-                onAddTag={async (ideaId, tag) => {
-                  await taskTagsHook.addTagToTask(ideaId, tag);
-                }}
-                onRemoveTag={async (ideaId, tagId) => {
-                  await taskTagsHook.removeTagFromTask(ideaId, tagId);
-                }}
-                onCreateTag={async (name, area) => {
-                  const tag = await tagsHook.createTag(name, area);
-                  return tag ?? null;
-                }}
-                onSelectEvent={(eventId) => {
-                  const params = new URLSearchParams(searchParams.toString());
-                  params.set("highlight", eventId);
-                  router.replace(`/?${params.toString()}`, { scroll: false });
-                }}
-              />
-            </div>
-          </div>
+          <PlannerScheduleColumn
+            activeDate={activeDate}
+            allTasks={allTasksForTimeline}
+            onUpdateTask={updateIdea}
+            onCreateTask={handleCreateScheduledTask}
+            getTagsForIdea={taskTagsHook.getTagsForIdea}
+            tags={tagsHook.tags}
+            selectedArea={selectedArea}
+            onAddTag={async (ideaId, tag) => {
+              await taskTagsHook.addTagToTask(ideaId, tag);
+            }}
+            onRemoveTag={async (ideaId, tagId) => {
+              await taskTagsHook.removeTagFromTask(ideaId, tagId);
+            }}
+            onCreateTag={async (name, area) => {
+              const tag = await tagsHook.createTag(name, area);
+              return tag ?? null;
+            }}
+            onSelectEvent={(eventId) => {
+              const params = new URLSearchParams(searchParams.toString());
+              params.set("highlight", eventId);
+              router.replace(`/?${params.toString()}`, { scroll: false });
+            }}
+            activeMobileTab={activeMobileTab}
+            rightColWidth={rightColWidth}
+          />
         </div>
       </PlannerDndProvider>
     </AppShell>
-  );
-}
-
-function DeferredOnDateSection({
-  occurrences,
-  today,
-  getTagsForIdea,
-}: {
-  occurrences: DayOccurrence[];
-  today: string;
-  getTagsForIdea: (ideaId: string) => Tag[];
-}) {
-  const { openNotes } = useNotes();
-  const router = useRouter();
-  return (
-    <div className="glass-card overflow-hidden rounded-2xl border border-amber-200/40 dark:border-amber-800/30">
-      <div className="flex items-center gap-2 border-b border-amber-200/30 bg-amber-50/40 px-4 py-3 dark:border-amber-800/20 dark:bg-amber-950/10">
-        <Clock size={13} className="text-amber-500" />
-        <h2 className="text-xs font-bold text-amber-700 dark:text-amber-400">
-          Deferred to this day
-        </h2>
-        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:bg-amber-900/40 dark:text-amber-400">
-          {occurrences.length}
-        </span>
-      </div>
-      <div className="space-y-1 p-2">
-        {occurrences.map(({ task }) => {
-          const meta = getTriageMeta(task);
-          const tags = getTagsForIdea(task.id);
-          const movedLabel = task.scheduled_date
-            ? `Moved to ${formatDayLabel(task.scheduled_date, today)}`
-            : meta.movedToLabel;
-          const visibleTags = tags.slice(0, 2);
-          return (
-            <div
-              key={task.id}
-              className="group flex items-center gap-2 rounded-xl border border-black/5 bg-white/60 px-2.5 py-1.5 transition-colors hover:bg-black/[0.015] dark:border-white/5 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]"
-            >
-              <span
-                title={movedLabel}
-                className="min-w-0 flex-1 truncate text-left text-[13px] font-semibold text-gray-700 dark:text-gray-200"
-              >
-                {task.text}
-              </span>
-              {task.scheduled_date ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.push(`/?date=${task.scheduled_date}&highlight=${task.id}`, {
-                      scroll: false,
-                    })
-                  }
-                  title={`${movedLabel} · Go to live task`}
-                  className="flex-shrink-0 cursor-pointer text-[10px] text-gray-400 tabular-nums hover:text-violet-600 hover:underline dark:text-gray-500 dark:hover:text-violet-400"
-                >
-                  {`→ ${formatDayLabel(task.scheduled_date, today)}`}
-                </button>
-              ) : (
-                <span
-                  title={movedLabel}
-                  className="flex-shrink-0 text-[10px] text-gray-400 tabular-nums dark:text-gray-500"
-                >
-                  {meta.movedToLabel}
-                </span>
-              )}
-              {visibleTags.length > 0 && (
-                <span className="hidden flex-shrink-0 items-center gap-1 sm:flex">
-                  {visibleTags.map((tag) => (
-                    <span
-                      key={tag.id}
-                      title={tag.name}
-                      className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold"
-                    >
-                      <span
-                        className={`inline-block h-1.5 w-1.5 rounded-full ${AREA_DOT_COLORS[tag.area]}`}
-                      />
-                      <span className="max-w-[80px] truncate">{tag.name}</span>
-                    </span>
-                  ))}
-                  {tags.length > visibleTags.length && (
-                    <span className="text-[9px] font-bold text-gray-400">
-                      +{tags.length - visibleTags.length}
-                    </span>
-                  )}
-                </span>
-              )}
-              <span className="flex-shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                Deferred
-              </span>
-              <NotesIndicator hasNotes={!!task.notes?.trim()} onClick={() => openNotes(task.id)} />
-            </div>
-          );
-        })}
-      </div>
-    </div>
   );
 }
