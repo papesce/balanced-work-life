@@ -1,289 +1,30 @@
 "use client";
-/* eslint-disable react-hooks/preserve-manual-memoization */
 
-import {
-  useMemo,
-  useRef,
-  useEffect,
-  useLayoutEffect,
-  useState,
-  useCallback,
-  Suspense,
-  type ReactNode,
-} from "react";
+import { useRef, useEffect, useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { motion } from "framer-motion";
-import { Sparkles, Clock, CalendarRange, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { Clock } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useClassifications } from "@/hooks/useClassifications";
-import { priorityRank } from "@/components/shared/PriorityChip";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { AppShell } from "@/components/AppShell";
-import { FloatingPanel } from "@/components/shared/FloatingPanel";
-import { MiniBalanceBar } from "@/components/MiniBalanceBar";
-import { Idea, LifeArea } from "@/lib/types";
-import {
-  getToday,
-  getTomorrow,
-  getDatesRange,
-  getMonthCalendarGrid,
-  getWindowRange,
-  isPast,
-  isPlanDate,
-  addDays,
-  addMonths,
-  daysBetween,
-} from "@/lib/dateUtils";
-import {
-  computeReschedulePatch,
-  getDayOccurrences,
-  isActiveOccurrence,
-  DayOccurrence,
-  RescheduleAction,
-} from "@/lib/tasks/rescheduleTask";
-import { STORAGE_KEYS, readJson, writeJson } from "@/lib/storage";
+import { LifeArea } from "@/lib/types";
+import { getToday, getTomorrow, isPlanDate } from "@/lib/dateUtils";
+import { STORAGE_KEYS, writeJson } from "@/lib/storage";
 import { useUndoAction } from "@/lib/tasks/undo";
-import { DayTaskList } from "@/components/timeline/DayTaskList";
 import { MonthGridView } from "@/components/timeline/MonthGridView";
 import { WeekStripView, type WeekCardPreview } from "@/components/timeline/WeekStripView";
-import { QuickAddInput } from "@/components/timeline/QuickAddInput";
 import { UndoBar } from "@/components/shared/UndoBar";
-import { DateChip } from "@/components/shared/DateChip";
 import { DateNav } from "@/components/planner/DateNav";
-import {
-  formatTimelineDate,
-  formatDayTitle,
-  getTimelineKicker,
-} from "@/components/timeline/timelineUtils";
-import { getCompletionEffects, hasAnyEffects } from "@/lib/linkEffects";
+import { hasAnyEffects } from "@/lib/linkEffects";
+import { useTimelineActions } from "@/hooks/useTimelineActions";
+import { useTimelineModel } from "@/hooks/useTimelineModel";
 import { useCompletionEffects } from "@/stores/feedbackStore";
 import { LinkedEffectsReveal } from "@/components/shared/LinkedEffectsReveal";
-
-const cardVariants = {
-  hidden: { opacity: 0, y: 12 },
-  visible: (i: number) =>
-    ({
-      opacity: 1,
-      y: 0,
-      transition: { delay: Math.min(i, 5) * 0.06, duration: 0.35, ease: "easeOut" },
-    }) as const,
-};
-
-interface TimelinePreset {
-  id: string;
-  label: string;
-  description: string;
-  group: string;
-  before: string;
-  after: string;
-  beforeDays?: number;
-  afterDays?: number;
-  beforeMonths?: number;
-  afterMonths?: number;
-}
-
-const TIMELINE_PRESETS: readonly TimelinePreset[] = [
-  {
-    id: "focus",
-    label: "Focus",
-    description: "A narrow window around today",
-    group: "Short",
-    before: "3 days",
-    after: "2 weeks",
-    beforeDays: 3,
-    afterDays: 14,
-  },
-  {
-    id: "planning",
-    label: "Planning",
-    description: "Near-term planning",
-    group: "Medium",
-    before: "1 week",
-    after: "1 month",
-    beforeDays: 7,
-    afterMonths: 1,
-  },
-  {
-    id: "review",
-    label: "Review",
-    description: "Step back and review recent work",
-    group: "Long",
-    before: "1 month",
-    after: "3 months",
-    beforeMonths: 1,
-    afterMonths: 3,
-  },
-  {
-    id: "horizon",
-    label: "Horizon",
-    description: "Long-range visibility",
-    group: "Extended",
-    before: "3 months",
-    after: "6 months",
-    beforeMonths: 3,
-    afterMonths: 6,
-  },
-] as const;
-
-type TimelinePresetId = (typeof TIMELINE_PRESETS)[number]["id"];
-
-const DEFAULT_PRESET: TimelinePresetId = "focus";
-const MAX_SHOW_ALL_DAYS = 60;
-const FOCUS_BACK_DAYS = 7;
-const FOCUS_FORWARD_DAYS = 31;
-
-type RenderUnit = { kind: "day"; date: string } | { kind: "gap"; count: number };
-
-type TimelineView = "agenda" | "week" | "month";
-
-function AnchorReadyMarker({
-  date,
-  onReady,
-  enabled,
-  children,
-}: {
-  date: string;
-  onReady: (date: string, node: HTMLDivElement) => void;
-  enabled: boolean;
-  children: ReactNode;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useLayoutEffect(() => {
-    if (enabled && ref.current) onReady(date, ref.current);
-  }, [date, enabled, onReady]);
-
-  return <div ref={ref}>{children}</div>;
-}
-
-interface TimelinePrefs {
-  filter: "all" | "deferred";
-  preset: TimelinePresetId;
-  view: TimelineView;
-  weekCardPreview?: WeekCardPreview;
-  pastRange?: string;
-  futureRange?: string;
-}
-
-const WEEK_CARD_PREVIEW_IDS: WeekCardPreview[] = ["top", "times", "status", "priority"];
-
-function loadPrefs(): TimelinePrefs {
-  const stored = readJson<Partial<TimelinePrefs>>(STORAGE_KEYS.timelinePrefs) ?? {};
-  const presetIds: string[] = TIMELINE_PRESETS.map((r) => r.id);
-  const legacyPreset = stored.preset as string | undefined;
-  const legacyPast = stored.pastRange as string | undefined;
-  const legacyFuture = stored.futureRange as string | undefined;
-  const migratedPreset =
-    legacyPast === "3days" && legacyFuture === "2weeks"
-      ? "focus"
-      : legacyPast === "week" && legacyFuture === "month"
-        ? "planning"
-        : legacyPast === "month" && legacyFuture === "quarter"
-          ? "review"
-          : legacyPast === "quarter" && legacyFuture === "6months"
-            ? "horizon"
-            : undefined;
-  return {
-    filter: stored.filter === "deferred" ? "deferred" : "all",
-    preset: presetIds.includes(legacyPreset ?? "")
-      ? (legacyPreset as TimelinePresetId)
-      : (migratedPreset ?? DEFAULT_PRESET),
-    view: stored.view === "week" || stored.view === "month" ? stored.view : "agenda",
-    weekCardPreview: WEEK_CARD_PREVIEW_IDS.includes(stored.weekCardPreview as WeekCardPreview)
-      ? (stored.weekCardPreview as WeekCardPreview)
-      : "top",
-  };
-}
-
-function RangeWindowDropdown({
-  preset,
-  counts,
-  spans,
-  open,
-  onToggle,
-  onClose,
-  onSelect,
-}: {
-  preset: TimelinePresetId;
-  counts: Record<string, string>;
-  spans: Record<string, string>;
-  open: boolean;
-  onToggle: () => void;
-  onClose: () => void;
-  onSelect: (id: TimelinePresetId) => void;
-}) {
-  const selected = TIMELINE_PRESETS.find((option) => option.id === preset) ?? TIMELINE_PRESETS[0];
-  const [detailId, setDetailId] = useState<TimelinePresetId | null>(null);
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
-  const detail = TIMELINE_PRESETS.find((option) => option.id === detailId);
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          setMenuPos({ top: rect.bottom + 6, left: rect.left });
-          onToggle();
-        }}
-        className={`toolbar-btn gap-1.5 px-2.5 ${open ? "toolbar-btn--accent" : "hover:text-gray-600 dark:hover:text-gray-300"}`}
-      >
-        <CalendarRange size={13} />
-        <span>
-          {selected.label}{" "}
-          <span className="text-[10px] opacity-60">
-            (−{selected.before} / +{selected.after})
-          </span>
-        </span>
-        <ChevronDown size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && menuPos && (
-        <FloatingPanel
-          anchor={menuPos}
-          onClose={onClose}
-          className="glass-card-strong min-w-[250px] rounded-xl border border-black/5 p-1.5 shadow-xl dark:border-white/5"
-        >
-          {TIMELINE_PRESETS.map((r, index) => (
-            <div key={r.id}>
-              {(index === 0 || r.group !== TIMELINE_PRESETS[index - 1].group) && (
-                <div className="px-2.5 pt-2 pb-1 text-[9px] font-bold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500">
-                  {r.group} window
-                </div>
-              )}
-              <button
-                onClick={() => onSelect(r.id)}
-                onMouseEnter={() => setDetailId(r.id as TimelinePresetId)}
-                onFocus={() => setDetailId(r.id as TimelinePresetId)}
-                className={`flex w-full cursor-pointer items-start justify-between gap-3 rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold transition-colors ${
-                  r.id === preset
-                    ? "bg-violet-50 text-violet-600 dark:bg-violet-950/20 dark:text-violet-400"
-                    : "text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                }`}
-              >
-                <span>
-                  <span className="font-bold">{r.label}</span>
-                  <span className="mt-0.5 block text-[10px] font-normal text-gray-400">
-                    {r.description}
-                  </span>
-                </span>
-                {r.id === preset && <span className="mt-0.5 text-violet-500">✓</span>}
-              </button>
-            </div>
-          ))}
-          {detail && (
-            <div className="mt-1 border-t border-black/5 px-2.5 pt-2 pb-1 text-[10px] text-gray-500 dark:border-white/5 dark:text-gray-400">
-              <div className="font-semibold text-gray-600 dark:text-gray-300">
-                {detail.label} · {spans[detail.id]}
-              </div>
-              <div className="mt-0.5">{counts[detail.id] ?? "0 before · 0 after"}</div>
-            </div>
-          )}
-        </FloatingPanel>
-      )}
-    </div>
-  );
-}
+import { AgendaDayCard, AgendaGap } from "@/components/timeline/AgendaDayCard";
+import { TimelineFloatingControls, TimelineToolbar } from "@/components/timeline/TimelineToolbar";
+import { loadTimelinePrefs, type TimelinePresetId, type TimelineView } from "@/lib/timelinePresets";
 
 export default function TimelinePage() {
   return (
@@ -311,13 +52,6 @@ function TimelineInner() {
   const taskTagsHook = useTaskTags();
   const linksHook = useIdeaLinks();
   const { getOptionForIdea } = useClassifications();
-  const priorityRankOf = useCallback(
-    (ideaId: string) =>
-      priorityRank(
-        (getOptionForIdea(ideaId, "priority")?.value ?? null) as "high" | "medium" | "low" | null,
-      ),
-    [getOptionForIdea],
-  );
   const scrolledAnchorRef = useRef<string | null>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
   const todayRef = useRef<HTMLDivElement>(null);
@@ -325,11 +59,11 @@ function TimelineInner() {
   const [showDateInput, setShowDateInput] = useState(false);
   const [windowMenuOpen, setWindowMenuOpen] = useState(false);
   const [rangeFlash, setRangeFlash] = useState(false);
-  const [filter, setFilter] = useState<"all" | "deferred">(() => loadPrefs().filter);
-  const [preset, setPreset] = useState<TimelinePresetId>(() => loadPrefs().preset);
-  const [view, setView] = useState<TimelineView>(() => loadPrefs().view);
+  const [filter, setFilter] = useState<"all" | "deferred">(() => loadTimelinePrefs().filter);
+  const [preset, setPreset] = useState<TimelinePresetId>(() => loadTimelinePrefs().preset);
+  const [view, setView] = useState<TimelineView>(() => loadTimelinePrefs().view);
   const [weekCardPreview, setWeekCardPreview] = useState<WeekCardPreview>(
-    () => loadPrefs().weekCardPreview ?? "top",
+    () => loadTimelinePrefs().weekCardPreview ?? "top",
   );
   const [quickAddArea, setQuickAddArea] = useState<LifeArea | null>(null);
   const [anchorVisible, setAnchorVisible] = useState(true);
@@ -343,136 +77,19 @@ function TimelineInner() {
   const anchorParam = searchParams.get("date");
   const anchor = anchorParam && /^\d{4}-\d{2}-\d{2}$/.test(anchorParam) ? anchorParam : today;
   const highlightId = searchParams.get("highlight");
-  const selectedPreset = TIMELINE_PRESETS.find((r) => r.id === preset) ?? TIMELINE_PRESETS[0];
-  const lookbackDays = selectedPreset.beforeMonths
-    ? daysBetween(addMonths(anchor, -selectedPreset.beforeMonths), anchor)
-    : (selectedPreset.beforeDays ?? 3);
-  const forwardDays = selectedPreset.afterMonths
-    ? daysBetween(anchor, addMonths(anchor, selectedPreset.afterMonths))
-    : (selectedPreset.afterDays ?? 14);
-  const extendedRange = lookbackDays !== 3 || forwardDays !== 14;
-  const dates = useMemo(
-    () => getDatesRange(lookbackDays, forwardDays, anchor),
-    [lookbackDays, forwardDays, anchor],
-  );
-  const hasRevisitDates = dates.some((d) => d <= today);
-  const effectiveFilter = hasRevisitDates ? filter : "all";
-  const tasks = useMemo(() => ideas.filter((i) => i.type === "task"), [ideas]);
 
-  const monthGridDates = useMemo(() => getMonthCalendarGrid(anchor), [anchor]);
-  const weekStart = useMemo(() => getWindowRange("week", anchor).start, [anchor]);
-  const weekDates = useMemo(() => getDatesRange(0, 6, weekStart), [weekStart]);
-
-  const occurrencesByDate = useMemo(() => {
-    const map: Record<string, DayOccurrence[]> = {};
-    const allVisible = new Set<string>([...dates, ...monthGridDates, ...weekDates]);
-    for (const date of allVisible) {
-      const occurrences = getDayOccurrences(tasks, date, today, true);
-      map[date] =
-        effectiveFilter === "deferred" && date <= today
-          ? occurrences.filter(isActiveOccurrence)
-          : occurrences;
-    }
-    return map;
-  }, [tasks, dates, monthGridDates, weekDates, today, effectiveFilter]);
-
-  const rangeCounts = useMemo(() => {
-    const dateCounts: Record<string, number> = {};
-    const maxBeforeDays = Math.max(
-      ...TIMELINE_PRESETS.map((r) =>
-        r.beforeMonths
-          ? daysBetween(addMonths(anchor, -r.beforeMonths), anchor)
-          : (r.beforeDays ?? 0),
-      ),
-    );
-    const maxAfterDays = Math.max(
-      ...TIMELINE_PRESETS.map((r) =>
-        r.afterMonths ? daysBetween(anchor, addMonths(anchor, r.afterMonths)) : (r.afterDays ?? 0),
-      ),
-    );
-    const spanDates = getDatesRange(maxBeforeDays, maxAfterDays, anchor);
-    for (const date of spanDates) {
-      const occs = getDayOccurrences(tasks, date, today, true);
-      dateCounts[date] =
-        effectiveFilter === "deferred" && date <= today
-          ? occs.filter(isActiveOccurrence).length
-          : occs.length;
-    }
-    const countPast = (days: number) =>
-      getDatesRange(days, 0, anchor).reduce(
-        (n, d) => (d < anchor ? n + (dateCounts[d] ?? 0) : n),
-        0,
-      );
-    const countFuture = (days: number) =>
-      getDatesRange(0, days, anchor).reduce(
-        (n, d) => (d > anchor ? n + (dateCounts[d] ?? 0) : n),
-        0,
-      );
-    const past: Record<string, number> = {};
-    const future: Record<string, number> = {};
-    for (const r of TIMELINE_PRESETS) {
-      const beforeDays = r.beforeMonths
-        ? daysBetween(addMonths(anchor, -r.beforeMonths), anchor)
-        : (r.beforeDays ?? 0);
-      const afterDays = r.afterMonths
-        ? daysBetween(anchor, addMonths(anchor, r.afterMonths))
-        : (r.afterDays ?? 0);
-      past[r.id] = countPast(beforeDays);
-      future[r.id] = countFuture(afterDays);
-    }
-    return { past, future };
-  }, [tasks, anchor, today, effectiveFilter]);
-
-  const rangeSpans = useMemo(() => {
-    const formatSpan = (d: string) =>
-      new Date(d + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
-    const spans: Record<string, string> = {};
-    for (const r of TIMELINE_PRESETS) {
-      const before = r.beforeMonths
-        ? addMonths(anchor, -r.beforeMonths)
-        : addDays(anchor, -(r.beforeDays ?? 0));
-      const after = r.afterMonths
-        ? addMonths(anchor, r.afterMonths)
-        : addDays(anchor, r.afterDays ?? 0);
-      spans[r.id] = `${formatSpan(before)} – ${formatSpan(after)}`;
-    }
-    return spans;
-  }, [anchor]);
-
-  const renderPlan = useMemo((): RenderUnit[] => {
-    if (!extendedRange || dates.length <= MAX_SHOW_ALL_DAYS) {
-      return dates.map((d) => ({ kind: "day", date: d }));
-    }
-    const anchorIndex = dates.indexOf(anchor);
-    const plan: RenderUnit[] = [];
-    let gapCount = 0;
-    const flushGap = () => {
-      if (gapCount > 0) {
-        plan.push({ kind: "gap", count: gapCount });
-        gapCount = 0;
-      }
-    };
-    dates.forEach((date, i) => {
-      const hasOccurrences = (occurrencesByDate[date]?.length ?? 0) > 0;
-      const withinFocus =
-        anchorIndex >= 0 &&
-        i >= anchorIndex - FOCUS_BACK_DAYS &&
-        i <= anchorIndex + FOCUS_FORWARD_DAYS;
-      if (hasOccurrences || withinFocus) {
-        flushGap();
-        plan.push({ kind: "day", date });
-      } else {
-        gapCount += 1;
-      }
-    });
-    flushGap();
-    return plan;
-  }, [dates, occurrencesByDate, extendedRange, anchor]);
-
-  const noDeferredActivity =
-    effectiveFilter === "deferred" &&
-    extendedRange &&
-    !dates.some((d) => (occurrencesByDate[d]?.length ?? 0) > 0);
+  const {
+    dates,
+    hasRevisitDates,
+    effectiveFilter,
+    monthGridDates,
+    weekDates,
+    occurrencesByDate,
+    rangeCounts,
+    rangeSpans,
+    renderPlan,
+    noDeferredActivity,
+  } = useTimelineModel({ ideas, anchor, today, preset, filter });
 
   const handleFilterChange = (id: "all" | "deferred") => {
     setFilter(id);
@@ -548,106 +165,28 @@ function TimelineInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- highlight deep-link runs once per highlightId
   }, [highlightId, anchor, loading, renderedAnchor, router, searchParams]);
 
-  const handleQuickAdd = async (text: string, date: string, area: LifeArea | null) => {
-    const past = isPast(date);
-    const id = await createIdea(text, null, "bottom", {
-      type: "task",
-      scheduled_date: date,
-      status: past ? "completed" : "planned",
-      ...(past ? { completed_at: new Date().toISOString() } : {}),
-    });
-    if (id && area) {
-      const tag = await tagsHook.getOrCreateSystemTag(area);
-      if (tag) await taskTagsHook.addTagToTask(id, tag);
-    }
-  };
-
-  const handleReschedule = useCallback(
-    async (id: string, action: RescheduleAction) => {
-      const idea = ideas.find((i) => i.id === id);
-      if (!idea) return;
-      const patch = computeReschedulePatch(idea, action);
-      await updateIdea(id, patch);
-    },
-    [ideas, updateIdea],
-  );
-
-  const handleDone = useCallback(
-    async (id: string) => {
-      const prev = ideas.find((i) => i.id === id);
-      const effects = getCompletionEffects(id, ideas, linksHook.links);
-      await markDone(id);
-      if (prev && hasAnyEffects(effects))
-        setCompletionEffects({ effects, completedText: prev.text });
-    },
-    [ideas, markDone, linksHook.links, setCompletionEffects],
-  );
-
-  const handleUpdate = useCallback(
-    async (id: string, patch: Partial<Idea>) => {
-      const prev = ideas.find((i) => i.id === id);
-      if (patch.status === "completed" && prev && prev.status !== "completed") {
-        const effects = getCompletionEffects(id, ideas, linksHook.links);
-        await updateIdea(id, patch);
-        if (hasAnyEffects(effects)) setCompletionEffects({ effects, completedText: prev.text });
-        return;
-      }
-      await updateIdea(id, patch);
-    },
-    [ideas, updateIdea, linksHook.links, setCompletionEffects],
-  );
-
-  const handleReorderDate = useCallback(
-    (reordered: Idea[]) => {
-      reorderTasks(reordered.map((t) => t.id));
-    },
-    [reorderTasks],
-  );
-
-  const setAnchorParam = useCallback(
-    (d: string, taskId?: string) => {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("date", d);
-      if (taskId) params.set("highlight", taskId);
-      router.replace(`/timeline?${params.toString()}`, { scroll: false });
-    },
-    [router, searchParams],
-  );
-
-  const handleAnchorChange = useCallback(
-    (d: string) => {
-      setAnchorParam(d);
-    },
-    [setAnchorParam],
-  );
-
-  const handleGoToDate = useCallback(
-    (targetDate: string, taskId: string) => {
-      setAnchorParam(targetDate, taskId);
-    },
-    [setAnchorParam],
-  );
-
-  const handleMove = useCallback(
-    async (id: string, newParentId: string | null, newSortOrder: number) => {
-      await moveIdea(id, newParentId, newSortOrder);
-    },
-    [moveIdea],
-  );
-
-  const handleCreateLink = useCallback(
-    async (sourceId: string, targetId: string, linkType: import("@/lib/types").LinkType) => {
-      return linksHook.createLink(sourceId, targetId, linkType);
-    },
-    [linksHook],
-  );
-
-  const handleDeleteLink = useCallback(
-    async (id: string) => {
-      await linksHook.deleteLink(id);
-    },
-    [linksHook],
-  );
+  const {
+    priorityRankOf,
+    handleQuickAdd,
+    handleReschedule,
+    handleDone,
+    handleUpdate,
+    handleReorderDate,
+    setAnchorParam,
+    handleAnchorChange,
+    handleGoToDate,
+    handleMove,
+    handleCreateLink,
+    handleDeleteLink,
+  } = useTimelineActions({
+    ideas,
+    ideasApi: { createIdea, markDone, updateIdea, moveIdea, reorderTasks },
+    linksHook,
+    tagsHook,
+    taskTagsHook,
+    getOptionForIdea,
+    setCompletionEffects,
+  });
 
   const setAnchorReady = useCallback((date: string, node: HTMLDivElement) => {
     anchorRef.current = node;
@@ -712,85 +251,25 @@ function TimelineInner() {
         : !monthGridDates.includes(today);
 
   const headerStartActions = (
-    <>
-      <div className="flex h-8 gap-1 rounded-lg border border-black/5 bg-white/70 p-0.5 shadow-sm dark:border-white/5 dark:bg-gray-900/60">
-        {[
-          { id: "agenda" as const, label: "Agenda" },
-          { id: "week" as const, label: "Week" },
-          { id: "month" as const, label: "Month" },
-        ].map((tab) => {
-          const isActive = view === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setView(tab.id)}
-              title={`Switch to ${tab.label} view`}
-              className={`cursor-pointer rounded-md px-2.5 text-xs font-semibold transition-all ${
-                isActive
-                  ? "bg-white font-bold text-violet-600 shadow-sm dark:bg-gray-800 dark:text-violet-400"
-                  : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              }`}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-      <div className="flex h-8 gap-1 rounded-lg border border-black/5 bg-white/70 p-0.5 shadow-sm dark:border-white/5 dark:bg-gray-900/60">
-        {[
-          { id: "all" as const, label: "All" },
-          { id: "deferred" as const, label: "Deferred", icon: Clock },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = filter === tab.id;
-          const isDisabled = tab.id === "deferred" && !hasRevisitDates;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => {
-                if (isDisabled) return;
-                handleFilterChange(tab.id);
-              }}
-              disabled={isDisabled}
-              title={isDisabled ? "Deferred applies to past dates" : undefined}
-              className={`flex items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition-all ${
-                isDisabled ? "cursor-not-allowed opacity-40" : "cursor-pointer"
-              } ${
-                isActive
-                  ? "bg-white font-bold text-violet-600 shadow-sm dark:bg-gray-800 dark:text-violet-400"
-                  : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              }`}
-            >
-              {Icon && <Icon size={13} />}
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-      {view === "agenda" && (
-        <RangeWindowDropdown
-          preset={preset}
-          counts={
-            Object.fromEntries(
-              TIMELINE_PRESETS.map((r) => [
-                r.id,
-                `${rangeCounts.past[r.id] ?? 0} before · ${rangeCounts.future[r.id] ?? 0} after`,
-              ]),
-            ) as Record<string, string>
-          }
-          spans={rangeSpans}
-          open={windowMenuOpen}
-          onToggle={() => setWindowMenuOpen((v) => !v)}
-          onClose={() => setWindowMenuOpen(false)}
-          onSelect={(id) => {
-            setPreset(id);
-            setRangeFlash(true);
-            window.setTimeout(() => setRangeFlash(false), 900);
-            setWindowMenuOpen(false);
-          }}
-        />
-      )}
-    </>
+    <TimelineToolbar
+      view={view}
+      filter={filter}
+      hasRevisitDates={hasRevisitDates}
+      preset={preset}
+      rangeCounts={rangeCounts}
+      rangeSpans={rangeSpans}
+      windowMenuOpen={windowMenuOpen}
+      onViewChange={setView}
+      onFilterChange={handleFilterChange}
+      onToggleWindowMenu={() => setWindowMenuOpen((v) => !v)}
+      onCloseWindowMenu={() => setWindowMenuOpen(false)}
+      onSelectPreset={(id) => {
+        setPreset(id);
+        setRangeFlash(true);
+        window.setTimeout(() => setRangeFlash(false), 900);
+        setWindowMenuOpen(false);
+      }}
+    />
   );
 
   return (
@@ -889,192 +368,60 @@ function TimelineInner() {
         ) : (
           renderPlan.map((unit, index) => {
             if (unit.kind === "gap") {
-              return (
-                <div key={`gap-${index}`} className="flex items-center justify-center py-1">
-                  <div className="flex items-center gap-2 text-[10px] font-semibold tracking-wider text-gray-300 uppercase dark:text-gray-600">
-                    <div className="h-px w-8 bg-black/10 dark:bg-white/10" />+{unit.count} empty{" "}
-                    {unit.count === 1 ? "day" : "days"}
-                    <div className="h-px w-8 bg-black/10 dark:bg-white/10" />
-                  </div>
-                </div>
-              );
+              return <AgendaGap key={`gap-${index}`} count={unit.count} />;
             }
             const date = unit.date;
-            const dayOccurrences = occurrencesByDate[date] ?? [];
-            const dayTasks = dayOccurrences.filter((o) => !o.isHistorical).map((o) => o.task);
-            const isAnchorDate = date === anchor;
-            const isTodayDate = date === today;
-            const dateLabel = formatTimelineDate(date);
-            const dayTitle = formatDayTitle(date, "agenda");
-            const timelineKicker = getTimelineKicker(date, today, tomorrow);
-            const unresolvedCount = dayOccurrences.filter(
-              (o) =>
-                !o.isHistorical &&
-                o.task.status !== "completed" &&
-                o.task.status !== "cancelled" &&
-                o.task.status !== "missed" &&
-                isPast(date),
-            ).length;
-
             return (
-              <motion.section
+              <AgendaDayCard
                 key={date}
-                id={`day-${date}`}
-                custom={index}
-                variants={cardVariants}
-                initial="hidden"
-                animate="visible"
-              >
-                <AnchorReadyMarker date={date} enabled={isAnchorDate} onReady={setAnchorReady}>
-                  <AnchorReadyMarker date={date} enabled={isTodayDate} onReady={setTodayReady}>
-                    <div
-                      id={isAnchorDate ? "anchor-card" : undefined}
-                      className={`glass-card rounded-[20px] transition-all${
-                        isTodayDate
-                          ? "border-l-4! border-l-violet-500! bg-violet-50/70! shadow-lg! shadow-violet-500/10! dark:bg-violet-500/10!"
-                          : ""
-                      }${
-                        isAnchorDate && !isTodayDate
-                          ? "shadow-lg! ring-2! ring-violet-300/80! dark:ring-violet-400/60!"
-                          : ""
-                      }`}
-                    >
-                      <div className="flex items-center justify-between px-5 pt-4 pb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="flex flex-col">
-                            <span
-                              className={`text-[10px] font-semibold tracking-[0.12em] uppercase ${
-                                isAnchorDate
-                                  ? "text-violet-600 dark:text-violet-400"
-                                  : "text-gray-400 dark:text-gray-500"
-                              }`}
-                            >
-                              {timelineKicker}
-                            </span>
-                            <span className="flex items-center gap-2">
-                              <DateChip
-                                dayNum={Number(date.slice(8, 10))}
-                                isToday={isTodayDate}
-                                isSelected={isAnchorDate}
-                                size="md"
-                              />
-                              <span className="text-[22px] leading-tight font-bold text-gray-900 dark:text-gray-100">
-                                {dayTitle.weekday}
-                                <span className="ml-2 align-middle text-sm font-semibold text-gray-400 dark:text-gray-500">
-                                  {dayTitle.month}
-                                </span>
-                              </span>
-                            </span>
-                          </div>
-                          {unresolvedCount > 0 && (
-                            <span className="rounded-full bg-red-100/80 px-2.5 py-0.5 text-[10px] font-semibold text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                              {unresolvedCount} unresolved
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <MiniBalanceBar
-                            tasks={dayTasks}
-                            getTagsForIdea={taskTagsHook.getTagsForIdea}
-                            date={date}
-                          />
-                          {dayTasks.length > 0 && (
-                            <button
-                              onClick={() => smartSortTasks(dayTasks, priorityRankOf)}
-                              className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-violet-500 transition-all hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/20"
-                              title="Sort tasks by priority score (effort × impact × urgency)"
-                            >
-                              <Sparkles size={12} />
-                              <span className="hidden sm:inline">Smart Sort</span>
-                            </button>
-                          )}
-                          <button
-                            onClick={() => router.push(`/?date=${date}`)}
-                            className="focus-button"
-                          >
-                            Plan
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="px-5 pb-2">
-                        {dayOccurrences.length === 0 ? (
-                          <p className="py-1 text-xs text-gray-400 italic dark:text-gray-500">
-                            {effectiveFilter === "deferred"
-                              ? "No deferred tasks this day"
-                              : "No tasks planned"}
-                          </p>
-                        ) : (
-                          <DayTaskList
-                            occurrences={dayOccurrences}
-                            onReorder={handleReorderDate}
-                            onDone={handleDone}
-                            onUndone={markUndone}
-                            onUpdate={handleUpdate}
-                            onReschedule={handleReschedule}
-                            onMove={handleMove}
-                            ideas={ideas}
-                            links={linksHook.links}
-                            onCreateLink={handleCreateLink}
-                            onDeleteLink={handleDeleteLink}
-                            today={today}
-                            onGoToDate={handleGoToDate}
-                            allTags={tagsHook.tags}
-                            getTagsForIdea={taskTagsHook.getTagsForIdea}
-                            onAddTag={taskTagsHook.addTagToTask}
-                            onRemoveTag={taskTagsHook.removeTagFromTask}
-                            onCreateTag={tagsHook.createTag}
-                          />
-                        )}
-                      </div>
-
-                      {effectiveFilter === "all" || isPlanDate(date) ? (
-                        <div className="px-5 pt-1 pb-4">
-                          <QuickAddInput
-                            placeholder={`+ Add task for ${isTodayDate ? "today" : dateLabel}...`}
-                            area={quickAddArea}
-                            onAreaChange={setQuickAddArea}
-                            onAdd={(text) => handleQuickAdd(text, date, quickAddArea)}
-                            suggestFrom={ideas}
-                          />
-                        </div>
-                      ) : null}
-                    </div>
-                  </AnchorReadyMarker>
-                </AnchorReadyMarker>
-              </motion.section>
+                index={index}
+                date={date}
+                anchor={anchor}
+                today={today}
+                tomorrow={tomorrow}
+                occurrences={occurrencesByDate[date] ?? []}
+                effectiveFilter={effectiveFilter}
+                quickAddArea={quickAddArea}
+                onQuickAddAreaChange={setQuickAddArea}
+                onQuickAdd={handleQuickAdd}
+                onSmartSort={(dayTasks) => smartSortTasks(dayTasks, priorityRankOf)}
+                onPlan={(d) => router.push(`/?date=${d}`)}
+                onAnchorReady={setAnchorReady}
+                onTodayReady={setTodayReady}
+                onReorder={handleReorderDate}
+                onDone={handleDone}
+                onUndone={markUndone}
+                onUpdate={handleUpdate}
+                onReschedule={handleReschedule}
+                onMove={handleMove}
+                ideas={ideas}
+                links={linksHook.links}
+                onCreateLink={handleCreateLink}
+                onDeleteLink={handleDeleteLink}
+                onGoToDate={handleGoToDate}
+                allTags={tagsHook.tags}
+                getTagsForIdea={taskTagsHook.getTagsForIdea}
+                onAddTag={taskTagsHook.addTagToTask}
+                onRemoveTag={taskTagsHook.removeTagFromTask}
+                onCreateTag={tagsHook.createTag}
+              />
             );
           })
         )}
       </div>
 
-      {/* Floating button to navigate back to the selected date */}
-      {!anchorVisible && (
-        <button
-          onClick={() => {
-            setScrollRequest((request) => request + 1);
-          }}
-          className="fixed right-6 bottom-6 z-50 flex items-center justify-center rounded-full bg-violet-600 p-3 text-white shadow-lg transition-all hover:scale-110 hover:bg-violet-700"
-          aria-label={`Jump to ${formatTimelineDate(anchor)}`}
-        >
-          <ChevronsUpDown size={20} />
-        </button>
-      )}
-      {/* Sticky Today pill when today is out of view */}
-      {showTodayPill && (
-        <button
-          onClick={() => {
-            // Anchor already today (e.g. scrolled away manually): replacing
-            // the URL would be a no-op, so re-center via scrollRequest instead.
-            if (anchor === today) setScrollRequest((request) => request + 1);
-            else handleAnchorChange(today);
-          }}
-          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-violet-600 px-4 py-2 text-xs font-bold text-white shadow-lg transition-all hover:scale-105 hover:bg-violet-700"
-          aria-label="Jump to today"
-        >
-          Today
-        </button>
-      )}
+      <TimelineFloatingControls
+        anchor={anchor}
+        anchorVisible={anchorVisible}
+        showTodayPill={showTodayPill}
+        onJumpToAnchor={() => setScrollRequest((request) => request + 1)}
+        onJumpToToday={() => {
+          // Anchor already today (e.g. scrolled away manually): replacing
+          // the URL would be a no-op, so re-center via scrollRequest instead.
+          if (anchor === today) setScrollRequest((request) => request + 1);
+          else handleAnchorChange(today);
+        }}
+      />
     </AppShell>
   );
 }
