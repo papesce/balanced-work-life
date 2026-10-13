@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
-  ChevronDown,
   ChevronUp,
   ChevronsLeft,
   ChevronsRight,
@@ -18,25 +17,14 @@ import {
 } from "lucide-react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import { useClassifications } from "@/hooks/useClassifications";
-import {
-  AREA_DOT_COLORS,
-  AREA_ICONS,
-  AREA_LABELS,
-  STATUS_LABELS,
-  STATUS_STYLES,
-  TERMINAL_STATUSES,
-} from "@/lib/constants";
-import { StatusPicker } from "@/components/brainstorm/StatusPicker";
-import { PriorityChip, priorityRank, type PriorityValue } from "@/components/shared/PriorityChip";
-import { TagPicker } from "@/components/shared/TagPicker";
-import { areaColors } from "@/styles/tokens";
+import { TERMINAL_STATUSES } from "@/lib/constants";
+import { priorityRank, type PriorityValue } from "@/components/shared/PriorityChip";
 import { ColumnShell, groupKeyOf, optionsForScheme } from "@/components/lens";
 import { buildLensColumns, resolveLens } from "@/lib/horizonLenses";
 import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 import { AppShell } from "@/components/AppShell";
 import { IdeaTree } from "@/components/brainstorm/IdeaTree";
 import { BrainstormBreadcrumb } from "@/components/brainstorm/BrainstormBreadcrumb";
-import { NotesIndicator } from "@/components/shared/NotesIndicator";
 import { useNotes } from "@/contexts/NotesContext";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
@@ -45,15 +33,15 @@ import { useTaskTags } from "@/hooks/useTaskTags";
 import { useProjectActions } from "@/hooks/useProjectActions";
 import { useProjectLookups } from "@/stores/projectLookups";
 import { useProjectTreeStore } from "@/stores/projectTreeStore";
-import { Idea, IdeaStatus, Tag, type IdeaNode } from "@/lib/types";
+import { Idea, Tag, type IdeaNode } from "@/lib/types";
 import { getAncestorChain } from "@/lib/ideaTreeFocus";
 import { hasAnyEffects } from "@/lib/linkEffects";
 import { LinkedEffectsReveal } from "@/components/shared/LinkedEffectsReveal";
 import { UndoBar } from "@/components/shared/UndoBar";
-import { IdeaActionMenu } from "@/components/shared/IdeaActionMenu";
 import { ValueHelpInfo } from "@/components/shared/ValueHelpInfo";
 import { hintForValue } from "@/lib/classificationHelp";
 import { ProjectPathsTab, type PathCanvasApi } from "@/components/projects/ProjectPathsTab";
+import { ProjectCard } from "@/components/projects/ProjectCard";
 import { ProjectFiltersMenu } from "@/components/projects/ProjectFiltersMenu";
 import { TaskComposer } from "@/components/shared/TaskComposer";
 import { usePathMembership } from "@/hooks/usePathMembership";
@@ -70,12 +58,6 @@ export default function ProjectsPage() {
   const lensKey = useUiPrefsStore((s) => s.projectsLens);
   const unclassifiedExpanded = useUiPrefsStore((s) => s.projectsUnclassifiedExpanded);
   const setPrefs = useUiPrefsStore((s) => s.set);
-  const [statusPickerId, setStatusPickerId] = useState<string | null>(null);
-  const [areaPickerPos, setAreaPickerPos] = useState<{ top: number; left: number } | null>(null);
-  const [statusPickerPos, setStatusPickerPos] = useState<{ top: number; left: number } | null>(
-    null,
-  );
-  const [areaPickerId, setAreaPickerId] = useState<string | null>(null);
   // Detail focus is local-only (subtree re-root); selectedId stays the project in URL.
   const [focusedId, setFocusedId] = useState<string | null>(null);
   // Expandable cards: which projects show inline tasks in list view.
@@ -376,12 +358,10 @@ export default function ProjectsPage() {
   const handleReplaceAreaTag = async (projectId: string, tag: Tag) => {
     const current = taskTagsHook.getTagsForIdea(projectId)[0] ?? null;
     if (current?.id === tag.id) {
-      setAreaPickerId(null);
       return;
     }
     if (current) await taskTagsHook.removeTagFromTask(projectId, current.id);
     await taskTagsHook.addTagToTask(projectId, tag);
-    setAreaPickerId(null);
     registerUndo({
       label: "Project area updated",
       run: async () => {
@@ -1023,293 +1003,57 @@ export default function ProjectsPage() {
 
   const renderProjectCard = (p: Idea) => {
     const { done, total } = statOf(p.id);
-    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-    const area = taskTagsHook.getTagsForIdea(p.id)[0]?.area ?? null;
-    const AreaIcon = area ? AREA_ICONS[area as keyof typeof AREA_ICONS] : null;
     return (
-      <div
+      <ProjectCard
         key={p.id}
-        onClick={() => handleSelect(p.id)}
-        onKeyDown={(e) => {
-          if (renamingCardId === p.id) return;
-          if (e.key === "Enter" || e.key === " ") handleSelect(p.id);
-          else if (e.key === "e" || e.key === "F2") {
-            e.preventDefault();
-            startCardRename(p);
-          } else if (e.key === "a") {
-            e.preventDefault();
-            void quickAddTaskToProject(p.id);
-          }
+        project={p}
+        done={done}
+        total={total}
+        area={taskTagsHook.getTagsForIdea(p.id)[0]?.area ?? null}
+        areaTags={taskTagsHook.getTagsForIdea(p.id)}
+        allTags={tagsHook.tags}
+        priority={priorityOf(p.id)}
+        lensKey={lensKey}
+        lensLabel={lensTabs.find((t) => t.key === lensKey)?.label ?? "Group"}
+        groupValue={valueOf(p.id)}
+        groupOptions={columns}
+        groupHint={hintForValue(lensKey, valueOf(p.id))}
+        renaming={renamingCardId === p.id}
+        renameDraft={renameDraft}
+        expanded={expandedCards.has(p.id)}
+        hideCompleted={hideCompleted}
+        tasks={directChildrenOf(p.id)}
+        allIdeas={ideasHook.ideas}
+        links={linksHook.links}
+        hasChildren={directChildrenOf(p.id).length > 0}
+        getTagsForIdea={taskTagsHook.getTagsForIdea}
+        onSelect={handleSelect}
+        onStartRename={startCardRename}
+        onRenameDraftChange={setRenameDraft}
+        onCommitRename={(id) => void commitCardRename(id)}
+        onCancelRename={() => setRenamingCardId(null)}
+        onSetPriority={(id, v) => void handleSetPriority(id, v)}
+        onSetClassification={(id, v) => void handleSetClassification(id, v)}
+        onReplaceAreaTag={(projectId, tag) => void handleReplaceAreaTag(projectId, tag)}
+        onRemoveAreaTag={(projectId, tagId) =>
+          void taskTagsHook.removeTagFromTask(projectId, tagId)
+        }
+        onCreateTag={tagsHook.createTag}
+        onToggleExpand={toggleCard}
+        onQuickAddTask={(id) => void quickAddTaskToProject(id)}
+        onUpdateStatus={(id, status) => void updateIdea(id, { status })}
+        onToggleTask={(id, completed) => void (completed ? markDone(id) : markUndone(id))}
+        onDelete={deleteIdea}
+        onSchedule={scheduleIdea}
+        onCreateLink={createLink}
+        onDeleteLink={deleteLink}
+        onMove={moveIdea}
+        onCreateParent={createParentAndMove}
+        onMoved={(id) => {
+          if (id) ideasHook.expandIdea(id);
         }}
-        role="button"
-        tabIndex={0}
-        className={`glass-card group flex w-full cursor-pointer flex-col gap-2 rounded-2xl border px-4 py-3 text-left transition hover:border-violet-200 dark:hover:border-violet-800 ${
-          priorityOf(p.id) === "high"
-            ? "border-violet-300 shadow-[0_0_0_1px_rgba(139,92,246,0.35),0_8px_24px_rgba(139,92,246,0.12)] dark:border-violet-700"
-            : "border-black/5 dark:border-white/5"
-        }`}
-      >
-        <div className="flex w-full items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30">
-              <FolderKanban size={16} />
-              {area && (
-                <span
-                  title={AREA_LABELS[area as keyof typeof AREA_LABELS] ?? area}
-                  className={`absolute -right-1 -bottom-1 h-3 w-3 rounded-full border-2 border-white ${AREA_DOT_COLORS[area as keyof typeof AREA_DOT_COLORS] ?? "bg-gray-400"} dark:border-gray-900`}
-                />
-              )}
-            </span>
-            <div className="min-w-0">
-              {renamingCardId === p.id ? (
-                <span
-                  className="flex items-center gap-1"
-                  onClick={(e) => e.stopPropagation()}
-                  onKeyDown={(e) => e.stopPropagation()}
-                >
-                  <input
-                    autoFocus
-                    value={renameDraft}
-                    onChange={(e) => setRenameDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") void commitCardRename(p.id);
-                      if (e.key === "Escape") setRenamingCardId(null);
-                    }}
-                    onBlur={() => void commitCardRename(p.id)}
-                    aria-label={`Rename ${p.text || "untitled project"}`}
-                    className="w-full min-w-0 rounded-md border border-violet-300 px-1.5 py-0.5 text-sm font-semibold focus:ring-2 focus:ring-violet-500/30 focus:outline-none dark:border-violet-700 dark:bg-gray-800"
-                  />
-                  <button
-                    onClick={() => void commitCardRename(p.id)}
-                    aria-label="Save name"
-                    className="rounded p-1 text-emerald-600 hover:bg-emerald-50"
-                  >
-                    <Check size={13} />
-                  </button>
-                </span>
-              ) : (
-                <p
-                  className="flex items-center gap-1.5 truncate text-sm font-semibold text-gray-800 dark:text-gray-100"
-                  onDoubleClick={(e) => {
-                    e.stopPropagation();
-                    startCardRename(p);
-                  }}
-                  title="Double-click to rename"
-                >
-                  <PriorityChip
-                    value={priorityOf(p.id)}
-                    onSelect={(v) => void handleSetPriority(p.id, v)}
-                  />
-                  {AreaIcon && (
-                    <AreaIcon
-                      size={12}
-                      className="shrink-0"
-                      style={{ color: area ? areaColors[area]?.dot : undefined }}
-                    />
-                  )}
-                  {p.text || "Untitled project"}
-                </p>
-              )}
-              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-gray-400">
-                <span className="relative" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={(e) => {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      setStatusPickerPos({ top: rect.bottom + 4, left: rect.left });
-                      setStatusPickerId(statusPickerId === p.id ? null : p.id);
-                    }}
-                    className={`rounded-full border px-1.5 py-0 text-[10px] font-semibold whitespace-nowrap transition hover:opacity-80 ${STATUS_STYLES[p.status]}`}
-                  >
-                    {STATUS_LABELS[p.status] ?? p.status}
-                  </button>
-                  {statusPickerId === p.id && statusPickerPos && (
-                    <StatusPicker
-                      current={p.status}
-                      onSelect={(s: IdeaStatus) => {
-                        setStatusPickerId(null);
-                        void updateIdea(p.id, { status: s });
-                      }}
-                      onClose={() => setStatusPickerId(null)}
-                      position={statusPickerPos}
-                    />
-                  )}
-                </span>
-                <span>
-                  {done}/{total} done
-                  {p.scheduled_date ? ` · ${p.scheduled_date}` : ""}
-                </span>
-                {lensKey !== "area" && (
-                  <span onClick={(e) => e.stopPropagation()}>
-                    <select
-                      aria-label={`Change ${lensTabs.find((t) => t.key === lensKey)?.label ?? "group"} for ${p.text || "untitled project"}`}
-                      title={hintForValue(lensKey, valueOf(p.id)) ?? undefined}
-                      value={valueOf(p.id) ?? ""}
-                      onChange={(e) => void handleSetClassification(p.id, e.target.value || null)}
-                      className="max-w-[110px] cursor-pointer rounded-md border border-black/10 bg-transparent px-1 py-0 text-[10px] font-semibold text-gray-500 dark:border-white/10 dark:text-gray-400"
-                    >
-                      <option value="">—</option>
-                      {columns
-                        .filter((c) => c.key !== null)
-                        .map((o) => (
-                          <option key={o.key} value={o.key ?? ""}>
-                            {o.label}
-                          </option>
-                        ))}
-                    </select>
-                  </span>
-                )}
-                {lensKey === "area" && (
-                  <span className="relative" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        setAreaPickerPos({ top: rect.bottom + 4, left: rect.left });
-                        setAreaPickerId(areaPickerId === p.id ? null : p.id);
-                      }}
-                      title={hintForValue("area", area) ?? undefined}
-                      className="cursor-pointer rounded-md border border-black/10 px-1 py-0 text-[10px] font-semibold text-gray-500 dark:border-white/10 dark:text-gray-400"
-                    >
-                      {area ? (AREA_LABELS[area as keyof typeof AREA_LABELS] ?? area) : "Set area"}
-                    </button>
-                    {areaPickerId === p.id && areaPickerPos && (
-                      <TagPicker
-                        allTags={tagsHook.tags}
-                        selectedTags={taskTagsHook.getTagsForIdea(p.id)}
-                        onAdd={(tag) => void handleReplaceAreaTag(p.id, tag)}
-                        onRemove={(tagId) => {
-                          void taskTagsHook.removeTagFromTask(p.id, tagId);
-                        }}
-                        onCreateTag={tagsHook.createTag}
-                        onClose={() => setAreaPickerId(null)}
-                        singleSelect
-                        fixedPosition={areaPickerPos}
-                      />
-                    )}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => toggleCard(p.id)}
-              title={expandedCards.has(p.id) ? "Collapse tasks" : "Expand tasks"}
-              aria-label={expandedCards.has(p.id) ? "Collapse tasks" : "Expand tasks"}
-              aria-expanded={expandedCards.has(p.id)}
-              className="rounded-lg p-1.5 text-gray-400 hover:bg-black/5 hover:text-violet-600"
-            >
-              <ChevronDown
-                size={14}
-                className={`transition-transform ${expandedCards.has(p.id) ? "rotate-180" : ""}`}
-              />
-            </button>
-            <IdeaActionMenu
-              idea={p}
-              allIdeas={ideasHook.ideas}
-              links={linksHook.links}
-              hasChildren={directChildrenOf(p.id).length > 0}
-              getTagsForIdea={taskTagsHook.getTagsForIdea}
-              onEdit={() => startCardRename(p)}
-              onDelete={deleteIdea}
-              onSchedule={scheduleIdea}
-              onCreateLink={createLink}
-              onDeleteLink={deleteLink}
-              onMove={moveIdea}
-              onCreateParent={createParentAndMove}
-              onMoved={(id) => {
-                if (id) ideasHook.expandIdea(id);
-              }}
-              onShowDetails={() => openNotes(p.id)}
-              currentView="projects"
-            />
-            <NotesIndicator hasNotes={!!p.notes?.trim()} onClick={() => openNotes(p.id)} />
-            <button
-              onClick={() => handleSelect(p.id)}
-              className="text-xs font-semibold text-violet-600 hover:underline"
-            >
-              Open →
-            </button>
-          </div>
-        </div>
-        {total > 0 && (
-          <div
-            className="h-1 overflow-hidden rounded-full bg-black/[0.06] dark:bg-white/10"
-            role="progressbar"
-            aria-valuenow={pct}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label={`Progress for ${p.text || "untitled project"}`}
-          >
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-violet-500 to-emerald-400 transition-all"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-        )}
-        {(() => {
-          const expanded = expandedCards.has(p.id);
-          if (!expanded) return null;
-          const kids = directChildrenOf(p.id);
-          const visible = hideCompleted ? kids.filter((k) => k.status !== "completed") : kids;
-          const preview = visible.slice(0, 5);
-          return (
-            <div
-              className="mt-1 space-y-1 border-t border-black/5 pt-2 dark:border-white/5"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {preview.length === 0 && (
-                <p className="px-1 text-[11px] text-gray-400 italic">No tasks yet</p>
-              )}
-              {preview.map((t) => (
-                <div key={t.id} className="flex items-center gap-2 px-1 text-xs">
-                  <input
-                    type="checkbox"
-                    checked={t.status === "completed"}
-                    onChange={() =>
-                      void (t.status === "completed" ? markUndone(t.id) : markDone(t.id))
-                    }
-                    aria-label={`Toggle ${t.text || "untitled task"}`}
-                    className="h-3.5 w-3.5 rounded accent-violet-600"
-                  />
-                  <button
-                    onClick={() => handleSelect(p.id)}
-                    title="Open in project"
-                    className={`min-w-0 flex-1 truncate text-left hover:text-violet-600 ${
-                      t.status === "completed"
-                        ? "text-gray-400 line-through"
-                        : "text-gray-700 dark:text-gray-200"
-                    }`}
-                  >
-                    {t.text || "Untitled"}
-                  </button>
-                  <span className="shrink-0 text-[10px] text-gray-400 capitalize">
-                    {t.status.replace("_", " ")}
-                  </span>
-                </div>
-              ))}
-              {visible.length > preview.length && (
-                <p className="px-1 text-[11px] text-gray-400">
-                  +{visible.length - preview.length} more
-                </p>
-              )}
-              <div className="flex gap-2 px-1 pt-1">
-                <button
-                  onClick={() => void quickAddTaskToProject(p.id)}
-                  className="rounded-lg border border-dashed border-black/10 px-2 py-1 text-[11px] font-semibold text-gray-500 hover:border-violet-300 hover:text-violet-600 dark:border-white/10"
-                >
-                  + Add task
-                </button>
-                <button
-                  onClick={() => handleSelect(p.id)}
-                  className="rounded-lg px-2 py-1 text-[11px] font-semibold text-violet-600 hover:bg-violet-50"
-                >
-                  Open →
-                </button>
-              </div>
-            </div>
-          );
-        })()}
-      </div>
+        onOpenNotes={openNotes}
+      />
     );
   };
 
