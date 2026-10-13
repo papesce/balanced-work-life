@@ -8,354 +8,22 @@ import {
   Idea,
   IdeaLink,
   IdeaNode as IdeaNodeType,
-  IdeaStatus,
   IdeaType,
   LifeArea,
   LinkType,
   Tag,
 } from "@/lib/types";
-import { computeStatusUpdates } from "@/lib/tasks/statusTransition";
-import { STATUS_LABELS, STATUS_STYLES, TYPE_BADGE } from "@/lib/constants";
 import { type ComposingState, type CreateIdeaPosition, type TreeNode } from "@/components/tree";
 import { TreeDnd } from "@/components/tree/useTreeDnd";
 import { TreeProvider } from "@/components/tree/context";
 import { TreeNodeRow } from "@/components/tree/TreeNodeRow";
-import { IdeaActionMenu } from "@/components/shared/IdeaActionMenu";
-import { StatusPicker } from "@/components/brainstorm/StatusPicker";
-import { TypePicker } from "@/components/brainstorm/TypePicker";
-import { TagPicker } from "@/components/shared/TagPicker";
-import { PriorityChip, type PriorityValue } from "@/components/shared/PriorityChip";
-import { HorizonQuickAssign } from "@/components/horizon/HorizonQuickAssign";
+import { type PriorityValue } from "@/components/shared/PriorityChip";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";
-import { NotesIndicator } from "@/components/shared/NotesIndicator";
-import { TaskComposer } from "@/components/shared/TaskComposer";
 import { useNotes } from "@/contexts/NotesContext";
-
-function PriorityChipSlot({
-  node,
-  priorityValueOf,
-  onSetPriority,
-}: {
-  node: IdeaNodeType;
-  priorityValueOf: (ideaId: string) => PriorityValue;
-  onSetPriority: (ideaId: string, value: string | null) => Promise<void>;
-}) {
-  return (
-    <span onClick={(e) => e.stopPropagation()} className="flex flex-shrink-0 items-center">
-      <PriorityChip
-        value={priorityValueOf(node.id)}
-        onSelect={(v) => void onSetPriority(node.id, v)}
-        usePortal
-      />
-    </span>
-  );
-}
-
-function TypeBadgeSlot({
-  node,
-  onUpdate,
-}: {
-  node: IdeaNodeType;
-  onUpdate: (id: string, updates: Partial<Idea>) => Promise<void>;
-}) {
-  const [showPicker, setShowPicker] = useState(false);
-  const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null);
-  const badge = node.type ? TYPE_BADGE[node.type] : null;
-  return (
-    <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-      <button
-        onClick={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          setPickerPos({ top: rect.bottom + 4, left: rect.left });
-          setShowPicker(!showPicker);
-        }}
-        className={
-          badge
-            ? `rounded-full px-1.5 py-0 text-[10px] font-semibold ${badge.className} cursor-pointer transition-opacity hover:opacity-80`
-            : "rounded-full px-1.5 py-0 text-[10px] font-semibold text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400"
-        }
-      >
-        {badge?.label ?? "Type"}
-      </button>
-      {showPicker && pickerPos && (
-        <TypePicker
-          current={node.type}
-          onSelect={(type) => {
-            void onUpdate(node.id, { type });
-            setShowPicker(false);
-          }}
-          onClose={() => setShowPicker(false)}
-          position={pickerPos}
-        />
-      )}
-    </div>
-  );
-}
-
-function HorizonTagsSlot({
-  node,
-  allTags,
-  getTagsForIdea,
-  onAddTag,
-  onRemoveTag,
-  onCreateTag,
-}: {
-  node: IdeaNodeType;
-  allTags: Tag[];
-  getTagsForIdea: (ideaId: string) => Tag[];
-  onAddTag: (ideaId: string, tag: Tag) => void;
-  onRemoveTag: (ideaId: string, tagId: string) => void;
-  onCreateTag: (name: string, area: LifeArea) => Promise<Tag | null>;
-}) {
-  const [showPicker, setShowPicker] = useState(false);
-  const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null);
-  const nodeTags = getTagsForIdea(node.id);
-  return (
-    <>
-      {nodeTags.length > 0 && (
-        <div className="flex flex-shrink-0 gap-0.5">
-          {nodeTags.slice(0, 2).map((tag) => (
-            <span
-              key={tag.id}
-              className="rounded-full bg-black/[0.04] px-1.5 py-0 text-[10px] text-gray-500 dark:bg-white/[0.06] dark:text-gray-400"
-            >
-              {tag.name}
-            </span>
-          ))}
-          {nodeTags.length > 2 && (
-            <span className="text-[10px] text-gray-400 dark:text-gray-500">
-              +{nodeTags.length - 2}
-            </span>
-          )}
-        </div>
-      )}
-      <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-        <button
-          onClick={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            setPickerPos({ top: rect.bottom + 4, left: rect.left });
-            setShowPicker(!showPicker);
-          }}
-          className="flex h-5 w-5 items-center justify-center rounded text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400"
-          title="Tags"
-        >
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" />
-            <line x1="7" y1="7" x2="7.01" y2="7" />
-          </svg>
-        </button>
-        {showPicker && pickerPos && (
-          <TagPicker
-            allTags={allTags}
-            selectedTags={nodeTags}
-            onAdd={(tag) => onAddTag(node.id, tag)}
-            onRemove={(tagId) => onRemoveTag(node.id, tagId)}
-            onCreateTag={onCreateTag}
-            onClose={() => setShowPicker(false)}
-            fixedPosition={pickerPos}
-          />
-        )}
-      </div>
-    </>
-  );
-}
-
-function StatusChipSlot({
-  node,
-  onUpdate,
-}: {
-  node: IdeaNodeType;
-  onUpdate: (id: string, updates: Partial<Idea>) => Promise<void>;
-}) {
-  const [showPicker, setShowPicker] = useState(false);
-  const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null);
-
-  const handleStatusSelect = (status: IdeaStatus) => {
-    void onUpdate(node.id, computeStatusUpdates(status));
-    setShowPicker(false);
-  };
-
-  return (
-    <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-      <button
-        onClick={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          setPickerPos({ top: rect.bottom + 4, left: rect.left });
-          setShowPicker(!showPicker);
-        }}
-        className={`cursor-pointer rounded-full border px-2 py-0.5 text-[10px] font-medium whitespace-nowrap ${STATUS_STYLES[node.status]}`}
-      >
-        {STATUS_LABELS[node.status]}
-      </button>
-      {showPicker && pickerPos && (
-        <StatusPicker
-          current={node.status}
-          onSelect={handleStatusSelect}
-          onClose={() => setShowPicker(false)}
-          position={pickerPos}
-        />
-      )}
-    </div>
-  );
-}
-
-function ComposingTypePill({
-  initialType,
-  onSelect,
-}: {
-  initialType: IdeaType;
-  onSelect: (type: IdeaType) => void;
-}) {
-  const [type, setType] = useState<IdeaType>(initialType);
-  const [showPicker, setShowPicker] = useState(false);
-  const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null);
-  const badge = TYPE_BADGE[type];
-  return (
-    <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-      <button
-        onClick={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          setPickerPos({ top: rect.bottom + 4, left: rect.left });
-          setShowPicker(!showPicker);
-        }}
-        className={`rounded-full px-1.5 py-0 text-[10px] font-semibold ${badge?.className ?? ""} cursor-pointer transition-opacity hover:opacity-80`}
-      >
-        {badge?.label ?? "Task"}
-      </button>
-      {showPicker && pickerPos && (
-        <TypePicker
-          current={type}
-          onSelect={(next) => {
-            const chosen = next ?? "task";
-            setType(chosen);
-            onSelect(chosen);
-            setShowPicker(false);
-          }}
-          onClose={() => setShowPicker(false)}
-          position={pickerPos}
-        />
-      )}
-    </div>
-  );
-}
-
-function SecondarySubGroup({
-  lensKey,
-  groupValue,
-  secondaryKey,
-  secondaryValue,
-  label,
-  nodes,
-  renderRows,
-  onAddSecondary,
-  suggestFrom,
-  muted = false,
-}: {
-  lensKey: string;
-  groupValue: string | null;
-  secondaryKey: string;
-  secondaryValue: string | null;
-  label: string;
-  nodes: TreeNode<Idea>[];
-  renderRows: (rows: TreeNode<Idea>[]) => React.ReactNode;
-  onAddSecondary?: (text: string, type: IdeaType, secondaryValue: string | null) => Promise<void>;
-  suggestFrom?: Idea[];
-  muted?: boolean;
-}) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: `group:${lensKey}:${groupValue ?? "null"}:${secondaryKey}:${secondaryValue ?? "null"}`,
-  });
-  const [draftType, setDraftType] = useState<IdeaType>("task");
-  const [showTypePicker, setShowTypePicker] = useState(false);
-  const [typePickerPos, setTypePickerPos] = useState<{ top: number; left: number } | null>(null);
-  return (
-    <div
-      ref={setNodeRef}
-      className={`mx-2 rounded-xl border border-black/[0.04] dark:border-white/[0.06] ${isOver ? "bg-indigo-50/60 dark:bg-indigo-500/10" : "bg-black/[0.015] dark:bg-white/[0.015]"}`}
-    >
-      <div className="flex items-center justify-between px-3 py-1.5">
-        <span
-          className={`text-[11px] font-semibold tracking-wide uppercase ${muted ? "text-gray-400 dark:text-gray-500" : "text-gray-500 dark:text-gray-400"}`}
-        >
-          {label}
-        </span>
-        <span className="rounded-full bg-black/[0.04] px-1.5 py-0 text-[10px] font-semibold text-gray-400 dark:bg-white/[0.06] dark:text-gray-500">
-          {nodes.length}
-        </span>
-      </div>
-      {nodes.length > 0 ? (
-        renderRows(nodes)
-      ) : (
-        <p className="px-3 pb-1 text-[11px] text-gray-400 italic dark:text-gray-500">
-          Drop here or add below
-        </p>
-      )}
-      {onAddSecondary && (
-        <div className="flex items-center gap-1.5 border-t border-black/[0.04] px-3 py-1.5 dark:border-white/[0.06]">
-          <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                setTypePickerPos({ top: rect.bottom + 4, left: rect.left });
-                setShowTypePicker(!showTypePicker);
-              }}
-              className={`rounded-full px-1.5 py-0 text-[10px] font-semibold ${TYPE_BADGE[draftType].className} cursor-pointer transition-opacity hover:opacity-80`}
-            >
-              {TYPE_BADGE[draftType].label}
-            </button>
-            {showTypePicker && typePickerPos && (
-              <TypePicker
-                current={draftType}
-                onSelect={(type) => {
-                  setDraftType(type ?? "task");
-                  setShowTypePicker(false);
-                }}
-                onClose={() => setShowTypePicker(false)}
-                position={typePickerPos}
-              />
-            )}
-          </div>
-          <QuickAddInline
-            secondaryValue={secondaryValue}
-            draftType={draftType}
-            onAdd={onAddSecondary}
-            suggestFrom={suggestFrom}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function QuickAddInline({
-  secondaryValue,
-  draftType,
-  onAdd,
-  suggestFrom,
-}: {
-  secondaryValue: string | null;
-  draftType: IdeaType;
-  onAdd: (text: string, type: IdeaType, secondaryValue: string | null) => Promise<void>;
-  suggestFrom?: Idea[];
-}) {
-  return (
-    <div className="flex flex-1 items-center gap-1.5">
-      <TaskComposer
-        variant="plain"
-        placeholder="+ Add..."
-        onCreate={(trimmed) => onAdd(trimmed, draftType, secondaryValue)}
-        suggestFrom={suggestFrom}
-      />
-    </div>
-  );
-}
+import { SecondarySubGroup } from "@/components/horizon/SecondarySubGroup";
+import { HorizonRowTrailing } from "@/components/horizon/HorizonRowTrailing";
+import { PromotionTraces } from "@/components/horizon/PromotionTraces";
+import { ComposingTypePill, PriorityChipSlot } from "@/components/horizon/slots/HorizonRowSlots";
 
 export interface SecondaryOption {
   key: string;
@@ -479,6 +147,14 @@ export function HorizonTree({
   };
 
   const ideasById = useMemo(() => new Map(ideas.map((i) => [i.id, i])), [ideas]);
+  const linkCountById = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const l of links) {
+      map.set(l.source_id, (map.get(l.source_id) ?? 0) + 1);
+      if (l.target_id !== l.source_id) map.set(l.target_id, (map.get(l.target_id) ?? 0) + 1);
+    }
+    return map;
+  }, [links]);
   const topLevelIds = useMemo(() => {
     if (secondaryGrouped) return new Set([...secondaryGrouped.values()].flat().map((n) => n.id));
     return new Set(nodes.map((n) => n.id));
@@ -523,41 +199,25 @@ export function HorizonTree({
       />
     ),
     renderTrailing: (node: IdeaNodeType) => (
-      <>
-        <NotesIndicator hasNotes={!!node.notes?.trim()} onClick={() => openNotes(node.id)} />
-        <TypeBadgeSlot node={node} onUpdate={onUpdate} />
-        <HorizonTagsSlot
-          node={node}
-          allTags={allTags}
-          getTagsForIdea={getTagsForIdea}
-          onAddTag={onAddTag}
-          onRemoveTag={onRemoveTag}
-          onCreateTag={onCreateTag}
-        />
-        <StatusChipSlot node={node} onUpdate={onUpdate} />
-        <HorizonQuickAssign node={node} onUpdate={onUpdate} />
-        {links.filter((l) => l.source_id === node.id || l.target_id === node.id).length > 0 && (
-          <span className="flex-shrink-0 rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] text-indigo-500 dark:bg-indigo-500/20 dark:text-indigo-300">
-            {links.filter((l) => l.source_id === node.id || l.target_id === node.id).length}
-          </span>
-        )}
-        <IdeaActionMenu
-          idea={node}
-          allIdeas={ideas}
-          links={links}
-          hasChildren={node.children.length > 0}
-          getTagsForIdea={getTagsForIdea}
-          onEdit={() => setEditingId(node.id)}
-          onDelete={onDelete}
-          onSchedule={onSchedule}
-          onCreateLink={onCreateLink}
-          onDeleteLink={onDeleteLink}
-          onMove={onMove}
-          hiddenActions={["move"]}
-          onShowDetails={() => openNotes(node.id, { section: "context" })}
-          currentView="horizon"
-        />
-      </>
+      <HorizonRowTrailing
+        node={node}
+        ideas={ideas}
+        links={links}
+        linkCount={linkCountById.get(node.id) ?? 0}
+        allTags={allTags}
+        getTagsForIdea={getTagsForIdea}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+        onSchedule={onSchedule}
+        onMove={onMove}
+        onCreateLink={onCreateLink}
+        onDeleteLink={onDeleteLink}
+        onAddTag={onAddTag}
+        onRemoveTag={onRemoveTag}
+        onCreateTag={onCreateTag}
+        onEdit={() => setEditingId(node.id)}
+        onOpenNotes={() => openNotes(node.id, { section: "context" })}
+      />
     ),
     composerLeading: (
       node: IdeaNodeType,
@@ -580,55 +240,18 @@ export function HorizonTree({
         </div>
       );
     },
-    renderAfterRow: (node: IdeaNodeType) => {
-      const refs = promotedByParent?.get(node.id) ?? [];
-      const secRefs = secondaryPromotedByParent?.get(node.id) ?? [];
-      if (refs.length === 0 && secRefs.length === 0) return null;
-      const byColumn = new Map<
-        string,
-        { ref: { id: string; columnKey: string }; secondary: boolean }[]
-      >();
-      for (const r of refs) {
-        const list = byColumn.get(`p:${r.columnKey}`) ?? [];
-        list.push({ ref: r, secondary: false });
-        byColumn.set(`p:${r.columnKey}`, list);
-      }
-      for (const r of secRefs) {
-        const list = byColumn.get(`s:${r.columnKey}`) ?? [];
-        list.push({ ref: r, secondary: true });
-        byColumn.set(`s:${r.columnKey}`, list);
-      }
-      return (
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5 px-9 py-0.5">
-          {[...byColumn.entries()].map(([key, list]) => {
-            const { ref: first, secondary } = list[0];
-            const label = secondary
-              ? (secondaryLabelByValue?.get(first.columnKey) ?? first.columnKey)
-              : (columnLabelByKey?.get(first.columnKey) ?? first.columnKey);
-            const text =
-              list.length === 1 ? `1 child in ${label}` : `${list.length} children in ${label}`;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  jumpToChild(
-                    first.id,
-                    first.columnKey,
-                    secondary ? { stayInColumn: true } : undefined,
-                  );
-                }}
-                title={`Jump to ${label}`}
-                className="cursor-pointer text-[11px] text-gray-400 italic hover:text-indigo-500 hover:underline dark:text-gray-500"
-              >
-                ↳ {text}
-              </button>
-            );
-          })}
-        </div>
-      );
-    },
+    renderAfterRow: (node: IdeaNodeType) => (
+      <PromotionTraces
+        node={node}
+        promotedByParent={promotedByParent}
+        secondaryPromotedByParent={secondaryPromotedByParent}
+        columnLabelByKey={columnLabelByKey}
+        secondaryLabelByValue={secondaryLabelByValue}
+        onJumpToChild={(childId, childColumnKey, stayInColumn) =>
+          jumpToChild(childId, childColumnKey, stayInColumn ? { stayInColumn: true } : undefined)
+        }
+      />
+    ),
   };
 
   const controller = {
