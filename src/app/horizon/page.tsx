@@ -2,101 +2,35 @@
 
 import { useMemo, useState, useRef, useCallback } from "react";
 import { useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Tag } from "lucide-react";
-import { useIdeas, type CreateIdeaPosition } from "@/hooks/useIdeas";
+import { useIdeas } from "@/hooks/useIdeas";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useUndoAction } from "@/lib/tasks/undo";
-import { filterTreeByType } from "@/lib/ideaTreeFilters";
-import { getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
-import { buildTree as buildTreeGeneric } from "@/components/tree/buildTree";
 import { AppShell } from "@/components/AppShell";
 import { UndoBar } from "@/components/shared/UndoBar";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { HorizonColumn } from "@/components/horizon/HorizonColumn";
 import { RootAddInput } from "@/components/horizon/RootAddInput";
-import { HorizonViewSwitcher } from "@/components/horizon/HorizonViewSwitcher";
-import { HorizonFiltersMenu } from "@/components/horizon/HorizonFiltersMenu";
 import { LensEditPanel } from "@/components/horizon/LensEditPanel";
-import { type PriorityValue } from "@/components/shared/PriorityChip";
-import { TypeFilterPicker } from "@/components/shared/TypeFilterPicker";
-import { Idea, IdeaNode, IdeaType } from "@/lib/types";
+import { HorizonBoardColumns } from "@/components/horizon/HorizonBoardColumns";
+import { HorizonBoardHeader } from "@/components/horizon/HorizonBoardHeader";
+import { IdeaType } from "@/lib/types";
 import { useClassifications } from "@/hooks/useClassifications";
 import { useHorizonPrefs, type UseHorizonPrefsResult } from "@/hooks/useHorizonPrefs";
 import { useHorizonUrl } from "@/hooks/useHorizonUrl";
 import { useHorizonSelection } from "@/hooks/useHorizonSelection";
 import { useHorizonLensSession } from "@/hooks/useHorizonLensSession";
-import {
-  STORAGE_KEYS,
-  readTreeOverrides,
-  writeTreeOverrides,
-  type TreeOverrideState,
-} from "@/lib/storage";
+import { useHorizonCollapse } from "@/hooks/useHorizonCollapse";
+import { useHorizonGrouping } from "@/hooks/useHorizonGrouping";
+import { useHorizonMutations } from "@/hooks/useHorizonMutations";
+import { STORAGE_KEYS, writeTreeOverrides } from "@/lib/storage";
 import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 
+import { ACTIVE_STATUSES, buildFilteredTree } from "@/lib/horizonBoard";
 import { UNCLASSIFIED, groupKeyOf, type LensColumn } from "@/components/lens";
-import { groupTreesByLens, groupSecondaryByLens } from "@/lib/horizonGrouping";
-import { getHiddenProjectIds } from "@/lib/horizonProjectVisibility";
-import {
-  filterOutOverdue,
-  filterOutUpcoming,
-  isOverdueCommitted,
-  isUpcomingCommitted,
-} from "@/lib/horizonScope";
+import { isOverdueCommitted, isUpcomingCommitted } from "@/lib/horizonScope";
 import { type HorizonLensDef } from "@/lib/horizonLenses";
-
-const ACTIVE_STATUSES = new Set(["draft", "planned", "in_progress", "scheduled"]);
-
-function buildFilteredTree(
-  ideas: Idea[],
-  collapsedIds: Set<string>,
-  hideClosed: boolean,
-  hideProjectsWithTasks: boolean,
-  hideUpcoming: boolean,
-  hideOverdue: boolean,
-): IdeaNode[] {
-  let pool = hideClosed ? ideas.filter((i) => ACTIVE_STATUSES.has(i.status)) : ideas;
-  if (hideUpcoming) pool = filterOutUpcoming(pool);
-  if (hideOverdue) pool = filterOutOverdue(pool);
-  if (hideProjectsWithTasks) {
-    const hidden = getHiddenProjectIds(pool, ideas);
-    if (hidden.size > 0) pool = pool.filter((i) => !hidden.has(i.id));
-  }
-
-  const poolIds = new Set(pool.map((i) => i.id));
-  const byId = new Map(pool.map((i) => [i.id, i] as const));
-  const childIds = new Set(
-    pool.filter((i) => i.parent_id && poolIds.has(i.parent_id)).map((i) => i.id),
-  );
-  // Every root is in scope: classified roots group by value under the
-  // active lens, the rest form the explicit unclassified group
-  // (never hidden, never defaulted).
-  const rootIds = pool.filter((i) => !childIds.has(i.id)).map((i) => i.id);
-  const rootSet = new Set(rootIds);
-
-  const included = pool.filter((i) => {
-    if (rootSet.has(i.id)) return true;
-    let cur = i;
-    while (cur.parent_id && poolIds.has(cur.parent_id)) {
-      const parent = byId.get(cur.parent_id);
-      if (!parent) break;
-      cur = parent;
-      if (rootSet.has(cur.id)) return true;
-    }
-    return false;
-  });
-
-  return buildTreeGeneric(included, collapsedIds, compareIdeasForTree);
-}
-
-function compareIdeasForTree(a: Idea, b: Idea): number {
-  const aDone = a.completed_at ? 1 : 0;
-  const bDone = b.completed_at ? 1 : 0;
-  if (aDone !== bDone) return aDone - bDone;
-  return a.sort_order - b.sort_order;
-}
 
 export default function HorizonPage() {
   const prefs = useHorizonPrefs();
@@ -128,13 +62,9 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
   const linksHook = useIdeaLinks();
   const { undoAction, registerUndo, clearUndo, handleUndo } = useUndoAction();
   const [activeTab, setActiveTab] = useState<string>("short");
-  const [overrides, setOverrides] = useState<Map<string, TreeOverrideState>>(() =>
-    readTreeOverrides(STORAGE_KEYS.horizonTreeOverrides),
-  );
+  const { setOverrides, collapsedIds, onToggleCollapse, onExpandIdea } = useHorizonCollapse(ideas);
   const [hideClosed, setHideClosed] = useState(true);
   const [typeFilter, setTypeFilter] = useState<IdeaType[]>([]);
-  const [typePickerOpen, setTypePickerOpen] = useState(false);
-  const [typePickerPos, setTypePickerPos] = useState<{ top: number; left: number } | null>(null);
   const cardMode = useUiPrefsStore((s) => s.cardMode);
   const hideProjectsWithTasks = useUiPrefsStore((s) => s.horizonHideProjectsWithTasks);
   const hideUpcomingPref = useUiPrefsStore((s) => s.horizonHideUpcomingCommitted);
@@ -237,88 +167,26 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
 
   // cardMode persists via uiPrefsStore (no per-change localStorage write needed).
 
-  const updateIdea = async (id: string, updates: Partial<Idea>) => {
-    const previous = ideasHook.ideas.find((idea) => idea.id === id);
-    await ideasHook.updateIdea(id, updates);
-    if (!previous) return;
-    const restore: Partial<Idea> = {};
-    for (const key of Object.keys(updates) as Array<keyof Idea>) {
-      restore[key] = previous[key] as never;
-    }
-    registerUndo({
-      label: "Idea updated",
-      run: async () => {
-        await ideasHook.updateIdea(id, restore);
-      },
-    });
-  };
-
-  const deleteIdea = async (id: string) => {
-    const deletedIds = getFocusedSubtreeIds(id, ideasHook.ideas);
-    const deletedIdeas = ideasHook.ideas.filter((idea) => deletedIds.has(idea.id));
-    const deletedLinks = linksHook.removeLinksForIdeaIds(deletedIds);
-    await ideasHook.deleteIdea(id);
-    if (deletedIdeas.length === 0) return;
-    registerUndo({
-      label: deletedIdeas.length > 1 ? "Ideas deleted" : "Idea deleted",
-      run: async () => {
-        await ideasHook.restoreIdeas(deletedIdeas);
-        await linksHook.restoreLinks(deletedLinks);
-      },
-    });
-  };
-
-  const createIdea = async (
-    text: string,
-    parentId: string | null,
-    position: CreateIdeaPosition,
-    initialUpdates?: Partial<Idea>,
-  ): Promise<string> => {
-    const id = await ideasHook.createIdea(text, parentId, position, initialUpdates);
-    if (id) {
-      registerUndo({
-        label: "Idea created",
-        run: async () => {
-          await ideasHook.deleteIdea(id);
-        },
-      });
-    }
-    return id;
-  };
-
-  const collapsedIds = useMemo(() => {
-    const parentIds = new Set(
-      ideas.filter((i) => ideas.some((c) => c.parent_id === i.id)).map((i) => i.id),
-    );
-    const collapsed = new Set<string>();
-
-    for (const id of parentIds) {
-      const override = overrides.get(id);
-      if (override === "expanded") continue;
-      collapsed.add(id);
-    }
-    return collapsed;
-  }, [ideas, overrides]);
-
-  const onToggleCollapse = (id: string) => {
-    setOverrides((prev) => {
-      const next = new Map(prev);
-      const isCurrentlyCollapsed = prev.get(id) === "collapsed" || !prev.has(id);
-      next.set(id, isCurrentlyCollapsed ? "expanded" : "collapsed");
-      writeTreeOverrides(STORAGE_KEYS.horizonTreeOverrides, next);
-      return next;
-    });
-  };
-
-  const onExpandIdea = (id: string) => {
-    setOverrides((prev) => {
-      if (!prev.has(id) || prev.get(id) === "expanded") return prev;
-      const next = new Map(prev);
-      next.set(id, "expanded");
-      writeTreeOverrides(STORAGE_KEYS.horizonTreeOverrides, next);
-      return next;
-    });
-  };
+  const {
+    updateIdea,
+    deleteIdea,
+    createIdea,
+    handleSetValue,
+    handleSetPriority,
+    handleSetSecondary,
+    handleAdd,
+  } = useHorizonMutations({
+    ideasHook,
+    linksHook,
+    setClassification,
+    registerUndo,
+    lensKey,
+    activeSchemeLabel: activeScheme?.label ?? lensKey,
+    valueOf,
+    priorityOf: (id) => valuesBySchemeKey.get("priority")?.get(id) ?? null,
+    secondaryLabelOf: (key) => schemeByKey.get(key)?.label ?? key,
+    secondaryValueOfId: (key, id) => valuesBySchemeKey.get(key)?.get(id) ?? null,
+  });
 
   const allTreeNodes = useMemo(
     () =>
@@ -333,130 +201,22 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
     [ideas, collapsedIds, hideClosed, hideProjectsWithTasks, hideUpcomingPref, hideOverduePref],
   );
 
-  const priorityOf = useCallback(
-    (ideaId: string): PriorityValue =>
-      (valuesBySchemeKey.get("priority")?.get(ideaId) ?? null) as PriorityValue,
-    [valuesBySchemeKey],
-  );
-
-  const { grouped: treesByLens, promotedByParent } = useMemo(
-    () => groupTreesByLens(allTreeNodes, valueOf),
-    [allTreeNodes, valueOf],
-  );
-
-  const columnLabelByKey = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const c of columns) map.set(groupKeyOf(c.key), c.label);
-    return map;
-  }, [columns]);
-
-  const filteredTreesByLens = useMemo(() => {
-    let result = treesByLens;
-    if (typeFilter.length > 0) {
-      const typed: Record<string, IdeaNode[]> = {};
-      for (const key of Object.keys(result)) {
-        typed[key] = filterTreeByType(result[key], typeFilter);
-      }
-      result = typed;
-    }
-    return result;
-  }, [treesByLens, typeFilter]);
-
-  /**
-   * Secondary-split promotion, per primary column. Runs after primary
-   * grouping + filters so filtered-out children never promote. Skipped when
-   * the column has no Split lens.
-   */
-  const secondaryByPrimary = useMemo(() => {
-    const out: Record<
-      string,
-      {
-        secKey: string;
-        grouped: Map<string | null, IdeaNode[]>;
-        promoted: Map<string, { id: string; columnKey: string }[]>;
-        labelByValue: Map<string, string>;
-      }
-    > = {};
-    for (const col of columns) {
-      const primaryGroupKey = groupKeyOf(col.key);
-      const secKey = secondaryKeyOf(col.key);
-      if (!secKey) continue;
-      const secMap = valuesBySchemeKey.get(secKey);
-      const secondaryOf = (ideaId: string): string | null => secMap?.get(ideaId) ?? null;
-      const pseudoRoots = filteredTreesByLens[primaryGroupKey] ?? [];
-      const { grouped, promotedByParent: promoted } = groupSecondaryByLens(
-        pseudoRoots,
-        secondaryOf,
-      );
-      const scheme = schemeByKey.get(secKey);
-      const labelByValue = new Map<string, string>();
-      if (scheme) {
-        for (const o of optionsBySchemeId.get(scheme.id) ?? []) labelByValue.set(o.value, o.label);
-      }
-      out[primaryGroupKey] = { secKey, grouped, promoted, labelByValue };
-    }
-    return out;
-  }, [
-    columns,
-    secondaryKeyOf,
-    valuesBySchemeKey,
+  const {
+    priorityOf,
+    promotedByParent,
+    columnLabelByKey,
     filteredTreesByLens,
+    secondaryByPrimary,
+  } = useHorizonGrouping({
+    allTreeNodes,
+    columns,
+    typeFilter,
+    valueOf,
+    valuesBySchemeKey,
+    secondaryKeyOf,
     schemeByKey,
     optionsBySchemeId,
-  ]);
-
-  /** Set a classification with undo support (shared by primary/priority/secondary). */
-  const handleSetClassification = async (
-    schemeKey: string,
-    id: string,
-    value: string | null,
-    previous: string | null,
-    label: string,
-  ) => {
-    await setClassification(id, schemeKey, value);
-    registerUndo({
-      label: `${label} updated`,
-      run: async () => {
-        await setClassification(id, schemeKey, previous);
-      },
-    });
-  };
-
-  const handleSetValue = (id: string, value: string | null) =>
-    handleSetClassification(lensKey, id, value, valueOf(id), activeScheme?.label ?? lensKey);
-
-  const handleSetPriority = (id: string, value: string | null) =>
-    handleSetClassification(
-      "priority",
-      id,
-      value,
-      valuesBySchemeKey.get("priority")?.get(id) ?? null,
-      "Priority",
-    );
-
-  const handleSetSecondary = (secondaryKey: string, id: string, value: string | null) =>
-    handleSetClassification(
-      secondaryKey,
-      id,
-      value,
-      valuesBySchemeKey.get(secondaryKey)?.get(id) ?? null,
-      schemeByKey.get(secondaryKey)?.label ?? secondaryKey,
-    );
-
-  const handleAdd = (value: string | null, secondaryKey: string | null = null) => {
-    return async (text: string, type?: IdeaType, secondaryValue?: string | null): Promise<void> => {
-      const id = await createIdea(text, null, "bottom", {
-        type: type ?? "task",
-        status: "draft",
-      });
-      if (id && value) {
-        await setClassification(id, lensKey, value);
-      }
-      if (id && secondaryKey && secondaryValue) {
-        await setClassification(id, secondaryKey, secondaryValue);
-      }
-    };
-  };
+  });
 
   const toggleUnclassified = () => {
     setUnclassifiedExpanded(!unclassifiedExpanded);
@@ -554,6 +314,7 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
     updateParams,
     valueOf,
     setPrefs,
+    setOverrides,
     hideProjectsWithTasks,
     hideUpcomingPref,
     hideOverduePref,
@@ -650,84 +411,45 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
   };
 
   const headerStartActions = (
-    <>
-      <HorizonViewSwitcher
-        views={views}
-        activeViewId={activeViewId}
-        defaultViewId={defaultViewId}
-        lenses={displayLenses}
-        activeLensId={!activeView && !lensSynthesized ? lens.id : null}
-        defaultLensId={defaultLensId}
-        schemes={schemes}
-        onSelect={handleSelectView}
-        onDelete={deleteView}
-        onToggleDefault={toggleDefaultView}
-        onSelectLens={handleSelectLens}
-        onToggleDefaultLens={toggleDefaultLens}
-        onCreateLens={createLens}
-        onStartEdit={startMenuEdit}
-        showClassificationOrder={showClassificationOrder}
-        onToggleShowClassificationOrder={() =>
-          setPrefs({ horizonShowClassificationOrder: !showClassificationOrder })
-        }
-      />
-      <HorizonFiltersMenu
-        hideClosed={hideClosed}
-        onToggleHideClosed={() => setHideClosed((v) => !v)}
-        hideUpcoming={hideUpcomingPref}
-        onToggleHideUpcoming={() => setPrefs({ horizonHideUpcomingCommitted: !hideUpcomingPref })}
-        hideOverdue={hideOverduePref}
-        onToggleHideOverdue={() => setPrefs({ horizonHideOverdueCommitted: !hideOverduePref })}
-        hideProjectsWithTasks={hideProjectsWithTasks}
-        onToggleHideProjectsWithTasks={() =>
-          setPrefs({ horizonHideProjectsWithTasks: !hideProjectsWithTasks })
-        }
-      />
-      <div className="relative">
-        <button
-          type="button"
-          onClick={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            setTypePickerPos({ top: rect.bottom + 4, left: rect.left });
-            setTypePickerOpen((v) => !v);
-          }}
-          className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-            typeFilter.length > 0
-              ? "border-indigo-300 bg-white text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
-              : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
-          }`}
-        >
-          <Tag size={12} />
-          <span className="hidden sm:inline">
-            {typeFilter.length > 0
-              ? `${typeFilter.length} type${typeFilter.length > 1 ? "s" : ""}`
-              : "Type"}
-          </span>
-        </button>
-        {typePickerOpen && typePickerPos && (
-          <TypeFilterPicker
-            selected={typeFilter}
-            onToggle={(type) =>
-              setTypeFilter((prev) =>
-                prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type],
-              )
-            }
-            onClear={() => setTypeFilter([])}
-            onClose={() => setTypePickerOpen(false)}
-            position={typePickerPos}
-          />
-        )}
-      </div>
-      <button
-        type="button"
-        onClick={() => setCardMode((v) => !v)}
-        className={`toolbar-btn ${cardMode ? "toolbar-btn--accent" : ""}`}
-        title={cardMode ? "Show rows" : "Show cards"}
-        aria-pressed={cardMode}
-      >
-        {cardMode ? "Rows" : "Cards"}
-      </button>
-    </>
+    <HorizonBoardHeader
+      views={views}
+      activeViewId={activeViewId}
+      defaultViewId={defaultViewId}
+      displayLenses={displayLenses}
+      activeLensId={!activeView && !lensSynthesized ? lens.id : null}
+      defaultLensId={defaultLensId}
+      schemes={schemes}
+      onSelectView={handleSelectView}
+      onDeleteView={deleteView}
+      onToggleDefaultView={toggleDefaultView}
+      onSelectLens={handleSelectLens}
+      onToggleDefaultLens={toggleDefaultLens}
+      onCreateLens={createLens}
+      onStartEdit={startMenuEdit}
+      showClassificationOrder={showClassificationOrder}
+      onToggleShowClassificationOrder={() =>
+        setPrefs({ horizonShowClassificationOrder: !showClassificationOrder })
+      }
+      hideClosed={hideClosed}
+      onToggleHideClosed={() => setHideClosed((v) => !v)}
+      hideUpcoming={hideUpcomingPref}
+      onToggleHideUpcoming={() => setPrefs({ horizonHideUpcomingCommitted: !hideUpcomingPref })}
+      hideOverdue={hideOverduePref}
+      onToggleHideOverdue={() => setPrefs({ horizonHideOverdueCommitted: !hideOverduePref })}
+      hideProjectsWithTasks={hideProjectsWithTasks}
+      onToggleHideProjectsWithTasks={() =>
+        setPrefs({ horizonHideProjectsWithTasks: !hideProjectsWithTasks })
+      }
+      typeFilter={typeFilter}
+      onToggleTypeFilter={(type) =>
+        setTypeFilter((prev) =>
+          prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type],
+        )
+      }
+      onClearTypeFilter={() => setTypeFilter([])}
+      cardMode={cardMode}
+      onToggleCardMode={() => setCardMode((v) => !v)}
+    />
   );
 
   return (
@@ -759,52 +481,12 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
       />
       <UndoBar undoAction={undoAction} onUndo={() => void handleUndo()} onDismiss={clearUndo} />
 
-      {/* Mobile tab bar */}
-      <div className="sticky top-[53px] z-10 mb-4 flex gap-1 overflow-x-auto rounded-xl bg-black/[0.03] p-1 md:hidden dark:bg-white/[0.04]">
-        {columns.map((col) => (
-          <button
-            key={groupKeyOf(col.key)}
-            onClick={() => setActiveTab(groupKeyOf(col.key))}
-            className={`flex-1 rounded-lg px-2 py-2 text-xs font-semibold whitespace-nowrap transition-all ${
-              activeTab === groupKeyOf(col.key)
-                ? "bg-violet-100/80 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
-                : "text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-            }`}
-          >
-            {col.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Desktop: columns stacked vertically */}
-      <div className="hidden gap-5 md:flex md:flex-col">
-        {columns.map((col, i) => (
-          <motion.div
-            key={groupKeyOf(col.key)}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.08, duration: 0.35, ease: "easeOut" }}
-            className="min-w-0"
-          >
-            {renderColumn(col)}
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Mobile: single column with animated tab switch */}
-      <div className="md:hidden">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, x: 16 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -16 }}
-            transition={{ duration: 0.2 }}
-          >
-            {renderColumn(columns.find((c) => groupKeyOf(c.key) === activeTab) ?? columns[0])}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+      <HorizonBoardColumns
+        columns={columns}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        renderColumn={renderColumn}
+      />
     </AppShell>
   );
 }
