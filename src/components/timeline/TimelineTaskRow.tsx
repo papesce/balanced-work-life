@@ -1,28 +1,22 @@
 "use client";
 
-import { useState, useEffect, useRef, KeyboardEvent } from "react";
-import { FloatingPanel } from "@/components/shared/FloatingPanel";
+import { useEffect, useRef } from "react";
 import { useDragControls } from "framer-motion";
-import { useDraggable } from "@dnd-kit/core";
-import { MoreHorizontal, Link2, GripVertical, CalendarDays } from "lucide-react";
-import { Idea, IdeaStatus, IdeaLink, LinkType, Tag, LifeArea } from "@/lib/types";
-import { TagPicker } from "@/components/shared/TagPicker";
-import { AREA_DOT_COLORS, STATUS_CONFIG, PRODUCTIVITY_SIGNALS } from "@/lib/constants";
-import { StatusPicker } from "@/components/brainstorm/StatusPicker";
-import { MoveIdeaPanel } from "@/components/brainstorm/MoveIdeaPanel";
-import { LinkPanel } from "@/components/shared/LinkPanel";
-import { RescheduleAction } from "@/lib/tasks/rescheduleTask";
-import { TaskRowMenu } from "@/components/shared/TaskRowMenu";
-import { RevealInMenu } from "@/components/shared/RevealInMenu";
-import { PriorityChipField } from "@/components/shared/PriorityChip";
+import { GripVertical, Link2 } from "lucide-react";
 import { NotesIndicator } from "@/components/shared/NotesIndicator";
+import { PriorityChipField } from "@/components/shared/PriorityChip";
 import { useNotes } from "@/contexts/NotesContext";
-import { Eye } from "lucide-react";
-import { applyStatusTransition } from "@/lib/tasks/statusTransition";
-import { useRouter } from "next/navigation";
-import { getRevealHref } from "@/lib/reveal";
+import { STATUS_CONFIG, PRODUCTIVITY_SIGNALS } from "@/lib/constants";
+import { useTimelineRowState } from "@/hooks/useTimelineRowState";
+import { RescheduleDragHandle } from "@/components/timeline/RescheduleDragHandle";
+import { ParentChip } from "@/components/timeline/row/ParentChip";
+import { TagCluster } from "@/components/timeline/row/TagCluster";
+import { TimelineRowMenus } from "@/components/timeline/row/TimelineRowMenus";
+import { TimelineStatusPill } from "@/components/timeline/row/TimelineStatusPill";
+import type { Idea, IdeaLink, LifeArea, LinkType, Tag } from "@/lib/types";
+import type { RescheduleAction } from "@/lib/tasks/rescheduleTask";
 
-interface TimelineTaskRowProps {
+export interface TimelineTaskRowProps {
   task: Idea;
   occurrenceDate?: string;
   onDone: (id: string) => void;
@@ -45,33 +39,6 @@ interface TimelineTaskRowProps {
   onGoToDate?: (date: string, taskId: string) => void;
   /** When set, renders a dnd-kit handle to drag this row onto a week/month day cell. */
   rescheduleDrag?: { taskId: string; fromDate: string; idPrefix: string };
-}
-
-export function RescheduleDragHandle({
-  taskId,
-  fromDate,
-  idPrefix,
-}: {
-  taskId: string;
-  fromDate: string;
-  idPrefix: string;
-}) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `${idPrefix}-detail-${taskId}-${fromDate}`,
-    data: { taskId, fromDate },
-  });
-  return (
-    <button
-      ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      title="Drag onto a day to reschedule"
-      aria-label="Drag to reschedule to another day"
-      className={`flex-shrink-0 cursor-grab touch-none text-gray-300 transition-colors hover:text-violet-500 active:cursor-grabbing dark:text-gray-600 dark:hover:text-violet-400 ${isDragging ? "opacity-40" : "opacity-0 group-hover:opacity-100"}`}
-    >
-      <CalendarDays size={13} />
-    </button>
-  );
 }
 
 export function TimelineTaskRow({
@@ -105,97 +72,18 @@ export function TimelineTaskRow({
   const statusConfig = STATUS_CONFIG[task.status];
   const attemptTarget = task.scheduled_date ?? task.attempt_dates[task.attempt_dates.length - 1];
   const attemptLabel = task.scheduled_date ? "Go to next attempt" : "Go to last attempt";
-  const [showMenu, setShowMenu] = useState(false);
-  const [showTagPicker, setShowTagPicker] = useState(false);
-  const [showStatusPicker, setShowStatusPicker] = useState(false);
-  const [showAttachPanel, setShowAttachPanel] = useState(false);
-  const [showLinkPanel, setShowLinkPanel] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
-  const menuTriggerRef = useRef<HTMLButtonElement>(null);
-  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
-  const [showReveal, setShowReveal] = useState(false);
-  const [revealPos, setRevealPos] = useState<{ top: number; right: number } | null>(null);
-  const statusTriggerRef = useRef<HTMLButtonElement>(null);
-  const [statusPickerPos, setStatusPickerPos] = useState<{ top: number; left: number } | null>(
-    null,
-  );
-  const tagTriggerRef = useRef<HTMLButtonElement>(null);
-  const [tagPickerPos, setTagPickerPos] = useState<{ top: number; left: number } | null>(null);
+  const ui = useTimelineRowState({ task, onUpdate, onDone, onUndone });
+  const { showLinkPanel, showMenu, setShowLinkPanel } = ui;
   const { openNotes } = useNotes();
-  const router = useRouter();
-  const linkBadgeRef = useRef<HTMLButtonElement>(null);
-  const [linkPanelPos, setLinkPanelPos] = useState<{ top: number; left: number } | null>(null);
-  const [attachPos, setAttachPos] = useState<{ top: number; left: number } | null>(null);
-
-  // Menu outside-click/scroll handling is owned by FloatingPanel. The
-  // scroll effect below also closes the inline submenu expanders.
-  useEffect(() => {
-    if (!showMenu) return;
-    const close = () => {
-      setShowMenu(false);
-      setShowAttachPanel(false);
-      setShowLinkPanel(false);
-    };
-    window.addEventListener("scroll", close, { capture: true, passive: true });
-    window.addEventListener("resize", close);
-    return () => {
-      window.removeEventListener("scroll", close, { capture: true });
-      window.removeEventListener("resize", close);
-    };
-  }, [showMenu]);
-
-  const [isEditing, setIsEditing] = useState(false);
-  const [editText, setEditText] = useState(task.text);
   const inputRef = useRef<HTMLInputElement>(null);
+  const linkBadgeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    if (isEditing && inputRef.current) {
+    if (ui.isEditing && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.select();
     }
-  }, [isEditing]);
-
-  useEffect(() => {
-    if (!showStatusPicker) return;
-    const close = () => setShowStatusPicker(false);
-    window.addEventListener("scroll", close, { capture: true, passive: true });
-    window.addEventListener("resize", close);
-    return () => {
-      window.removeEventListener("scroll", close, { capture: true });
-      window.removeEventListener("resize", close);
-    };
-  }, [showStatusPicker]);
-
-  const handleStatusSelect = (status: IdeaStatus) => {
-    applyStatusTransition(task.id, status, onUpdate, { onDone, onUndone });
-    setShowStatusPicker(false);
-  };
-
-  const handleStartEdit = () => {
-    setEditText(task.text);
-    setIsEditing(true);
-  };
-
-  const handleConfirmEdit = () => {
-    if (editText.trim() && editText.trim() !== task.text) {
-      onUpdate(task.id, { text: editText.trim() });
-    }
-    setIsEditing(false);
-  };
-
-  const handleCancelEdit = () => {
-    setIsEditing(false);
-  };
-
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleConfirmEdit();
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      handleCancelEdit();
-    }
-  };
+  }, [ui.isEditing]);
 
   useEffect(() => {
     if (!showLinkPanel || showMenu) return;
@@ -214,16 +102,19 @@ export function TimelineTaskRow({
       window.removeEventListener("resize", close);
       document.removeEventListener("mousedown", handler);
     };
-  }, [showLinkPanel, showMenu]);
+  }, [showLinkPanel, showMenu, setShowLinkPanel]);
 
   const signalCfg =
     task.productivity_signal &&
     PRODUCTIVITY_SIGNALS[task.productivity_signal as keyof typeof PRODUCTIVITY_SIGNALS];
 
+  const linkCount =
+    links?.filter((l) => l.source_id === task.id || l.target_id === task.id).length ?? 0;
+
   return (
     <div
       id={occurrenceDate ? `task-${task.id}-${occurrenceDate}` : undefined}
-      className={`group flex items-center gap-1.5 rounded-xl px-3 py-2 transition-colors ${isHovered ? "bg-black/[0.03] dark:bg-white/[0.04]" : ""} ${signalCfg ? "border-b-2" : ""}`}
+      className={`group flex items-center gap-1.5 rounded-xl px-3 py-2 transition-colors ${ui.isHovered ? "bg-black/[0.03] dark:bg-white/[0.04]" : ""} ${signalCfg ? "border-b-2" : ""}`}
       style={
         signalCfg
           ? {
@@ -233,12 +124,12 @@ export function TimelineTaskRow({
             }
           : undefined
       }
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={() => ui.setIsHovered(true)}
+      onMouseLeave={() => ui.setIsHovered(false)}
       onContextMenu={(e) => {
         e.preventDefault();
-        setRevealPos({ top: e.clientY + 4, right: window.innerWidth - e.clientX - 4 });
-        setShowReveal(true);
+        ui.setRevealPos({ top: e.clientY + 4, right: window.innerWidth - e.clientX - 4 });
+        ui.setShowReveal(true);
       }}
       aria-label={signalCfg ? `Productivity: ${signalCfg.label}` : undefined}
     >
@@ -264,19 +155,19 @@ export function TimelineTaskRow({
           className={`flex-shrink-0 ${statusConfig.textClass}`}
         />
       )}
-      {isEditing ? (
+      {ui.isEditing ? (
         <input
           ref={inputRef}
           type="text"
-          value={editText}
-          onChange={(e) => setEditText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={handleConfirmEdit}
+          value={ui.editText}
+          onChange={(e) => ui.setEditText(e.target.value)}
+          onKeyDown={ui.handleKeyDown}
+          onBlur={ui.handleConfirmEdit}
           className="min-w-0 flex-1 rounded-lg border border-violet-300 bg-white/80 px-1.5 py-0.5 text-sm outline-none focus:border-violet-500 dark:border-violet-600 dark:bg-gray-800/80"
         />
       ) : (
         <span
-          onClick={handleStartEdit}
+          onClick={ui.handleStartEdit}
           className={`-mx-1 flex-1 cursor-text truncate rounded px-1 text-sm hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${isCancelled ? "text-red-400/60" : isMissed ? "text-rose-400/60" : ""}`}
           style={{
             fontWeight: 450,
@@ -301,149 +192,49 @@ export function TimelineTaskRow({
         </span>
       )}
 
-      {(() => {
-        const parent = ideas?.find((i) => i.id === task.parent_id);
-        if (!parent) return null;
-        const isProject = parent.type === "project";
-        const href = isProject
-          ? getRevealHref("projects", parent, ideas)
-          : getRevealHref("brainstorm", parent, ideas);
-        return (
-          <button
-            title={`Reveal parent: ${parent.text || "Untitled"}`}
-            aria-label={`Reveal parent ${parent.text || "Untitled"}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              router.push(href);
-            }}
-            className="max-w-[100px] cursor-pointer truncate rounded-full bg-black/[0.04] px-2 py-0.5 text-[9px] font-semibold text-gray-500 transition-colors hover:bg-black/[0.08] hover:text-gray-700 dark:bg-white/[0.06] dark:text-gray-400 dark:hover:bg-white/[0.10] dark:hover:text-gray-200"
-          >
-            in: {parent.text || "Untitled"}
-          </button>
-        );
-      })()}
-      {(() => {
-        const count =
-          links?.filter((l) => l.source_id === task.id || l.target_id === task.id).length ?? 0;
-        if (count === 0) return null;
-        return (
-          <button
-            ref={linkBadgeRef}
-            aria-label={`View links (${count})`}
-            title="View links"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (showLinkPanel) {
-                setShowLinkPanel(false);
-                return;
-              }
-              const rect = linkBadgeRef.current?.getBoundingClientRect();
-              if (rect) setLinkPanelPos({ top: rect.bottom + 4, left: rect.left });
-              setShowMenu(false);
-              setShowAttachPanel(false);
-              setShowLinkPanel(true);
-            }}
-            className="flex cursor-pointer items-center gap-0.5 rounded-full bg-indigo-50 px-1.5 py-0.5 text-[9px] font-bold text-indigo-600 transition-colors hover:bg-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-400 dark:hover:bg-indigo-900/30"
-          >
-            <Link2 size={10} /> {count}
-          </button>
-        );
-      })()}
-
-      <div className="relative flex flex-shrink-0 items-center gap-1">
-        {taskTags.map((tag) => (
-          <span
-            key={tag.id}
-            className="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
-            style={{ opacity: 0.85 }}
-          >
-            <span
-              className={`inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full ${AREA_DOT_COLORS[tag.area]}`}
-            />
-            {tag.name}
-          </span>
-        ))}
+      <ParentChip task={task} ideas={ideas} />
+      {linkCount > 0 && (
         <button
-          ref={tagTriggerRef}
-          onClick={() => {
-            if (showTagPicker) {
-              setShowTagPicker(false);
+          ref={linkBadgeRef}
+          aria-label={`View links (${linkCount})`}
+          title="View links"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (ui.showLinkPanel) {
+              ui.setShowLinkPanel(false);
               return;
             }
-            const rect = tagTriggerRef.current?.getBoundingClientRect();
-            if (rect) setTagPickerPos({ top: rect.bottom + 4, left: rect.left });
-            setShowTagPicker(true);
+            const rect = linkBadgeRef.current?.getBoundingClientRect();
+            if (rect) ui.setLinkPanelPos({ top: rect.bottom + 4, left: rect.left });
+            ui.setShowMenu(false);
+            ui.setShowAttachPanel(false);
+            ui.setShowLinkPanel(true);
           }}
-          className="rounded-full bg-black/5 px-1.5 py-0.5 text-[9px] font-semibold text-gray-400 hover:bg-black/10 dark:bg-white/5 dark:text-gray-500 dark:hover:bg-white/10"
+          className="flex cursor-pointer items-center gap-0.5 rounded-full bg-indigo-50 px-1.5 py-0.5 text-[9px] font-bold text-indigo-600 transition-colors hover:bg-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-400 dark:hover:bg-indigo-900/30"
         >
-          {taskTags.length === 0 ? "tag" : "+"}
+          <Link2 size={10} /> {linkCount}
         </button>
-        {showTagPicker && tagPickerPos && (
-          <TagPicker
-            allTags={allTags}
-            selectedTags={taskTags}
-            onAdd={(tag) => {
-              void onAddTag(task.id, tag);
-            }}
-            onRemove={(tagId) => {
-              void onRemoveTag(task.id, tagId);
-            }}
-            onCreateTag={onCreateTag}
-            onClose={() => setShowTagPicker(false)}
-            fixedPosition={tagPickerPos}
-          />
-        )}
-      </div>
+      )}
 
-      <div className="relative flex-shrink-0">
-        <button
-          ref={statusTriggerRef}
-          onClick={() => {
-            if (showStatusPicker) {
-              setShowStatusPicker(false);
-              return;
-            }
-            const rect = statusTriggerRef.current?.getBoundingClientRect();
-            if (rect) setStatusPickerPos({ top: rect.bottom + 4, left: rect.left });
-            setShowStatusPicker(true);
-          }}
-          className="flex cursor-pointer items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold transition-all hover:opacity-80"
-          style={{
-            background: isCompleted
-              ? "#f5f3ff"
-              : isCancelled
-                ? "#fef2f2"
-                : isMissed
-                  ? "#fff1f2"
-                  : isPaused
-                    ? "#fff7ed"
-                    : isInProgress
-                      ? "#fefce8"
-                      : "rgba(0,0,0,0.05)",
-            color: isCompleted
-              ? "#7c3aed"
-              : isCancelled
-                ? "#ef4444"
-                : isMissed
-                  ? "#f43f5e"
-                  : isPaused
-                    ? "#f97316"
-                    : isInProgress
-                      ? "#d97706"
-                      : "#9ca3af",
-          }}
-        >
-          {statusConfig.label}
-        </button>
-        {showStatusPicker && statusPickerPos && (
-          <StatusPicker
-            current={task.status}
-            onSelect={handleStatusSelect}
-            onClose={() => setShowStatusPicker(false)}
-            position={statusPickerPos}
-          />
-        )}
-      </div>
+      <TagCluster
+        task={task}
+        taskTags={taskTags}
+        allTags={allTags}
+        ui={ui}
+        onAddTag={onAddTag}
+        onRemoveTag={onRemoveTag}
+        onCreateTag={onCreateTag}
+      />
+
+      <TimelineStatusPill
+        task={task}
+        isCompleted={isCompleted}
+        isCancelled={isCancelled}
+        isMissed={isMissed}
+        isPaused={isPaused}
+        isInProgress={isInProgress}
+        ui={ui}
+      />
 
       <NotesIndicator hasNotes={!!task.notes?.trim()} onClick={() => openNotes(task.id)} />
       <PriorityChipField ideaId={task.id} />
@@ -457,162 +248,22 @@ export function TimelineTaskRow({
         </span>
       )}
 
-      <div className="relative">
-        <button
-          ref={menuTriggerRef}
-          onClick={() => {
-            if (showMenu) {
-              setShowMenu(false);
-              return;
-            }
-            const rect = menuTriggerRef.current?.getBoundingClientRect();
-            if (rect) setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
-            setShowMenu(true);
-          }}
-          className={`flex-shrink-0 text-gray-300 transition-all hover:text-gray-500 dark:text-gray-600 ${isHovered || showMenu ? "opacity-100" : "opacity-0"}`}
-        >
-          <MoreHorizontal size={16} strokeWidth={1.5} />
-        </button>
-        {showMenu && menuPos && (
-          <FloatingPanel
-            anchor={menuPos}
-            onClose={() => setShowMenu(false)}
-            className="glass-card-strong min-w-[160px] rounded-xl py-1.5 shadow-lg"
-          >
-            {isHistorical && onGoToDate && attemptTarget && (
-              <>
-                <button
-                  onClick={() => {
-                    onGoToDate(attemptTarget, task.id);
-                    setShowMenu(false);
-                  }}
-                  className="flex w-full px-3 py-2 text-left text-xs font-medium text-violet-600 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/20"
-                >
-                  {attemptLabel}
-                </button>
-                <div className="my-1 border-t border-black/5 dark:border-white/5" />
-              </>
-            )}
-            <TaskRowMenu
-              task={task}
-              today={today}
-              onReschedule={onReschedule}
-              onUpdate={onUpdate}
-              onDone={() => {
-                setShowMenu(false);
-                setShowAttachPanel(false);
-                setShowLinkPanel(false);
-              }}
-              organizeSection={
-                <>
-                  {onMove && ideas && (
-                    <div className="relative">
-                      <button
-                        onClick={(e) => {
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          setAttachPos({ top: rect.bottom + 4, left: rect.left });
-                          setShowAttachPanel((v) => !v);
-                        }}
-                        className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                        title="Keeps deferred occurrence on this day, also shows under selected parent"
-                      >
-                        Attach to…{" "}
-                        <span className="text-[10px]">{showAttachPanel ? "▴" : "▸"}</span>
-                      </button>
-                      {showAttachPanel && attachPos && (
-                        <MoveIdeaPanel
-                          idea={task}
-                          ideas={ideas}
-                          variant="attach"
-                          onMove={async (newParentId, newSortOrder) => {
-                            await onMove(task.id, newParentId, newSortOrder);
-                            setShowAttachPanel(false);
-                            setShowMenu(false);
-                          }}
-                          onMoved={() => {
-                            setShowAttachPanel(false);
-                            setShowMenu(false);
-                          }}
-                          onClose={() => setShowAttachPanel(false)}
-                          position={attachPos}
-                        />
-                      )}
-                    </div>
-                  )}
-                  {onCreateLink && onDeleteLink && ideas && links && (
-                    <div className="relative">
-                      <button
-                        onClick={(e) => {
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          setLinkPanelPos({ top: rect.bottom + 4, left: rect.left });
-                          setShowLinkPanel((v) => !v);
-                        }}
-                        className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                      >
-                        Link… <span className="text-[10px]">{showLinkPanel ? "▴" : "▸"}</span>
-                      </button>
-                      {showLinkPanel && linkPanelPos && (
-                        <LinkPanel
-                          ideaId={task.id}
-                          ideas={ideas}
-                          links={links}
-                          onCreateLink={onCreateLink}
-                          onDeleteLink={onDeleteLink}
-                          onClose={() => setShowLinkPanel(false)}
-                          fixedPosition={linkPanelPos}
-                        />
-                      )}
-                    </div>
-                  )}
-                </>
-              }
-              navigateSection={
-                <button
-                  onClick={() => {
-                    const rect = menuTriggerRef.current?.getBoundingClientRect();
-                    if (rect)
-                      setRevealPos({
-                        top: rect.bottom + 4,
-                        right: window.innerWidth - rect.right,
-                      });
-                    setShowMenu(false);
-                    setShowReveal(true);
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                >
-                  <Eye size={12} strokeWidth={1.5} />
-                  Reveal in...
-                </button>
-              }
-            />
-          </FloatingPanel>
-        )}
-        {showReveal && revealPos && (
-          <RevealInMenu
-            idea={task}
-            currentView="timeline"
-            position={revealPos}
-            onClose={() => setShowReveal(false)}
-          />
-        )}
-        {showLinkPanel &&
-          linkPanelPos &&
-          !showMenu &&
-          onCreateLink &&
-          onDeleteLink &&
-          ideas &&
-          links && (
-            <LinkPanel
-              ideaId={task.id}
-              ideas={ideas}
-              links={links}
-              onCreateLink={onCreateLink}
-              onDeleteLink={onDeleteLink}
-              onClose={() => setShowLinkPanel(false)}
-              fixedPosition={linkPanelPos}
-            />
-          )}
-      </div>
+      <TimelineRowMenus
+        task={task}
+        today={today}
+        ui={ui}
+        isHistorical={isHistorical}
+        attemptTarget={attemptTarget}
+        attemptLabel={attemptLabel}
+        onReschedule={onReschedule}
+        onUpdate={onUpdate}
+        onMove={onMove}
+        ideas={ideas}
+        links={links}
+        onCreateLink={onCreateLink}
+        onDeleteLink={onDeleteLink}
+        onGoToDate={onGoToDate}
+      />
     </div>
   );
 }
