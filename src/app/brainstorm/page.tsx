@@ -2,26 +2,30 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { useIdeas, type CreateIdeaPosition } from "@/hooks/useIdeas";
+import { useIdeas } from "@/hooks/useIdeas";
 import { useClassifications } from "@/hooks/useClassifications";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
 import { AppShell } from "@/components/AppShell";
 import { IdeaTree } from "@/components/brainstorm/IdeaTree";
-import { BrainstormToolbar } from "@/components/brainstorm/BrainstormToolbar";
+import {
+  BrainstormActions,
+  BrainstormStartActions,
+} from "@/components/brainstorm/BrainstormHeaders";
 import { BrainstormBreadcrumb } from "@/components/brainstorm/BrainstormBreadcrumb";
 import { GraphView } from "@/components/brainstorm/GraphView";
-import { Idea, IdeaType, LinkType } from "@/lib/types";
+import { IdeaType } from "@/lib/types";
 import { STORAGE_KEYS, readRawString, writeRawString } from "@/lib/storage";
 import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 import { getAncestorChain, getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
-import { getCompletionEffects, hasAnyEffects } from "@/lib/linkEffects";
+import { hasAnyEffects } from "@/lib/linkEffects";
 import { useCompletionEffects } from "@/stores/feedbackStore";
 import { LinkedEffectsReveal, LinkedEffectsBadge } from "@/components/shared/LinkedEffectsReveal";
 import type { IdeasScope } from "@/hooks/useIdeas";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useUndoAction } from "@/lib/tasks/undo";
+import { useBrainstormMutations } from "@/hooks/useBrainstormMutations";
 
 export default function BrainstormPage() {
   const [timeScope, setTimeScope] = useState<IdeasScope>("this_month");
@@ -130,187 +134,23 @@ export default function BrainstormPage() {
     }
   };
 
-  const createIdea = async (
-    text: string,
-    parentId?: string | null,
-    position?: CreateIdeaPosition,
-  ): Promise<string> => {
-    const id = await ideasHook.createIdea(text, parentId, position);
-    if (id) {
-      registerUndo({
-        label: "Idea created",
-        run: async () => {
-          await ideasHook.deleteIdea(id);
-        },
-      });
-    }
-    return id;
-  };
-
-  const updateIdea = async (id: string, updates: Partial<Idea>) => {
-    const previous = ideasHook.ideas.find((idea) => idea.id === id);
-    if (updates.status === "completed" && previous && previous.status !== "completed") {
-      const effects = getCompletionEffects(id, ideasHook.ideas, linksHook.links);
-      await ideasHook.updateIdea(id, updates);
-      const restore: Partial<Idea> = {};
-      for (const key of Object.keys(updates) as Array<keyof Idea>) {
-        restore[key] = previous[key] as never;
-      }
-      registerUndo({
-        label: "Idea updated",
-        run: async () => {
-          await ideasHook.updateIdea(id, restore);
-        },
-      });
-      if (hasAnyEffects(effects)) setCompletionEffects({ effects, completedText: previous.text });
-      return;
-    }
-    await ideasHook.updateIdea(id, updates);
-    if (!previous) return;
-
-    const restore: Partial<Idea> = {};
-    for (const key of Object.keys(updates) as Array<keyof Idea>) {
-      restore[key] = previous[key] as never;
-    }
-    registerUndo({
-      label: "Idea updated",
-      run: async () => {
-        await ideasHook.updateIdea(id, restore);
-      },
-    });
-  };
-
-  const deleteIdea = async (id: string) => {
-    const deletedIds = getFocusedSubtreeIds(id, ideasHook.ideas);
-    const deletedIdeas = ideasHook.ideas.filter((idea) => deletedIds.has(idea.id));
-    const deletedLinks = linksHook.removeLinksForIdeaIds(deletedIds);
-    await ideasHook.deleteIdea(id);
-    if (deletedIdeas.length === 0) return;
-
-    registerUndo({
-      label: deletedIdeas.length > 1 ? "Ideas deleted" : "Idea deleted",
-      run: async () => {
-        await ideasHook.restoreIdeas(deletedIdeas);
-        await linksHook.restoreLinks(deletedLinks);
-      },
-    });
-  };
-
-  const moveIdea = async (id: string, newParentId: string | null, newSortOrder: number) => {
-    const previous = ideasHook.ideas.find((idea) => idea.id === id);
-    await ideasHook.moveIdea(id, newParentId, newSortOrder);
-    if (!previous) return;
-
-    registerUndo({
-      label: "Idea moved",
-      run: async () => {
-        await ideasHook.moveIdea(id, previous.parent_id, previous.sort_order);
-      },
-    });
-  };
-
-  const createParentAndMove = async (
-    id: string,
-    text: string,
-    type: IdeaType,
-  ): Promise<string | null> => {
-    const previous = ideasHook.ideas.find((idea) => idea.id === id);
-    const parentId = await ideasHook.createParentAndMove(id, text, type);
-    if (!parentId) return null;
-    if (previous) {
-      registerUndo({
-        label: "Parent created",
-        run: async () => {
-          await ideasHook.moveIdea(id, previous.parent_id, previous.sort_order);
-          await ideasHook.deleteIdea(parentId);
-        },
-      });
-    }
-    return parentId;
-  };
-
-  const createLink = async (
-    sourceId: string,
-    targetId: string,
-    linkType: LinkType,
-  ): Promise<string> => {
-    const id = await linksHook.createLink(sourceId, targetId, linkType);
-    if (id) {
-      registerUndo({
-        label: "Link created",
-        run: async () => {
-          await linksHook.deleteLink(id);
-        },
-      });
-    }
-    return id;
-  };
-
-  const deleteLink = async (id: string) => {
-    const deletedLink = linksHook.links.find((link) => link.id === id);
-    await linksHook.deleteLink(id);
-    if (!deletedLink) return;
-
-    registerUndo({
-      label: "Link deleted",
-      run: async () => {
-        await linksHook.restoreLinks([deletedLink]);
-      },
-    });
-  };
-
-  const markDone = async (id: string) => {
-    const previous = ideasHook.ideas.find((idea) => idea.id === id);
-    // Compute effects BEFORE status flips to completed (uses current statuses)
-    const effects = getCompletionEffects(id, ideasHook.ideas, linksHook.links);
-    await ideasHook.markDone(id);
-    if (!previous) return;
-
-    registerUndo({
-      label: "Idea completed",
-      run: async () => {
-        await ideasHook.updateIdea(id, {
-          status: previous.status,
-          completed_at: previous.completed_at,
-        });
-      },
-    });
-    if (hasAnyEffects(effects)) {
-      setCompletionEffects({ effects, completedText: previous.text });
-    }
-  };
-
-  const markUndone = async (id: string) => {
-    const previous = ideasHook.ideas.find((idea) => idea.id === id);
-    await ideasHook.markUndone(id);
-    if (!previous) return;
-
-    registerUndo({
-      label: "Idea reopened",
-      run: async () => {
-        await ideasHook.updateIdea(id, {
-          status: previous.status,
-          completed_at: previous.completed_at,
-        });
-      },
-    });
-  };
-
-  const scheduleIdea = async (id: string, date: string | null) => {
-    const previous = ideasHook.ideas.find((idea) => idea.id === id);
-    await ideasHook.scheduleIdea(id, date);
-    if (!previous) return;
-
-    registerUndo({
-      label: date ? "Idea scheduled" : "Schedule cleared",
-      run: async () => {
-        await ideasHook.updateIdea(id, {
-          scheduled_date: previous.scheduled_date,
-          attempt_dates: previous.attempt_dates,
-        });
-      },
-    });
-  };
+  const {
+    createIdea,
+    updateIdea,
+    deleteIdea,
+    moveIdea,
+    createParentAndMove,
+    createLink,
+    deleteLink,
+    markDone,
+    markUndone,
+    scheduleIdea,
+  } = useBrainstormMutations({
+    ideasApi: ideasHook,
+    linksApi: linksHook,
+    registerUndo,
+    setCompletionEffects,
+  });
 
   useEffect(() => {
     if (!highlightId || ideasHook.loading) return;
@@ -363,9 +203,9 @@ export default function BrainstormPage() {
   }
 
   const headerStartActions = (
-    <BrainstormToolbar
+    <BrainstormStartActions
       editMode={editMode}
-      setEditMode={changeEditMode}
+      onEditModeChange={changeEditMode}
       cardMode={cardMode}
       showType={showType}
       setShowType={setShowType}
@@ -383,67 +223,22 @@ export default function BrainstormPage() {
       setHideInHorizon={setHideInHorizon}
       typeFilter={typeFilter}
       setTypeFilter={setTypeFilter}
-      onAddRoot={handleAddRoot}
-      expandAll={ideasHook.expandAll}
-      collapseAll={ideasHook.collapseAll}
+      onAddRoot={() => void handleAddRoot()}
+      onExpandAll={ideasHook.expandAll}
+      onCollapseAll={ideasHook.collapseAll}
     />
   );
 
   const headerActions = (
-    <div className="flex items-center gap-2">
-      <div className="flex gap-1">
-        <button
-          onClick={() => setTimeScope("this_month")}
-          className={`toolbar-btn ${timeScope === "this_month" ? "toolbar-btn--accent" : ""}`}
-          title="Only load ideas scheduled this month or unscheduled and active"
-        >
-          This month
-        </button>
-        <button
-          onClick={() => setTimeScope("all")}
-          className={`toolbar-btn ${timeScope === "all" ? "toolbar-btn--accent" : ""}`}
-          title="Load every idea"
-        >
-          All
-        </button>
-      </div>
-      <span className="text-gray-200">|</span>
-      {viewMode === "tree" && (
-        <>
-          <button
-            onClick={() => setCardMode((v: boolean) => !v)}
-            className={`toolbar-btn ${cardMode ? "toolbar-btn--accent" : ""}`}
-            title={cardMode ? "Show rows" : "Show cards"}
-            aria-pressed={cardMode}
-          >
-            {cardMode ? "Rows" : "Cards"}
-          </button>
-          <span className="text-gray-200">|</span>
-        </>
-      )}
-      <div className="flex gap-1">
-        <button
-          onClick={() => setViewMode("tree")}
-          className={`toolbar-btn ${viewMode === "tree" ? "toolbar-btn--accent" : ""}`}
-        >
-          Tree
-        </button>
-        <button
-          onClick={() => setViewMode("graph")}
-          disabled={!hasLinks}
-          className={`toolbar-btn ${
-            !hasLinks
-              ? "cursor-not-allowed opacity-40"
-              : viewMode === "graph"
-                ? "toolbar-btn--accent"
-                : ""
-          }`}
-          title={!hasLinks ? "Link two ideas to unlock" : ""}
-        >
-          Graph
-        </button>
-      </div>
-    </div>
+    <BrainstormActions
+      cardMode={cardMode}
+      onToggleCardMode={() => setCardMode((v: boolean) => !v)}
+      timeScope={timeScope}
+      onTimeScopeChange={setTimeScope}
+      viewMode={viewMode}
+      onViewModeChange={setViewMode}
+      hasLinks={hasLinks}
+    />
   );
 
   return (
