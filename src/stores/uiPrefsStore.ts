@@ -25,6 +25,8 @@ interface UiPrefsState {
   projectsUnclassifiedExpanded: boolean;
   projectsDetailHideCompleted: boolean;
   projectsDetailHideClosed: boolean;
+  /** Project detail TASKS grouping: classification scheme key, or null for manual (tree) order. */
+  projectTasksGroupBy: string | null;
   horizonUnclassifiedExpanded: boolean;
   horizonHideProjectsWithTasks: boolean;
   horizonHideCommitted: boolean;
@@ -78,6 +80,7 @@ export const useUiPrefsStore = create<UiPrefsState>()(
       projectsUnclassifiedExpanded: true,
       projectsDetailHideCompleted: true,
       projectsDetailHideClosed: true,
+      projectTasksGroupBy: null,
       horizonUnclassifiedExpanded: false,
       horizonHideProjectsWithTasks: true,
       horizonHideCommitted: true,
@@ -105,6 +108,7 @@ export const useUiPrefsStore = create<UiPrefsState>()(
         projectsUnclassifiedExpanded: s.projectsUnclassifiedExpanded,
         projectsDetailHideCompleted: s.projectsDetailHideCompleted,
         projectsDetailHideClosed: s.projectsDetailHideClosed,
+        projectTasksGroupBy: s.projectTasksGroupBy,
         horizonUnclassifiedExpanded: s.horizonUnclassifiedExpanded,
         horizonHideProjectsWithTasks: s.horizonHideProjectsWithTasks,
         horizonHideUpcomingCommitted: s.horizonHideUpcomingCommitted,

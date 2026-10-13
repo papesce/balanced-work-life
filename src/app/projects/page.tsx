@@ -30,7 +30,8 @@ import { StatusPicker } from "@/components/brainstorm/StatusPicker";
 import { PriorityChip, priorityRank, type PriorityValue } from "@/components/shared/PriorityChip";
 import { TagPicker } from "@/components/shared/TagPicker";
 import { areaColors } from "@/styles/tokens";
-import { ColumnShell, groupKeyOf } from "@/components/lens";
+import { ColumnShell, groupKeyOf, optionsForScheme } from "@/components/lens";
+import { buildLensColumns, resolveLens } from "@/lib/horizonLenses";
 import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 import { AppShell } from "@/components/AppShell";
 import { IdeaTree } from "@/components/brainstorm/IdeaTree";
@@ -44,7 +45,7 @@ import { useTaskTags } from "@/hooks/useTaskTags";
 import { useProjectActions } from "@/hooks/useProjectActions";
 import { useProjectLookups } from "@/stores/projectLookups";
 import { useProjectTreeStore } from "@/stores/projectTreeStore";
-import { Idea, IdeaStatus, Tag } from "@/lib/types";
+import { Idea, IdeaStatus, Tag, type IdeaNode } from "@/lib/types";
 import { getAncestorChain } from "@/lib/ideaTreeFocus";
 import { hasAnyEffects } from "@/lib/linkEffects";
 import { LinkedEffectsReveal } from "@/components/shared/LinkedEffectsReveal";
@@ -448,6 +449,54 @@ export default function ProjectsPage() {
     [projectTasks, pathedIds],
   );
 
+  // Detail TASKS grouping (Option A): bucket the focus-root's direct-child
+  // subtrees by a user-picked classification scheme. Subtrees travel intact
+  // with their top-level parent — no Horizon-style promotion.
+  const tasksGroupBy = useUiPrefsStore((s) => s.projectTasksGroupBy);
+  const detailLens = useMemo(() => {
+    if (!tasksGroupBy) return null;
+    const infos = schemes.map((s) => ({
+      key: s.key,
+      label: s.label,
+      options: optionsForScheme(classificationOptions, s.id).map((o) => o.value),
+    }));
+    const { lens } = resolveLens(tasksGroupBy, infos);
+    const scheme =
+      schemes.find((s) => s.key === lens.primaryScheme) ??
+      schemes.find((s) => s.key === tasksGroupBy) ??
+      null;
+    if (!scheme) return null;
+    const columns = buildLensColumns(lens, optionsForScheme(classificationOptions, scheme.id));
+    const inner = valuesBySchemeKey.get(scheme.key);
+    return { scheme, columns, valueOf: (id: string) => inner?.get(id) ?? null };
+  }, [tasksGroupBy, schemes, classificationOptions, valuesBySchemeKey]);
+
+  const focusRootId = focusedId ?? selectedId;
+  const focusForest: IdeaNode[] = useMemo(() => {
+    if (!focusRootId) return [];
+    const findNode = (nodes: IdeaNode[]): IdeaNode | null => {
+      for (const n of nodes) {
+        if (n.id === focusRootId) return n;
+        const found = findNode(n.children);
+        if (found) return found;
+      }
+      return null;
+    };
+    return findNode(ideasHook.tree)?.children ?? [];
+  }, [ideasHook.tree, focusRootId]);
+
+  const groupedForest = useMemo(() => {
+    if (!detailLens) return null;
+    const grouped = new Map<string, IdeaNode[]>();
+    for (const node of focusForest) {
+      const key = groupKeyOf(detailLens.valueOf(node.id));
+      const list = grouped.get(key) ?? [];
+      list.push(node);
+      grouped.set(key, list);
+    }
+    return grouped;
+  }, [detailLens, focusForest]);
+
   /** Single UI entry for "new editable row": expand parent, select + edit the draft. */
   const spawnEditable = (id: string, parentId: string | null) => {
     if (parentId) ideasHook.expandIdea(parentId);
@@ -489,6 +538,20 @@ export default function ProjectsPage() {
       handleSelect(id);
       spawnEditable(id, null);
     }
+  };
+
+  /** Grouped TASKS: quick-add a task under the focus root, pre-tagged with the group value. */
+  const handleAddTaskInGroup = async (groupValue: string | null) => {
+    const parentId = focusedId ?? selectedId;
+    if (!parentId || !detailLens) return;
+    const id = await actions.createIdea("", parentId, "bottom", {
+      type: "task",
+      status: "draft",
+    });
+    if (!id) return;
+    if (groupValue) await setClassification(id, detailLens.scheme.key, groupValue);
+    ideasHook.expandIdea(parentId);
+    spawnEditable(id, parentId);
   };
 
   const toggleCard = (id: string) => {
@@ -542,6 +605,53 @@ export default function ProjectsPage() {
     const composerParent = focusedId
       ? (ideasHook.ideas.find((i) => i.id === focusedId) ?? null)
       : null;
+    // Shared IdeaTree props for the detail TASKS pane (single + grouped modes).
+    const sharedTreeProps = {
+      ideas: ideasHook.ideas,
+      links: linksHook.links,
+      scope: "all" as const,
+      createIdea,
+      updateIdea,
+      deleteIdea,
+      moveIdea,
+      onCreateParent: createParentAndMove,
+      toggleCollapse: ideasHook.toggleCollapse,
+      expandIdea: ideasHook.expandIdea,
+      onCreateLink: createLink,
+      onDeleteLink: deleteLink,
+      onMarkDone: markDone,
+      onMarkUndone: markUndone,
+      onSchedule: scheduleIdea,
+      allTags: tagsHook.tags,
+      getTagsForIdea: taskTagsHook.getTagsForIdea,
+      onAddTag: taskTagsHook.addTagToTask,
+      onRemoveTag: taskTagsHook.removeTagFromTask,
+      onCreateTag: tagsHook.createTag,
+      search: "",
+      showType,
+      showArea,
+      editMode: "edit" as const,
+      editingId,
+      setEditingId,
+      selectedId: selectedTreeId,
+      setSelectedId: setSelectedTreeId,
+      composing,
+      setComposing,
+      showToday: false,
+      hideClosed: detailHideClosed,
+      hideCompleted: detailHideCompleted,
+      hideDeferred: false,
+      pathChipsForIdea: (id: string) => membership.titlesByIdea.get(id) ?? [],
+      onFocus: (id: string | null) => setFocusedId(id === selectedId ? null : id),
+      cardMode: false,
+      compact: effectiveMode === "split",
+      onAddToPath: effectiveMode === "split" ? handleAddToPath : undefined,
+      isInPath,
+      pathAddDisabled: !canvasApi?.selectedPathId,
+    };
+    const groupSchemeOptions = [...schemes]
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((s) => ({ key: s.key, label: s.label }));
     const listPane = (
       <div className="flex min-h-0 flex-col">
         <div className="sticky top-0 z-10 bg-white pb-2 dark:bg-gray-950">
@@ -556,53 +666,71 @@ export default function ProjectsPage() {
             suggestFrom={ideasHook.ideas}
             currentView="projects"
           />
+          <div className="mt-1.5 flex items-center gap-1.5">
+            <label
+              htmlFor="tasks-group-by"
+              className="text-[11px] font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500"
+            >
+              Group
+            </label>
+            <select
+              id="tasks-group-by"
+              value={tasksGroupBy ?? ""}
+              onChange={(e) => setPrefs({ projectTasksGroupBy: e.target.value || null })}
+              aria-label="Group tasks by classification"
+              className="rounded-lg border border-gray-200 bg-gray-100 px-1.5 py-1 text-xs font-semibold text-gray-600 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-300"
+            >
+              <option value="">Manual</option>
+              {groupSchemeOptions.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-        <IdeaTree
-          tree={ideasHook.tree}
-          ideas={ideasHook.ideas}
-          links={linksHook.links}
-          scope="all"
-          createIdea={createIdea}
-          updateIdea={updateIdea}
-          deleteIdea={deleteIdea}
-          moveIdea={moveIdea}
-          onCreateParent={createParentAndMove}
-          toggleCollapse={ideasHook.toggleCollapse}
-          expandIdea={ideasHook.expandIdea}
-          onCreateLink={createLink}
-          onDeleteLink={deleteLink}
-          onMarkDone={markDone}
-          onMarkUndone={markUndone}
-          onSchedule={scheduleIdea}
-          allTags={tagsHook.tags}
-          getTagsForIdea={taskTagsHook.getTagsForIdea}
-          onAddTag={taskTagsHook.addTagToTask}
-          onRemoveTag={taskTagsHook.removeTagFromTask}
-          onCreateTag={tagsHook.createTag}
-          search=""
-          showType={showType}
-          showArea={showArea}
-          editMode="edit"
-          editingId={editingId}
-          setEditingId={setEditingId}
-          selectedId={selectedTreeId}
-          setSelectedId={setSelectedTreeId}
-          composing={composing}
-          setComposing={setComposing}
-          showToday={false}
-          hideClosed={detailHideClosed}
-          hideCompleted={detailHideCompleted}
-          hideDeferred={false}
-          hideIds={unpathedOnly ? pathedIds : undefined}
-          pathChipsForIdea={(id) => membership.titlesByIdea.get(id) ?? []}
-          focusedId={focusedId ?? selectedId}
-          onFocus={(id) => setFocusedId(id === selectedId ? null : id)}
-          cardMode={false}
-          compact={effectiveMode === "split"}
-          onAddToPath={effectiveMode === "split" ? handleAddToPath : undefined}
-          isInPath={isInPath}
-          pathAddDisabled={!canvasApi?.selectedPathId}
-        />
+        {!detailLens || !groupedForest ? (
+          <IdeaTree
+            tree={ideasHook.tree}
+            {...sharedTreeProps}
+            hideIds={unpathedOnly ? pathedIds : undefined}
+            focusedId={focusedId ?? selectedId}
+          />
+        ) : (
+          <div className="flex flex-col gap-4">
+            {detailLens.columns.map((col) => {
+              const forest = groupedForest.get(groupKeyOf(col.key)) ?? [];
+              if (forest.length === 0) return null;
+              return (
+                <section key={groupKeyOf(col.key)} aria-label={col.label}>
+                  <div className="mb-1 flex items-center gap-2">
+                    <h4 className="text-xs font-bold tracking-wide text-gray-500 uppercase dark:text-gray-400">
+                      {col.label}
+                    </h4>
+                    <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[11px] font-semibold text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                      {forest.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void handleAddTaskInGroup(col.key)}
+                      title={`Add task to ${col.label}`}
+                      aria-label={`Add task to ${col.label}`}
+                      className="rounded-lg p-1 text-gray-400 hover:bg-black/5 hover:text-violet-600"
+                    >
+                      <Plus size={13} />
+                    </button>
+                  </div>
+                  <IdeaTree
+                    tree={forest}
+                    {...sharedTreeProps}
+                    hideIds={unpathedOnly ? pathedIds : undefined}
+                    focusedId={null}
+                  />
+                </section>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
     const pathsPane = (
