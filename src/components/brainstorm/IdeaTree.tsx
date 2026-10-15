@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Focus as FocusIcon } from "lucide-react";
+import Link from "next/link";
+import { Focus as FocusIcon, ArrowUpRight } from "lucide-react";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";
 import { NotesIndicator } from "@/components/shared/NotesIndicator";
 import { useNotes } from "@/contexts/NotesContext";
@@ -330,6 +331,18 @@ export function IdeaTree({
               </span>
             ))}
             <ScheduleChip node={node} todayString={todayString} />
+            {node.type === "project" && (
+              <Link
+                href={`/projects?projectId=${node.id}`}
+                title="Open this project"
+                aria-label="Open this project"
+                onClick={(e) => e.stopPropagation()}
+                className="flex flex-shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-500/10"
+              >
+                Open
+                <ArrowUpRight size={11} strokeWidth={2.5} />
+              </Link>
+            )}
             {focusedId !== node.id && (
               <button
                 type="button"

@@ -361,8 +361,8 @@ export function ProjectCard({
                 className="h-3.5 w-3.5 rounded accent-violet-600"
               />
               <button
-                onClick={() => onSelect(p.id)}
-                title="Open in project"
+                onClick={() => onSelect(t.type === "project" ? t.id : p.id)}
+                title={t.type === "project" ? "Open nested project" : "Open in project"}
                 className={`min-w-0 flex-1 truncate text-left hover:text-violet-600 ${
                   t.status === "completed"
                     ? "text-gray-400 line-through"

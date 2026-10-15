@@ -2,6 +2,8 @@
 
 import { IdeaActionMenu } from "@/components/shared/IdeaActionMenu";
 import { NotesIndicator } from "@/components/shared/NotesIndicator";
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import { HorizonQuickAssign } from "@/components/horizon/HorizonQuickAssign";
 import {
   HorizonTagsSlot,
@@ -69,6 +71,18 @@ export function HorizonRowTrailing({
         onCreateTag={onCreateTag}
       />
       <StatusChipSlot node={node} onUpdate={onUpdate} />
+      {node.type === "project" && (
+        <Link
+          href={`/projects?projectId=${node.id}`}
+          title="Open this project"
+          aria-label="Open this project"
+          onClick={(e) => e.stopPropagation()}
+          className="flex flex-shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-500/10"
+        >
+          Open
+          <ArrowUpRight size={11} strokeWidth={2.5} />
+        </Link>
+      )}
       <HorizonQuickAssign node={node} onUpdate={onUpdate} />
       {linkCount > 0 && (
         <span className="flex-shrink-0 rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] text-indigo-500 dark:bg-indigo-500/20 dark:text-indigo-300">
