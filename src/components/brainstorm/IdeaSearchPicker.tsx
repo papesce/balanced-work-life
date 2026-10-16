@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { Plus } from "lucide-react";
 import { Idea, IdeaType, Tag } from "@/lib/types";
 import { AREA_DOT_COLORS, STATUS_LABELS, STATUS_STYLES } from "@/lib/constants";
@@ -25,6 +25,17 @@ interface IdeaSearchPickerProps {
   defaultCreateType?: IdeaType;
   /** Called with the trimmed query + chosen type when the create row is confirmed. */
   onCreateNew?: (text: string, type: IdeaType) => Promise<void>;
+  /** Called with the raw input whenever it changes (e.g. to mirror the query elsewhere). */
+  onSearchChange?: (query: string) => void;
+  /**
+   * When provided, the result title becomes a one-click action (and Enter
+   * picks the highlighted result). The caller decides what picking means
+   * (e.g. smart reveal). The eye/menu slot in `renderActions` stays for
+   * explicit choices.
+   */
+  onPick?: (idea: Idea) => void;
+  /** Called whenever the keyboard/mouse-highlighted result changes. */
+  onActiveChange?: (idea: Idea | null) => void;
 }
 
 function getTypeLabel(type: IdeaType) {
@@ -66,8 +77,12 @@ export function IdeaSearchPicker({
   showCreateOption = false,
   defaultCreateType = "project",
   onCreateNew,
+  onSearchChange,
+  onPick,
+  onActiveChange,
 }: IdeaSearchPickerProps) {
   const [search, setSearch] = useState(initialQuery ?? "");
+  const [activeIndex, setActiveIndex] = useState(0);
   const [createType, setCreateType] = useState<IdeaType>(defaultCreateType);
   const [creating, setCreating] = useState(false);
   const ideasById = new Map(ideas.map((idea) => [idea.id, idea]));
@@ -90,6 +105,12 @@ export function IdeaSearchPicker({
   const trimmed = search.trim();
   const showCreateRow =
     showCreateOption && !!onCreateNew && trimmed.length > 0 && !hasExactMatch(ideas, trimmed);
+  const active = Math.min(activeIndex, Math.max(searchResults.length - 1, 0));
+  const activeIdea = searchResults[active] ?? null;
+
+  useEffect(() => {
+    onActiveChange?.(activeIdea);
+  }, [activeIdea, onActiveChange]);
 
   const handleCreate = async () => {
     if (!onCreateNew || !trimmed || creating) return;
@@ -107,9 +128,30 @@ export function IdeaSearchPicker({
         type="text"
         placeholder={placeholder}
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        onChange={(e) => {
+          setSearch(e.target.value);
+          setActiveIndex(0);
+          onSearchChange?.(e.target.value);
+        }}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && showCreateRow) void handleCreate();
+          if (e.key === "ArrowDown" && searchResults.length > 0) {
+            e.preventDefault();
+            setActiveIndex((i) => Math.min(i + 1, searchResults.length - 1));
+            return;
+          }
+          if (e.key === "ArrowUp" && searchResults.length > 0) {
+            e.preventDefault();
+            setActiveIndex((i) => Math.max(i - 1, 0));
+            return;
+          }
+          if (e.key === "Enter") {
+            if (searchResults.length > 0 && onPick) {
+              e.preventDefault();
+              onPick(searchResults[active]!);
+              return;
+            }
+            if (showCreateRow) void handleCreate();
+          }
         }}
         className="mb-2 w-full rounded-lg border border-black/10 bg-white/60 px-2 py-1.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:ring-1 focus:ring-violet-500/40 dark:border-white/10 dark:bg-gray-800/60 dark:text-gray-200 dark:placeholder:text-gray-500"
         autoFocus
@@ -117,17 +159,33 @@ export function IdeaSearchPicker({
 
       {searchResults.length > 0 && (
         <div className="mb-2 max-h-[220px] overflow-y-auto rounded-lg border border-black/10 dark:border-white/10">
-          {searchResults.map((idea) => {
+          {searchResults.map((idea, idx) => {
             const tags = getTagsForIdea?.(idea.id) ?? [];
+            const isActive = !!onPick && idx === active;
             return (
               <div
                 key={idea.id}
-                className="flex items-start justify-between gap-2 px-2.5 py-2 hover:bg-black/[0.02] dark:hover:bg-white/[0.04]"
+                onMouseEnter={() => {
+                  if (onPick) setActiveIndex(idx);
+                }}
+                className={`flex items-start justify-between gap-2 px-2.5 py-2 ${isActive ? "bg-violet-50/70 dark:bg-violet-500/10" : "hover:bg-black/[0.02] dark:hover:bg-white/[0.04]"}`}
               >
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-sm leading-snug break-words text-gray-800 dark:text-gray-200">
-                    {idea.text || "empty"}
-                  </p>
+                  {onPick ? (
+                    <button
+                      onClick={() => onPick(idea)}
+                      title="Reveal"
+                      className="block w-full cursor-pointer text-left"
+                    >
+                      <p className="line-clamp-2 text-sm leading-snug break-words text-gray-800 hover:text-violet-700 dark:text-gray-200 dark:hover:text-violet-300">
+                        {idea.text || "empty"}
+                      </p>
+                    </button>
+                  ) : (
+                    <p className="line-clamp-2 text-sm leading-snug break-words text-gray-800 dark:text-gray-200">
+                      {idea.text || "empty"}
+                    </p>
+                  )}
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     {idea.type && (
                       <span

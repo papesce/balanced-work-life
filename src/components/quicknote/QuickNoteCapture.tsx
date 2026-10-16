@@ -9,6 +9,7 @@ import {
 } from "@/contexts/QuickNoteContext";
 import { QuickNoteSaveIndicator } from "./QuickNoteSaveIndicator";
 import { QuickNoteSelectionActions } from "./QuickNoteSelectionActions";
+import { QuickNoteIdeaSearch } from "./QuickNoteIdeaSearch";
 import { requestGlobalSearch } from "@/lib/globalSearchBus";
 
 /**
@@ -26,6 +27,8 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
     null,
   );
   const [selectionOpen, setSelectionOpen] = useState(false);
+  /** Inline idea search query — the panel stays open while searching. */
+  const [ideaSearchQuery, setIdeaSearchQuery] = useState<string | null>(null);
   const selectionRef = useRef(selection);
   const selectionOpenRef = useRef(selectionOpen);
   selectionRef.current = selection;
@@ -38,6 +41,7 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
     prevNoteIdRef.current = noteId;
     setSelection(null);
     setSelectionOpen(false);
+    setIdeaSearchQuery(null);
   }
   // Autofocus with caret at end (only for editable notes)
   useEffect(() => {
@@ -56,6 +60,7 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
       // (React bails on identical state, this avoids the extra work entirely).
       if (selectionRef.current) setSelection(null);
       if (selectionOpenRef.current) setSelectionOpen(false);
+      setIdeaSearchQuery(null);
       updateText(e.target.value);
     },
     [updateText, readonly],
@@ -88,6 +93,7 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
   const handleSelectionDone = useCallback(() => {
     setSelection(null);
     setSelectionOpen(false);
+    setIdeaSearchQuery(null);
     const el = textareaRef.current;
     if (el) {
       const pos = el.selectionEnd;
@@ -95,16 +101,24 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
     }
   }, []);
 
-  // Send the selection to the global search bar and close the panel
-  // (the backdrop would otherwise cover the results dropdown). No mark,
-  // no DB writes — pure navigation via existing search behavior.
-  const handleSearchSelection = useCallback(async () => {
+  // Open inline idea search — the panel stays open while searching.
+  // Only picking a reveal target navigates (and closes the panel).
+  // The global-search fallback below preserves the old close-then-search flow.
+  const handleSearchSelection = useCallback(() => {
     if (!selection || !selection.text.trim()) return;
-    const query = selection.text;
-    handleSelectionDone();
-    await closePanel();
-    requestGlobalSearch(query);
-  }, [selection, handleSelectionDone, closePanel]);
+    setSelectionOpen(false);
+    setIdeaSearchQuery(selection.text);
+  }, [selection]);
+
+  // Fallback: close the panel and hand the query to the header search bar.
+  const handleOpenInGlobalSearch = useCallback(
+    async (query: string) => {
+      handleSelectionDone();
+      await closePanel();
+      requestGlobalSearch(query);
+    },
+    [handleSelectionDone, closePanel],
+  );
 
   // Insert a "✓ " mark at the selection start after successful processing.
   // Skipped for archived notes so their text stays pristine. Offsets are
@@ -197,6 +211,15 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
             selection={selection.text}
             onMarked={handleSelectionMarked}
             onDone={handleSelectionDone}
+          />
+        </div>
+      )}
+      {ideaSearchQuery && (
+        <div className="mt-2">
+          <QuickNoteIdeaSearch
+            initialQuery={ideaSearchQuery}
+            onDone={handleSelectionDone}
+            onOpenInGlobalSearch={(q) => void handleOpenInGlobalSearch(q)}
           />
         </div>
       )}
