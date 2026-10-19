@@ -172,7 +172,6 @@ function TimelineInner() {
     handleDone,
     handleUpdate,
     handleReorderDate,
-    setAnchorParam,
     handleAnchorChange,
     handleGoToDate,
     handleMove,
@@ -296,10 +295,7 @@ function TimelineInner() {
             today={today}
             occurrencesByDate={occurrencesByDate}
             onAnchorChange={handleAnchorChange}
-            onOpenDay={(d) => {
-              setView("agenda");
-              setAnchorParam(d);
-            }}
+            onOpenDay={(d) => router.push(`/?date=${d}`)}
             onReorder={handleReorderDate}
             onDone={handleDone}
             onUndone={markUndone}
@@ -331,10 +327,7 @@ function TimelineInner() {
             occurrencesByDate={occurrencesByDate}
             showQuickAdd={(date) => effectiveFilter === "all" || isPlanDate(date)}
             onAnchorChange={handleAnchorChange}
-            onOpenDay={(d) => {
-              setView("agenda");
-              setAnchorParam(d);
-            }}
+            onOpenDay={(d) => router.push(`/?date=${d}`)}
             onReorder={handleReorderDate}
             onDone={handleDone}
             onUndone={markUndone}
