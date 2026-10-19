@@ -15,20 +15,41 @@ import {
 } from "@/components/brainstorm/BrainstormHeaders";
 import { BrainstormBreadcrumb } from "@/components/brainstorm/BrainstormBreadcrumb";
 import { GraphView } from "@/components/brainstorm/GraphView";
-import { IdeaType } from "@/lib/types";
 import { STORAGE_KEYS, readRawString, writeRawString } from "@/lib/storage";
+import { useBrainstormFilters } from "@/hooks/useBrainstormFilters";
 import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 import { getAncestorChain, getFocusedSubtreeIds } from "@/lib/ideaTreeFocus";
 import { hasAnyEffects } from "@/lib/linkEffects";
 import { useCompletionEffects } from "@/stores/feedbackStore";
 import { LinkedEffectsReveal, LinkedEffectsBadge } from "@/components/shared/LinkedEffectsReveal";
-import type { IdeasScope } from "@/hooks/useIdeas";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useUndoAction } from "@/lib/tasks/undo";
 import { useBrainstormMutations } from "@/hooks/useBrainstormMutations";
 
 export default function BrainstormPage() {
-  const [timeScope, setTimeScope] = useState<IdeasScope>("this_month");
+  const bf = useBrainstormFilters();
+  const {
+    showType,
+    setShowType,
+    showArea,
+    setShowArea,
+    showToday,
+    setShowToday,
+    hideClosed,
+    setHideClosed,
+    hideCompleted,
+    setHideCompleted,
+    hideDeferred,
+    setHideDeferred,
+    hideInHorizon,
+    setHideInHorizon,
+    typeFilter,
+    setTypeFilter,
+    timeScope,
+    setTimeScope,
+    resetFilters,
+    activeFilterCount,
+  } = bf;
   const ideasHook = useIdeas({ scope: timeScope });
   const linksHook = useIdeaLinks();
   const tagsHook = useTags();
@@ -56,8 +77,6 @@ export default function BrainstormPage() {
     if (mode === "view") setComposing(null);
   };
 
-  const [showType, setShowType] = useState(true);
-  const [showArea, setShowArea] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [composing, setComposing] = useState<{
@@ -66,14 +85,6 @@ export default function BrainstormPage() {
     position: "child" | "top" | "bottom";
     depth: number;
   } | null>(null);
-  const [showToday, setShowToday] = useState(false);
-  const [hideClosed, setHideClosed] = useState(false);
-  const [hideCompleted, setHideCompleted] = useState(false);
-  const [hideDeferred, setHideDeferred] = useState(false);
-  const [hideInHorizon, setHideInHorizon] = useState(
-    () => readRawString(STORAGE_KEYS.brainstormHideInHorizon) === "true",
-  );
-  const [typeFilter, setTypeFilter] = useState<IdeaType[]>([]);
   const { classifications } = useClassifications();
   const classifiedIds = useMemo(
     () => new Set(classifications.map((c) => c.idea_id)),
@@ -90,10 +101,7 @@ export default function BrainstormPage() {
   }, [focusedId]);
 
   // cardMode persists via uiPrefsStore (shared with horizon).
-
-  useEffect(() => {
-    writeRawString(STORAGE_KEYS.brainstormHideInHorizon, String(hideInHorizon));
-  }, [hideInHorizon]);
+  // filters (incl. hideInHorizon) persist via useBrainstormFilters.
 
   useEffect(() => {
     if (cardMode && editMode !== "view") {
@@ -223,6 +231,8 @@ export default function BrainstormPage() {
       setHideInHorizon={setHideInHorizon}
       typeFilter={typeFilter}
       setTypeFilter={setTypeFilter}
+      activeFilterCount={activeFilterCount}
+      onResetFilters={resetFilters}
       onAddRoot={() => void handleAddRoot()}
       onExpandAll={ideasHook.expandAll}
       onCollapseAll={ideasHook.collapseAll}

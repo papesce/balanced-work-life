@@ -28,6 +28,7 @@ import {
   StatusIconSlot,
   StatusPillSlot,
   TagChipsSlot,
+  TypeIconSlot,
   TypePillSlot,
 } from "./ideaNodeSlots";
 
@@ -299,7 +300,10 @@ export function IdeaTree({
         pathAddDisabled={pathAddDisabled}
         labelClassName={labelClassName}
         renderLeading={(node) => (
-          <StatusIconSlot node={node} onMarkDone={onMarkDone} onMarkUndone={onMarkUndone} />
+          <>
+            <StatusIconSlot node={node} onMarkDone={onMarkDone} onMarkUndone={onMarkUndone} />
+            {compact && <TypeIconSlot node={node} />}
+          </>
         )}
         renderTrailing={(node) => (
           <>

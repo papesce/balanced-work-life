@@ -1,5 +1,5 @@
 import { AREA_ORDER, DEFAULT_TARGETS } from "@/lib/constants";
-import { LifeArea } from "@/lib/types";
+import type { LifeArea } from "@/lib/types";
 
 const APP_STORAGE_KEYS = [
   "brainstorm-tree-overrides",
@@ -7,6 +7,7 @@ const APP_STORAGE_KEYS = [
   "brainstorm-focus-id",
   "brainstorm-card-mode",
   "brainstorm-hide-in-horizon",
+  "brainstorm-filters",
   "horizon-tree-overrides",
   "horizon-lens",
   "horizon-unclassified-expanded",
@@ -27,6 +28,7 @@ export const STORAGE_KEYS = {
   brainstormFocusId: "brainstorm-focus-id",
   brainstormCardMode: "brainstorm-card-mode",
   brainstormHideInHorizon: "brainstorm-hide-in-horizon",
+  brainstormFilters: "brainstorm-filters",
   horizonTreeOverrides: "horizon-tree-overrides",
   horizonLens: "horizon-lens",
   horizonUnclassifiedExpanded: "horizon-unclassified-expanded",

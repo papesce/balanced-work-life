@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Folder, Target } from "lucide-react";
 import {
   IdeaNode as IdeaNodeType,
   Idea,
@@ -67,6 +68,32 @@ export function StatusIconSlot({
       <Icon size={14} strokeWidth={2.5} />
     </button>
   );
+}
+
+export function TypeIconSlot({ node }: { node: IdeaNodeType }) {
+  if (node.type === "project") {
+    return (
+      <span
+        title="Project"
+        aria-label="Type: project"
+        className="flex flex-shrink-0 items-center text-emerald-600 dark:text-emerald-400"
+      >
+        <Folder size={12} strokeWidth={2} />
+      </span>
+    );
+  }
+  if (node.type === "objective") {
+    return (
+      <span
+        title="Goal (objective)"
+        aria-label="Type: goal"
+        className="flex flex-shrink-0 items-center text-purple-600 dark:text-purple-400"
+      >
+        <Target size={12} strokeWidth={2} />
+      </span>
+    );
+  }
+  return null;
 }
 
 export function TypePillSlot({

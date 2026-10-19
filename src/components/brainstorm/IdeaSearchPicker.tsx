@@ -174,7 +174,7 @@ export function IdeaSearchPicker({
                   {onPick ? (
                     <button
                       onClick={() => onPick(idea)}
-                      title="Reveal"
+                      title="Open selected idea"
                       className="block w-full cursor-pointer text-left"
                     >
                       <p className="line-clamp-2 text-sm leading-snug break-words text-gray-800 hover:text-violet-700 dark:text-gray-200 dark:hover:text-violet-300">

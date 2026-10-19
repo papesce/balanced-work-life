@@ -30,6 +30,8 @@ interface BrainstormStartActionsProps {
   setHideInHorizon: (v: boolean) => void;
   typeFilter: IdeaType[];
   setTypeFilter: Dispatch<SetStateAction<IdeaType[]>>;
+  activeFilterCount?: number;
+  onResetFilters?: () => void;
   onAddRoot: () => void;
   onExpandAll: () => void;
   onCollapseAll: () => void;
@@ -57,6 +59,8 @@ export function BrainstormStartActions(props: BrainstormStartActionsProps) {
       setHideInHorizon={props.setHideInHorizon}
       typeFilter={props.typeFilter}
       setTypeFilter={props.setTypeFilter}
+      activeFilterCount={props.activeFilterCount}
+      onResetFilters={props.onResetFilters}
       onAddRoot={props.onAddRoot}
       expandAll={props.onExpandAll}
       collapseAll={props.onCollapseAll}
