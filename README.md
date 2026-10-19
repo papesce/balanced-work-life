@@ -89,6 +89,10 @@ Override the foreground launcher port with `PORT=4000 pnpm dev:open`.
 Open [http://localhost:3000](http://localhost:3000) in your browser (auto-opened by `:open` variants).
 The background launcher uses [http://localhost:4327](http://localhost:4327) by default.
 
+### Shared Supabase objects
+
+This project also hosts database objects owned by the separate BimbiMappa app. Keep `public.places`, `public.trips`, their RLS policies, the `place-photos` Storage bucket and its policies, and their Realtime publication entries when reviewing or cleaning up unused objects. Their schema and ownership are tracked in `supabase/migrations/20261019000000_add_bimbimappa_objects.sql`.
+
 ### Database & Sync
 
 After creating or modifying Supabase migrations, push them:
