@@ -22,6 +22,7 @@ import {
 import { useCalmedSaveStatus } from "@/lib/quicknote/useCalmedSaveStatus";
 import { QuickNoteCapture } from "./QuickNoteCapture";
 import { QuickNoteList } from "./QuickNoteList";
+import { useNotes } from "@/contexts/NotesContext";
 
 const MODE_STORAGE_KEY = "quicknote-panel-mode";
 // "process" was removed (selection-based flow); stale stored values fall
@@ -80,6 +81,7 @@ export function QuickNotePanel() {
     requestedMode,
     consumeRequestedMode,
   } = useQuickNoteData();
+  const { detailsOpen } = useNotes();
   const [mode, setMode] = useState<QuickNotePanelMode>(readStoredMode);
   const [menuOpen, setMenuOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -109,6 +111,9 @@ export function QuickNotePanel() {
     if (!panelOpen) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        // The details drawer is the top overlay; let its Escape handler close
+        // it first while preserving the Quick Note underneath.
+        if (detailsOpen) return;
         e.preventDefault();
         setMenuOpen(false);
         setDiscardArmed(false);
@@ -117,7 +122,7 @@ export function QuickNotePanel() {
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [panelOpen, closePanel]);
+  }, [panelOpen, closePanel, detailsOpen]);
 
   const handleDiscard = useCallback(async () => {
     if (!discardArmed) {
@@ -200,7 +205,7 @@ export function QuickNotePanel() {
 
       {/* Panel */}
       <div
-        className="relative flex w-full flex-col rounded-t-2xl bg-white shadow-xl sm:mx-4 sm:max-w-lg sm:rounded-2xl dark:bg-gray-900"
+        className="relative flex w-full flex-col rounded-t-2xl bg-white shadow-xl sm:mx-4 sm:max-w-lg sm:rounded-2xl sm:has-[.quick-note-split]:max-w-5xl dark:bg-gray-900"
         style={{ maxHeight: "min(80vh, 600px)" }}
       >
         {/* Header: title stacks over meta so neither truncates the other;

@@ -6,6 +6,7 @@ import { DetailsDrawer, type DetailsSection } from "@/components/shared/DetailsD
 interface NotesContextValue {
   openNotes: (ideaId: string, opts?: { section?: DetailsSection }) => void;
   closeNotes: () => void;
+  detailsOpen: boolean;
 }
 
 const NotesContext = createContext<NotesContextValue | null>(null);
@@ -27,7 +28,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const closeNotes = useCallback(() => setSelectedId(null), []);
 
   return (
-    <NotesContext.Provider value={{ openNotes, closeNotes }}>
+    <NotesContext.Provider value={{ openNotes, closeNotes, detailsOpen: selectedId !== null }}>
       {children}
       <DetailsDrawer ideaId={selectedId} initialSection={initialSection} onClose={closeNotes} />
     </NotesContext.Provider>

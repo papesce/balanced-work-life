@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuickNoteEditor, useQuickNoteData } from "@/contexts/QuickNoteContext";
+import { useNotes } from "@/contexts/NotesContext";
 import { IdeaSearchPicker } from "@/components/brainstorm/IdeaSearchPicker";
 import type { Idea } from "@/lib/types";
 import {
@@ -36,8 +37,8 @@ const VIEW_ICON: Record<RevealView, React.ReactNode> = {
 };
 
 /**
- * Inline idea search for Quick Notes. The dialog stays open while searching;
- * only picking a reveal target closes the panel and navigates.
+ * Inline idea search for Quick Notes. Opening a result keeps the note open
+ * underneath its details drawer; explicit reveal actions navigate away.
  */
 export function QuickNoteIdeaSearch({
   initialQuery,
@@ -52,8 +53,9 @@ export function QuickNoteIdeaSearch({
 }) {
   const router = useRouter();
   const { user } = useAuth();
-  const { closePanel } = useQuickNoteData();
+  const { openNotes } = useNotes();
   const { flushNow } = useQuickNoteEditor();
+  const { closePanel } = useQuickNoteData();
   const [eyeFor, setEyeFor] = useState<string | null>(null);
   const [query, setQuery] = useState(initialQuery);
   const [activeIdea, setActiveIdea] = useState<Idea | null>(null);
@@ -88,10 +90,11 @@ export function QuickNoteIdeaSearch({
   );
 
   const handlePick = useCallback(
-    (idea: Idea) => {
-      void handleReveal(idea, getSmartRevealView(idea, allIdeas));
+    async (idea: Idea) => {
+      await flushNow();
+      openNotes(idea.id);
     },
-    [allIdeas, handleReveal],
+    [flushNow, openNotes],
   );
 
   const activeSmart = activeIdea ? getSmartRevealView(activeIdea, allIdeas) : null;
@@ -100,7 +103,7 @@ export function QuickNoteIdeaSearch({
     <div className="flex flex-col gap-1.5 rounded-xl border border-black/10 bg-white/80 p-2 dark:border-white/10 dark:bg-gray-800/80">
       <div className="flex items-center justify-between px-1">
         <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400">
-          Search ideas{activeSmart ? ` · Enter opens in ${getRevealLabel(activeSmart)}` : ""}
+          Search ideas{activeSmart ? " · Enter opens details" : ""}
         </p>
         <button
           onClick={() => onOpenInGlobalSearch(query)}

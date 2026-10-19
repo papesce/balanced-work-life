@@ -12,6 +12,16 @@ import { QuickNoteSelectionActions } from "./QuickNoteSelectionActions";
 import { QuickNoteIdeaSearch } from "./QuickNoteIdeaSearch";
 import { requestGlobalSearch } from "@/lib/globalSearchBus";
 
+const SUGGESTIONS_STORAGE_KEY = "quicknote-auto-suggestions";
+
+function readAutoSuggestions(): boolean {
+  try {
+    return localStorage.getItem(SUGGESTIONS_STORAGE_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Capture mode: a plain textarea. Enter inserts a newline and nothing else.
  * Lazy note creation is handled by the context's updateText.
@@ -29,6 +39,7 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
   const [selectionOpen, setSelectionOpen] = useState(false);
   /** Inline idea search query — the panel stays open while searching. */
   const [ideaSearchQuery, setIdeaSearchQuery] = useState<string | null>(null);
+  const [autoSuggestions, setAutoSuggestions] = useState(readAutoSuggestions);
   const selectionRef = useRef(selection);
   const selectionOpenRef = useRef(selectionOpen);
   selectionRef.current = selection;
@@ -83,12 +94,14 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
             ? prev
             : { start: selectionStart, end: selectionEnd, text },
         );
+        if (autoSuggestions) setIdeaSearchQuery(text);
         return;
       }
     }
     setSelection((prev) => (prev === null ? prev : null));
     setSelectionOpen((prev) => (prev ? false : prev));
-  }, []);
+    setIdeaSearchQuery(null);
+  }, [autoSuggestions]);
 
   const handleSelectionDone = useCallback(() => {
     setSelection(null);
@@ -101,14 +114,26 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
     }
   }, []);
 
-  // Open inline idea search — the panel stays open while searching.
-  // Only picking a reveal target navigates (and closes the panel).
+  // Open inline idea search — picking a result opens its details drawer while
+  // leaving the panel open; explicit reveal choices navigate away.
   // The global-search fallback below preserves the old close-then-search flow.
   const handleSearchSelection = useCallback(() => {
     if (!selection || !selection.text.trim()) return;
     setSelectionOpen(false);
     setIdeaSearchQuery(selection.text);
   }, [selection]);
+
+  const handleAutoSuggestionsChange = useCallback(
+    (enabled: boolean) => {
+      setAutoSuggestions(enabled);
+      try {
+        localStorage.setItem(SUGGESTIONS_STORAGE_KEY, String(enabled));
+      } catch {}
+      if (!enabled) setIdeaSearchQuery(null);
+      else if (selection?.text.trim()) setIdeaSearchQuery(selection.text);
+    },
+    [selection],
+  );
 
   // Fallback: close the panel and hand the query to the header search bar.
   const handleOpenInGlobalSearch = useCallback(
@@ -152,71 +177,92 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
   }, [flushNow, readonly]);
 
   return (
-    <div className="flex flex-col p-4">
-      {readonly && (
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-[10px] font-bold tracking-wider text-gray-400 uppercase dark:text-gray-500">
-            Read-only
-          </p>
-          <button
-            onClick={() => void reopenNote()}
-            className="rounded-lg bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-600 transition-colors hover:bg-violet-100 dark:bg-violet-950/20 dark:text-violet-400 dark:hover:bg-violet-900/30"
-          >
-            Reopen note
-          </button>
-        </div>
-      )}
-      <textarea
-        ref={textareaRef}
-        value={draft}
-        onChange={handleChange}
-        onPaste={handlePaste}
-        onSelect={handleSelect}
-        onBlur={handleBlur}
-        readOnly={readonly}
-        placeholder={
-          readonly
-            ? "This note is archived"
-            : "Capture anything...\n- Start a line with “- ” to make it a task\n- [Title](notes) adds notes to the created idea\n- End with #project, #task, #goal, #idea or #initiative for the type"
-        }
-        className={`h-full min-h-[200px] w-full resize-none bg-transparent text-sm leading-relaxed text-gray-800 outline-none placeholder:text-gray-400 dark:text-gray-200 dark:placeholder:text-gray-500 ${readonly ? "cursor-default opacity-70" : ""}`}
-        rows={10}
-      />
-      {!readonly && (
-        <div className="mt-2 flex items-center justify-end border-t border-black/5 pt-2 dark:border-white/5">
-          <QuickNoteSaveIndicator />
-        </div>
-      )}
-      {selection && !selectionOpen && (
-        <div className="mt-2 flex items-center justify-end gap-1.5">
-          <button
-            onClick={() => void handleSearchSelection()}
-            title="Search ideas for the selected text"
-            className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-500 transition-colors hover:bg-black/5 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"
-          >
-            <Search size={13} />
-            Search ideas
-          </button>
-          <button
-            onClick={() => setSelectionOpen(true)}
-            className="rounded-lg bg-violet-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-violet-700"
-          >
-            Process selection
-          </button>
-        </div>
-      )}
-      {selection && selectionOpen && (
-        <div className="mt-2">
-          <QuickNoteSelectionActions
-            selection={selection.text}
-            onMarked={handleSelectionMarked}
-            onDone={handleSelectionDone}
-          />
-        </div>
-      )}
+    <div
+      className={`flex flex-col p-4 ${ideaSearchQuery ? "quick-note-split lg:flex-row lg:items-start lg:gap-4 lg:p-5" : ""}`}
+    >
+      <div className={ideaSearchQuery ? "min-w-0 lg:flex-1" : ""}>
+        {readonly && (
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-[10px] font-bold tracking-wider text-gray-400 uppercase dark:text-gray-500">
+              Read-only
+            </p>
+            <button
+              onClick={() => void reopenNote()}
+              className="rounded-lg bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-600 transition-colors hover:bg-violet-100 dark:bg-violet-950/20 dark:text-violet-400 dark:hover:bg-violet-900/30"
+            >
+              Reopen note
+            </button>
+          </div>
+        )}
+        <textarea
+          ref={textareaRef}
+          value={draft}
+          onChange={handleChange}
+          onPaste={handlePaste}
+          onSelect={handleSelect}
+          onBlur={handleBlur}
+          readOnly={readonly}
+          placeholder={
+            readonly
+              ? "This note is archived"
+              : "Capture anything...\n- Start a line with “- ” to make it a task\n- [Title](notes) adds notes to the created idea\n- End with #project, #task, #goal, #idea or #initiative for the type"
+          }
+          className={`h-full min-h-[200px] w-full resize-none bg-transparent text-sm leading-relaxed text-gray-800 outline-none placeholder:text-gray-400 dark:text-gray-200 dark:placeholder:text-gray-500 ${readonly ? "cursor-default opacity-70" : ""}`}
+          rows={10}
+        />
+        {!readonly && (
+          <div className="mt-2 flex items-center justify-end border-t border-black/5 pt-2 dark:border-white/5">
+            <QuickNoteSaveIndicator />
+          </div>
+        )}
+        {!readonly && (
+          <label className="mt-2 flex cursor-pointer items-center justify-end gap-2 text-xs text-gray-500 dark:text-gray-400">
+            <input
+              type="checkbox"
+              checked={autoSuggestions}
+              onChange={(e) => handleAutoSuggestionsChange(e.target.checked)}
+              className="accent-violet-600"
+            />
+            Suggest existing ideas automatically
+          </label>
+        )}
+        {selection && !selectionOpen && (
+          <div className="mt-2 flex items-center justify-end gap-1.5">
+            {!autoSuggestions && (
+              <button
+                onClick={() => void handleSearchSelection()}
+                title="Search ideas for the selected text"
+                className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-500 transition-colors hover:bg-black/5 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"
+              >
+                <Search size={13} />
+                Search ideas
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setSelectionOpen(true);
+                setIdeaSearchQuery(null);
+              }}
+              className="rounded-lg bg-violet-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-violet-700"
+            >
+              Process selection
+            </button>
+          </div>
+        )}
+        {selection && selectionOpen && (
+          <div className="mt-2">
+            <QuickNoteSelectionActions
+              selection={selection.text}
+              onMarked={handleSelectionMarked}
+              onDone={handleSelectionDone}
+            />
+          </div>
+        )}
+      </div>
       {ideaSearchQuery && (
-        <div className="mt-2">
+        <div className="mt-2 min-w-0 lg:mt-0 lg:w-[42%] lg:shrink-0 lg:border-l lg:border-black/10 lg:pl-4 dark:lg:border-white/10">
           <QuickNoteIdeaSearch
+            key={ideaSearchQuery}
             initialQuery={ideaSearchQuery}
             onDone={handleSelectionDone}
             onOpenInGlobalSearch={(q) => void handleOpenInGlobalSearch(q)}

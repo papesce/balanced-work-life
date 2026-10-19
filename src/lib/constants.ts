@@ -10,7 +10,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { IdeaStatus, LifeArea } from "@/lib/types";
+import type { IdeaStatus, LifeArea } from "@/lib/types";
 
 export const AREA_ORDER: LifeArea[] = [
   "work",
