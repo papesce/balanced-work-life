@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import { computeReschedulePatch, type RescheduleAction } from "@/lib/tasks/rescheduleTask";
+import { isPast } from "@/lib/dateUtils";
 import { minutesToTimeString } from "@/components/planner/dayslotAdapter";
 import type { Idea, LifeArea, Tag } from "@/lib/types";
 import type { useIdeas } from "@/hooks/useIdeas";
@@ -105,11 +106,13 @@ export function usePlannerActions({
     area?: LifeArea,
     tag?: Tag,
   ) => {
+    const past = isPast(activeDate);
     const id = await createIdea(text, null, "bottom", {
       type: "task",
       scheduled_date: activeDate,
       scheduled_time: time,
-      status: "scheduled",
+      status: past ? "completed" : "scheduled",
+      ...(past ? { completed_at: new Date().toISOString() } : {}),
       productivity_signal: null,
     });
     if (id && area) {
