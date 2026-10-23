@@ -322,7 +322,7 @@ export function ProjectCard({
           <NotesIndicator hasNotes={!!p.notes?.trim()} onClick={() => onOpenNotes(p.id)} />
           <button
             onClick={() => onSelect(p.id)}
-            className="text-xs font-semibold text-violet-600 hover:underline"
+            className="hidden text-xs font-semibold text-violet-600 hover:underline"
           >
             Open →
           </button>
@@ -390,7 +390,7 @@ export function ProjectCard({
             </button>
             <button
               onClick={() => onSelect(p.id)}
-              className="rounded-lg px-2 py-1 text-[11px] font-semibold text-violet-600 hover:bg-violet-50"
+              className="hidden rounded-lg px-2 py-1 text-[11px] font-semibold text-violet-600 hover:bg-violet-50"
             >
               Open →
             </button>
