@@ -27,7 +27,7 @@ export const uploadPathItems: TableUploadHandler = async (
       if (!current) return;
       const { error } = await supabase
         .from(op.table)
-        .upsert({ ...(current as Record<string, unknown>) }, { onConflict: "path_id,idea_id" });
+        .upsert({ ...(current as Record<string, unknown>) });
       throwIfSupabaseError(error, `upsert ${op.table} id=${op.id}`);
       break;
     }

@@ -70,6 +70,14 @@ export function PathView({ pathId, fillHeight = false }: Props) {
     userId ? [userId, pathId] : [],
   );
 
+  const [titleDraft, setTitleDraft] = useState<string>("");
+  const currentTitle = String(pathRows[0]?.text ?? "");
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync title draft when database query updates
+    setTitleDraft(currentTitle);
+  }, [currentTitle]);
+
   const { data: links } = useQuery<Record<string, unknown>>(
     userId
       ? "SELECT * FROM idea_links WHERE user_id = ? AND source_id = ? AND link_type = 'path_of'"
@@ -131,15 +139,20 @@ export function PathView({ pathId, fillHeight = false }: Props) {
       <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2 dark:border-gray-700">
         <input
           aria-label="Path title"
-          key={pathId}
-          defaultValue={String(pathRows[0]?.text ?? "Untitled path")}
-          onBlur={(event) => {
-            const title = event.currentTarget.value.trim();
-            if (title) void updatePathTitle(title);
+          value={titleDraft}
+          onChange={(event) => setTitleDraft(event.target.value)}
+          onBlur={() => {
+            const trimmed = titleDraft.trim();
+            if (trimmed && trimmed !== currentTitle) {
+              void updatePathTitle(trimmed);
+            } else {
+              setTitleDraft(currentTitle);
+            }
           }}
           onKeyDown={(event) => {
             if (event.key === "Enter") event.currentTarget.blur();
           }}
+          placeholder="Untitled path"
           className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-gray-700 outline-none dark:text-gray-200"
         />
         <select

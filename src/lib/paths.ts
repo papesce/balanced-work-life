@@ -57,7 +57,7 @@ export function deserializePath(row: Record<string, unknown>): Path {
   return {
     id: String(row.id ?? ""),
     user_id: String(row.user_id ?? ""),
-    title: typeof row.title === "string" ? row.title : "",
+    title: typeof row.text === "string" ? row.text : typeof row.title === "string" ? row.title : "",
     sort_order: toNumber(row.sort_order, 0),
     created_at: typeof row.created_at === "string" ? row.created_at : "",
     updated_at: typeof row.updated_at === "string" ? row.updated_at : "",
