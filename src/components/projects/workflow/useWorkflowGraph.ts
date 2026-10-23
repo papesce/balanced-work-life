@@ -48,7 +48,10 @@ export function useWorkflowGraph({
 
   const taskMap = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
   const placedIds = useMemo(
-    () => new Set(items.map((n) => n.idea_id).filter((id) => taskMap.has(id))),
+    () =>
+      new Set(
+        items.map((n) => n.idea_id).filter((id): id is string => id !== null && taskMap.has(id)),
+      ),
     [items, taskMap],
   );
   const statusById = useMemo(
@@ -105,7 +108,9 @@ export function useWorkflowGraph({
   // points in workflow direction (prerequisite -> dependent) so that
   // `depends_on` links are flipped (source depends on target).
   useEffect(() => {
-    const savedPositions = new Map(items.map((n) => [n.idea_id, { x: n.x, y: n.y }]));
+    const savedPositions = new Map(
+      items.flatMap((n) => (n.idea_id ? [[n.idea_id, { x: n.x, y: n.y }] as const] : [])),
+    );
     const nextNodes: FlowNode[] = [...visibleIds].map((id, i) => ({
       id,
       type: "workflowTask",

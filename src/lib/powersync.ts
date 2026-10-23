@@ -15,8 +15,8 @@ export {
   IdeaClassificationsTable,
   HorizonViewsTable,
   HorizonPrefsTable,
-  PathsTable,
   PathItemsTable,
+  PathEdgesTable,
 } from "./powersyncSchema";
 export { SupabaseConnector, normalizeIdeasPayload } from "./supabaseConnector";
 

@@ -18,6 +18,7 @@ import {
   restoreClassifications,
   restoreHorizonLensConfig,
   restoreQuickNotes,
+  restorePaths,
 } from "@/lib/backup";
 
 export function UserMenu() {
@@ -64,6 +65,7 @@ export function UserMenu() {
       const data = await parseBackupFile(file);
       await restoreIdeas(data.ideas);
       await restoreLinks(data.ideaLinks);
+      if (user) await restorePaths(db, user.id, data.pathItems, data.pathEdges);
       await restoreTags(data.tags);
       await restoreTaskTags(data.taskTags);
       await restoreQuickNotes(db, data.quickNotes);

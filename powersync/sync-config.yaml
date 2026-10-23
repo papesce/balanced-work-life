@@ -19,5 +19,5 @@ streams:
       - SELECT * FROM idea_classifications WHERE user_id = auth.user_id()
       - SELECT * FROM horizon_views WHERE user_id = auth.user_id()
       - SELECT * FROM horizon_prefs WHERE user_id = auth.user_id()
-      - SELECT * FROM paths WHERE user_id = auth.user_id()
       - SELECT * FROM path_items WHERE user_id = auth.user_id()
+      - SELECT * FROM path_edges WHERE user_id = auth.user_id()

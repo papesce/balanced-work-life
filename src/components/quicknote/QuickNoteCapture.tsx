@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useRef, useEffect, useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import {
   useQuickNoteEditor,
@@ -31,6 +32,8 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
   const { draft, updateText, flushNow } = useQuickNoteEditor();
   const { noteId, isSelectedNoteLive, reopenNote } = useQuickNoteCaptureMeta();
   const { closePanel } = useQuickNoteData();
+  const { convertToPath } = useQuickNoteData();
+  const router = useRouter();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const readonly = !isSelectedNoteLive;
   const [selection, setSelection] = useState<{ start: number; end: number; text: string } | null>(
@@ -122,6 +125,16 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
     setSelectionOpen(false);
     setIdeaSearchQuery(selection.text);
   }, [selection]);
+
+  const handleConvertToPath = useCallback(async () => {
+    if (!selection?.text.trim()) return;
+    const { pathId } = await convertToPath(selection.text);
+    await flushNow();
+    setSelection(null);
+    setSelectionOpen(false);
+    await closePanel();
+    router.push(`/paths/${pathId}`);
+  }, [selection, convertToPath, flushNow, closePanel, router]);
 
   const handleAutoSuggestionsChange = useCallback(
     (enabled: boolean) => {
@@ -246,6 +259,12 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
               className="rounded-lg bg-violet-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-violet-700"
             >
               Process selection
+            </button>
+            <button
+              onClick={() => void handleConvertToPath()}
+              className="rounded-lg border border-violet-200 px-2.5 py-1.5 text-xs font-semibold text-violet-700 transition-colors hover:bg-violet-50 dark:border-violet-500/30 dark:text-violet-300 dark:hover:bg-violet-500/10"
+            >
+              Convert to path
             </button>
           </div>
         )}

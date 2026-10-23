@@ -26,7 +26,7 @@ export const DEFAULT_BRAINSTORM_FILTERS: BrainstormFilters = {
   timeScope: "this_month",
 };
 
-const IDEA_TYPES: IdeaType[] = ["idea", "objective", "project", "initiative", "task"];
+const IDEA_TYPES: IdeaType[] = ["idea", "objective", "project", "initiative", "task", "path"];
 
 function asBool(v: unknown, fallback: boolean): boolean {
   return typeof v === "boolean" ? v : fallback;

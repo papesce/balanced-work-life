@@ -137,25 +137,25 @@ export const HorizonPrefsTable = new Table(
   { indexes: {} },
 );
 
-export const PathsTable = new Table(
-  {
-    user_id: column.text,
-    project_id: column.text,
-    title: column.text,
-    sort_order: column.integer,
-    created_at: column.text,
-    updated_at: column.text,
-  },
-  { indexes: {} },
-);
-
 export const PathItemsTable = new Table(
   {
     user_id: column.text,
     path_id: column.text,
+    title: column.text,
     idea_id: column.text,
     x: column.real,
     y: column.real,
+    created_at: column.text,
+  },
+  { indexes: {} },
+);
+
+export const PathEdgesTable = new Table(
+  {
+    user_id: column.text,
+    path_id: column.text,
+    from_item_id: column.text,
+    to_item_id: column.text,
     created_at: column.text,
   },
   { indexes: {} },
@@ -172,8 +172,8 @@ export const AppSchema = new Schema({
   idea_classifications: IdeaClassificationsTable,
   horizon_views: HorizonViewsTable,
   horizon_prefs: HorizonPrefsTable,
-  paths: PathsTable,
   path_items: PathItemsTable,
+  path_edges: PathEdgesTable,
 });
 
 // Allowlist of tables the connector knows how to upload. An unknown op.table
@@ -191,6 +191,6 @@ export const KNOWN_UPLOAD_TABLES: ReadonlySet<string> = new Set([
   "idea_classifications",
   "horizon_views",
   "horizon_prefs",
-  "paths",
   "path_items",
+  "path_edges",
 ]);

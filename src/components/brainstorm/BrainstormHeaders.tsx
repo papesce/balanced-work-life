@@ -73,17 +73,11 @@ export function BrainstormActions({
   onToggleCardMode,
   timeScope,
   onTimeScopeChange,
-  viewMode,
-  onViewModeChange,
-  hasLinks,
 }: {
   cardMode: boolean;
   onToggleCardMode: () => void;
   timeScope: IdeasScope;
   onTimeScopeChange: (scope: IdeasScope) => void;
-  viewMode: "tree" | "graph";
-  onViewModeChange: (mode: "tree" | "graph") => void;
-  hasLinks: boolean;
 }) {
   return (
     <div className="flex items-center gap-2">
@@ -104,41 +98,14 @@ export function BrainstormActions({
         </button>
       </div>
       <span className="text-gray-200">|</span>
-      {viewMode === "tree" && (
-        <>
-          <button
-            onClick={onToggleCardMode}
-            className={`toolbar-btn ${cardMode ? "toolbar-btn--accent" : ""}`}
-            title={cardMode ? "Show rows" : "Show cards"}
-            aria-pressed={cardMode}
-          >
-            {cardMode ? "Rows" : "Cards"}
-          </button>
-          <span className="text-gray-200">|</span>
-        </>
-      )}
-      <div className="flex gap-1">
-        <button
-          onClick={() => onViewModeChange("tree")}
-          className={`toolbar-btn ${viewMode === "tree" ? "toolbar-btn--accent" : ""}`}
-        >
-          Tree
-        </button>
-        <button
-          onClick={() => onViewModeChange("graph")}
-          disabled={!hasLinks}
-          className={`toolbar-btn ${
-            !hasLinks
-              ? "cursor-not-allowed opacity-40"
-              : viewMode === "graph"
-                ? "toolbar-btn--accent"
-                : ""
-          }`}
-          title={!hasLinks ? "Link two ideas to unlock" : ""}
-        >
-          Graph
-        </button>
-      </div>
+      <button
+        onClick={onToggleCardMode}
+        className={`toolbar-btn ${cardMode ? "toolbar-btn--accent" : ""}`}
+        title={cardMode ? "Show rows" : "Show cards"}
+        aria-pressed={cardMode}
+      >
+        {cardMode ? "Rows" : "Cards"}
+      </button>
     </div>
   );
 }

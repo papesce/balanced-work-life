@@ -1,4 +1,4 @@
-export type IdeaType = "idea" | "objective" | "project" | "initiative" | "task";
+export type IdeaType = "idea" | "objective" | "project" | "initiative" | "task" | "path";
 export type LifeArea = "work" | "health" | "relationships" | "growth" | "finances" | "life";
 export type IdeaStatus =
   | "draft"
@@ -66,7 +66,8 @@ export interface Idea {
   productivity_signal?: "productive" | "lazy" | null;
 }
 
-export type LinkType = "unblocks" | "contributes_to" | "depends_on" | "related_to" | "part_of";
+export type LinkType =
+  "unblocks" | "contributes_to" | "depends_on" | "related_to" | "part_of" | "path_of";
 
 export interface IdeaLink {
   id: string;

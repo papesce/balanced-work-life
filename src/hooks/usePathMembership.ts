@@ -1,37 +1,28 @@
 "use client";
 
 import { useMemo } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@powersync/react";
-import { useAuth } from "./useAuth";
 import { buildPathMembership, type PathMembershipRow } from "@/lib/paths";
 
-/**
- * Project-wide path membership: task id → sorted path titles.
- * Single JOIN query so the List view can chip every row without
- * one query per path.
- */
+/** Task membership derived from path items and path ideas associated to a project. */
 export function usePathMembership(projectId: string) {
   const { user } = useAuth();
   const userId = user?.id ?? "";
-
-  const hasScope = Boolean(userId && projectId);
-  const { data: rawRows, isLoading } = useQuery<Record<string, unknown>>(
-    hasScope
-      ? `SELECT pi.idea_id AS idea_id, pi.path_id AS path_id, p.title AS title
-         FROM path_items pi JOIN paths p ON p.id = pi.path_id
-         WHERE p.project_id = ? AND p.user_id = ?`
+  const { data } = useQuery<Record<string, unknown>>(
+    userId && projectId
+      ? `SELECT pi.idea_id, pi.path_id, p.text AS title
+         FROM path_items pi
+         JOIN ideas p ON p.id = pi.path_id
+         JOIN idea_links l ON l.source_id = p.id AND l.link_type = 'path_of'
+         WHERE pi.user_id = ? AND l.target_id = ? AND pi.idea_id IS NOT NULL`
       : "SELECT * FROM path_items WHERE 0",
-    hasScope ? [projectId, userId] : [],
+    userId && projectId ? [userId, projectId] : [],
   );
-
-  const titlesByIdea = useMemo(() => {
-    const rows: PathMembershipRow[] = rawRows.map((r) => ({
-      idea_id: typeof r.idea_id === "string" ? r.idea_id : "",
-      path_id: typeof r.path_id === "string" ? r.path_id : "",
-      title: typeof r.title === "string" ? r.title : "",
-    }));
-    return buildPathMembership(rows);
-  }, [rawRows]);
-
-  return { titlesByIdea, loading: isLoading };
+  const titlesByIdea = useMemo(
+    () => buildPathMembership(data as unknown as PathMembershipRow[]),
+    [data],
+  );
+  const pathedIds = useMemo(() => new Set(titlesByIdea.keys()), [titlesByIdea]);
+  return { titlesByIdea, pathedIds };
 }

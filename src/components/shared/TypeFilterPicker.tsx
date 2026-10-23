@@ -6,7 +6,7 @@ import { IdeaType } from "@/lib/types";
 import { TYPE_BADGE } from "@/lib/constants";
 import { FloatingPanel, type FloatingAnchor } from "@/components/shared/FloatingPanel";
 
-const TYPES: IdeaType[] = ["idea", "objective", "project", "initiative", "task"];
+const TYPES: IdeaType[] = ["idea", "objective", "project", "initiative", "task", "path"];
 
 interface TypeFilterPickerProps {
   selected: IdeaType[];

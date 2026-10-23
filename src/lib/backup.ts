@@ -22,6 +22,25 @@ import {
 } from "@/lib/horizonViews";
 import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 
+export interface BackupPathItem {
+  id: string;
+  user_id: string;
+  path_id: string;
+  title: string;
+  idea_id: string | null;
+  x: number;
+  y: number;
+  created_at: string;
+}
+export interface BackupPathEdge {
+  id: string;
+  user_id: string;
+  path_id: string;
+  from_item_id: string;
+  to_item_id: string;
+  created_at: string;
+}
+
 export interface BackupTaskTag extends TaskTag {
   id: string;
 }
@@ -62,6 +81,8 @@ export interface BackupData {
   lensPrefs: BackupLensPrefs | null;
   horizonViews: BackupHorizonView[];
   horizonPrefs: BackupHorizonPrefs | null;
+  pathItems: BackupPathItem[];
+  pathEdges: BackupPathEdge[];
 }
 
 export const BACKUP_VERSION = 5;
@@ -105,6 +126,8 @@ export function normalizeBackup(data: BackupData): BackupData {
       obj.horizonPrefs && typeof obj.horizonPrefs === "object"
         ? (obj.horizonPrefs as BackupHorizonPrefs)
         : null,
+    pathItems: asArray<BackupPathItem>(obj.pathItems),
+    pathEdges: asArray<BackupPathEdge>(obj.pathEdges),
   };
 }
 
@@ -123,6 +146,8 @@ export async function buildBackupData(
     rawClassifications,
     rawHorizonViews,
     rawHorizonPrefs,
+    rawPathItems,
+    rawPathEdges,
   ] = await Promise.all([
     db.getAll<Record<string, unknown>>("SELECT * FROM ideas WHERE user_id = ?", [user.id]),
     db.getAll<IdeaLink>("SELECT * FROM idea_links WHERE user_id = ?", [user.id]),
@@ -155,6 +180,8 @@ export async function buildBackupData(
       "SELECT default_view_id, default_lens_id, secondary_map FROM horizon_prefs WHERE user_id = ?",
       [user.id],
     ),
+    db.getAll<BackupPathItem>("SELECT * FROM path_items WHERE user_id = ?", [user.id]),
+    db.getAll<BackupPathEdge>("SELECT * FROM path_edges WHERE user_id = ?", [user.id]),
   ]);
 
   // Deserialize JSON text columns stored by PowerSync
@@ -192,7 +219,42 @@ export async function buildBackupData(
     lensPrefs: null,
     horizonViews: rawHorizonViews,
     horizonPrefs: rawHorizonPrefs[0] ?? null,
+    pathItems: rawPathItems,
+    pathEdges: rawPathEdges,
   };
+}
+
+/** Restore path structure after its ideas and nodes' promoted ideas exist. */
+export async function restorePaths(
+  db: AbstractPowerSyncDatabase,
+  userId: string,
+  items: BackupPathItem[],
+  edges: BackupPathEdge[],
+): Promise<void> {
+  if (items.length === 0 && edges.length === 0) return;
+  await db.writeTransaction(async (tx) => {
+    for (const item of items) {
+      await tx.execute(
+        `INSERT OR REPLACE INTO path_items (id, user_id, path_id, title, idea_id, x, y, created_at) VALUES (?,?,?,?,?,?,?,?)`,
+        [
+          item.id,
+          userId,
+          item.path_id,
+          item.title,
+          item.idea_id ?? null,
+          item.x,
+          item.y,
+          item.created_at,
+        ],
+      );
+    }
+    for (const edge of edges) {
+      await tx.execute(
+        `INSERT OR REPLACE INTO path_edges (id, user_id, path_id, from_item_id, to_item_id, created_at) VALUES (?,?,?,?,?,?,?)`,
+        [edge.id, userId, edge.path_id, edge.from_item_id, edge.to_item_id, edge.created_at],
+      );
+    }
+  });
 }
 
 /**

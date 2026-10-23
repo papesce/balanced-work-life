@@ -11,25 +11,36 @@ const TERMINAL_STATUSES: readonly string[] = ["completed", "cancelled", "missed"
 export interface Path {
   id: string;
   user_id: string;
-  project_id: string;
   title: string;
   sort_order: number;
   created_at: string;
   updated_at: string;
+  type: string;
+  status: string;
 }
 
 export interface PathItem {
   id: string;
   user_id: string;
   path_id: string;
-  idea_id: string;
+  title: string;
+  idea_id: string | null;
   x: number;
   y: number;
   created_at: string;
 }
 
+export interface PathEdge {
+  id: string;
+  user_id: string;
+  path_id: string;
+  from_item_id: string;
+  to_item_id: string;
+  created_at: string;
+}
+
 export interface PathPosition {
-  ideaId: string;
+  itemId: string;
   x: number;
   y: number;
 }
@@ -46,11 +57,12 @@ export function deserializePath(row: Record<string, unknown>): Path {
   return {
     id: String(row.id ?? ""),
     user_id: String(row.user_id ?? ""),
-    project_id: String(row.project_id ?? ""),
     title: typeof row.title === "string" ? row.title : "",
     sort_order: toNumber(row.sort_order, 0),
     created_at: typeof row.created_at === "string" ? row.created_at : "",
     updated_at: typeof row.updated_at === "string" ? row.updated_at : "",
+    type: String(row.type ?? "path"),
+    status: String(row.status ?? "open"),
   };
 }
 
@@ -59,9 +71,21 @@ export function deserializePathItem(row: Record<string, unknown>): PathItem {
     id: String(row.id ?? ""),
     user_id: String(row.user_id ?? ""),
     path_id: String(row.path_id ?? ""),
-    idea_id: String(row.idea_id ?? ""),
+    title: typeof row.title === "string" ? row.title : "",
+    idea_id: row.idea_id ? String(row.idea_id) : null,
     x: toNumber(row.x, 0),
     y: toNumber(row.y, 0),
+    created_at: typeof row.created_at === "string" ? row.created_at : "",
+  };
+}
+
+export function deserializePathEdge(row: Record<string, unknown>): PathEdge {
+  return {
+    id: String(row.id ?? ""),
+    user_id: String(row.user_id ?? ""),
+    path_id: String(row.path_id ?? ""),
+    from_item_id: String(row.from_item_id ?? ""),
+    to_item_id: String(row.to_item_id ?? ""),
     created_at: typeof row.created_at === "string" ? row.created_at : "",
   };
 }
@@ -94,7 +118,7 @@ export function dedupePathItems<T extends Pick<PathItem, "idea_id">>(items: T[])
   const seen = new Set<string>();
   const out: T[] = [];
   for (const item of items) {
-    if (seen.has(item.idea_id)) continue;
+    if (item.idea_id === null || seen.has(item.idea_id)) continue;
     seen.add(item.idea_id);
     out.push(item);
   }
@@ -137,6 +161,7 @@ export function pathProgress(items: Pick<PathItem, "idea_id">[], byId: StatusLoo
   let total = 0;
   let done = 0;
   for (const item of dedupePathItems(items)) {
+    if (!item.idea_id) continue;
     const status = byId.get(item.idea_id)?.status;
     if (!status) continue;
     total += 1;
@@ -151,7 +176,7 @@ export function pathProgress(items: Pick<PathItem, "idea_id">[], byId: StatusLoo
  * dependent) these are the nodes with no outgoing edge inside the path.
  */
 export function pathEndpoints(items: Pick<PathItem, "idea_id">[], links: LinkRef[]): string[] {
-  const members = new Set(dedupePathItems(items).map((i) => i.idea_id));
+  const members = new Set(dedupePathItems(items).flatMap((i) => (i.idea_id ? [i.idea_id] : [])));
   const dependedOn = new Set<string>();
   for (const link of links) {
     if (link.link_type !== "depends_on") continue;

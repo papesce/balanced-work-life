@@ -7,6 +7,7 @@ export const LINK_TYPES: { value: LinkType; label: string }[] = [
   { value: "depends_on", label: "Depends on" },
   { value: "related_to", label: "Related to" },
   { value: "part_of", label: "Part of" },
+  { value: "path_of", label: "Associated with" },
 ];
 
 export const LINK_TYPE_LABELS: Record<LinkType, string> = {
@@ -15,6 +16,7 @@ export const LINK_TYPE_LABELS: Record<LinkType, string> = {
   depends_on: "depends on",
   related_to: "related",
   part_of: "part of",
+  path_of: "associated with",
 };
 
 /** Canvas edge styling per link type so the relationship kind is visible. */
@@ -27,4 +29,5 @@ export const LINK_EDGE_STYLE: Record<
   contributes_to: { stroke: "#3b82f6" },
   part_of: { stroke: "#f59e0b" },
   related_to: { stroke: "#9ca3af", dashed: true },
+  path_of: { stroke: "#8b5cf6", dashed: true },
 };

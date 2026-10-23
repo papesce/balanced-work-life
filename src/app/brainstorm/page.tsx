@@ -14,7 +14,6 @@ import {
   BrainstormStartActions,
 } from "@/components/brainstorm/BrainstormHeaders";
 import { BrainstormBreadcrumb } from "@/components/brainstorm/BrainstormBreadcrumb";
-import { GraphView } from "@/components/brainstorm/GraphView";
 import { STORAGE_KEYS, readRawString, writeRawString } from "@/lib/storage";
 import { useBrainstormFilters } from "@/hooks/useBrainstormFilters";
 import { useUiPrefsStore } from "@/stores/uiPrefsStore";
@@ -57,7 +56,6 @@ export default function BrainstormPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const highlightId = searchParams.get("highlight");
-  const [viewMode, setViewMode] = useState<"tree" | "graph">("tree");
   const cardMode = useUiPrefsStore((s) => s.cardMode);
   const setPrefs = useUiPrefsStore((s) => s.set);
   const setCardMode = (v: boolean | ((p: boolean) => boolean)) =>
@@ -132,8 +130,6 @@ export default function BrainstormPage() {
     if (id) ideasHook.expandIdea(id);
   };
 
-  const hasLinks = linksHook.links.length > 0;
-
   const handleAddRoot = async () => {
     const id = await createIdea("", effectiveFocusId, "top");
     if (id) {
@@ -170,7 +166,6 @@ export default function BrainstormPage() {
     ideasHook.expandIdea(highlightId);
     /* eslint-disable react-hooks/set-state-in-effect -- highlight deep-link syncs selection/view */
     setSelectedId(highlightId);
-    setViewMode("tree");
     // Guarantee the highlight target is visible: lift filters that could hide it.
     if (focusedId && !getFocusedSubtreeIds(focusedId, ideasHook.ideas).has(highlightId)) {
       setFocusedId(null);
@@ -245,9 +240,6 @@ export default function BrainstormPage() {
       onToggleCardMode={() => setCardMode((v: boolean) => !v)}
       timeScope={timeScope}
       onTimeScopeChange={setTimeScope}
-      viewMode={viewMode}
-      onViewModeChange={setViewMode}
-      hasLinks={hasLinks}
     />
   );
 
@@ -256,7 +248,6 @@ export default function BrainstormPage() {
       title="Brainstorm"
       headerActions={headerActions}
       headerStartActions={headerStartActions}
-      fullWidth={viewMode !== "tree"}
     >
       {undoAction && (
         <motion.div
@@ -306,59 +297,47 @@ export default function BrainstormPage() {
           />
         </div>
       )}
-      {viewMode === "tree" ? (
-        <IdeaTree
-          tree={ideasHook.tree}
-          ideas={ideasHook.ideas}
-          links={linksHook.links}
-          scope={timeScope}
-          createIdea={createIdea}
-          updateIdea={updateIdea}
-          deleteIdea={deleteIdea}
-          moveIdea={moveIdea}
-          onCreateParent={createParentAndMove}
-          toggleCollapse={ideasHook.toggleCollapse}
-          expandIdea={ideasHook.expandIdea}
-          onCreateLink={createLink}
-          onDeleteLink={deleteLink}
-          onMarkDone={markDone}
-          onMarkUndone={markUndone}
-          onSchedule={scheduleIdea}
-          allTags={tagsHook.tags}
-          getTagsForIdea={taskTagsHook.getTagsForIdea}
-          onAddTag={taskTagsHook.addTagToTask}
-          onRemoveTag={taskTagsHook.removeTagFromTask}
-          onCreateTag={tagsHook.createTag}
-          showType={showType}
-          showArea={showArea}
-          editMode={editMode}
-          editingId={editingId}
-          setEditingId={setEditingId}
-          selectedId={selectedId}
-          setSelectedId={setSelectedId}
-          composing={composing}
-          setComposing={setComposing}
-          showToday={showToday}
-          hideClosed={hideClosed}
-          hideCompleted={hideCompleted}
-          hideDeferred={hideDeferred}
-          hideInHorizonIds={hideInHorizon ? classifiedIds : undefined}
-          typeFilter={typeFilter}
-          focusedId={effectiveFocusId}
-          onFocus={handleFocus}
-          cardMode={cardMode}
-        />
-      ) : (
-        <GraphView
-          ideas={ideasHook.ideas}
-          links={linksHook.links}
-          focusedId={effectiveFocusId}
-          onNodeDoubleClick={(ideaId) => {
-            handleFocus(ideaId);
-            setViewMode("tree");
-          }}
-        />
-      )}
+      <IdeaTree
+        tree={ideasHook.tree}
+        ideas={ideasHook.ideas}
+        links={linksHook.links}
+        scope={timeScope}
+        createIdea={createIdea}
+        updateIdea={updateIdea}
+        deleteIdea={deleteIdea}
+        moveIdea={moveIdea}
+        onCreateParent={createParentAndMove}
+        toggleCollapse={ideasHook.toggleCollapse}
+        expandIdea={ideasHook.expandIdea}
+        onCreateLink={createLink}
+        onDeleteLink={deleteLink}
+        onMarkDone={markDone}
+        onMarkUndone={markUndone}
+        onSchedule={scheduleIdea}
+        allTags={tagsHook.tags}
+        getTagsForIdea={taskTagsHook.getTagsForIdea}
+        onAddTag={taskTagsHook.addTagToTask}
+        onRemoveTag={taskTagsHook.removeTagFromTask}
+        onCreateTag={tagsHook.createTag}
+        showType={showType}
+        showArea={showArea}
+        editMode={editMode}
+        editingId={editingId}
+        setEditingId={setEditingId}
+        selectedId={selectedId}
+        setSelectedId={setSelectedId}
+        composing={composing}
+        setComposing={setComposing}
+        showToday={showToday}
+        hideClosed={hideClosed}
+        hideCompleted={hideCompleted}
+        hideDeferred={hideDeferred}
+        hideInHorizonIds={hideInHorizon ? classifiedIds : undefined}
+        typeFilter={typeFilter}
+        focusedId={effectiveFocusId}
+        onFocus={handleFocus}
+        cardMode={cardMode}
+      />
     </AppShell>
   );
 }

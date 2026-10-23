@@ -1,0 +1,161 @@
+"use client";
+
+import { useMemo } from "react";
+import { v4 as uuidv4 } from "uuid";
+import { usePowerSync, useQuery } from "@powersync/react";
+import { useAuth } from "./useAuth";
+import {
+  deserializePathItem,
+  deserializePathEdge,
+  type PathItem,
+  type PathEdge,
+  type PathPosition,
+} from "@/lib/paths";
+
+export function usePathManager(pathId: string) {
+  const { user } = useAuth();
+  const db = usePowerSync();
+  const userId = user?.id ?? "";
+
+  const hasScope = Boolean(userId && pathId);
+
+  // 1. Data Fetching
+  const { data: rawItems, isLoading: itemsLoading } = useQuery<Record<string, unknown>>(
+    hasScope ? "SELECT * FROM path_items WHERE path_id = ?" : "SELECT * FROM path_items WHERE 0",
+    hasScope ? [pathId] : [],
+  );
+  const { data: rawEdges, isLoading: edgesLoading } = useQuery<Record<string, unknown>>(
+    hasScope ? "SELECT * FROM path_edges WHERE path_id = ?" : "SELECT * FROM path_edges WHERE 0",
+    hasScope ? [pathId] : [],
+  );
+
+  const items: PathItem[] = useMemo(() => rawItems.map(deserializePathItem), [rawItems]);
+  const edges: PathEdge[] = useMemo(() => rawEdges.map(deserializePathEdge), [rawEdges]);
+
+  // 2. Node Management
+  const addNode = async (title: string, x = 0, y = 0): Promise<string> => {
+    if (!user || !pathId) throw new Error("Auth or PathId missing");
+    const id = uuidv4();
+    const now = new Date().toISOString();
+    await db.execute(
+      `INSERT INTO path_items (id, user_id, path_id, title, idea_id, x, y, created_at) VALUES (?,?,?,?,?,?,?,?)`,
+      [id, userId, pathId, title, null, x, y, now],
+    );
+    return id;
+  };
+
+  const updateNodeTitle = async (itemId: string, title: string): Promise<void> => {
+    if (!user || !pathId) throw new Error("Auth or PathId missing");
+    await db.execute("UPDATE path_items SET title = ? WHERE id = ?", [title, itemId]);
+  };
+
+  const moveNodes = async (positions: PathPosition[]): Promise<void> => {
+    if (positions.length === 0) return;
+    await db.writeTransaction(async (tx) => {
+      for (const pos of positions) {
+        await tx.execute(`UPDATE path_items SET x = ?, y = ? WHERE id = ?`, [
+          pos.x,
+          pos.y,
+          pos.itemId,
+        ]);
+      }
+    });
+  };
+
+  const deleteNode = async (itemId: string): Promise<void> => {
+    if (!user || !pathId) return;
+    await db.writeTransaction(async (tx) => {
+      await tx.execute(`DELETE FROM path_items WHERE id = ?`, [itemId]);
+      await tx.execute(`DELETE FROM path_edges WHERE from_item_id = ? OR to_item_id = ?`, [
+        itemId,
+        itemId,
+      ]);
+    });
+  };
+
+  // 3. Edge Management
+  const addEdge = async (fromId: string, toId: string): Promise<void> => {
+    if (!user || !pathId) throw new Error("Auth or PathId missing");
+    const id = uuidv4();
+    const now = new Date().toISOString();
+    await db.execute(
+      `INSERT OR IGNORE INTO path_edges (id, user_id, path_id, from_item_id, to_item_id, created_at) VALUES (?,?,?,?,?,?)`,
+      [id, userId, pathId, fromId, toId, now],
+    );
+  };
+
+  const removeEdge = async (edgeId: string): Promise<void> => {
+    if (!user || !pathId) return;
+    await db.execute(`DELETE FROM path_edges WHERE id = ?`, [edgeId]);
+  };
+
+  // 4. Promotion Pipeline
+  const promoteNode = async (itemId: string, taskTitle: string): Promise<string> => {
+    if (!user || !pathId) throw new Error("Auth or PathId missing");
+
+    return await db.writeTransaction(async (tx) => {
+      const existing = await tx.getOptional<Record<string, unknown>>(
+        "SELECT idea_id FROM path_items WHERE id = ? AND path_id = ?",
+        [itemId, pathId],
+      );
+      if (!existing) throw new Error("Path node not found");
+      if (existing.idea_id) return String(existing.idea_id);
+      const taskId = uuidv4();
+      const now = new Date().toISOString();
+
+      // a. Create the real Idea (Task)
+      await tx.execute(
+        `INSERT INTO ideas (id, user_id, text, type, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?)`,
+        [taskId, userId, taskTitle, "task", "draft", now, now],
+      );
+
+      // b. Link the node to the Idea
+      await tx.execute(`UPDATE path_items SET idea_id = ? WHERE id = ?`, [taskId, itemId]);
+
+      // c. Materialize Edges
+      // Find all edges connected to this node
+      const connectedEdges = await tx.getAll<Record<string, unknown>>(
+        `SELECT * FROM path_edges WHERE path_id = ? AND (from_item_id = ? OR to_item_id = ?)`,
+        [pathId, itemId, itemId],
+      );
+
+      for (const edge of connectedEdges) {
+        const fromId = String(edge.from_item_id);
+        const toId = String(edge.to_item_id);
+
+        // We only materialize as idea_links if BOTH ends of the edge are now promoted
+        const fromItem = await tx.getOptional<Record<string, unknown>>(
+          `SELECT idea_id FROM path_items WHERE id = ?`,
+          [fromId],
+        );
+        const toItem = await tx.getOptional<Record<string, unknown>>(
+          `SELECT idea_id FROM path_items WHERE id = ?`,
+          [toId],
+        );
+
+        if (fromItem?.idea_id && toItem?.idea_id) {
+          const linkId = uuidv4();
+          await tx.execute(
+            `INSERT OR IGNORE INTO idea_links (id, user_id, source_id, target_id, link_type, created_at) VALUES (?,?,?,?,?,?)`,
+            [linkId, userId, String(fromItem.idea_id), String(toItem.idea_id), "depends_on", now],
+          );
+        }
+      }
+
+      return taskId;
+    });
+  };
+
+  return {
+    items,
+    edges,
+    loading: itemsLoading || edgesLoading,
+    addNode,
+    updateNodeTitle,
+    moveNodes,
+    deleteNode,
+    addEdge,
+    removeEdge,
+    promoteNode,
+  };
+}

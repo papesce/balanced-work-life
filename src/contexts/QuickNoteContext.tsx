@@ -36,64 +36,10 @@ import { useQuickNoteDraft } from "@/lib/quicknote/draft";
 import { useQuickNoteNotes } from "@/lib/quicknote/notes";
 import { useQuickNotePersistence } from "@/lib/quicknote/persistence";
 import { useQuickNoteOperations } from "@/lib/quicknote/operations";
+import { useQuickNotePathOperations } from "@/lib/quicknote/pathOperations";
 import type { QuickNotePanelMode, QuickNoteSaveStatus } from "@/lib/quicknote/types";
 
 export type { QuickNotePanelMode, QuickNoteSaveStatus } from "@/lib/quicknote/types";
-
-interface QuickNoteContextValue {
-  note: QuickNote | null;
-  loading: boolean;
-  panelOpen: boolean;
-  openPanel: (mode?: QuickNotePanelMode) => void;
-  closePanel: () => Promise<void>;
-  /** Requested panel mode (consumed by the panel on open). Null = no request. */
-  requestedMode: QuickNotePanelMode | null;
-  consumeRequestedMode: () => void;
-  /** Flush pending autosave immediately. Resolves after the write lands (or fails). */
-  flushNow: () => Promise<void>;
-  /** True while there are edits not yet confirmed persisted (drives close guards). */
-  hasUnsaved: boolean;
-  /** Update the full note text (capture mode). Creates the note lazily on first non-whitespace input. */
-  updateText: (text: string) => void;
-  /** Create an idea from selected text. Never mutates note text. */
-  createSelectionIdea: (
-    text: string,
-    parentId?: string | null,
-    initial?: { type?: string | null; scheduled_date?: string | null },
-  ) => Promise<string | null>;
-  /** Soft-delete the entire note. */
-  discardNote: () => Promise<void>;
-  /** Reopen the selected archived note. No-op unless it is archived. */
-  reopenNote: () => Promise<void>;
-  /** Number of unresolved non-empty lines in the active note. */
-  unreadCount: number;
-  /** Total unresolved lines across all open notes. */
-  totalUnreadCount: number;
-  /** Number of open notes with at least one unresolved non-empty line. */
-  pendingNotesCount: number;
-  /** Undo bar state (global singleton — rendered by the active page's bar). */
-  undoAction: ReturnType<typeof useUndoAction>["undoAction"];
-  handleUndo: ReturnType<typeof useUndoAction>["handleUndo"];
-  clearUndo: ReturnType<typeof useUndoAction>["clearUndo"];
-  /** Current draft text (for Process mode to read). */
-  draft: string;
-  /** All quick notes (open + archived, excluding deleted). */
-  allNotes: QuickNote[];
-  /** All open notes, newest first. */
-  openNotes: QuickNote[];
-  /** The currently selected note in the panel (may be open or archived). */
-  selectedNote: QuickNote | null;
-  /** Select a note by id to view in the panel. Flushes dirty draft first. */
-  selectNote: (id: string) => Promise<void>;
-  /** Create a new blank open note and select it. Returns the new id. */
-  createNote: () => Promise<string | null>;
-  /** Whether the currently selected note is an open note (editable). */
-  isSelectedNoteLive: boolean;
-  /** Autosave feedback: current status + when the draft was last persisted. */
-  saveStatus: QuickNoteSaveStatus;
-  /** ISO timestamp of the last successful save (null until first save). */
-  lastSavedAt: string | null;
-}
 
 /** Per-keystroke slice: changes only when the draft text changes. */
 interface QuickNoteEditorContextValue {
@@ -118,10 +64,35 @@ interface QuickNoteCaptureMetaContextValue {
 }
 
 /** Low-frequency slice: stable across keystrokes. */
-type QuickNoteDataContextValue = Omit<
-  QuickNoteContextValue,
-  "draft" | "updateText" | "saveStatus" | "lastSavedAt" | "hasUnsaved" | "flushNow"
->;
+interface QuickNoteDataContextValue {
+  note: QuickNote | null;
+  loading: boolean;
+  panelOpen: boolean;
+  openPanel: (mode?: QuickNotePanelMode) => void;
+  closePanel: () => Promise<void>;
+  requestedMode: QuickNotePanelMode | null;
+  consumeRequestedMode: () => void;
+  createSelectionIdea: (
+    text: string,
+    parentId?: string | null,
+    initial?: { type?: string | null; scheduled_date?: string | null },
+  ) => Promise<string | null>;
+  convertToPath: (text: string) => Promise<{ pathId: string; nodeCount: number }>;
+  discardNote: () => Promise<void>;
+  reopenNote: () => Promise<void>;
+  unreadCount: number;
+  totalUnreadCount: number;
+  pendingNotesCount: number;
+  undoAction: ReturnType<typeof useUndoAction>["undoAction"];
+  handleUndo: ReturnType<typeof useUndoAction>["handleUndo"];
+  clearUndo: ReturnType<typeof useUndoAction>["clearUndo"];
+  allNotes: QuickNote[];
+  openNotes: QuickNote[];
+  selectedNote: QuickNote | null;
+  selectNote: (id: string) => Promise<void>;
+  createNote: () => Promise<string | null>;
+  isSelectedNoteLive: boolean;
+}
 
 const QuickNoteEditorContext = createContext<QuickNoteEditorContextValue | null>(null);
 const QuickNoteSaveContext = createContext<QuickNoteSaveContextValue | null>(null);
@@ -189,6 +160,10 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
     draft,
     persistence,
     registerUndo,
+  });
+  const pathOps = useQuickNotePathOperations({
+    db,
+    userId,
   });
 
   // Sync draft from DB on note switches (initial load, selection change).
@@ -313,6 +288,7 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
       requestedMode,
       consumeRequestedMode,
       createSelectionIdea: ops.createSelectionIdea,
+      convertToPath: pathOps.convertToPath,
       discardNote: ops.discardNote,
       reopenNote: ops.reopenNote,
       unreadCount,
@@ -336,6 +312,7 @@ export function QuickNoteProvider({ children }: { children: ReactNode }) {
       notes.selectedNote,
       notes.isSelectedNoteLive,
       ops.createSelectionIdea,
+      pathOps.convertToPath,
       ops.discardNote,
       ops.reopenNote,
       ops.selectNote,

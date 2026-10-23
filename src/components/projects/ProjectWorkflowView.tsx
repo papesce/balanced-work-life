@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Background, Controls, MiniMap, ReactFlow, ReactFlowProvider } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { Idea, IdeaLink, LinkType, Tag } from "@/lib/types";
-import type { PathItem, PathPosition } from "@/lib/paths";
+import type { PathItem } from "@/lib/paths";
 import { WorkflowTaskNode } from "./WorkflowTaskNode";
 import { useWorkflowGraph, type FlowNode } from "./workflow/useWorkflowGraph";
 import { useWorkflowInteractions } from "./workflow/useWorkflowInteractions";
@@ -23,7 +23,7 @@ interface Props {
   items: PathItem[];
   onAddItem: (ideaId: string, x: number, y: number) => Promise<void>;
   onRemoveItem: (ideaId: string) => Promise<void>;
-  onMoveItems: (positions: PathPosition[]) => Promise<void>;
+  onMoveItems: (positions: { ideaId: string; x: number; y: number }[]) => Promise<void>;
   tagsForTask: (id: string) => Tag[];
   onUpdateTask: (id: string, updates: Partial<Idea>) => Promise<void>;
   onOpenNotes: (id: string) => void;

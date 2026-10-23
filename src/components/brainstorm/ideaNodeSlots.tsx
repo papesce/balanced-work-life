@@ -27,6 +27,7 @@ export const TYPE_COLORS: Record<IdeaType, string> = {
   initiative:
     "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700/30",
   task: "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700/30",
+  path: "bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-700/30",
 };
 
 function formatScheduleDate(date: string, today: string): string {
