@@ -302,8 +302,8 @@ export function IdeaTree({
         renderLeading={(node) => (
           <>
             <StatusIconSlot node={node} onMarkDone={onMarkDone} onMarkUndone={onMarkUndone} />
-            {compact && (
-              node.type === "project" ? (
+            {compact &&
+              (node.type === "project" ? (
                 <Link
                   href={`/projects?projectId=${node.id}`}
                   title="Open this project"
@@ -315,8 +315,7 @@ export function IdeaTree({
                 </Link>
               ) : (
                 <TypeIconSlot node={node} />
-              )
-            )}
+              ))}
           </>
         )}
         renderTrailing={(node) => (

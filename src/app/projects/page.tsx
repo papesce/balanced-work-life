@@ -31,15 +31,15 @@ export default function ProjectsPage() {
       lensKey={model.lensKey}
       lensTabs={model.lensTabs}
       statusFilter={model.statusFilter}
-       hideCompleted={model.hideCompleted}
-       hideChildProjects={model.hideChildProjects}
-       unclassifiedExpanded={model.unclassifiedExpanded}
+      hideCompleted={model.hideCompleted}
+      hideChildProjects={model.hideChildProjects}
+      unclassifiedExpanded={model.unclassifiedExpanded}
       undoAction={model.undoAction}
       renderCard={(project) => <ProjectCardRow key={project.id} project={project} model={model} />}
       onLensChange={model.handleLensChange}
       onStatusFilterChange={model.setStatusFilter}
-       onToggleHideCompleted={model.onToggleHideCompleted}
-       onToggleHideChildProjects={model.onToggleHideChildProjects}
+      onToggleHideCompleted={model.onToggleHideCompleted}
+      onToggleHideChildProjects={model.onToggleHideChildProjects}
       onToggleUnclassifiedExpanded={model.onToggleUnclassifiedExpanded}
       onAddProject={() => void model.handleAddProject()}
       onAddProjectInGroup={(value) => void model.handleAddProjectInGroup(value)}

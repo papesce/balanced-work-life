@@ -3,8 +3,19 @@ import assert from "node:assert/strict";
 import { getHiddenChildProjectIds } from "./childProjectVisibility";
 import type { Idea } from "@/lib/types";
 
-function idea(id: string, type: "project" | "task" = "project", parent_id: string | null = null): Idea {
-  return { id, type, parent_id, text: id, status: "open", updated_at: "2026-01-01" } as unknown as Idea;
+function idea(
+  id: string,
+  type: "project" | "task" = "project",
+  parent_id: string | null = null,
+): Idea {
+  return {
+    id,
+    type,
+    parent_id,
+    text: id,
+    status: "open",
+    updated_at: "2026-01-01",
+  } as unknown as Idea;
 }
 
 test("root project not hidden", () => {
