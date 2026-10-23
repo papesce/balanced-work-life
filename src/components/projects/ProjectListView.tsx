@@ -183,13 +183,6 @@ export function ProjectListView({
                 onToggle: () => onStatusFilterChange(statusFilter === "open" ? "all" : "open"),
               },
               {
-                key: "hide-completed",
-                label: "Hide completed",
-                description: "Hide completed projects from the list",
-                checked: hideCompleted,
-                onToggle: onToggleHideCompleted,
-              },
-              {
                 key: "hide-children",
                 label: "Hide subprojects",
                 description: "Hide subprojects whose parent is visible",
