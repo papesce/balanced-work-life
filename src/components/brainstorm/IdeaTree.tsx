@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Focus as FocusIcon, ArrowUpRight } from "lucide-react";
+import { Focus as FocusIcon } from "lucide-react";
 import { RevealInMenu } from "@/components/shared/RevealInMenu";
 import { NotesIndicator } from "@/components/shared/NotesIndicator";
 import { useNotes } from "@/contexts/NotesContext";
@@ -302,7 +302,21 @@ export function IdeaTree({
         renderLeading={(node) => (
           <>
             <StatusIconSlot node={node} onMarkDone={onMarkDone} onMarkUndone={onMarkUndone} />
-            {compact && <TypeIconSlot node={node} />}
+            {compact && (
+              node.type === "project" ? (
+                <Link
+                  href={`/projects?projectId=${node.id}`}
+                  title="Open this project"
+                  aria-label="Open this project"
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-emerald-600 hover:bg-emerald-50 focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none dark:text-emerald-400 dark:hover:bg-emerald-500/10"
+                >
+                  <TypeIconSlot node={node} />
+                </Link>
+              ) : (
+                <TypeIconSlot node={node} />
+              )
+            )}
           </>
         )}
         renderTrailing={(node) => (
@@ -335,18 +349,6 @@ export function IdeaTree({
               </span>
             ))}
             <ScheduleChip node={node} todayString={todayString} />
-            {node.type === "project" && (
-              <Link
-                href={`/projects?projectId=${node.id}`}
-                title="Open this project"
-                aria-label="Open this project"
-                onClick={(e) => e.stopPropagation()}
-                className="flex flex-shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-500/10"
-              >
-                Open
-                <ArrowUpRight size={11} strokeWidth={2.5} />
-              </Link>
-            )}
             {focusedId !== node.id && (
               <button
                 type="button"

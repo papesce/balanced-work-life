@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { ChevronUp, FolderKanban, Plus } from "lucide-react";
+import { FilterMenu } from "@/components/shared/FilterMenu";
 import { AppShell } from "@/components/AppShell";
 import { ColumnShell, groupKeyOf, type LensColumn } from "@/components/lens";
 import { ValueHelpInfo } from "@/components/shared/ValueHelpInfo";
@@ -22,12 +23,14 @@ interface ProjectListViewProps {
   lensTabs: ProjectLensTab[];
   statusFilter: "all" | "open";
   hideCompleted: boolean;
+  hideChildProjects: boolean;
   unclassifiedExpanded: boolean;
   undoAction: UndoAction | null;
   renderCard: (p: Idea) => ReactNode;
   onLensChange: (key: string) => void;
   onStatusFilterChange: (v: "all" | "open") => void;
   onToggleHideCompleted: () => void;
+  onToggleHideChildProjects: () => void;
   onToggleUnclassifiedExpanded: (expanded: boolean) => void;
   onAddProject: () => void;
   onAddProjectInGroup: (value: string | null) => void;
@@ -132,12 +135,14 @@ export function ProjectListView({
   lensTabs,
   statusFilter,
   hideCompleted,
+  hideChildProjects,
   unclassifiedExpanded,
   undoAction,
   renderCard,
   onLensChange,
   onStatusFilterChange,
   onToggleHideCompleted,
+  onToggleHideChildProjects,
   onToggleUnclassifiedExpanded,
   onAddProject,
   onAddProjectInGroup,
@@ -168,38 +173,38 @@ export function ProjectListView({
               ))}
             </select>
           </label>
-          <div className="flex gap-1">
-            <button
-              type="button"
-              onClick={() => onStatusFilterChange("open")}
-              aria-pressed={statusFilter === "open"}
-              className={`toolbar-btn ${statusFilter === "open" ? "toolbar-btn--accent" : ""}`}
-            >
-              Open
-            </button>
-            <button
-              type="button"
-              onClick={() => onStatusFilterChange("all")}
-              aria-pressed={statusFilter === "all"}
-              className={`toolbar-btn ${statusFilter === "all" ? "toolbar-btn--accent" : ""}`}
-            >
-              All
-            </button>
-          </div>
-          <button
-            type="button"
-            onClick={onToggleHideCompleted}
-            aria-pressed={hideCompleted}
-            title="Hide completed projects"
-            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-              hideCompleted
-                ? "border-indigo-300 bg-white text-indigo-700 dark:border-indigo-500/50 dark:bg-gray-700 dark:text-indigo-300"
-                : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
-            }`}
-          >
-            <span className="hidden sm:inline">Hide completed</span>
-            <span className="sm:hidden">Hide done</span>
-          </button>
+          <FilterMenu
+            options={[
+              {
+                key: "status-open",
+                label: "Show only open",
+                description: "Filter out completed and archived projects",
+                checked: statusFilter === "open",
+                onToggle: () => onStatusFilterChange(statusFilter === "open" ? "all" : "open"),
+              },
+              {
+                key: "hide-completed",
+                label: "Hide completed",
+                description: "Hide completed projects from the list",
+                checked: hideCompleted,
+                onToggle: onToggleHideCompleted,
+              },
+              {
+                key: "hide-children",
+                label: "Hide subprojects",
+                description: "Hide subprojects whose parent is visible",
+                checked: hideChildProjects,
+                onToggle: onToggleHideChildProjects,
+              },
+              {
+                key: "unclassified-expanded",
+                label: "Unclassified expanded",
+                description: "Expand the unclassified group by default",
+                checked: unclassifiedExpanded,
+                onToggle: () => onToggleUnclassifiedExpanded(!unclassifiedExpanded),
+              },
+            ]}
+          />
         </>
       }
       headerActions={

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Tag } from "lucide-react";
-import { HorizonFiltersMenu } from "@/components/horizon/HorizonFiltersMenu";
+import { FilterMenu } from "@/components/shared/FilterMenu";
 import { HorizonViewSwitcher, type DisplayLens } from "@/components/horizon/HorizonViewSwitcher";
 import { TypeFilterPicker } from "@/components/shared/TypeFilterPicker";
 import type { HorizonLensDef } from "@/lib/horizonLenses";
@@ -95,15 +95,38 @@ export function HorizonBoardHeader({
         showClassificationOrder={showClassificationOrder}
         onToggleShowClassificationOrder={onToggleShowClassificationOrder}
       />
-      <HorizonFiltersMenu
-        hideClosed={hideClosed}
-        onToggleHideClosed={onToggleHideClosed}
-        hideUpcoming={hideUpcoming}
-        onToggleHideUpcoming={onToggleHideUpcoming}
-        hideOverdue={hideOverdue}
-        onToggleHideOverdue={onToggleHideOverdue}
-        hideProjectsWithTasks={hideProjectsWithTasks}
-        onToggleHideProjectsWithTasks={onToggleHideProjectsWithTasks}
+      <FilterMenu
+        title="Display"
+        options={[
+          {
+            key: "closed",
+            label: "Hide closed",
+            description: "Hide completed, cancelled, missed and archived items",
+            checked: hideClosed,
+            onToggle: onToggleHideClosed,
+          },
+          {
+            key: "upcoming",
+            label: "Hide upcoming",
+            description: "Hide tasks dated today or later, plus in-progress work",
+            checked: hideUpcoming,
+            onToggle: onToggleHideUpcoming,
+          },
+          {
+            key: "overdue",
+            label: "Hide overdue",
+            description: "Hide past-due tasks; off surfaces them for rescheduling",
+            checked: hideOverdue,
+            onToggle: onToggleHideOverdue,
+          },
+          {
+            key: "projects",
+            label: "Hide projects with visible tasks",
+            description: "Tasks show on their own with the project breadcrumb",
+            checked: hideProjectsWithTasks,
+            onToggle: onToggleHideProjectsWithTasks,
+          },
+        ]}
       />
       <div className="relative">
         <button

@@ -205,7 +205,7 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
           placeholder={
             readonly
               ? "This note is archived"
-              : "Capture anything...\n- Start a line with “- ” to make it a task\n- [Title](notes) adds notes to the created idea\n- End with #project, #task, #goal, #idea or #initiative for the type"
+              : "Capture anything...\n- Start a line with “- ” to make it a task\n- Add an indented “Notes: …” line below it for task notes\n- End with #project, #task, #goal, #idea or #initiative for the type"
           }
           className={`h-full min-h-[200px] w-full resize-none bg-transparent text-sm leading-relaxed text-gray-800 outline-none placeholder:text-gray-400 dark:text-gray-200 dark:placeholder:text-gray-500 ${readonly ? "cursor-default opacity-70" : ""}`}
           rows={10}

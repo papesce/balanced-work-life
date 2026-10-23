@@ -3,7 +3,7 @@
 import { useCallback, useMemo } from "react";
 import { v4 as uuidv4 } from "uuid";
 import type { AbstractPowerSyncDatabase } from "@powersync/web";
-import { parseTaskAll, stripTaskPrefix, isTaskLine } from "@/lib/quickNotes";
+import { parseTaskBlock, stripTaskPrefix, isTaskLine } from "@/lib/quickNotes";
 import { ideaInsertSql, ideaInsertParams } from "@/lib/ideaInsert";
 import type { QuickNoteDraftApi } from "./draft";
 import type { QuickNoteNotes } from "./notes";
@@ -200,8 +200,8 @@ export function useQuickNoteOperations({
 
   /**
    * Create an idea from arbitrary selected text. Multi-line selections use
-   * the first line as title (with `[title](notes)` + trailing `#type`
-   * honored) and the rest as notes detail. Never mutates note text, so no
+   * the first line as title (with trailing `#type` honored) and indented
+   * `Notes:` lines as notes detail. Never mutates note text, so no
    * line resolution or archiving happens here.
    */
   const createSelectionIdea = useCallback(
@@ -217,11 +217,10 @@ export function useQuickNoteOperations({
         .map((l) => l.trim())
         .filter(Boolean);
       if (taskLines.length === 0) return null;
-      const { title, detail, kind } = parseTaskAll(taskLines[0]);
-      const rest = taskLines.slice(1).join("\n");
+      const { title, detail, kind } = parseTaskBlock(taskLines);
       const cleanTitle = title.trim();
       if (!cleanTitle) return null;
-      const combinedNotes = [detail, rest].filter(Boolean).join("\n") || null;
+      const combinedNotes = detail;
       const finalType = initial?.type ?? kind ?? "idea";
       const scheduledDate =
         initial?.scheduled_date && /^\d{4}-\d{2}-\d{2}$/.test(initial.scheduled_date)

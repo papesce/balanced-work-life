@@ -20,7 +20,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useQuickNoteEditor, useQuickNoteData } from "@/contexts/QuickNoteContext";
-import { parseTaskAll, findBestMatch, isTaskLine } from "@/lib/quickNotes";
+import { parseTaskBlock, findBestMatch, isTaskLine } from "@/lib/quickNotes";
 import { Idea, IdeaType } from "@/lib/types";
 import { getToday, getTomorrow, formatDate } from "@/lib/dateUtils";
 import { getRevealHref, getSmartRevealView, getRevealLabel, type RevealView } from "@/lib/reveal";
@@ -81,15 +81,9 @@ export function QuickNoteSelectionActions({
   );
   const allIdeas: Idea[] = useMemo(() => (ideaRows as unknown as Idea[]) ?? [], [ideaRows]);
 
-  const firstLine = useMemo(
-    () =>
-      selection
-        .split("\n")
-        .map((l) => l.trim())
-        .filter(Boolean)[0] ?? "",
-    [selection],
-  );
-  const parsed = useMemo(() => parseTaskAll(firstLine), [firstLine]);
+  const taskLines = useMemo(() => selection.split("\n"), [selection]);
+  const firstLine = taskLines[0]?.trim() ?? "";
+  const parsed = useMemo(() => parseTaskBlock(taskLines), [taskLines]);
   const suggestedMatch = useMemo(
     () => (parsed.title ? findBestMatch(parsed.title, allIdeas) : null),
     [parsed.title, allIdeas],

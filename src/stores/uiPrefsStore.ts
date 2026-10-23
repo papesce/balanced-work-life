@@ -25,6 +25,7 @@ interface UiPrefsState {
   projectsUnclassifiedExpanded: boolean;
   projectsDetailHideCompleted: boolean;
   projectsDetailHideClosed: boolean;
+  projectsHideChildProjects: boolean;
   /** Project detail TASKS grouping: classification scheme key, or null for manual (tree) order. */
   projectTasksGroupBy: string | null;
   horizonUnclassifiedExpanded: boolean;
@@ -77,9 +78,10 @@ export const useUiPrefsStore = create<UiPrefsState>()(
       horizonLens: "term",
       horizonLensId: null,
       horizonActiveViewId: null,
-      projectsUnclassifiedExpanded: true,
-      projectsDetailHideCompleted: true,
-      projectsDetailHideClosed: true,
+       projectsUnclassifiedExpanded: true,
+       projectsDetailHideCompleted: true,
+       projectsDetailHideClosed: true,
+       projectsHideChildProjects: true,
       projectTasksGroupBy: null,
       horizonUnclassifiedExpanded: false,
       horizonHideProjectsWithTasks: true,
@@ -105,9 +107,10 @@ export const useUiPrefsStore = create<UiPrefsState>()(
         horizonLens: s.horizonLens,
         horizonLensId: s.horizonLensId,
         horizonActiveViewId: s.horizonActiveViewId,
-        projectsUnclassifiedExpanded: s.projectsUnclassifiedExpanded,
-        projectsDetailHideCompleted: s.projectsDetailHideCompleted,
-        projectsDetailHideClosed: s.projectsDetailHideClosed,
+         projectsUnclassifiedExpanded: s.projectsUnclassifiedExpanded,
+         projectsDetailHideCompleted: s.projectsDetailHideCompleted,
+         projectsDetailHideClosed: s.projectsDetailHideClosed,
+         projectsHideChildProjects: s.projectsHideChildProjects,
         projectTasksGroupBy: s.projectTasksGroupBy,
         horizonUnclassifiedExpanded: s.horizonUnclassifiedExpanded,
         horizonHideProjectsWithTasks: s.horizonHideProjectsWithTasks,

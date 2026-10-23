@@ -3,12 +3,12 @@
 import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
-import { parseTaskAll, isTaskLine } from "@/lib/quickNotes";
+import { parseTaskBlock, isTaskLine } from "@/lib/quickNotes";
 import type { IdeaType } from "@/lib/types";
 
 /**
  * Phase 1 plan support: create a child idea/task from selected notes text.
- * First line = title ([title](notes) + trailing #type honored), rest = notes.
+ * First line = title (trailing #type honored); indented `Notes:` lines = notes.
  * Parent defaults to the idea whose notes are being edited (project plan).
  */
 export function PlanSelectionActions({
@@ -27,35 +27,25 @@ export function PlanSelectionActions({
   const [kindOverride, setKindOverride] = useState<IdeaType | null>(null);
   const [createdLabel, setCreatedLabel] = useState<string | null>(null);
 
-  const firstLine = useMemo(
-    () =>
-      selection
-        .split("\n")
-        .map((l) => l.trim())
-        .filter(Boolean)[0] ?? "",
-    [selection],
-  );
-  const parsed = useMemo(() => parseTaskAll(firstLine), [firstLine]);
+  const selectionLines = useMemo(() => selection.split("\n"), [selection]);
+  const firstLine = selectionLines.find((line) => line.trim())?.trim() ?? "";
+  const parsed = useMemo(() => parseTaskBlock([firstLine]), [firstLine]);
   const effectiveKind: IdeaType =
     kindOverride ?? parsed.kind ?? (isTaskLine(firstLine) ? "task" : "task");
 
   const preview = selection.length > 120 ? selection.slice(0, 120).trimEnd() + "…" : selection;
 
   const handleCreate = async () => {
-    const lines = selection
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean);
+    const lines = selectionLines.filter((line) => line.trim());
     if (lines.length === 0) return;
     // Strip a leading "- " so plan bullets become clean titles.
     const rawFirst = lines[0].replace(/^\s*-\s?/, "");
-    const { title, detail, kind } = parseTaskAll(rawFirst);
-    const rest = lines.slice(1).join("\n");
+    const { title, detail, kind } = parseTaskBlock([rawFirst, ...lines.slice(1)]);
     const cleanTitle = title.trim();
     if (!cleanTitle) return;
     setSaving(true);
     try {
-      const combinedNotes = [detail, rest].filter(Boolean).join("\n") || null;
+      const combinedNotes = detail;
       const id = await createIdea(cleanTitle, parentId, "bottom", {
         type: (kindOverride ?? kind ?? "task") as IdeaType,
         status: "draft",
@@ -108,7 +98,8 @@ export function PlanSelectionActions({
         <p className="px-1 text-[11px] text-emerald-600 dark:text-emerald-400">{createdLabel}</p>
       )}
       <p className="px-1 text-[10px] text-gray-400 dark:text-gray-500">
-        First line becomes the title · supports [title](notes) and trailing #task #idea #initiative
+        First line becomes the title · add an indented “Notes: …” line for notes · trailing #task
+        #idea #initiative supported
       </p>
     </div>
   );

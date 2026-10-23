@@ -7,6 +7,7 @@ import { groupKeyOf, optionsForScheme } from "@/components/lens";
 import { buildLensColumns, resolveLens } from "@/lib/horizonLenses";
 import { priorityRank, type PriorityValue } from "@/components/shared/PriorityChip";
 import { useUiPrefsStore } from "@/stores/uiPrefsStore";
+import { getHiddenChildProjectIds } from "@/lib/childProjectVisibility";
 import { useProjectLookups } from "@/stores/projectLookups";
 import type { useClassifications } from "@/hooks/useClassifications";
 import type { useTaskTags } from "@/hooks/useTaskTags";
@@ -49,6 +50,7 @@ export function useProjectsDerived({
   const { schemes, options: classificationOptions } = classifications;
   const setPrefs = useUiPrefsStore((s) => s.set);
   const tasksGroupBy = useUiPrefsStore((s) => s.projectTasksGroupBy);
+  const hideChildProjects = useUiPrefsStore((s) => s.projectsHideChildProjects);
 
   const projects = useMemo(() => ideas.filter((i) => i.type === "project"), [ideas]);
 
@@ -72,12 +74,16 @@ export function useProjectsDerived({
     if (hideCompleted) {
       list = list.filter((p) => p.status !== "completed");
     }
+    if (hideChildProjects) {
+      const hidden = getHiddenChildProjectIds(list, ideas);
+      list = list.filter((p) => !hidden.has(p.id));
+    }
     return [...list].sort((a, b) => {
       const rankDiff = priorityRank(priorityOf(a.id)) - priorityRank(priorityOf(b.id));
       if (rankDiff !== 0) return rankDiff;
       return b.updated_at.localeCompare(a.updated_at);
     });
-  }, [projects, statusFilter, hideCompleted, priorityOf]);
+  }, [projects, statusFilter, hideCompleted, priorityOf, ideas, hideChildProjects]);
 
   const groupedProjects = useMemo(() => {
     const grouped = new Map<string | null, Idea[]>();
