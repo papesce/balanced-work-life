@@ -71,16 +71,19 @@ export function ProjectPathsTab({
   useEffect(() => {
     if (loading || paths.length === 0) return;
     const remembered = projectLastPath[projectId];
+    let nextId = selectedId;
+
     if (remembered && paths.some((p) => p.id === remembered)) {
       if (remembered !== selectedId) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setSelectedId(remembered);
+        nextId = remembered;
       }
-      return;
+    } else if (!selectedId || !paths.some((p) => p.id === selectedId)) {
+      nextId = paths[0].id;
     }
-    if (!selectedId || !paths.some((p) => p.id === selectedId)) {
+
+    if (nextId !== undefined && nextId !== selectedId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSelectedId(paths[0].id);
+      setSelectedId(nextId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, paths, projectId]);
