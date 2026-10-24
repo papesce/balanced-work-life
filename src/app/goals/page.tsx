@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ArrowLeft, Plus } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { IdeaTree } from "@/components/brainstorm/IdeaTree";
 import { BrainstormBreadcrumb } from "@/components/brainstorm/BrainstormBreadcrumb";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
+import { useClassifications } from "@/hooks/useClassifications";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
+import { groupKeyOf, useLens } from "@/components/lens";
 import { getChildCount } from "@/lib/ideaTreeFocus";
 import { hasAnyEffects } from "@/lib/linkEffects";
 import { useCompletionEffects } from "@/stores/feedbackStore";
@@ -18,6 +20,8 @@ import { UndoBar } from "@/components/shared/UndoBar";
 import { GoalListView } from "@/components/goals/GoalListView";
 import { useGoalMutations } from "@/hooks/useGoalMutations";
 import { useGoalSelection } from "@/hooks/useGoalSelection";
+import { useUiPrefsStore } from "@/stores/uiPrefsStore";
+import type { Idea } from "@/lib/types";
 
 export default function GoalsPage() {
   const [hideCompleted, setHideCompleted] = useState(true);
@@ -27,7 +31,31 @@ export default function GoalsPage() {
   const linksHook = useIdeaLinks();
   const tagsHook = useTags();
   const taskTagsHook = useTaskTags();
+  const classifications = useClassifications();
+  const lensKey = useUiPrefsStore((s) => s.goalsLens);
+  const setPrefs = useUiPrefsStore((s) => s.set);
 
+  const { columns: goalColumns, valueOf: goalValueOf } = useLens({
+    schemes: classifications.schemes,
+    classificationOptions: classifications.options,
+    classifications: classifications.classifications,
+    lensKey,
+  });
+  const lensTabs = useMemo(
+    () =>
+      classifications.schemes
+        .filter((scheme) =>
+          ["term", "nnl", "moscow", "priority", "attention", "when", "effort", "impact"].includes(
+            scheme.key,
+          ),
+        )
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((scheme) => ({
+          key: scheme.key,
+          label: scheme.key === "term" ? "Horizon" : scheme.label,
+        })),
+    [classifications.schemes],
+  );
   const { selectedId, handleSelect, visibleGoals, selectedGoal, breadcrumbChain } =
     useGoalSelection({
       ideas: ideasHook.ideas,
@@ -38,6 +66,17 @@ export default function GoalsPage() {
       setHideCompleted,
       setStatusFilter,
     });
+
+  const groupedGoals = useMemo(() => {
+    const grouped = new Map<string, Idea[]>();
+    for (const goal of visibleGoals) {
+      const key = groupKeyOf(goalValueOf(goal.id));
+      const group = grouped.get(key) ?? [];
+      group.push(goal);
+      grouped.set(key, group);
+    }
+    return grouped;
+  }, [visibleGoals, goalValueOf]);
 
   const [showType] = useState(true);
   const [showArea] = useState(true);
@@ -83,7 +122,14 @@ export default function GoalsPage() {
     }
   };
 
-  if (ideasHook.loading) {
+  const handleCreateGoal = async (text: string) => {
+    const id = await createIdea(text, null, "bottom", { type: "objective", status: "draft" });
+    if (!id) return false;
+    handleSelect(id);
+    return true;
+  };
+
+  if (ideasHook.loading || classifications.isLoading) {
     return (
       <AppShell title="Goals">
         <div className="flex justify-center py-20">
@@ -190,9 +236,15 @@ export default function GoalsPage() {
     <GoalListView
       visibleGoals={visibleGoals}
       allIdeas={ideasHook.ideas}
+      columns={goalColumns}
+      groupedGoals={groupedGoals}
+      lensKey={lensKey}
+      lensTabs={lensTabs}
       statusFilter={statusFilter}
       hideCompleted={hideCompleted}
       undoAction={undoAction}
+      onCreateGoal={handleCreateGoal}
+      onLensChange={(key) => setPrefs({ goalsLens: key })}
       onStatusFilterChange={setStatusFilter}
       onToggleHideCompleted={() => setHideCompleted((v) => !v)}
       onSelect={handleSelect}

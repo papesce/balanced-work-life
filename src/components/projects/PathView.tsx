@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   Background,
   Controls,
@@ -8,6 +8,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   type Edge,
+  useNodesInitialized,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { v4 as uuidv4 } from "uuid";
@@ -33,6 +34,9 @@ interface Props {
 
 export function PathView({ pathId, fillHeight = false }: Props) {
   const manager = usePathManager(pathId);
+  const nodesInitialized = useNodesInitialized();
+  const initialFitPathId = useRef<string | null>(null);
+  const [flowReady, setFlowReady] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [promotingId, setPromotingId] = useState<string | null>(null);
@@ -42,6 +46,7 @@ export function PathView({ pathId, fillHeight = false }: Props) {
     edges: manager.edges,
     onMoveNodes: manager.moveNodes,
   });
+  const { fitView, getNodes } = flow;
   const [flowNodes, setFlowNodes, onNodesChange] = useNodesState<PathFlowNode>(nodes);
   const [flowEdges, setFlowEdges, onEdgesChange] = useEdgesState<Edge>(edges);
   useEffect(() => {
@@ -50,6 +55,45 @@ export function PathView({ pathId, fillHeight = false }: Props) {
   useEffect(() => {
     setFlowEdges(edges);
   }, [edges, setFlowEdges]);
+  useEffect(() => {
+    if (
+      manager.loading ||
+      !flowReady ||
+      !nodesInitialized ||
+      nodes.length === 0 ||
+      initialFitPathId.current === pathId
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    let attempts = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const tryFit = async () => {
+      if (cancelled) return;
+      const registeredIds = new Set(getNodes().map((node) => node.id));
+      if (!nodes.every((node) => registeredIds.has(node.id))) {
+        if (attempts < 20) {
+          attempts += 1;
+          timer = setTimeout(() => void tryFit(), 100);
+        }
+        return;
+      }
+      const fitted = await fitView({ nodes, padding: 0.2, duration: 250 });
+      if (fitted) {
+        initialFitPathId.current = pathId;
+      } else if (attempts < 10) {
+        attempts += 1;
+        timer = setTimeout(() => void tryFit(), 100);
+      }
+    };
+    const frame = requestAnimationFrame(() => void tryFit());
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+      if (timer) clearTimeout(timer);
+    };
+  }, [fitView, flowReady, getNodes, manager.loading, nodes, nodesInitialized, pathId]);
   useEffect(() => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<{ id: string; title: string }>).detail;
@@ -176,7 +220,7 @@ export function PathView({ pathId, fillHeight = false }: Props) {
         nodeCount={nodes.length}
         selectedId={selectedId}
         onAutoLayout={autoLayout}
-        onFitView={() => flow.fitView({ padding: 0.2, duration: 250 })}
+        onFitView={() => fitView({ nodes, padding: 0.2, duration: 250 })}
         onRemoveSelected={() => {
           if (selectedId) {
             void manager.deleteNode(selectedId);
@@ -227,6 +271,7 @@ export function PathView({ pathId, fillHeight = false }: Props) {
           </p>
         )}
         <ReactFlow
+          onInit={() => setFlowReady(true)}
           nodes={flowNodes}
           edges={flowEdges}
           nodeTypes={nodeTypes}
@@ -249,7 +294,6 @@ export function PathView({ pathId, fillHeight = false }: Props) {
           minZoom={0.25}
           maxZoom={1.5}
           deleteKeyCode={["Backspace", "Delete"]}
-          proOptions={{ hideAttribution: true }}
         >
           <Background gap={20} size={1} />
           <Controls position="bottom-left" />

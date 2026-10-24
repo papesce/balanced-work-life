@@ -17,6 +17,7 @@ interface TimelinePrefs {
 
 interface UiPrefsState {
   projectsLens: string;
+  goalsLens: string;
   horizonLens: string;
   /** Last selected built-in Horizon lens id (local device state). */
   horizonLensId: string | null;
@@ -75,6 +76,7 @@ export const useUiPrefsStore = create<UiPrefsState>()(
   persist(
     (set) => ({
       projectsLens: "term",
+      goalsLens: "term",
       horizonLens: "term",
       horizonLensId: null,
       horizonActiveViewId: null,
@@ -104,6 +106,7 @@ export const useUiPrefsStore = create<UiPrefsState>()(
       version: 1,
       partialize: (s) => ({
         projectsLens: s.projectsLens,
+        goalsLens: s.goalsLens,
         horizonLens: s.horizonLens,
         horizonLensId: s.horizonLensId,
         horizonActiveViewId: s.horizonActiveViewId,
