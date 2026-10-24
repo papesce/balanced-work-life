@@ -93,7 +93,7 @@ interface IdeaTreeProps {
   /** Opt-in "add to path" handle (project split view); forwarded to TreeView. */
   onAddToPath?: (id: string) => void;
   isInPath?: (id: string) => boolean;
-  pathAddDisabled?: boolean;
+  pathAddDisabled?: boolean | ((id: string) => boolean);
   /** Open path editor drawer */
   onOpenPathDrawer?: (pathId: string) => void;
   groupUnassociatedPaths?: boolean;

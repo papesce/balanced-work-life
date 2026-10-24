@@ -44,6 +44,48 @@ export function usePathManager(pathId: string) {
     return id;
   };
 
+  const addExistingIdea = async (
+    ideaId: string,
+    x = 100 + (items.length % 3) * 220,
+    y = 100 + Math.floor(items.length / 3) * 140,
+  ): Promise<string> => {
+    if (!user || !pathId) throw new Error("Auth or PathId missing");
+
+    return db.writeTransaction(async (tx) => {
+      const path = await tx.getOptional<Record<string, unknown>>(
+        "SELECT id FROM ideas WHERE id = ? AND user_id = ? AND type = 'path'",
+        [pathId, userId],
+      );
+      if (!path) throw new Error("This path is unavailable.");
+
+      const existing = await tx.getOptional<Record<string, unknown>>(
+        "SELECT id FROM path_items WHERE path_id = ? AND user_id = ? AND idea_id = ?",
+        [pathId, userId, ideaId],
+      );
+      if (existing) return String(existing.id);
+
+      const idea = await tx.getOptional<Record<string, unknown>>(
+        "SELECT text, type FROM ideas WHERE id = ? AND user_id = ?",
+        [ideaId, userId],
+      );
+      if (!idea || idea.type === "path") {
+        throw new Error("This idea is unavailable or cannot be added to a path.");
+      }
+
+      const itemId = uuidv4();
+      await tx.execute(
+        `INSERT OR IGNORE INTO path_items (id, user_id, path_id, title, idea_id, x, y, created_at) VALUES (?,?,?,?,?,?,?,?)`,
+        [itemId, userId, pathId, String(idea.text ?? ""), ideaId, x, y, new Date().toISOString()],
+      );
+      const inserted = await tx.getOptional<Record<string, unknown>>(
+        "SELECT id FROM path_items WHERE path_id = ? AND user_id = ? AND idea_id = ?",
+        [pathId, userId, ideaId],
+      );
+      if (!inserted) throw new Error("The idea could not be added to this path.");
+      return String(inserted.id);
+    });
+  };
+
   const updateNodeTitle = async (itemId: string, title: string): Promise<void> => {
     if (!user || !pathId) throw new Error("Auth or PathId missing");
     await db.execute("UPDATE path_items SET title = ? WHERE id = ?", [title, itemId]);
@@ -151,6 +193,7 @@ export function usePathManager(pathId: string) {
     edges,
     loading: itemsLoading || edgesLoading,
     addNode,
+    addExistingIdea,
     updateNodeTitle,
     moveNodes,
     deleteNode,

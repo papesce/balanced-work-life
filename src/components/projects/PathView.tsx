@@ -34,7 +34,7 @@ interface Props {
 export function PathView({ pathId, fillHeight = false }: Props) {
   const manager = usePathManager(pathId);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [, setMessage] = useState("");
+  const [message, setMessage] = useState("");
   const [promotingId, setPromotingId] = useState<string | null>(null);
 
   const { nodes, edges, flow, itemMap } = usePathGraph({
@@ -198,7 +198,34 @@ export function PathView({ pathId, fillHeight = false }: Props) {
             ? "relative min-h-[400px] w-full flex-1"
             : "relative h-[600px] min-h-[560px] w-full"
         }
+        onDragOver={(event) => {
+          if (event.dataTransfer.types.includes("application/project-task")) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "copy";
+          }
+        }}
+        onDrop={(event) => {
+          const ideaId = event.dataTransfer.getData("application/project-task");
+          if (!ideaId) return;
+          event.preventDefault();
+          event.stopPropagation();
+          const position = flow.screenToFlowPosition({ x: event.clientX, y: event.clientY });
+          void manager
+            .addExistingIdea(ideaId, position.x, position.y)
+            .then(() => setMessage("Idea added to path."))
+            .catch((error: unknown) => {
+              setMessage(error instanceof Error ? error.message : "Could not add idea to path.");
+            });
+        }}
       >
+        {message && (
+          <p
+            role="status"
+            className="absolute top-3 left-1/2 z-20 -translate-x-1/2 rounded-lg border border-gray-200 bg-white/95 px-3 py-1.5 text-xs text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-900/95 dark:text-gray-300"
+          >
+            {message}
+          </p>
+        )}
         <ReactFlow
           nodes={flowNodes}
           edges={flowEdges}
@@ -244,21 +271,23 @@ export function PathView({ pathId, fillHeight = false }: Props) {
               onAssociate={handleAssociate}
               onDisassociate={handleDisassociate}
             />
-            <PathPromotePanel
-              item={{ title: selectedItem.title, ideaId: selectedItem.idea_id }}
-              onPromote={async (title) => {
-                try {
-                  await manager.promoteNode(selectedId, title);
-                  setMessage("Node promoted to task!");
-                  setPromotingId(null);
-                } catch {
-                  setMessage("Promotion failed.");
-                }
-              }}
-              onCancel={() => setPromotingId(null)}
-              isPromoting={promotingId !== null}
-              setPromoting={() => setPromotingId(selectedId)}
-            />
+            {!selectedItem.idea_id && (
+              <PathPromotePanel
+                item={{ title: selectedItem.title, ideaId: selectedItem.idea_id }}
+                onPromote={async (title) => {
+                  try {
+                    await manager.promoteNode(selectedId, title);
+                    setMessage("Node promoted to task!");
+                    setPromotingId(null);
+                  } catch {
+                    setMessage("Promotion failed.");
+                  }
+                }}
+                onCancel={() => setPromotingId(null)}
+                isPromoting={promotingId !== null}
+                setPromoting={() => setPromotingId(selectedId)}
+              />
+            )}
           </div>
         )}
       </div>

@@ -230,7 +230,11 @@ export function TreeNodeRow<T extends TreeItem>({
                 label={label}
                 onAddToPath={options.onAddToPath}
                 isInPath={options.isInPath?.(node.id) ?? false}
-                pathAddDisabled={options.pathAddDisabled ?? false}
+                pathAddDisabled={
+                  typeof options.pathAddDisabled === "function"
+                    ? options.pathAddDisabled(node.id)
+                    : (options.pathAddDisabled ?? false)
+                }
               />
             )}
 

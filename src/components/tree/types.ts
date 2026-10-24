@@ -124,7 +124,7 @@ export interface TreeOptions<T extends TreeItem> {
   /** True when the node is already placed in the selected path (dims handle). */
   isInPath?: (id: string) => boolean;
   /** True when there is no selected path (dims handle, click is a no-op). */
-  pathAddDisabled?: boolean;
+  pathAddDisabled?: boolean | ((id: string) => boolean);
   /** Hides the "+" add-child button and the hover insertion bands. */
   disableInsert?: boolean;
   /** When false, clicking a selected row's label selects instead of entering edit mode. Defaults to true. */

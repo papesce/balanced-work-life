@@ -20,7 +20,7 @@ interface PathGraphProps {
 }
 
 export function usePathGraph({ items, edges }: PathGraphProps) {
-  const { setViewport, fitView } = useReactFlow();
+  const { setViewport, fitView, screenToFlowPosition } = useReactFlow();
 
   const itemMap = useMemo(() => {
     const map = new Map<string, PathItem>();
@@ -54,7 +54,7 @@ export function usePathGraph({ items, edges }: PathGraphProps) {
   return {
     nodes,
     edges: flowEdges,
-    flow: { fitView, setViewport },
+    flow: { fitView, setViewport, screenToFlowPosition },
     itemMap,
   };
 }

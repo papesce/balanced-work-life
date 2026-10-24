@@ -261,11 +261,57 @@ export default function BrainstormPage() {
     />
   );
 
+  const brainstormTreeProps = {
+    tree: ideasHook.tree,
+    ideas: ideasHook.ideas,
+    links: linksHook.links,
+    scope: timeScope,
+    createIdea,
+    updateIdea,
+    deleteIdea,
+    moveIdea,
+    onCreateParent: createParentAndMove,
+    toggleCollapse: ideasHook.toggleCollapse,
+    expandIdea: ideasHook.expandIdea,
+    onCreateLink: createLink,
+    onDeleteLink: deleteLink,
+    onMarkDone: markDone,
+    onMarkUndone: markUndone,
+    onSchedule: scheduleIdea,
+    allTags: tagsHook.tags,
+    getTagsForIdea: taskTagsHook.getTagsForIdea,
+    onAddTag: taskTagsHook.addTagToTask,
+    onRemoveTag: taskTagsHook.removeTagFromTask,
+    onCreateTag: tagsHook.createTag,
+    showType,
+    showArea,
+    editMode,
+    editingId,
+    setEditingId,
+    selectedId,
+    setSelectedId,
+    composing,
+    setComposing,
+    showToday,
+    hideClosed,
+    hideCompleted,
+    hideDeferred,
+    collapsedIds: ideasHook.collapsedIds,
+    hideInHorizonIds: hideInHorizon ? classifiedIds : undefined,
+    typeFilter,
+    focusedId: effectiveFocusId,
+    onFocus: handleFocus,
+    cardMode,
+    onOpenPathDrawer: openPathDrawer,
+    groupUnassociatedPaths,
+  };
+
   return (
     <AppShell
       title="Brainstorm"
       headerActions={headerActions}
       headerStartActions={headerStartActions}
+      fullWidth={Boolean(pathParam)}
     >
       {undoAction && (
         <motion.div
@@ -306,7 +352,7 @@ export default function BrainstormPage() {
           />
         </div>
       )}
-      {effectiveFocusId && focusedIdea && (
+      {!pathParam && effectiveFocusId && focusedIdea && (
         <div className="mb-3">
           <BrainstormBreadcrumb
             chain={breadcrumbChain}
@@ -315,51 +361,28 @@ export default function BrainstormPage() {
           />
         </div>
       )}
-      <IdeaTree
-        tree={ideasHook.tree}
-        ideas={ideasHook.ideas}
-        links={linksHook.links}
-        scope={timeScope}
-        createIdea={createIdea}
-        updateIdea={updateIdea}
-        deleteIdea={deleteIdea}
-        moveIdea={moveIdea}
-        onCreateParent={createParentAndMove}
-        toggleCollapse={ideasHook.toggleCollapse}
-        expandIdea={ideasHook.expandIdea}
-        onCreateLink={createLink}
-        onDeleteLink={deleteLink}
-        onMarkDone={markDone}
-        onMarkUndone={markUndone}
-        onSchedule={scheduleIdea}
-        allTags={tagsHook.tags}
-        getTagsForIdea={taskTagsHook.getTagsForIdea}
-        onAddTag={taskTagsHook.addTagToTask}
-        onRemoveTag={taskTagsHook.removeTagFromTask}
-        onCreateTag={tagsHook.createTag}
-        showType={showType}
-        showArea={showArea}
-        editMode={editMode}
-        editingId={editingId}
-        setEditingId={setEditingId}
-        selectedId={selectedId}
-        setSelectedId={setSelectedId}
-        composing={composing}
-        setComposing={setComposing}
-        showToday={showToday}
-        hideClosed={hideClosed}
-        hideCompleted={hideCompleted}
-        hideDeferred={hideDeferred}
-        collapsedIds={ideasHook.collapsedIds}
-        hideInHorizonIds={hideInHorizon ? classifiedIds : undefined}
-        typeFilter={typeFilter}
-        focusedId={effectiveFocusId}
-        onFocus={handleFocus}
-        cardMode={cardMode}
-        onOpenPathDrawer={openPathDrawer}
-        groupUnassociatedPaths={groupUnassociatedPaths}
-      />
-      <PathDrawer pathId={pathParam} onClose={closePathDrawer} />
+      {pathParam ? (
+        <PathDrawer
+          pathId={pathParam}
+          onClose={closePathDrawer}
+          renderTaskPicker={({ search, placedIds, addingId, onAddIdea }) => (
+            <IdeaTree
+              {...brainstormTreeProps}
+              search={search}
+              editMode="view"
+              compact
+              onAddToPath={(ideaId) => void onAddIdea(ideaId)}
+              isInPath={(ideaId) => placedIds.has(ideaId)}
+              pathAddDisabled={(ideaId) =>
+                addingId === ideaId ||
+                !ideasHook.ideas.some((idea) => idea.id === ideaId && idea.type !== "path")
+              }
+            />
+          )}
+        />
+      ) : (
+        <IdeaTree {...brainstormTreeProps} />
+      )}
     </AppShell>
   );
 }
