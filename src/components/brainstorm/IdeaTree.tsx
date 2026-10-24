@@ -570,6 +570,13 @@ export function IdeaTree({
           position={revealPos}
           onClose={() => setRevealTarget(null)}
           allIdeas={ideas}
+          onAddToPath={onAddToPath ? () => onAddToPath(revealTarget.id) : undefined}
+          isInPath={isInPath?.(revealTarget.id)}
+          pathAddDisabled={
+            typeof pathAddDisabled === "function"
+              ? pathAddDisabled(revealTarget.id)
+              : pathAddDisabled
+          }
         />
       )}
     </div>

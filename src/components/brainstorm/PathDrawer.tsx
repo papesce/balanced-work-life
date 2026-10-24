@@ -135,7 +135,9 @@ export function PathDrawer({ pathId, onClose, renderTaskPicker }: PathDrawerProp
             </div>
             <div className="flex items-center gap-1.5 border-t border-gray-200 px-3 py-2 text-[10px] text-gray-400 dark:border-gray-800">
               <ArrowDown size={12} aria-hidden="true" />
-              <span>Click the arrow to add, or drag a row onto the canvas.</span>
+              <span>
+                Click the arrow or use the context menu to add; drag it onto the canvas to place it.
+              </span>
             </div>
           </section>
         </Panel>

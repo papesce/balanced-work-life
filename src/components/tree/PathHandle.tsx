@@ -40,7 +40,7 @@ export function PathHandle({
       onDragStart={(e) => {
         e.stopPropagation();
         e.dataTransfer.setData("application/project-task", nodeId);
-        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.effectAllowed = "copy";
       }}
       onClick={(e) => {
         e.stopPropagation();
