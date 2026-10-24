@@ -89,7 +89,7 @@ export function AppShell({
       <DesktopSidebar collapsed={collapsed} onToggle={handleToggle} />
 
       <div
-        className={`${collapsed ? "md:ml-[64px]" : "md:ml-[220px]"} flex min-h-screen flex-col transition-[margin-left] duration-200 ease-in-out`}
+        className={`${collapsed ? "md:ml-[64px]" : "md:ml-[184px]"} flex min-h-screen flex-col transition-[margin-left] duration-200 ease-in-out`}
       >
         <header className="glass-card-strong sticky top-0 z-40 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-none border-b border-white/30 px-4 py-2.5 md:px-5 dark:border-white/5">
           <div className="flex min-w-0 items-center gap-2">

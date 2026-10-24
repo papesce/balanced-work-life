@@ -18,7 +18,7 @@ export function DesktopSidebar({ collapsed, onToggle }: DesktopSidebarProps) {
   return (
     <aside
       className={`glass-sidebar z-30 hidden transition-[width] duration-200 ease-in-out md:fixed md:inset-y-0 md:flex md:flex-col ${
-        collapsed ? "md:w-[64px]" : "md:w-[220px]"
+        collapsed ? "md:w-[64px]" : "md:w-[184px]"
       }`}
     >
       {/* BRANDING + TOGGLE */}
