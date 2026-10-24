@@ -15,6 +15,7 @@ export function RowChrome<T extends TreeItem>({
   clickToInsert,
   isEditing,
   draggable,
+  isVirtualNode,
 }: {
   node: TreeNode<T>;
   label: string;
@@ -31,6 +32,7 @@ export function RowChrome<T extends TreeItem>({
     setNodeRef: (el: HTMLSpanElement | null) => void;
     setActivatorNodeRef: (el: HTMLSpanElement | null) => void;
   };
+  isVirtualNode?: boolean;
 }) {
   const setDragHandleRef = (el: HTMLSpanElement | null) => {
     draggable.setNodeRef(el);
@@ -80,7 +82,7 @@ export function RowChrome<T extends TreeItem>({
       )}
 
       {/* Drag handle */}
-      {Boolean(controller.onMove) && (
+      {Boolean(controller.onMove) && !isVirtualNode && (
         <span
           // Measure from the grip so the compact drag overlay tracks the
           // pointer instead of inheriting the full row's dimensions.

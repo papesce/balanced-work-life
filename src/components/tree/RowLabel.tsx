@@ -39,8 +39,14 @@ export function RowLabel<T extends TreeItem>({
   onLabelClick,
   onInsertLabelClick,
 }: RowLabelProps<T>) {
-  const handleClick = (e: React.MouseEvent) =>
-    clickToInsert && !isEditing ? onInsertLabelClick(e) : onLabelClick(e);
+  const handleClick = (e: React.MouseEvent) => {
+    if (options.onNodeLabelClick?.(node)) {
+      e.stopPropagation();
+      return;
+    }
+    if (clickToInsert && !isEditing) onInsertLabelClick(e);
+    else onLabelClick(e);
+  };
   if (isEditing && canRename) {
     return (
       <input
@@ -71,6 +77,7 @@ export function RowLabel<T extends TreeItem>({
             {notesText}
           </span>
         )}
+        {options.renderCardBody?.(node)}
         <div className="flex flex-wrap items-center gap-1 px-1">
           {options.renderTrailing?.(node)}
         </div>

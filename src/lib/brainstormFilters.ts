@@ -12,6 +12,7 @@ export interface BrainstormFilters {
   hideInHorizon: boolean;
   typeFilter: IdeaType[];
   timeScope: IdeasScope;
+  groupUnassociatedPaths: boolean;
 }
 
 export const DEFAULT_BRAINSTORM_FILTERS: BrainstormFilters = {
@@ -24,6 +25,7 @@ export const DEFAULT_BRAINSTORM_FILTERS: BrainstormFilters = {
   hideInHorizon: false,
   typeFilter: [],
   timeScope: "this_month",
+  groupUnassociatedPaths: true,
 };
 
 const IDEA_TYPES: IdeaType[] = ["idea", "objective", "project", "initiative", "task", "path"];
@@ -56,6 +58,10 @@ export function loadBrainstormFilters(): BrainstormFilters {
         : (legacyHide ?? DEFAULT_BRAINSTORM_FILTERS.hideInHorizon),
     typeFilter,
     timeScope: stored.timeScope === "all" ? "all" : "this_month",
+    groupUnassociatedPaths: asBool(
+      stored.groupUnassociatedPaths,
+      DEFAULT_BRAINSTORM_FILTERS.groupUnassociatedPaths,
+    ),
   };
 }
 

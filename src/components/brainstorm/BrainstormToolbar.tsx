@@ -12,6 +12,7 @@ import {
   Plus,
   SlidersHorizontal,
   Tag,
+  Waypoints,
 } from "lucide-react";
 import { IdeaType } from "@/lib/types";
 import { TypeFilterPicker } from "@/components/shared/TypeFilterPicker";
@@ -43,6 +44,8 @@ export interface BrainstormToolbarProps {
   cardMode?: boolean;
   activeFilterCount?: number;
   onResetFilters?: () => void;
+  groupUnassociatedPaths?: boolean;
+  setGroupUnassociatedPaths?: (v: boolean) => void;
 }
 
 function pillClass(active: boolean) {
@@ -78,6 +81,8 @@ export function BrainstormToolbar({
   cardMode,
   activeFilterCount: activeFilterCountProp,
   onResetFilters,
+  groupUnassociatedPaths,
+  setGroupUnassociatedPaths,
 }: BrainstormToolbarProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [typePickerOpen, setTypePickerOpen] = useState(false);
@@ -292,6 +297,21 @@ export function BrainstormToolbar({
                 <span>Hide in Horizon</span>
                 <span className={pillClass(hideInHorizon)}>On</span>
               </button>
+              {setGroupUnassociatedPaths && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => setGroupUnassociatedPaths(!groupUnassociatedPaths)}
+                  className="flex w-full cursor-pointer items-center justify-between rounded-lg px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-black/[0.03] dark:text-gray-200 dark:hover:bg-white/[0.04]"
+                >
+                  <span className="flex items-center gap-2">
+                    <Waypoints size={13} /> Group unassociated paths
+                  </span>
+                  <span className={pillClass(Boolean(groupUnassociatedPaths))}>
+                    {groupUnassociatedPaths ? "On" : "Off"}
+                  </span>
+                </button>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

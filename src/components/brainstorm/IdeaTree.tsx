@@ -21,7 +21,10 @@ import { pruneTreeToIds } from "@/components/tree/filterTree";
 import { TreeView, type ComposingState, type CreateIdeaPosition } from "@/components/tree";
 import { getToday } from "@/lib/dateUtils";
 import type { IdeasScope } from "@/hooks/useIdeas";
+import { useAllPathStepSummaries } from "@/hooks/usePathStepSummary";
+import { PathPreviewSvg } from "@/components/paths/PathPreviewSvg";
 import { IdeaActionMenu } from "@/components/shared/IdeaActionMenu";
+import { Waypoints } from "lucide-react";
 import {
   LinkCountBadge,
   ScheduleChip,
@@ -89,6 +92,9 @@ interface IdeaTreeProps {
   onAddToPath?: (id: string) => void;
   isInPath?: (id: string) => boolean;
   pathAddDisabled?: boolean;
+  /** Open path editor drawer */
+  onOpenPathDrawer?: (pathId: string) => void;
+  groupUnassociatedPaths?: boolean;
 }
 
 function getAncestorIds(ideaId: string, ideas: Idea[]): Set<string> {
@@ -173,14 +179,103 @@ export function IdeaTree({
   onAddToPath,
   isInPath,
   pathAddDisabled,
+  onOpenPathDrawer,
+  groupUnassociatedPaths = false,
 }: IdeaTreeProps) {
   const todayString = getToday();
   const [revealTarget, setRevealTarget] = useState<Idea | null>(null);
   const [revealPos, setRevealPos] = useState<{ top: number; right: number } | null>(null);
   const { openNotes } = useNotes();
+  const pathSummaries = useAllPathStepSummaries();
 
-  const filteredTree = useMemo(() => {
-    let filtered = filterIdeaTree(tree, ideas, {
+  const presentation = useMemo(() => {
+    const ideaById = new Map(ideas.map((idea) => [idea.id, idea]));
+    const pathIdeas = ideas.filter((idea) => idea.type === "path");
+    const associatedPathIds = new Set<string>();
+    const virtualNodes: Idea[] = [];
+    for (const link of links) {
+      if (link.link_type !== "path_of") continue;
+      const path = ideaById.get(link.source_id);
+      const owner = ideaById.get(link.target_id);
+      if (!path || path.type !== "path" || !owner || owner.type === "path") continue;
+      associatedPathIds.add(path.id);
+      virtualNodes.push({ ...path, parent_id: owner.id });
+    }
+
+    const virtualIds = new Set(virtualNodes.map((path) => path.id));
+    const treeWithoutAssociatedPaths = (nodes: IdeaNodeType[]): IdeaNodeType[] =>
+      nodes
+        .filter((node) => !virtualIds.has(node.id))
+        .map((node) => ({ ...node, children: treeWithoutAssociatedPaths(node.children) }));
+    let baseTree = treeWithoutAssociatedPaths(tree);
+    const baseIdeas = ideas.filter((idea) => !virtualIds.has(idea.id));
+    if (groupUnassociatedPaths) {
+      const unassociated = pathIdeas.filter((path) => !associatedPathIds.has(path.id));
+      if (unassociated.length > 0) {
+        const groupId = "__unassociated_paths__";
+        const group: Idea = {
+          id: groupId,
+          user_id: unassociated[0].user_id,
+          parent_id: null,
+          text: "Unassociated paths",
+          description: null,
+          type: "idea",
+          effort: null,
+          impact: null,
+          urgency: null,
+          scheduled_date: null,
+          scheduled_time: null,
+          duration_minutes: null,
+          is_priority: false,
+          priority_order: null,
+          status: "planned",
+          notes: null,
+          why: null,
+          completed_at: null,
+          cancelled_at: null,
+          paused_at: null,
+          attempt_dates: [],
+          status_history: null,
+          sort_order: Number.MAX_SAFE_INTEGER,
+          created_at: "",
+          updated_at: "",
+        };
+        baseIdeas.push(group);
+        const groupNode: IdeaNodeType = { ...group, children: [], collapsed: false };
+        const addGroupedPaths = (nodes: IdeaNodeType[]): IdeaNodeType[] =>
+          nodes.map((node) => {
+            if (node.id === groupId) return node;
+            const children = addGroupedPaths(node.children);
+            return { ...node, children };
+          });
+        baseTree = addGroupedPaths(baseTree);
+        for (const path of unassociated) {
+          const node = { ...path, parent_id: groupId, children: [], collapsed: false };
+          groupNode.children.push(node);
+          baseIdeas.push({ ...path, parent_id: groupId });
+        }
+        baseTree.push(groupNode);
+      }
+    }
+    const fullIdeas = [...baseIdeas, ...virtualNodes];
+    const withVirtualChildren = (nodes: IdeaNodeType[]): IdeaNodeType[] =>
+      nodes.map((node) => ({
+        ...node,
+        children: [
+          ...node.children,
+          ...virtualNodes
+            .filter((path) => path.parent_id === node.id)
+            .map((path) => ({ ...path, children: [], collapsed: false })),
+        ].sort((a, b) => a.sort_order - b.sort_order),
+      }));
+    const allTree = withVirtualChildren(baseTree);
+    const syntheticIds = new Set([
+      ...virtualIds,
+      ...(groupUnassociatedPaths && pathIdeas.some((path) => !associatedPathIds.has(path.id))
+        ? ["__unassociated_paths__"]
+        : []),
+    ]);
+    const filtered = filterIdeaTree(allTree, fullIdeas, {
       search,
       hideClosed,
       hideCompleted,
@@ -190,6 +285,7 @@ export function IdeaTree({
       typeFilter,
     });
 
+    let result = filtered;
     if (showToday) {
       const passingIds = new Set<string>();
       for (const idea of ideas) {
@@ -202,12 +298,21 @@ export function IdeaTree({
       for (const id of passingIds) {
         for (const aid of getAncestorIds(id, ideas)) visibleIds.add(aid);
       }
-      filtered = pruneTreeToIds(filtered, visibleIds);
+      for (const path of virtualNodes) {
+        if (visibleIds.has(path.parent_id ?? "")) visibleIds.add(path.id);
+      }
+      if (groupUnassociatedPaths && pathIdeas.some((path) => !associatedPathIds.has(path.id))) {
+        visibleIds.add("__unassociated_paths__");
+        for (const path of pathIdeas) {
+          if (!associatedPathIds.has(path.id)) visibleIds.add(path.id);
+        }
+      }
+      result = pruneTreeToIds(result, visibleIds);
     }
 
     if (focusedId) {
       const focusIds = getFocusedSubtreeIds(focusedId, ideas);
-      const treeIds = collectTreeIds(filtered);
+      const treeIds = collectTreeIds(result);
       const visibleFocusIds = new Set<string>();
       for (const id of focusIds) {
         if (treeIds.has(id)) visibleFocusIds.add(id);
@@ -222,16 +327,18 @@ export function IdeaTree({
         }
         return null;
       };
-      const focusedNode = visibleFocusIds.has(focusedId) ? findNode(filtered) : null;
-      filtered = focusedNode
+      const focusedNode = visibleFocusIds.has(focusedId) ? findNode(result) : null;
+      result = focusedNode
         ? [pruneTreeToIds([focusedNode], visibleFocusIds)[0] ?? focusedNode]
         : [];
     }
 
-    return filtered;
+    return { tree: result, fullIdeas, syntheticIds };
   }, [
     tree,
     ideas,
+    links,
+    groupUnassociatedPaths,
     search,
     hideClosed,
     hideCompleted,
@@ -243,6 +350,7 @@ export function IdeaTree({
     focusedId,
     todayString,
   ]);
+  const filteredTree = presentation.tree;
 
   const labelClassName = (node: IdeaNodeType): string => {
     switch (node.status) {
@@ -265,7 +373,7 @@ export function IdeaTree({
     <div className="space-y-3">
       <TreeView
         nodes={filteredTree}
-        items={ideas}
+        items={presentation.fullIdeas}
         className="space-y-0.5"
         onMove={moveIdea}
         onCreate={createIdea}
@@ -298,9 +406,40 @@ export function IdeaTree({
         onAddToPath={onAddToPath}
         isInPath={isInPath}
         pathAddDisabled={pathAddDisabled}
+        canExpand={(node) => node.type === "path"}
+        isVirtualNode={(node) => presentation.syntheticIds.has(node.id)}
+        onNodeLabelClick={(node) => {
+          if (node.type === "path" && onOpenPathDrawer && editMode !== "edit") {
+            onOpenPathDrawer(node.id);
+            return true;
+          }
+          return false;
+        }}
+        renderCardBody={(node) =>
+          node.type === "path" ? (
+            <div className="my-1 w-full overflow-hidden rounded-lg border border-gray-100 bg-gray-50/50 p-1.5 dark:border-gray-800 dark:bg-gray-800/40">
+              <PathPreviewSvg pathId={node.id} compact />
+            </div>
+          ) : null
+        }
+        renderAfterRow={(node) =>
+          node.type === "path" && !node.collapsed && !cardMode ? (
+            <div className="my-1.5 ml-6 overflow-hidden rounded-lg border border-gray-200/80 bg-gray-50/50 p-2 shadow-xs dark:border-gray-800 dark:bg-gray-800/30">
+              <PathPreviewSvg pathId={node.id} />
+            </div>
+          ) : null
+        }
         labelClassName={labelClassName}
         renderLeading={(node) => (
           <>
+            {node.id === "__unassociated_paths__" ? (
+              <span
+                className="flex h-5 w-5 items-center justify-center text-violet-500"
+                aria-hidden="true"
+              >
+                <Waypoints size={14} />
+              </span>
+            ) : null}
             <StatusIconSlot node={node} onMarkDone={onMarkDone} onMarkUndone={onMarkUndone} />
             {compact &&
               (node.type === "project" ? (
@@ -337,7 +476,12 @@ export function IdeaTree({
               />
             )}
             <StatusPillSlot node={node} onUpdate={updateIdea} />
-            <LinkCountBadge nodeId={node.id} links={links} />
+            <LinkCountBadge
+              nodeId={node.id}
+              links={links}
+              stepSummary={node.type === "path" ? pathSummaries.get(node.id) : undefined}
+              isPath={node.type === "path"}
+            />
             {pathChipsForIdea?.(node.id).map((title) => (
               <span
                 key={title}
@@ -370,8 +514,12 @@ export function IdeaTree({
               getTagsForIdea={getTagsForIdea}
               hiddenActions={editMode === "edit" ? [] : ["edit"]}
               onEdit={() => {
-                setSelectedId(node.id);
-                setEditingId(node.id);
+                if (node.type === "path" && onOpenPathDrawer) {
+                  onOpenPathDrawer(node.id);
+                } else {
+                  setSelectedId(node.id);
+                  setEditingId(node.id);
+                }
               }}
               onDelete={deleteIdea}
               onSchedule={onSchedule}

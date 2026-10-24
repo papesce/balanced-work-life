@@ -94,6 +94,8 @@ export interface TreeOptions<T extends TreeItem> {
   renderTrailing?: (node: TreeNode<T>) => ReactNode;
   /** Small muted line directly under the label (e.g. parent breadcrumb). */
   renderSubtitle?: (node: TreeNode<T>) => ReactNode;
+  /** Content rendered inside the card body (cardMode only). */
+  renderCardBody?: (node: TreeNode<T>) => ReactNode;
   /** Muted line after the row (e.g. promoted-children trace). Rendered indented. */
   renderAfterRow?: (node: TreeNode<T>) => ReactNode;
   /** Rendered below a row while it is selected (e.g. a read-only detail strip). */
@@ -131,4 +133,10 @@ export interface TreeOptions<T extends TreeItem> {
   clickToInsert?: boolean;
   editBehavior?: TreeEditBehavior;
   onContextMenu?: (node: TreeNode<T>, e: React.MouseEvent) => void;
+  /** Allow custom expand/collapse chevrons even if node has no tree children (e.g. paths with graph preview). */
+  canExpand?: (node: TreeNode<T>) => boolean;
+  /** Disable hierarchy drag and drop for rendered-only virtual nodes. */
+  isVirtualNode?: (node: TreeNode<T>) => boolean;
+  /** Custom label click handler. If provided and returns true, default edit/select behavior is bypassed. */
+  onNodeLabelClick?: (node: TreeNode<T>) => boolean | void;
 }

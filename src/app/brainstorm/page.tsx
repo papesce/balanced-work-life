@@ -24,6 +24,7 @@ import { LinkedEffectsReveal, LinkedEffectsBadge } from "@/components/shared/Lin
 import { useSearchParams, useRouter } from "next/navigation";
 import { useUndoAction } from "@/lib/tasks/undo";
 import { useBrainstormMutations } from "@/hooks/useBrainstormMutations";
+import { PathDrawer } from "@/components/brainstorm/PathDrawer";
 
 export default function BrainstormPage() {
   const bf = useBrainstormFilters();
@@ -48,6 +49,8 @@ export default function BrainstormPage() {
     setTimeScope,
     resetFilters,
     activeFilterCount,
+    groupUnassociatedPaths,
+    setGroupUnassociatedPaths,
   } = bf;
   const ideasHook = useIdeas({ scope: timeScope });
   const linksHook = useIdeaLinks();
@@ -56,6 +59,19 @@ export default function BrainstormPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const highlightId = searchParams.get("highlight");
+  const pathParam = searchParams.get("path");
+
+  const openPathDrawer = (pathId: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("path", pathId);
+    router.replace(`/brainstorm?${params.toString()}`, { scroll: false });
+  };
+
+  const closePathDrawer = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("path");
+    router.replace(`/brainstorm?${params.toString()}`, { scroll: false });
+  };
   const cardMode = useUiPrefsStore((s) => s.cardMode);
   const setPrefs = useUiPrefsStore((s) => s.set);
   const setCardMode = (v: boolean | ((p: boolean) => boolean)) =>
@@ -231,6 +247,8 @@ export default function BrainstormPage() {
       onAddRoot={() => void handleAddRoot()}
       onExpandAll={ideasHook.expandAll}
       onCollapseAll={ideasHook.collapseAll}
+      groupUnassociatedPaths={groupUnassociatedPaths}
+      setGroupUnassociatedPaths={setGroupUnassociatedPaths}
     />
   );
 
@@ -337,7 +355,10 @@ export default function BrainstormPage() {
         focusedId={effectiveFocusId}
         onFocus={handleFocus}
         cardMode={cardMode}
+        onOpenPathDrawer={openPathDrawer}
+        groupUnassociatedPaths={groupUnassociatedPaths}
       />
+      <PathDrawer pathId={pathParam} onClose={closePathDrawer} />
     </AppShell>
   );
 }

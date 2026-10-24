@@ -35,6 +35,8 @@ interface BrainstormStartActionsProps {
   onAddRoot: () => void;
   onExpandAll: () => void;
   onCollapseAll: () => void;
+  groupUnassociatedPaths: boolean;
+  setGroupUnassociatedPaths: (v: boolean) => void;
 }
 
 export function BrainstormStartActions(props: BrainstormStartActionsProps) {
@@ -64,6 +66,8 @@ export function BrainstormStartActions(props: BrainstormStartActionsProps) {
       onAddRoot={props.onAddRoot}
       expandAll={props.onExpandAll}
       collapseAll={props.onCollapseAll}
+      groupUnassociatedPaths={props.groupUnassociatedPaths}
+      setGroupUnassociatedPaths={props.setGroupUnassociatedPaths}
     />
   );
 }

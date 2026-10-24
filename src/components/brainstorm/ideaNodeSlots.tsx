@@ -246,7 +246,36 @@ export function StatusPillSlot({
   );
 }
 
-export function LinkCountBadge({ nodeId, links }: { nodeId: string; links: IdeaLink[] }) {
+export function LinkCountBadge({
+  nodeId,
+  links,
+  stepSummary,
+  isPath,
+}: {
+  nodeId: string;
+  links: IdeaLink[];
+  stepSummary?: { totalSteps: number; completedSteps: number };
+  isPath?: boolean;
+}) {
+  if (isPath) {
+    if (!stepSummary || stepSummary.totalSteps === 0) {
+      return (
+        <span className="flex-shrink-0 rounded-full bg-violet-50 px-1.5 py-0.5 text-xs text-violet-600 dark:bg-violet-500/20 dark:text-violet-300">
+          0 steps
+        </span>
+      );
+    }
+    return (
+      <span
+        title={`${stepSummary.completedSteps} of ${stepSummary.totalSteps} steps completed`}
+        className="flex-shrink-0 rounded-full bg-violet-50 px-1.5 py-0.5 text-xs text-violet-600 dark:bg-violet-500/20 dark:text-violet-300"
+      >
+        {stepSummary.totalSteps} {stepSummary.totalSteps === 1 ? "step" : "steps"}
+        {stepSummary.completedSteps > 0 && ` · ${stepSummary.completedSteps} done`}
+      </span>
+    );
+  }
+
   const linkCount = links.filter((l) => l.source_id === nodeId || l.target_id === nodeId).length;
   if (linkCount === 0) return null;
   return (

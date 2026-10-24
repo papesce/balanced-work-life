@@ -36,6 +36,10 @@ export function TreeNodeRow<T extends TreeItem>({
   const isCardMode = Boolean(options.cardMode);
   const notesText = (node as unknown as { notes?: string | null }).notes?.trim() ?? "";
 
+  const canExpand = options.canExpand?.(node) ?? false;
+  const isExpandable = hasChildren || canExpand;
+  const isVirtualNode = options.isVirtualNode?.(node) ?? false;
+
   const editing = useRowEditing({
     node,
     label,
@@ -50,7 +54,11 @@ export function TreeNodeRow<T extends TreeItem>({
   const { isEditing, isSelected } = editing;
 
   const droppable = useDroppable({ id: `row:${node.id}`, data: { itemId: node.id, depth } });
-  const draggable = useDraggable({ id: node.id, data: { itemId: node.id } });
+  const draggable = useDraggable({
+    id: node.id,
+    data: { itemId: node.id },
+    disabled: isVirtualNode,
+  });
   const isDragging = dnd.activeItemId === node.id;
   const dropZone = dnd.overItemId === node.id ? dnd.zone : null;
 
@@ -158,7 +166,7 @@ export function TreeNodeRow<T extends TreeItem>({
             role="treeitem"
             aria-level={depth + 1}
             aria-selected={isSelected}
-            aria-expanded={hasChildren ? !node.collapsed : undefined}
+            aria-expanded={isExpandable ? !node.collapsed : undefined}
             tabIndex={isSelected ? 0 : -1}
             className={rowClasses}
             id={`idea-${node.id}`}
@@ -203,13 +211,14 @@ export function TreeNodeRow<T extends TreeItem>({
               node={node}
               label={label}
               depth={depth}
-              hasChildren={hasChildren}
+              hasChildren={isExpandable}
               controller={controller}
               ui={ui}
               canCreate={canCreate}
               clickToInsert={clickToInsert}
               isEditing={isEditing}
               draggable={draggable}
+              isVirtualNode={isVirtualNode}
             />
 
             {/* Add-to-path handle (opt-in, project split view only). Native

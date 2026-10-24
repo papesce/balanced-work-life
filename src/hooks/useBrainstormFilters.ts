@@ -43,6 +43,8 @@ export function useBrainstormFilters() {
     setHideDeferred: (hideDeferred: boolean) => patch({ hideDeferred }),
     setHideInHorizon: (hideInHorizon: boolean) => patch({ hideInHorizon }),
     setTypeFilter,
+    setGroupUnassociatedPaths: (groupUnassociatedPaths: boolean) =>
+      patch({ groupUnassociatedPaths }),
     setTimeScope,
     resetFilters,
     activeFilterCount: countActiveBrainstormFilters(filters),

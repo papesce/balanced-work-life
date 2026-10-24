@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "@/hooks/useAuth";
 import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 import { deserializePath } from "@/lib/paths";
-import { PathView, PathCanvasProvider } from "./PathView";
+import { PathEditor } from "@/components/paths/PathEditor";
 import type { Idea, IdeaLink, LinkType, Tag } from "@/lib/types";
 
 interface Props {
@@ -174,9 +174,7 @@ export function ProjectPathsTab({ projectId, tasks, fillHeight = false, onCanvas
           No paths associated with this project yet.
         </div>
       ) : (
-        <PathCanvasProvider>
-          <PathView pathId={selectedPath.id} fillHeight={fillHeight} />
-        </PathCanvasProvider>
+        <PathEditor pathId={selectedPath.id} fillHeight={fillHeight} mode="edit" />
       )}
     </div>
   );
