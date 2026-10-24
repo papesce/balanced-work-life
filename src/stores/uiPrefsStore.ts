@@ -7,6 +7,7 @@ import { STORAGE_KEYS, readRawString } from "@/lib/storage";
 export const UI_PREFS_KEY = "bwl-ui-prefs-v1";
 
 export type ProjectViewMode = "split" | "list" | "paths";
+export type BrainstormPathViewMode = "tree" | "split" | "path";
 
 interface TimelinePrefs {
   filter: string;
@@ -47,6 +48,10 @@ interface UiPrefsState {
   projectViewMode: ProjectViewMode;
   /** List-pane width in split mode, as a percentage (10–80). */
   projectSplitRatio: number;
+  brainstormPathViewMode: BrainstormPathViewMode;
+  brainstormPathLayoutVersion: number;
+  /** Idea-picker pane size in the Brainstorm path workspace. */
+  brainstormPathSplitRatio: number;
   /** Global header search: whether done (completed/cancelled/missed/archived) ideas are included. */
   globalSearchIncludeDone: boolean;
   set: (partial: Partial<UiPrefsState>) => void;
@@ -98,6 +103,9 @@ export const useUiPrefsStore = create<UiPrefsState>()(
       projectLastPath: {},
       projectViewMode: "split",
       projectSplitRatio: 35,
+      brainstormPathViewMode: "tree",
+      brainstormPathLayoutVersion: 1,
+      brainstormPathSplitRatio: 34,
       globalSearchIncludeDone: true,
       set: (partial) => set(partial),
     }),
@@ -127,6 +135,9 @@ export const useUiPrefsStore = create<UiPrefsState>()(
         projectLastPath: s.projectLastPath,
         projectViewMode: s.projectViewMode,
         projectSplitRatio: s.projectSplitRatio,
+        brainstormPathViewMode: s.brainstormPathViewMode,
+        brainstormPathLayoutVersion: s.brainstormPathLayoutVersion,
+        brainstormPathSplitRatio: s.brainstormPathSplitRatio,
         globalSearchIncludeDone: s.globalSearchIncludeDone,
       }),
       merge: (persisted, current) => {
@@ -134,6 +145,10 @@ export const useUiPrefsStore = create<UiPrefsState>()(
         // First run: no persisted slice yet → seed from legacy per-key entries.
         const legacy = readLegacy();
         const merged = { ...current, ...legacy, ...p };
+        if ((p as Partial<UiPrefsState>).brainstormPathLayoutVersion !== 1) {
+          merged.brainstormPathViewMode = "tree";
+          merged.brainstormPathLayoutVersion = 1;
+        }
         // One-time migration: Hide closed defaults to the existing Hide completed
         // value so users who already hid completed keep cancelled/missed/archived hidden too.
         if (

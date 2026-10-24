@@ -94,8 +94,8 @@ interface IdeaTreeProps {
   onAddToPath?: (id: string) => void;
   isInPath?: (id: string) => boolean;
   pathAddDisabled?: boolean | ((id: string) => boolean);
-  /** Open path editor drawer */
-  onOpenPathDrawer?: (pathId: string) => void;
+  /** Select a path and open its editor. */
+  onOpenPath?: (pathId: string) => void;
   groupUnassociatedPaths?: boolean;
 }
 
@@ -182,7 +182,7 @@ export function IdeaTree({
   onAddToPath,
   isInPath,
   pathAddDisabled,
-  onOpenPathDrawer,
+  onOpenPath,
   groupUnassociatedPaths = false,
 }: IdeaTreeProps) {
   const todayString = getToday();
@@ -426,8 +426,8 @@ export function IdeaTree({
         canExpand={(node) => node.type === "path"}
         isVirtualNode={(node) => presentation.syntheticIds.has(node.id)}
         onNodeLabelClick={(node) => {
-          if (node.type === "path" && onOpenPathDrawer && editMode !== "edit") {
-            onOpenPathDrawer(node.id);
+          if (node.type === "path" && onOpenPath && editMode !== "edit") {
+            onOpenPath(node.id);
             return true;
           }
           return false;
@@ -531,8 +531,8 @@ export function IdeaTree({
               getTagsForIdea={getTagsForIdea}
               hiddenActions={editMode === "edit" ? [] : ["edit"]}
               onEdit={() => {
-                if (node.type === "path" && onOpenPathDrawer) {
-                  onOpenPathDrawer(node.id);
+                if (node.type === "path" && onOpenPath) {
+                  onOpenPath(node.id);
                 } else {
                   setSelectedId(node.id);
                   setEditingId(node.id);

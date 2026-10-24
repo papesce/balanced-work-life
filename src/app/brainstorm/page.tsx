@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useClassifications } from "@/hooks/useClassifications";
@@ -24,7 +24,8 @@ import { LinkedEffectsReveal, LinkedEffectsBadge } from "@/components/shared/Lin
 import { useSearchParams, useRouter } from "next/navigation";
 import { useUndoAction } from "@/lib/tasks/undo";
 import { useBrainstormMutations } from "@/hooks/useBrainstormMutations";
-import { PathDrawer } from "@/components/brainstorm/PathDrawer";
+import { BrainstormPathLayout } from "@/components/brainstorm/BrainstormPathLayout";
+import type { BrainstormPathViewMode } from "@/stores/uiPrefsStore";
 
 export default function BrainstormPage() {
   const bf = useBrainstormFilters();
@@ -61,19 +62,35 @@ export default function BrainstormPage() {
   const highlightId = searchParams.get("highlight");
   const pathParam = searchParams.get("path");
 
-  const openPathDrawer = (pathId: string) => {
+  const handleOpenPath = (pathId: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("path", pathId);
     router.replace(`/brainstorm?${params.toString()}`, { scroll: false });
+    setPrefs({ brainstormPathViewMode: "split" });
   };
 
-  const closePathDrawer = () => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("path");
-    router.replace(`/brainstorm?${params.toString()}`, { scroll: false });
-  };
   const cardMode = useUiPrefsStore((s) => s.cardMode);
+  const pathViewMode = useUiPrefsStore((s) => s.brainstormPathViewMode);
+  const pathSplitRatio = useUiPrefsStore((s) => s.brainstormPathSplitRatio);
   const setPrefs = useUiPrefsStore((s) => s.set);
+  const splitResizeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (splitResizeTimer.current) clearTimeout(splitResizeTimer.current);
+    },
+    [],
+  );
+  const handlePathSplitResize = (size: { asPercentage: number }) => {
+    const ratio = Math.min(65, Math.max(22, Math.round(size.asPercentage)));
+    if (splitResizeTimer.current) clearTimeout(splitResizeTimer.current);
+    splitResizeTimer.current = setTimeout(() => setPrefs({ brainstormPathSplitRatio: ratio }), 400);
+  };
+  const setPathViewMode = (mode: BrainstormPathViewMode) => {
+    setPrefs({ brainstormPathViewMode: mode });
+  };
+  useEffect(() => {
+    if (pathParam) setPrefs({ brainstormPathViewMode: "split" });
+  }, [pathParam, setPrefs]);
   const setCardMode = (v: boolean | ((p: boolean) => boolean)) =>
     setPrefs({ cardMode: typeof v === "function" ? v(cardMode) : v });
   const { undoAction, registerUndo, clearUndo, handleUndo } = useUndoAction();
@@ -253,12 +270,50 @@ export default function BrainstormPage() {
   );
 
   const headerActions = (
-    <BrainstormActions
-      cardMode={cardMode}
-      onToggleCardMode={() => setCardMode((v: boolean) => !v)}
-      timeScope={timeScope}
-      onTimeScopeChange={setTimeScope}
-    />
+    <div className="flex flex-wrap items-center gap-2">
+      {pathParam && (
+        <div
+          role="group"
+          aria-label="Brainstorm path layout"
+          className="flex items-center gap-0.5 rounded-xl border border-gray-200 bg-gray-100 p-0.5 dark:border-gray-700 dark:bg-gray-800/60"
+        >
+          {(
+            [
+              ["tree", "Tree"],
+              ["split", "Split"],
+              ["path", "Path"],
+            ] as const
+          ).map(([mode, label]) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setPathViewMode(mode)}
+              aria-pressed={pathViewMode === mode}
+              title={
+                mode === "tree"
+                  ? "Show Brainstorm tree"
+                  : mode === "split"
+                    ? "Show tree and path side by side"
+                    : "Show path editor only"
+              }
+              className={`rounded-lg px-2 py-1 text-[11px] font-semibold transition-colors ${
+                pathViewMode === mode
+                  ? "bg-white text-violet-700 shadow-sm dark:bg-gray-700 dark:text-violet-300"
+                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+      <BrainstormActions
+        cardMode={cardMode}
+        onToggleCardMode={() => setCardMode((v: boolean) => !v)}
+        timeScope={timeScope}
+        onTimeScopeChange={setTimeScope}
+      />
+    </div>
   );
 
   const brainstormTreeProps = {
@@ -302,7 +357,7 @@ export default function BrainstormPage() {
     focusedId: effectiveFocusId,
     onFocus: handleFocus,
     cardMode,
-    onOpenPathDrawer: openPathDrawer,
+    onOpenPath: handleOpenPath,
     groupUnassociatedPaths,
   };
 
@@ -311,7 +366,8 @@ export default function BrainstormPage() {
       title="Brainstorm"
       headerActions={headerActions}
       headerStartActions={headerStartActions}
-      fullWidth={Boolean(pathParam)}
+      fullWidth={Boolean(pathParam && pathViewMode !== "tree")}
+      fillViewport={Boolean(pathParam && pathViewMode !== "tree")}
     >
       {undoAction && (
         <motion.div
@@ -352,37 +408,26 @@ export default function BrainstormPage() {
           />
         </div>
       )}
-      {!pathParam && effectiveFocusId && focusedIdea && (
-        <div className="mb-3">
-          <BrainstormBreadcrumb
-            chain={breadcrumbChain}
-            focused={focusedIdea}
-            onSelect={handleFocus}
-          />
-        </div>
-      )}
-      {pathParam ? (
-        <PathDrawer
-          pathId={pathParam}
-          onClose={closePathDrawer}
-          renderTaskPicker={({ search, placedIds, addingId, onAddIdea }) => (
-            <IdeaTree
-              {...brainstormTreeProps}
-              search={search}
-              editMode="view"
-              compact
-              onAddToPath={(ideaId) => void onAddIdea(ideaId)}
-              isInPath={(ideaId) => placedIds.has(ideaId)}
-              pathAddDisabled={(ideaId) =>
-                addingId === ideaId ||
-                !ideasHook.ideas.some((idea) => idea.id === ideaId && idea.type !== "path")
-              }
-            />
-          )}
-        />
-      ) : (
-        <IdeaTree {...brainstormTreeProps} />
-      )}
+      <BrainstormPathLayout
+        pathId={pathParam ?? ""}
+        mode={pathParam ? pathViewMode : "tree"}
+        splitRatio={pathSplitRatio}
+        onSplitResize={handlePathSplitResize}
+        tree={
+          <>
+            {effectiveFocusId && focusedIdea && (
+              <div className="mb-3">
+                <BrainstormBreadcrumb
+                  chain={breadcrumbChain}
+                  focused={focusedIdea}
+                  onSelect={handleFocus}
+                />
+              </div>
+            )}
+            <IdeaTree {...brainstormTreeProps} />
+          </>
+        }
+      />
     </AppShell>
   );
 }

@@ -19,6 +19,7 @@ interface AppShellProps {
   headerActions?: ReactNode;
   headerStartActions?: ReactNode;
   fullWidth?: boolean;
+  fillViewport?: boolean;
   onAdd?: (text: string, scheduledDate: string | null) => Promise<unknown>;
 }
 
@@ -28,6 +29,7 @@ export function AppShell({
   headerActions,
   headerStartActions,
   fullWidth,
+  fillViewport,
   onAdd,
 }: AppShellProps) {
   const {
@@ -85,13 +87,15 @@ export function AppShell({
   }, [setPrefs]);
 
   return (
-    <div className="min-h-screen">
+    <div className={fillViewport ? "h-dvh overflow-hidden" : "min-h-screen"}>
       <DesktopSidebar collapsed={collapsed} onToggle={handleToggle} />
 
       <div
-        className={`${collapsed ? "md:ml-[64px]" : "md:ml-[184px]"} flex min-h-screen flex-col transition-[margin-left] duration-200 ease-in-out`}
+        className={`${collapsed ? "md:ml-[64px]" : "md:ml-[184px]"} flex ${
+          fillViewport ? "h-full min-h-0" : "min-h-screen"
+        } flex-col transition-[margin-left] duration-200 ease-in-out`}
       >
-        <header className="glass-card-strong sticky top-0 z-40 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-none border-b border-white/30 px-4 py-2.5 md:px-5 dark:border-white/5">
+        <header className="glass-card-strong sticky top-0 z-40 flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-none border-b border-white/30 px-4 py-2.5 md:px-5 dark:border-white/5">
           <div className="flex min-w-0 items-center gap-2">
             <h1 className="truncate text-[13px] font-semibold tracking-tight text-gray-500 dark:text-gray-400">
               {title}
@@ -113,8 +117,18 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 px-5 py-5 pb-24 md:pb-6">
-          <div className={fullWidth ? "w-full" : "mx-auto max-w-4xl"}>{children}</div>
+        <main
+          className={`flex-1 px-5 py-5 pb-24 md:pb-6 ${
+            fillViewport ? "flex min-h-0 flex-col overflow-hidden" : ""
+          }`}
+        >
+          <div
+            className={`${fullWidth ? "w-full" : "mx-auto max-w-4xl"} ${
+              fillViewport ? "flex min-h-0 flex-1 flex-col" : ""
+            }`}
+          >
+            {children}
+          </div>
         </main>
       </div>
 
