@@ -42,6 +42,7 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
   const [selectionOpen, setSelectionOpen] = useState(false);
   /** Inline idea search query — the panel stays open while searching. */
   const [ideaSearchQuery, setIdeaSearchQuery] = useState<string | null>(null);
+  const [hideCompletedIdeas, setHideCompletedIdeas] = useState(false);
   const [autoSuggestions, setAutoSuggestions] = useState(readAutoSuggestions);
   const selectionRef = useRef(selection);
   const selectionOpenRef = useRef(selectionOpen);
@@ -103,7 +104,6 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
     }
     setSelection((prev) => (prev === null ? prev : null));
     setSelectionOpen((prev) => (prev ? false : prev));
-    setIdeaSearchQuery(null);
   }, [autoSuggestions]);
 
   const handleSelectionDone = useCallback(() => {
@@ -283,6 +283,8 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
           <QuickNoteIdeaSearch
             key={ideaSearchQuery}
             initialQuery={ideaSearchQuery}
+            hideCompleted={hideCompletedIdeas}
+            onHideCompletedChange={setHideCompletedIdeas}
             onDone={handleSelectionDone}
             onOpenInGlobalSearch={(q) => void handleOpenInGlobalSearch(q)}
           />

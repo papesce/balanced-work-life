@@ -205,7 +205,7 @@ export function QuickNotePanel() {
 
       {/* Panel */}
       <div
-        className="relative flex w-full flex-col rounded-t-2xl bg-white shadow-xl sm:mx-4 sm:max-w-lg sm:rounded-2xl sm:has-[.quick-note-split]:max-w-5xl dark:bg-gray-900"
+        className="relative flex w-full flex-col rounded-t-2xl bg-white shadow-xl sm:mx-4 sm:max-w-5xl sm:rounded-2xl dark:bg-gray-900"
         style={{ maxHeight: "min(80vh, 600px)" }}
       >
         {/* Header: title stacks over meta so neither truncates the other;

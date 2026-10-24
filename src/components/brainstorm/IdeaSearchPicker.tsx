@@ -17,6 +17,8 @@ interface IdeaSearchPickerProps {
   excludeDone?: boolean;
   /** Prefill the search input. */
   initialQuery?: string;
+  /** Hide the search field while still using `initialQuery` to filter results. */
+  hideSearchInput?: boolean;
   /** When true, match when every whitespace-separated word is contained in idea text (not just substring). */
   matchAllWords?: boolean;
   /** Show a trailing "Create "<query>" as <type>" row when there's no exact match. */
@@ -73,6 +75,7 @@ export function IdeaSearchPicker({
   renderActions,
   excludeDone = false,
   initialQuery,
+  hideSearchInput = false,
   matchAllWords = false,
   showCreateOption = false,
   defaultCreateType = "project",
@@ -124,38 +127,40 @@ export function IdeaSearchPicker({
 
   return (
     <>
-      <input
-        type="text"
-        placeholder={placeholder}
-        value={search}
-        onChange={(e) => {
-          setSearch(e.target.value);
-          setActiveIndex(0);
-          onSearchChange?.(e.target.value);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "ArrowDown" && searchResults.length > 0) {
-            e.preventDefault();
-            setActiveIndex((i) => Math.min(i + 1, searchResults.length - 1));
-            return;
-          }
-          if (e.key === "ArrowUp" && searchResults.length > 0) {
-            e.preventDefault();
-            setActiveIndex((i) => Math.max(i - 1, 0));
-            return;
-          }
-          if (e.key === "Enter") {
-            if (searchResults.length > 0 && onPick) {
+      {!hideSearchInput && (
+        <input
+          type="text"
+          placeholder={placeholder}
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setActiveIndex(0);
+            onSearchChange?.(e.target.value);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown" && searchResults.length > 0) {
               e.preventDefault();
-              onPick(searchResults[active]!);
+              setActiveIndex((i) => Math.min(i + 1, searchResults.length - 1));
               return;
             }
-            if (showCreateRow) void handleCreate();
-          }
-        }}
-        className="mb-2 w-full rounded-lg border border-black/10 bg-white/60 px-2 py-1.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:ring-1 focus:ring-violet-500/40 dark:border-white/10 dark:bg-gray-800/60 dark:text-gray-200 dark:placeholder:text-gray-500"
-        autoFocus
-      />
+            if (e.key === "ArrowUp" && searchResults.length > 0) {
+              e.preventDefault();
+              setActiveIndex((i) => Math.max(i - 1, 0));
+              return;
+            }
+            if (e.key === "Enter") {
+              if (searchResults.length > 0 && onPick) {
+                e.preventDefault();
+                onPick(searchResults[active]!);
+                return;
+              }
+              if (showCreateRow) void handleCreate();
+            }
+          }}
+          className="mb-2 w-full rounded-lg border border-black/10 bg-white/60 px-2 py-1.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:ring-1 focus:ring-violet-500/40 dark:border-white/10 dark:bg-gray-800/60 dark:text-gray-200 dark:placeholder:text-gray-500"
+          autoFocus
+        />
+      )}
 
       {searchResults.length > 0 && (
         <div className="mb-2 max-h-[220px] overflow-y-auto rounded-lg border border-black/10 dark:border-white/10">

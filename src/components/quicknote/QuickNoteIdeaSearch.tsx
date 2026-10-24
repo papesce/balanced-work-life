@@ -42,10 +42,14 @@ const VIEW_ICON: Record<RevealView, React.ReactNode> = {
  */
 export function QuickNoteIdeaSearch({
   initialQuery,
+  hideCompleted,
+  onHideCompletedChange,
   onDone,
   onOpenInGlobalSearch,
 }: {
   initialQuery: string;
+  hideCompleted: boolean;
+  onHideCompletedChange: (hide: boolean) => void;
   /** Clear selection/search UI state (does not close the panel). */
   onDone: () => void;
   /** Fall back to the header global search (closes the panel). */
@@ -68,6 +72,10 @@ export function QuickNoteIdeaSearch({
     user ? [user.id] : [],
   );
   const allIdeas: Idea[] = useMemo(() => (ideaRows as unknown as Idea[]) ?? [], [ideaRows]);
+  const searchableIdeas = useMemo(
+    () => (hideCompleted ? allIdeas.filter((idea) => idea.status !== "completed") : allIdeas),
+    [allIdeas, hideCompleted],
+  );
 
   useEffect(() => {
     if (!eyeFor) return;
@@ -113,9 +121,19 @@ export function QuickNoteIdeaSearch({
           Open in global search
         </button>
       </div>
+      <label className="flex cursor-pointer items-center gap-1.5 px-1 text-[11px] text-gray-500 dark:text-gray-400">
+        <input
+          type="checkbox"
+          checked={hideCompleted}
+          onChange={(event) => onHideCompletedChange(event.target.checked)}
+          className="accent-violet-600"
+        />
+        Hide completed
+      </label>
       <IdeaSearchPicker
-        ideas={allIdeas}
+        ideas={searchableIdeas}
         initialQuery={initialQuery}
+        hideSearchInput
         matchAllWords
         placeholder="Search tasks, projects, goals..."
         emptyLabel="No matching ideas — it may not exist yet"
