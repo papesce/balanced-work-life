@@ -91,15 +91,17 @@ export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } =
     scheduleIdea,
   } = useIdeaStatus({ ideas, updateIdea });
 
-  const { tree, toggleCollapse, expandIdea, expandAll, collapseAll } = useIdeaCollapse({
-    ideas,
-    rawRowCount: rawRows.length,
-    searchQuery,
-  });
+  const { tree, toggleCollapse, expandIdea, expandAll, collapseAll, collapsedIds } =
+    useIdeaCollapse({
+      ideas,
+      rawRowCount: rawRows.length,
+      searchQuery,
+    });
 
   return {
     ideas,
     tree,
+    collapsedIds,
     loading,
     createIdea,
     updateIdea,

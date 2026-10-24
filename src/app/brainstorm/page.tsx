@@ -350,6 +350,7 @@ export default function BrainstormPage() {
         hideClosed={hideClosed}
         hideCompleted={hideCompleted}
         hideDeferred={hideDeferred}
+        collapsedIds={ideasHook.collapsedIds}
         hideInHorizonIds={hideInHorizon ? classifiedIds : undefined}
         typeFilter={typeFilter}
         focusedId={effectiveFocusId}

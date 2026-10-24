@@ -76,6 +76,8 @@ interface IdeaTreeProps {
   hideClosed: boolean;
   hideCompleted: boolean;
   hideDeferred: boolean;
+  /** Ids currently collapsed (drives synthetic nodes too — group + virtual paths). */
+  collapsedIds?: Set<string>;
   /** Ids already triaged into Horizon — hidden, ancestors kept. */
   hideInHorizonIds?: Set<string>;
   /** Generic counterpart (e.g. pathed ids for the unpathed-only view). */
@@ -168,6 +170,7 @@ export function IdeaTree({
   hideClosed,
   hideCompleted,
   hideDeferred,
+  collapsedIds,
   hideInHorizonIds,
   hideIds,
   pathChipsForIdea,
@@ -241,7 +244,11 @@ export function IdeaTree({
           updated_at: "",
         };
         baseIdeas.push(group);
-        const groupNode: IdeaNodeType = { ...group, children: [], collapsed: false };
+        const groupNode: IdeaNodeType = {
+          ...group,
+          children: [],
+          collapsed: collapsedIds?.has(groupId) ?? false,
+        };
         const addGroupedPaths = (nodes: IdeaNodeType[]): IdeaNodeType[] =>
           nodes.map((node) => {
             if (node.id === groupId) return node;
@@ -250,7 +257,12 @@ export function IdeaTree({
           });
         baseTree = addGroupedPaths(baseTree);
         for (const path of unassociated) {
-          const node = { ...path, parent_id: groupId, children: [], collapsed: false };
+          const node = {
+            ...path,
+            parent_id: groupId,
+            children: [],
+            collapsed: collapsedIds?.has(path.id) ?? false,
+          };
           groupNode.children.push(node);
           baseIdeas.push({ ...path, parent_id: groupId });
         }
@@ -265,7 +277,11 @@ export function IdeaTree({
           ...node.children,
           ...virtualNodes
             .filter((path) => path.parent_id === node.id)
-            .map((path) => ({ ...path, children: [], collapsed: false })),
+            .map((path) => ({
+              ...path,
+              children: [],
+              collapsed: collapsedIds?.has(path.id) ?? false,
+            })),
         ].sort((a, b) => a.sort_order - b.sort_order),
       }));
     const allTree = withVirtualChildren(baseTree);
@@ -343,6 +359,7 @@ export function IdeaTree({
     hideClosed,
     hideCompleted,
     hideDeferred,
+    collapsedIds,
     hideInHorizonIds,
     hideIds,
     typeFilter,
