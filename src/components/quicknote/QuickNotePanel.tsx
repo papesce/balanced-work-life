@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { LAYER_MODAL } from "@/lib/layers";
 import {
@@ -97,6 +97,8 @@ export function QuickNotePanel() {
     consumeRequestedMode,
   } = useQuickNoteData();
   const { detailsOpen } = useNotes();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
   const [mode, setMode] = useState<QuickNotePanelMode>(readStoredMode);
   const [menuOpen, setMenuOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -127,10 +129,44 @@ export function QuickNotePanel() {
   // until the user navigates — derived during render, no effect needed.
   const effectiveMode = panelOpen && requestedMode ? requestedMode : mode;
 
+  useEffect(() => {
+    if (!panelOpen) return;
+    const activeElement = document.activeElement;
+    restoreFocusRef.current = activeElement instanceof HTMLElement ? activeElement : null;
+    panelRef.current?.focus();
+    return () => {
+      if (restoreFocusRef.current?.isConnected) restoreFocusRef.current.focus();
+      restoreFocusRef.current = null;
+    };
+  }, [panelOpen]);
+
   // Escape to close (closePanel awaits the pending autosave first)
   useEffect(() => {
     if (!panelOpen) return;
     const handler = (e: KeyboardEvent) => {
+      if (e.key === "Tab" && !detailsOpen) {
+        const panel = panelRef.current;
+        if (!panel) return;
+        const focusable = Array.from(
+          panel.querySelectorAll<HTMLElement>(
+            'a[href], button:not(:disabled), textarea:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])',
+          ),
+        ).filter((element) => element.getClientRects().length > 0);
+        if (focusable.length === 0) {
+          e.preventDefault();
+          panel.focus();
+          return;
+        }
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && (document.activeElement === first || document.activeElement === panel)) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
       if (e.key === "Escape") {
         // The details drawer is the top overlay; let its Escape handler close
         // it first while preserving the Quick Note underneath.
@@ -241,83 +277,102 @@ export function QuickNotePanel() {
   return createPortal(
     <div
       style={{ zIndex: LAYER_MODAL }}
-      className="fixed inset-0 flex items-end justify-center sm:items-center"
+      className="fixed inset-0 flex items-end justify-center p-0 sm:items-center sm:p-6"
     >
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/20 backdrop-blur-[1px]"
+      <button
+        type="button"
+        className="absolute inset-0 cursor-default bg-gray-950/35 backdrop-blur-[3px]"
         onClick={closePanel}
-        aria-hidden
+        aria-label="Close quick notes"
       />
 
       {/* Panel */}
       <div
-        className="relative flex w-full flex-col rounded-t-2xl bg-white shadow-xl sm:mx-4 sm:max-w-5xl sm:rounded-2xl dark:bg-gray-900"
-        style={{ maxHeight: "min(80vh, 600px)" }}
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="quick-note-dialog-title"
+        tabIndex={-1}
+        className="relative flex w-full flex-col overflow-hidden rounded-t-3xl border border-black/5 bg-white shadow-2xl focus:outline-none sm:max-w-3xl sm:rounded-3xl dark:border-white/10 dark:bg-gray-900"
+        style={{ maxHeight: "min(88dvh, 720px)" }}
       >
-        {/* Header: title stacks over meta so neither truncates the other;
-            actions are labeled (not icon-only) except close. */}
-        <div className="flex items-start justify-between gap-2 border-b border-black/5 px-4 py-3 dark:border-white/5">
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            {effectiveMode !== "capture" ? (
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => persistMode("capture")}
-                  className="flex cursor-pointer items-center gap-1 rounded-lg px-1.5 py-1 text-xs font-medium text-gray-500 transition-colors hover:bg-black/5 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"
+        <div className="flex items-center justify-between gap-3 border-b border-black/5 bg-gray-50/70 px-4 py-3.5 sm:px-6 dark:border-white/5 dark:bg-gray-950/30">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
+              <FileText size={17} />
+            </div>
+            <div className="flex min-w-0 flex-col gap-0.5">
+              {effectiveMode === "list" ? (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => persistMode("capture")}
+                    className="flex cursor-pointer items-center gap-1 rounded-lg px-1 py-0.5 text-xs font-medium text-violet-600 transition-colors hover:bg-violet-100 focus-visible:outline-2 focus-visible:outline-violet-500 dark:text-violet-300 dark:hover:bg-violet-500/10"
+                  >
+                    <ChevronLeft size={14} />
+                    <span>Back</span>
+                  </button>
+                  <h2
+                    id="quick-note-dialog-title"
+                    className="text-sm font-bold tracking-tight text-gray-800 dark:text-gray-100"
+                  >
+                    All notes
+                  </h2>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <h2
+                    id="quick-note-dialog-title"
+                    className="truncate text-sm font-bold tracking-tight text-gray-800 dark:text-gray-100"
+                  >
+                    {isSelectedNoteLive ? "Quick Note" : "Archived Note"}
+                  </h2>
+                  {isSelectedNoteLive && <CaptureStatusDot />}
+                  {effectiveMode === "capture" && openNotes.length > 1 && selectedIndex >= 0 && (
+                    <span className="flex shrink-0 items-center">
+                      <button
+                        onClick={() => stepNote(-1)}
+                        disabled={!canOlder}
+                        aria-label="Previous note"
+                        title="Previous (older) note"
+                        className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-violet-500 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-white/5 dark:hover:text-gray-200"
+                      >
+                        <ChevronLeft size={13} />
+                      </button>
+                      <button
+                        onClick={() => stepNote(1)}
+                        disabled={!canNewer}
+                        aria-label="Next note"
+                        title="Next (newer) note"
+                        className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-violet-500 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-white/5 dark:hover:text-gray-200"
+                      >
+                        <ChevronRight size={13} />
+                      </button>
+                    </span>
+                  )}
+                </div>
+              )}
+              {positionLabel && timestampLabel && (
+                <span
+                  className="truncate text-[11px] font-medium text-gray-500 dark:text-gray-400"
+                  title={new Date(selectedNote!.created_at).toLocaleString()}
                 >
-                  <ChevronLeft size={14} />
-                  <span>Back</span>
-                </button>
-                <span className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
-                  All notes
+                  {positionLabel} · {timestampLabel}
                 </span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5">
-                <FileText size={16} className="shrink-0 text-violet-500" />
-                <span className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
-                  {isSelectedNoteLive ? "Quick Note" : "Archived Note"}
+              )}
+              {effectiveMode === "list" && (
+                <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                  {openNotes.length} open {openNotes.length === 1 ? "note" : "notes"}
                 </span>
-                {isSelectedNoteLive && <CaptureStatusDot />}
-                {effectiveMode === "capture" && openNotes.length > 1 && selectedIndex >= 0 && (
-                  <span className="flex shrink-0 items-center">
-                    <button
-                      onClick={() => stepNote(-1)}
-                      disabled={!canOlder}
-                      aria-label="Previous note"
-                      title="Previous (older) note"
-                      className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-white/5"
-                    >
-                      <ChevronLeft size={13} />
-                    </button>
-                    <button
-                      onClick={() => stepNote(1)}
-                      disabled={!canNewer}
-                      aria-label="Next note"
-                      title="Next (newer) note"
-                      className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-white/5"
-                    >
-                      <ChevronRight size={13} />
-                    </button>
-                  </span>
-                )}
-              </div>
-            )}
-            {positionLabel && timestampLabel && (
-              <span
-                className="truncate text-xs font-normal text-gray-500 dark:text-gray-400"
-                title={new Date(selectedNote!.created_at).toLocaleString()}
-              >
-                {positionLabel} · {timestampLabel}
-              </span>
-            )}
+              )}
+            </div>
           </div>
 
           <div className="flex shrink-0 items-center gap-1">
             {effectiveMode !== "list" && (
               <button
                 onClick={() => persistMode("list")}
-                className="flex h-7 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-gray-500 transition-colors hover:bg-black/5 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"
+                className="flex h-8 cursor-pointer items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold text-gray-600 transition-colors hover:bg-black/5 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-violet-500 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
                 title="Browse all notes"
                 aria-label="Browse all notes"
               >
@@ -329,7 +384,7 @@ export function QuickNotePanel() {
             <button
               onClick={handleNew}
               disabled={creating}
-              className="flex h-7 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-gray-500 transition-colors hover:bg-black/5 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"
+              className="flex h-8 cursor-pointer items-center gap-1.5 rounded-xl bg-violet-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:cursor-not-allowed disabled:opacity-40"
               title="New note"
               aria-label="New note"
             >
@@ -344,7 +399,7 @@ export function QuickNotePanel() {
                     setMenuOpen(!menuOpen);
                     setDiscardArmed(false);
                   }}
-                  className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:hover:bg-white/5 dark:hover:text-gray-200"
+                  className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl text-gray-500 transition-colors hover:bg-black/5 hover:text-gray-800 focus-visible:outline-2 focus-visible:outline-violet-500 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-100"
                   aria-label="More options"
                 >
                   <MoreHorizontal size={16} />
@@ -384,7 +439,7 @@ export function QuickNotePanel() {
             <button
               onClick={() => void closePanel()}
               aria-label="Close quick note"
-              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:hover:bg-white/5 dark:hover:text-gray-200"
+              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl text-gray-500 transition-colors hover:bg-black/5 hover:text-gray-800 focus-visible:outline-2 focus-visible:outline-violet-500 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-100"
             >
               <X size={16} />
             </button>
@@ -392,11 +447,11 @@ export function QuickNotePanel() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {actionError && (
             <div
               role="alert"
-              className="mx-4 mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
+              className="mx-4 mt-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-700 sm:mx-6 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
             >
               <AlertCircle size={14} className="mt-0.5 shrink-0" aria-hidden />
               <span className="min-w-0 flex-1">{actionError}</span>

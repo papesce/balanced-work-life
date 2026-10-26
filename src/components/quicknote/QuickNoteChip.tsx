@@ -15,9 +15,8 @@ function useFormattedAge(isoTimestamp: string, intervalMs: number): string {
 }
 
 /**
- * Small chip shown in the Daily Planner header when open notes have content.
- * Shows total unresolved line count across all open notes and age of the
- * latest note. Clicking opens the panel in list mode.
+ * Small launcher shown in the Daily Planner header when open notes have content.
+ * Clicking opens the list when there is more than one note.
  */
 export function QuickNoteChip() {
   const { note, totalUnreadCount, pendingNotesCount, openPanel } = useQuickNoteData();
@@ -30,12 +29,14 @@ export function QuickNoteChip() {
   return (
     <button
       onClick={() => openPanel(noteCount > 1 ? "list" : undefined)}
-      className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-violet-50 px-2.5 py-1.5 text-[11px] font-bold text-violet-600 transition-colors hover:bg-violet-100 dark:bg-violet-950/20 dark:text-violet-400 dark:hover:bg-violet-900/30"
+      className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-violet-200/70 bg-violet-50 px-2.5 py-1.5 text-[11px] font-semibold text-violet-700 transition-colors hover:bg-violet-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-300 dark:hover:bg-violet-500/15"
       title={`Quick Notes (${totalUnreadCount} unresolved across ${noteCount} note${noteCount === 1 ? "" : "s"})`}
+      aria-label={`Open quick notes: ${totalUnreadCount} unresolved tasks across ${noteCount} note${noteCount === 1 ? "" : "s"}, latest ${age}`}
     >
       <FileText size={12} />
+      <span>Notes</span>
       <span>{totalUnreadCount}</span>
-      <span className="font-medium text-violet-400/70 dark:text-violet-500/50">· {age}</span>
+      <span className="font-medium text-violet-500/75 dark:text-violet-300/70">· {age}</span>
     </button>
   );
 }

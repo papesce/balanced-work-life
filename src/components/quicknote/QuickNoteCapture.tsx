@@ -210,9 +210,9 @@ export const QuickNoteCapture = memo(function QuickNoteCapture({
 
   return (
     <div
-      className={`flex flex-col p-4 ${ideaSearchQuery ? "quick-note-split lg:flex-row lg:items-start lg:gap-4 lg:p-5" : ""}`}
+      className={`flex flex-col p-4 sm:p-6 ${ideaSearchQuery ? "quick-note-split lg:flex-row lg:items-start lg:gap-5" : ""}`}
     >
-      <div className={ideaSearchQuery ? "min-w-0 lg:flex-1" : ""}>
+      <div className={ideaSearchQuery ? "min-w-0 lg:flex-1" : "mx-auto w-full max-w-2xl"}>
         {readonly ? (
           <div className="mb-2 flex items-center justify-between">
             <p className="text-[10px] font-bold tracking-wider text-gray-400 uppercase dark:text-gray-500">
@@ -269,14 +269,12 @@ export const QuickNoteCapture = memo(function QuickNoteCapture({
             onPaste={handlePaste}
             onSelect={handleSelect}
             onBlur={handleBlur}
-            placeholder={
-              "Capture anything...\n- Start a line with “- ” to make it a task\n- Add an indented “Notes: …” line below it for task notes\n- End with #project, #task, #goal, #idea or #initiative for the type"
-            }
-            className="h-full min-h-[200px] w-full resize-none bg-transparent text-sm leading-relaxed text-gray-800 outline-none placeholder:text-gray-400 dark:text-gray-200 dark:placeholder:text-gray-500"
+            placeholder="Write a thought, task, or idea…"
+            className="min-h-[280px] w-full resize-none rounded-2xl border border-gray-200/80 bg-gray-50/70 px-4 py-4 text-[14px] leading-7 text-gray-800 transition-colors outline-none placeholder:text-gray-400 focus:border-violet-300 focus:ring-2 focus:ring-violet-500/15 sm:min-h-[360px] sm:px-5 sm:py-5 dark:border-white/10 dark:bg-gray-950/30 dark:text-gray-200 dark:placeholder:text-gray-500 dark:focus:border-violet-500/50"
             rows={10}
           />
         ) : (
-          <div className="min-h-[200px] text-sm leading-relaxed break-words whitespace-pre-wrap text-gray-800 dark:text-gray-200">
+          <div className="min-h-[280px] rounded-2xl border border-gray-200/80 bg-gray-50/70 px-4 py-4 text-sm leading-relaxed break-words whitespace-pre-wrap text-gray-800 sm:min-h-[360px] sm:px-5 sm:py-5 dark:border-white/10 dark:bg-gray-950/30 dark:text-gray-200">
             {previewSegments.length === 0 ? (
               <span className="text-gray-400 italic dark:text-gray-500">Empty note</span>
             ) : (
@@ -297,6 +295,17 @@ export const QuickNoteCapture = memo(function QuickNoteCapture({
               )
             )}
           </div>
+        )}
+        {editing && !readonly && (
+          <p className="mt-2 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
+            Start a line with <span className="font-semibold">-</span> for a task, or indent{" "}
+            <span className="font-semibold">Notes: …</span> beneath it for task notes. Use{" "}
+            <span className="font-semibold">#project</span>,{" "}
+            <span className="font-semibold">#task</span>,{" "}
+            <span className="font-semibold">#goal</span>,{" "}
+            <span className="font-semibold">#idea</span>, or{" "}
+            <span className="font-semibold">#initiative</span> to classify it
+          </p>
         )}
         {editing && !readonly && (
           <div className="mt-2 flex items-center justify-end border-t border-black/5 pt-2 dark:border-white/5">

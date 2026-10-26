@@ -136,17 +136,18 @@ export function AppShell({
       {onAdd && <QuickAddButton onAdd={onAdd} />}
       <button
         onClick={() => openQuickNote()}
-        className="fixed right-6 bottom-24 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-white/80 text-gray-600 shadow-lg backdrop-blur-lg transition-all hover:bg-white hover:shadow-xl active:scale-95 dark:border-white/10 dark:bg-gray-800/80 dark:text-gray-300 dark:hover:bg-gray-800"
+        className="fixed right-6 bottom-24 z-50 flex h-12 items-center justify-center gap-2 rounded-2xl bg-violet-600 px-3 text-white shadow-lg shadow-violet-900/20 transition-all hover:bg-violet-700 hover:shadow-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 active:scale-95"
         title={quickNoteLabel}
         aria-label={
           totalUnreadCount > 0 ? `Open quick notes, ${quickNoteLabel}` : "Open quick notes"
         }
       >
         <FileText size={18} />
+        <span className="hidden text-xs font-semibold sm:inline">Quick note</span>
         {totalUnreadCount > 0 && (
           <span
             aria-hidden="true"
-            className={`absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] leading-none font-bold text-white shadow-md ${badgeColor} ${
+            className={`absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white px-1.5 text-[10px] leading-none font-bold text-white shadow-sm dark:border-gray-900 ${badgeColor} ${
               backlogLevel !== "normal" ? "animate-pulse" : ""
             }`}
           >

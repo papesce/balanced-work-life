@@ -14,16 +14,6 @@ function getPreview(text: string): string {
   return first.text.length > 60 ? first.text.slice(0, 60) + "…" : first.text;
 }
 
-function formatTimestamp(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return (
-    d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
-    ", " +
-    d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
-  );
-}
-
 function NoteRow({
   note,
   isSelected,
@@ -37,7 +27,6 @@ function NoteRow({
 }) {
   const preview = useMemo(() => getPreview(note.text), [note.text]);
   const age = useMemo(() => formatAge(note.created_at, "short"), [note.created_at]);
-  const timestamp = useMemo(() => formatTimestamp(note.created_at), [note.created_at]);
   // Actionable unresolved lines only — the same predicate the FAB badge
   // and chip counts use, so every quick-note number agrees.
   const unresolvedCount = useMemo(() => unresolvedNonEmptyCount(note.text), [note.text]);
@@ -46,25 +35,26 @@ function NoteRow({
     <button
       onClick={onSelect}
       title={new Date(note.created_at).toLocaleString()}
-      className={`flex w-full cursor-pointer flex-col gap-0.5 rounded-xl px-3 py-2.5 text-left transition-colors ${
+      aria-pressed={isSelected}
+      className={`flex w-full cursor-pointer flex-col gap-2 rounded-2xl border px-4 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 ${
         isSelected
-          ? "bg-violet-50 dark:bg-violet-950/20"
-          : "hover:bg-black/[0.03] dark:hover:bg-white/[0.03]"
+          ? "border-violet-200 bg-violet-50/80 dark:border-violet-500/30 dark:bg-violet-500/10"
+          : "border-transparent hover:border-black/5 hover:bg-gray-50 dark:hover:border-white/5 dark:hover:bg-white/[0.03]"
       }`}
     >
-      <div className="flex items-center gap-2">
-        <FileText size={12} className="shrink-0 text-violet-500" />
-        <span className="flex-1 truncate text-xs font-medium text-gray-700 dark:text-gray-300">
-          {label} · {timestamp}
+      <div className="flex min-w-0 items-center gap-2">
+        <FileText size={14} className="shrink-0 text-violet-500" />
+        <span className="truncate text-xs font-semibold text-gray-700 dark:text-gray-200">
+          {label}
         </span>
+        <span className="shrink-0 text-[11px] text-gray-400 dark:text-gray-500">{age}</span>
         {unresolvedCount > 0 && (
-          <span className="shrink-0 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
-            {unresolvedCount}
+          <span className="ml-auto shrink-0 rounded-full bg-violet-100 px-2 py-1 text-[10px] font-semibold text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
+            {unresolvedCount} {unresolvedCount === 1 ? "task" : "tasks"}
           </span>
         )}
-        <span className="shrink-0 text-[10px] text-gray-400 dark:text-gray-500">{age}</span>
       </div>
-      <p className="truncate pl-5 text-[11px] text-gray-400 dark:text-gray-500">{preview}</p>
+      <p className="truncate pl-[22px] text-xs text-gray-500 dark:text-gray-400">{preview}</p>
     </button>
   );
 }
@@ -105,13 +95,20 @@ export function QuickNoteList({
 
   if (openNotes.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <FileText size={24} className="mb-2 text-gray-300 dark:text-gray-600" />
-        <p className="text-sm text-gray-400 dark:text-gray-500">No notes yet</p>
+      <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+        <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
+          <FileText size={19} />
+        </div>
+        <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+          Nothing captured yet
+        </p>
+        <p className="mt-1 max-w-xs text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+          Start a quick note and come back to it whenever you need.
+        </p>
         <button
           onClick={handleNew}
           disabled={creating}
-          className="mt-3 flex cursor-pointer items-center gap-1.5 rounded-xl bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-600 transition-colors hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-violet-950/20 dark:text-violet-400"
+          className="mt-4 flex cursor-pointer items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Plus size={13} />
           {creating ? "Creating…" : "New note"}
@@ -121,31 +118,36 @@ export function QuickNoteList({
   }
 
   return (
-    <div className="flex flex-col gap-1 p-2">
+    <div className="flex flex-col gap-2 p-3 sm:p-4">
       {openNotes.length > 0 && (
         <div>
-          <div className="mb-1 flex items-center justify-between px-3 pt-1">
-            <p className="text-[10px] font-bold tracking-wider text-gray-400 uppercase dark:text-gray-500">
-              Open · {openNotes.length}
+          <div className="mb-2 flex items-center justify-between gap-3 px-1">
+            <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+              Your notes{" "}
+              <span className="font-normal text-gray-400 dark:text-gray-500">
+                · {openNotes.length}
+              </span>
             </p>
             <button
               onClick={handleNew}
               disabled={creating}
-              className="flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-violet-600 transition-colors hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-violet-400 dark:hover:bg-violet-950/20"
+              className="flex cursor-pointer items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-semibold text-violet-700 transition-colors hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-violet-500 disabled:cursor-not-allowed disabled:opacity-40 dark:text-violet-300 dark:hover:bg-violet-500/10"
             >
               <Plus size={11} />
               {creating ? "Creating…" : "New note"}
             </button>
           </div>
-          {openNotes.map((n, i) => (
-            <NoteRow
-              key={n.id}
-              note={n}
-              isSelected={selectedNote?.id === n.id}
-              label={`Note ${openNotes.length - i}`}
-              onSelect={() => handleSelect(n.id)}
-            />
-          ))}
+          <div className="flex flex-col gap-1">
+            {openNotes.map((n, i) => (
+              <NoteRow
+                key={n.id}
+                note={n}
+                isSelected={selectedNote?.id === n.id}
+                label={`Note ${openNotes.length - i}`}
+                onSelect={() => handleSelect(n.id)}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>
