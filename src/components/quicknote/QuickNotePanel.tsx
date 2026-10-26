@@ -12,6 +12,7 @@ import {
   ChevronRight,
   List,
   Plus,
+  AlertCircle,
 } from "lucide-react";
 import { memo } from "react";
 import {
@@ -23,6 +24,7 @@ import { useCalmedSaveStatus } from "@/lib/quicknote/useCalmedSaveStatus";
 import { QuickNoteCapture } from "./QuickNoteCapture";
 import { QuickNoteList } from "./QuickNoteList";
 import { useNotes } from "@/contexts/NotesContext";
+import type { QuickNoteOperationFailureReason } from "@/lib/quicknote/operations";
 
 const MODE_STORAGE_KEY = "quicknote-panel-mode";
 // "process" was removed (selection-based flow); stale stored values fall
@@ -46,6 +48,19 @@ function formatTimestamp(iso: string): string {
     ", " +
     d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
   );
+}
+
+function operationErrorMessage(reason: QuickNoteOperationFailureReason): string {
+  switch (reason) {
+    case "save_failed":
+      return "Couldn't switch notes because the current note hasn't saved. Your draft is still here; try again when saving succeeds.";
+    case "not_found":
+      return "That note is no longer available. Refresh the list and try again.";
+    case "unauthenticated":
+      return "Sign in to create a quick note.";
+    case "create_failed":
+      return "Couldn't create a quick note. Check your connection and try again.";
+  }
 }
 
 /**
@@ -86,8 +101,14 @@ export function QuickNotePanel() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [discarding, setDiscarding] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [editState, setEditState] = useState({ panelOpen, noteId: null as string | null });
   // Two-step discard confirm: first click arms, second click executes.
   const [discardArmed, setDiscardArmed] = useState(false);
+
+  if (editState.panelOpen !== panelOpen) {
+    setEditState({ panelOpen, noteId: null });
+  }
 
   const persistMode = useCallback(
     (next: QuickNotePanelMode) => {
@@ -149,7 +170,8 @@ export function QuickNotePanel() {
       if (!next) {
         await closePanel();
       } else {
-        await selectNote(next.id);
+        const result = await selectNote(next.id);
+        if (!result.ok) setActionError(operationErrorMessage(result.reason));
       }
     } finally {
       setDiscarding(false);
@@ -165,9 +187,30 @@ export function QuickNotePanel() {
     if (creating) return;
     setCreating(true);
     void createNote()
-      .then(() => persistMode("capture"))
+      .then((result) => {
+        if (!result.ok) {
+          setActionError(operationErrorMessage(result.reason));
+          return;
+        }
+        setActionError(null);
+        setEditState((prev) => ({ ...prev, noteId: result.id }));
+        persistMode("capture");
+      })
       .finally(() => setCreating(false));
   }, [creating, createNote, persistMode]);
+
+  const handleListNavigate = useCallback(
+    (next: QuickNotePanelMode, createdNoteId?: string) => {
+      setActionError(null);
+      setEditState((prev) => ({ ...prev, noteId: createdNoteId ?? null }));
+      persistMode(next);
+    },
+    [persistMode],
+  );
+
+  const handleActionError = useCallback((reason: QuickNoteOperationFailureReason) => {
+    setActionError(operationErrorMessage(reason));
+  }, []);
 
   const selectedIndex = selectedNote ? openNotes.findIndex((n) => n.id === selectedNote.id) : -1;
   // Displayed numbers are chronological (oldest = 1, newest = N) while
@@ -180,7 +223,11 @@ export function QuickNotePanel() {
     (dir: -1 | 1) => {
       // dir -1 = previous/older (‹), dir +1 = next/newer (›).
       const next = openNotes[selectedIndex - dir];
-      if (next) void selectNote(next.id);
+      if (next) {
+        void selectNote(next.id).then((result) => {
+          setActionError(result.ok ? null : operationErrorMessage(result.reason));
+        });
+      }
     },
     [openNotes, selectedIndex, selectNote],
   );
@@ -346,10 +393,35 @@ export function QuickNotePanel() {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
+          {actionError && (
+            <div
+              role="alert"
+              className="mx-4 mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
+            >
+              <AlertCircle size={14} className="mt-0.5 shrink-0" aria-hidden />
+              <span className="min-w-0 flex-1">{actionError}</span>
+              <button
+                type="button"
+                onClick={() => setActionError(null)}
+                aria-label="Dismiss error"
+                className="shrink-0 rounded p-0.5 hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-red-500 dark:hover:bg-red-900/40"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          )}
           {effectiveMode === "list" ? (
-            <QuickNoteList onNavigate={persistMode} />
+            <QuickNoteList onNavigate={handleListNavigate} onError={handleActionError} />
           ) : (
-            <QuickNoteCapture />
+            <QuickNoteCapture
+              editing={selectedNote?.id === editState.noteId}
+              onEditingChange={(next) =>
+                setEditState((prev) => ({
+                  ...prev,
+                  noteId: next ? (selectedNote?.id ?? null) : null,
+                }))
+              }
+            />
           )}
         </div>
       </div>

@@ -10,8 +10,8 @@ import type { QuickNoteNotes } from "./notes";
 import type { QuickNotePersistence } from "./persistence";
 
 export interface QuickNoteOperations {
-  selectNote: (id: string) => Promise<void>;
-  createNote: () => Promise<string | null>;
+  selectNote: (id: string) => Promise<QuickNoteSelectResult>;
+  createNote: () => Promise<QuickNoteCreateResult>;
   /** Create an idea from arbitrary selected text. Never mutates note text. */
   createSelectionIdea: (
     text: string,
@@ -22,6 +22,16 @@ export interface QuickNoteOperations {
   /** Flip an archived note back to open. No-op when the selected note isn't archived. */
   reopenNote: () => Promise<void>;
 }
+
+export type QuickNoteOperationFailureReason =
+  "save_failed" | "not_found" | "unauthenticated" | "create_failed";
+
+export type QuickNoteSelectResult =
+  { ok: true } | { ok: false; reason: "save_failed" | "not_found" };
+
+export type QuickNoteCreateResult =
+  | { ok: true; id: string }
+  | { ok: false; reason: "save_failed" | "unauthenticated" | "create_failed" };
 
 interface OperationsDeps {
   db: AbstractPowerSyncDatabase;
@@ -148,21 +158,22 @@ export function useQuickNoteOperations({
   ]);
 
   const selectNote = useCallback(
-    async (id: string) => {
-      if (!(await flushBeforeSwitch())) return;
-      setSelectedNoteId(id);
+    async (id: string): Promise<QuickNoteSelectResult> => {
       const target = allNotes.find((n) => n.id === id);
-      if (target) {
-        loadDraft(target.id, target.text);
-        markPersistIdle(target.updated_at ?? null);
-      }
+      if (!target) return { ok: false, reason: "not_found" };
+      if (selectedNote?.id === id) return { ok: true };
+      if (!(await flushBeforeSwitch())) return { ok: false, reason: "save_failed" };
+      setSelectedNoteId(id);
+      loadDraft(target.id, target.text);
+      markPersistIdle(target.updated_at ?? null);
+      return { ok: true };
     },
-    [flushBeforeSwitch, setSelectedNoteId, allNotes, loadDraft, markPersistIdle],
+    [flushBeforeSwitch, setSelectedNoteId, allNotes, selectedNote?.id, loadDraft, markPersistIdle],
   );
 
-  const createNote = useCallback(async () => {
-    if (!userId) return null;
-    if (!(await flushBeforeSwitch())) return null;
+  const createNote = useCallback(async (): Promise<QuickNoteCreateResult> => {
+    if (!userId) return { ok: false, reason: "unauthenticated" };
+    if (!(await flushBeforeSwitch())) return { ok: false, reason: "save_failed" };
     const id = uuidv4();
     const now = new Date().toISOString();
     try {
@@ -175,14 +186,14 @@ export function useQuickNoteOperations({
       console.error("[QuickNote] createNote failed", err);
       markPersistError();
       setDraftDirty(draftRef.current !== baseTextRef.current);
-      return null;
+      return { ok: false, reason: "create_failed" };
     }
     resetPending();
     clearDraftWriteState();
     setSelectedNoteId(id);
     loadDraft(id, "");
     markPersistIdle(null);
-    return id;
+    return { ok: true, id };
   }, [
     db,
     userId,

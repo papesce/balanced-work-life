@@ -272,6 +272,7 @@ export function PathView({ pathId, fillHeight = false }: Props) {
         )}
         <ReactFlow
           onInit={() => setFlowReady(true)}
+          nodesDraggable={nodesInitialized}
           nodes={flowNodes}
           edges={flowEdges}
           nodeTypes={nodeTypes}

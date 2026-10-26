@@ -36,6 +36,7 @@ import { useQuickNoteDraft } from "@/lib/quicknote/draft";
 import { useQuickNoteNotes } from "@/lib/quicknote/notes";
 import { useQuickNotePersistence } from "@/lib/quicknote/persistence";
 import { useQuickNoteOperations } from "@/lib/quicknote/operations";
+import type { QuickNoteCreateResult, QuickNoteSelectResult } from "@/lib/quicknote/operations";
 import { useQuickNotePathOperations } from "@/lib/quicknote/pathOperations";
 import type { QuickNotePanelMode, QuickNoteSaveStatus } from "@/lib/quicknote/types";
 
@@ -89,8 +90,8 @@ interface QuickNoteDataContextValue {
   allNotes: QuickNote[];
   openNotes: QuickNote[];
   selectedNote: QuickNote | null;
-  selectNote: (id: string) => Promise<void>;
-  createNote: () => Promise<string | null>;
+  selectNote: (id: string) => Promise<QuickNoteSelectResult>;
+  createNote: () => Promise<QuickNoteCreateResult>;
   isSelectedNoteLive: boolean;
 }
 

@@ -1,8 +1,8 @@
 "use client";
 
-import { memo, useRef, useEffect, useCallback, useState } from "react";
+import { memo, useRef, useEffect, useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search } from "lucide-react";
+import { Eye, Pencil, Search } from "lucide-react";
 import {
   useQuickNoteEditor,
   useQuickNoteData,
@@ -12,6 +12,7 @@ import { QuickNoteSaveIndicator } from "./QuickNoteSaveIndicator";
 import { QuickNoteSelectionActions } from "./QuickNoteSelectionActions";
 import { QuickNoteIdeaSearch } from "./QuickNoteIdeaSearch";
 import { requestGlobalSearch } from "@/lib/globalSearchBus";
+import { parseNoteLinks } from "@/lib/quicknote/markdownLinks";
 
 const SUGGESTIONS_STORAGE_KEY = "quicknote-auto-suggestions";
 
@@ -24,11 +25,16 @@ function readAutoSuggestions(): boolean {
 }
 
 /**
- * Capture mode: a plain textarea. Enter inserts a newline and nothing else.
- * Lazy note creation is handled by the context's updateText.
- * When viewing an archived note, the textarea is read-only.
+ * Existing notes open in a link-aware preview; live notes can switch to the
+ * plain-text editor. Lazy note creation remains handled by updateText.
  */
-export const QuickNoteCapture = memo(function QuickNoteCapture() {
+export const QuickNoteCapture = memo(function QuickNoteCapture({
+  editing,
+  onEditingChange,
+}: {
+  editing: boolean;
+  onEditingChange: (editing: boolean) => void;
+}) {
   const { draft, updateText, flushNow } = useQuickNoteEditor();
   const { noteId, isSelectedNoteLive, reopenNote } = useQuickNoteCaptureMeta();
   const { closePanel } = useQuickNoteData();
@@ -36,6 +42,7 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
   const router = useRouter();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const readonly = !isSelectedNoteLive;
+  const previewSegments = useMemo(() => parseNoteLinks(draft), [draft]);
   const [selection, setSelection] = useState<{ start: number; end: number; text: string } | null>(
     null,
   );
@@ -60,12 +67,24 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
   }
   // Autofocus with caret at end (only for editable notes)
   useEffect(() => {
-    if (readonly) return;
+    if (readonly || !editing) return;
     const el = textareaRef.current;
     if (!el) return;
     el.focus();
     el.setSelectionRange(el.value.length, el.value.length);
-  }, [noteId, readonly]);
+  }, [noteId, readonly, editing]);
+
+  const handleEditingChange = useCallback(
+    (next: boolean) => {
+      if (!next) {
+        setSelection(null);
+        setSelectionOpen(false);
+        setIdeaSearchQuery(null);
+      }
+      onEditingChange(next);
+    },
+    [onEditingChange],
+  );
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -194,7 +213,7 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
       className={`flex flex-col p-4 ${ideaSearchQuery ? "quick-note-split lg:flex-row lg:items-start lg:gap-4 lg:p-5" : ""}`}
     >
       <div className={ideaSearchQuery ? "min-w-0 lg:flex-1" : ""}>
-        {readonly && (
+        {readonly ? (
           <div className="mb-2 flex items-center justify-between">
             <p className="text-[10px] font-bold tracking-wider text-gray-400 uppercase dark:text-gray-500">
               Read-only
@@ -206,29 +225,85 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
               Reopen note
             </button>
           </div>
+        ) : (
+          <div className="mb-2 flex justify-end">
+            <div
+              role="group"
+              aria-label="Note display mode"
+              className="inline-flex rounded-lg bg-gray-100 p-0.5 dark:bg-gray-800"
+            >
+              <button
+                type="button"
+                onClick={() => handleEditingChange(false)}
+                aria-pressed={!editing}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-violet-500 ${
+                  !editing
+                    ? "bg-white text-gray-800 shadow-sm dark:bg-gray-700 dark:text-gray-100"
+                    : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                }`}
+              >
+                <Eye size={12} />
+                Preview
+              </button>
+              <button
+                type="button"
+                onClick={() => handleEditingChange(true)}
+                aria-pressed={editing}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-violet-500 ${
+                  editing
+                    ? "bg-white text-gray-800 shadow-sm dark:bg-gray-700 dark:text-gray-100"
+                    : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                }`}
+              >
+                <Pencil size={12} />
+                Edit
+              </button>
+            </div>
+          </div>
         )}
-        <textarea
-          ref={textareaRef}
-          value={draft}
-          onChange={handleChange}
-          onPaste={handlePaste}
-          onSelect={handleSelect}
-          onBlur={handleBlur}
-          readOnly={readonly}
-          placeholder={
-            readonly
-              ? "This note is archived"
-              : "Capture anything...\n- Start a line with “- ” to make it a task\n- Add an indented “Notes: …” line below it for task notes\n- End with #project, #task, #goal, #idea or #initiative for the type"
-          }
-          className={`h-full min-h-[200px] w-full resize-none bg-transparent text-sm leading-relaxed text-gray-800 outline-none placeholder:text-gray-400 dark:text-gray-200 dark:placeholder:text-gray-500 ${readonly ? "cursor-default opacity-70" : ""}`}
-          rows={10}
-        />
-        {!readonly && (
+        {editing && !readonly ? (
+          <textarea
+            ref={textareaRef}
+            value={draft}
+            onChange={handleChange}
+            onPaste={handlePaste}
+            onSelect={handleSelect}
+            onBlur={handleBlur}
+            placeholder={
+              "Capture anything...\n- Start a line with “- ” to make it a task\n- Add an indented “Notes: …” line below it for task notes\n- End with #project, #task, #goal, #idea or #initiative for the type"
+            }
+            className="h-full min-h-[200px] w-full resize-none bg-transparent text-sm leading-relaxed text-gray-800 outline-none placeholder:text-gray-400 dark:text-gray-200 dark:placeholder:text-gray-500"
+            rows={10}
+          />
+        ) : (
+          <div className="min-h-[200px] text-sm leading-relaxed break-words whitespace-pre-wrap text-gray-800 dark:text-gray-200">
+            {previewSegments.length === 0 ? (
+              <span className="text-gray-400 italic dark:text-gray-500">Empty note</span>
+            ) : (
+              previewSegments.map((segment, index) =>
+                segment.type === "link" ? (
+                  <a
+                    key={index}
+                    href={segment.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-violet-600 underline decoration-violet-300 underline-offset-2 hover:text-violet-700 dark:text-violet-400 dark:decoration-violet-700 dark:hover:text-violet-300"
+                  >
+                    {segment.label}
+                  </a>
+                ) : (
+                  <span key={index}>{segment.value}</span>
+                ),
+              )
+            )}
+          </div>
+        )}
+        {editing && !readonly && (
           <div className="mt-2 flex items-center justify-end border-t border-black/5 pt-2 dark:border-white/5">
             <QuickNoteSaveIndicator />
           </div>
         )}
-        {!readonly && (
+        {editing && !readonly && (
           <label className="mt-2 flex cursor-pointer items-center justify-end gap-2 text-xs text-gray-500 dark:text-gray-400">
             <input
               type="checkbox"
@@ -239,7 +314,7 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
             Suggest existing ideas automatically
           </label>
         )}
-        {selection && !selectionOpen && (
+        {editing && selection && !selectionOpen && (
           <div className="mt-2 flex items-center justify-end gap-1.5">
             {!autoSuggestions && (
               <button
@@ -268,7 +343,7 @@ export const QuickNoteCapture = memo(function QuickNoteCapture() {
             </button>
           </div>
         )}
-        {selection && selectionOpen && (
+        {editing && selection && selectionOpen && (
           <div className="mt-2">
             <QuickNoteSelectionActions
               selection={selection.text}

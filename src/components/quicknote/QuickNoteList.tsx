@@ -5,6 +5,7 @@ import { FileText, Plus } from "lucide-react";
 import { useQuickNoteData, type QuickNotePanelMode } from "@/contexts/QuickNoteContext";
 import { parseNoteLines, unresolvedNonEmptyCount, formatAge } from "@/lib/quickNotes";
 import { QuickNote } from "@/lib/types";
+import type { QuickNoteOperationFailureReason } from "@/lib/quicknote/operations";
 
 function getPreview(text: string): string {
   const lines = parseNoteLines(text);
@@ -74,19 +75,31 @@ function NoteRow({
  * (Archiving was removed with batch process mode; pre-existing archived
  * notes stay in the DB and backups but are no longer listed.)
  */
-export function QuickNoteList({ onNavigate }: { onNavigate?: (mode: QuickNotePanelMode) => void }) {
+export function QuickNoteList({
+  onNavigate,
+  onError,
+}: {
+  onNavigate?: (mode: QuickNotePanelMode, createdNoteId?: string) => void;
+  onError?: (reason: QuickNoteOperationFailureReason) => void;
+}) {
   const { openNotes, selectedNote, selectNote, createNote } = useQuickNoteData();
   const [creating, setCreating] = useState(false);
 
   const handleSelect = (id: string) => {
-    void selectNote(id).then(() => onNavigate?.("capture"));
+    void selectNote(id).then((result) => {
+      if (result.ok) onNavigate?.("capture");
+      else onError?.(result.reason);
+    });
   };
 
   const handleNew = () => {
     if (creating) return;
     setCreating(true);
     void createNote()
-      .then(() => onNavigate?.("capture"))
+      .then((result) => {
+        if (result.ok) onNavigate?.("capture", result.id);
+        else onError?.(result.reason);
+      })
       .finally(() => setCreating(false));
   };
 
