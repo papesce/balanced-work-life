@@ -430,10 +430,7 @@ export function DetailsDrawer({
               onClose();
             }}
           />
-          <DetailsEditor value={idea.notes} onSave={handleSave} parentId={idea.id} />
-          <p className="mt-2 text-[10px] text-gray-400 dark:text-gray-500">
-            ⌘+Enter to save · Esc to close
-          </p>
+          <DetailsEditor key={idea.id} value={idea.notes} onSave={handleSave} parentId={idea.id} />
         </div>
       </div>
     </div>,

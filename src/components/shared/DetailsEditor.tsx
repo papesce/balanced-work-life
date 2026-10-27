@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Maximize2, Minimize2, StickyNote, X } from "lucide-react";
+import { Eye, Maximize2, Minimize2, Pencil, StickyNote, X } from "lucide-react";
 import { LAYER_MODAL } from "@/lib/layers";
 import { DetailField } from "@/components/brainstorm/IdeaDetailField";
 import { PlanSelectionActions } from "./PlanSelectionActions";
+import { parseNoteLinks } from "@/lib/quicknote/markdownLinks";
 
 export function DetailsEditor({
   value,
@@ -23,6 +24,7 @@ export function DetailsEditor({
   );
   const [selectionOpen, setSelectionOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(() => !value?.trim());
 
   useEffect(() => {
     if (!expanded) return;
@@ -58,29 +60,97 @@ export function DetailsEditor({
     setSelectionOpen(false);
   }, []);
 
+  const handleModeChange = (nextEditing: boolean) => {
+    if (!nextEditing) handleDone();
+    setEditing(nextEditing);
+  };
+  const previewSegments = useMemo(() => parseNoteLinks(value ?? ""), [value]);
+
   return (
     <div>
-      <div className="relative">
-        <DetailField
-          icon={StickyNote}
-          value={value}
-          placeholder="Add notes… Use as project plan: select text to create tasks."
-          multiline
-          onSave={onSave}
-          textareaRef={textareaRef}
-          onSelectText={parentId ? handleSelectText : undefined}
-          onChange={parentId ? () => handleDone() : undefined}
-        />
-        <button
-          type="button"
-          onClick={() => setExpanded(true)}
-          aria-label="Expand notes editor"
-          title="Expand notes editor"
-          className="absolute top-1 right-1 rounded p-1 text-gray-400 hover:bg-black/5 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200"
+      <div className="mb-1.5 flex justify-end">
+        <div
+          role="group"
+          aria-label="Notes display mode"
+          className="inline-flex rounded-lg bg-gray-100 p-0.5 dark:bg-gray-800"
         >
-          <Maximize2 size={13} />
-        </button>
+          <button
+            type="button"
+            onClick={() => handleModeChange(false)}
+            aria-pressed={!editing}
+            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-indigo-500 ${
+              !editing
+                ? "bg-white text-gray-800 shadow-sm dark:bg-gray-700 dark:text-gray-100"
+                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            }`}
+          >
+            <Eye size={11} />
+            Preview
+          </button>
+          <button
+            type="button"
+            onClick={() => handleModeChange(true)}
+            aria-pressed={editing}
+            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-indigo-500 ${
+              editing
+                ? "bg-white text-gray-800 shadow-sm dark:bg-gray-700 dark:text-gray-100"
+                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            }`}
+          >
+            <Pencil size={11} />
+            Edit
+          </button>
+        </div>
       </div>
+      {editing ? (
+        <div className="relative">
+          <DetailField
+            icon={StickyNote}
+            value={value}
+            placeholder="Add notes… Use as project plan: select text to create tasks."
+            multiline
+            onSave={onSave}
+            textareaRef={textareaRef}
+            onSelectText={parentId ? handleSelectText : undefined}
+            onChange={parentId ? () => handleDone() : undefined}
+          />
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            aria-label="Expand notes editor"
+            title="Expand notes editor"
+            className="absolute top-1 right-1 rounded p-1 text-gray-400 hover:bg-black/5 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200"
+          >
+            <Maximize2 size={13} />
+          </button>
+        </div>
+      ) : (
+        <div
+          role="region"
+          aria-label="Notes preview"
+          className="min-h-[4.5rem] rounded-md border border-black/10 bg-white/80 px-2 py-1.5 text-xs leading-relaxed break-words whitespace-pre-wrap text-gray-700 dark:border-white/10 dark:bg-gray-900/50 dark:text-gray-200"
+        >
+          {previewSegments.length === 0 ? (
+            <span className="text-gray-400 italic dark:text-gray-500">No notes yet</span>
+          ) : (
+            previewSegments.map((segment, index) =>
+              segment.type === "link" ? (
+                <a
+                  key={index}
+                  href={segment.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-600 underline decoration-indigo-300 underline-offset-2 hover:text-indigo-700 dark:text-indigo-400 dark:decoration-indigo-700 dark:hover:text-indigo-300"
+                >
+                  {segment.label}
+                </a>
+              ) : (
+                <span key={index}>{segment.value}</span>
+              ),
+            )
+          )}
+        </div>
+      )}
       {expanded &&
         createPortal(
           <div
@@ -129,9 +199,11 @@ export function DetailsEditor({
                     onChange={parentId ? () => handleDone() : undefined}
                   />
                 </div>
-                <p className="mt-2 text-[10px] text-gray-400 dark:text-gray-500">
-                  ⌘+Enter to save · Esc to close
-                </p>
+                {editing && (
+                  <p className="mt-2 text-[10px] text-gray-400 dark:text-gray-500">
+                    ⌘+Enter to save · Esc to close
+                  </p>
+                )}
               </div>
             </div>
           </div>,
@@ -155,6 +227,11 @@ export function DetailsEditor({
             onDone={handleDone}
           />
         </div>
+      )}
+      {editing && !expanded && (
+        <p className="mt-2 text-[10px] text-gray-400 dark:text-gray-500">
+          ⌘+Enter to save · Esc to close
+        </p>
       )}
     </div>
   );
