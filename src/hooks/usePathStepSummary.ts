@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@powersync/react";
+import { isPathStepComplete } from "@/lib/paths";
 
 export interface PathStepSummary {
   totalSteps: number;
@@ -15,7 +16,7 @@ export function usePathStepSummary(pathId: string): PathStepSummary {
 
   const { data: rows } = useQuery<Record<string, unknown>>(
     userId && pathId
-      ? `SELECT pi.id, pi.idea_id, i.status AS idea_status
+      ? `SELECT pi.id, pi.idea_id, pi.completed_at, i.status AS idea_status
          FROM path_items pi
          LEFT JOIN ideas i ON i.id = pi.idea_id
          WHERE pi.user_id = ? AND pi.path_id = ?`
@@ -27,7 +28,12 @@ export function usePathStepSummary(pathId: string): PathStepSummary {
     const totalSteps = rows.length;
     let completedSteps = 0;
     for (const r of rows) {
-      if (r.idea_status === "completed") {
+      if (
+        isPathStepComplete(
+          typeof r.completed_at === "string" ? r.completed_at : null,
+          typeof r.idea_status === "string" ? r.idea_status : null,
+        )
+      ) {
         completedSteps++;
       }
     }
@@ -41,7 +47,7 @@ export function useAllPathStepSummaries(): Map<string, PathStepSummary> {
 
   const { data: rows } = useQuery<Record<string, unknown>>(
     userId
-      ? `SELECT pi.path_id, pi.id, pi.idea_id, i.status AS idea_status
+      ? `SELECT pi.path_id, pi.id, pi.idea_id, pi.completed_at, i.status AS idea_status
          FROM path_items pi
          LEFT JOIN ideas i ON i.id = pi.idea_id
          WHERE pi.user_id = ?`
@@ -60,7 +66,12 @@ export function useAllPathStepSummaries(): Map<string, PathStepSummary> {
         map.set(pid, entry);
       }
       entry.total++;
-      if (r.idea_status === "completed") {
+      if (
+        isPathStepComplete(
+          typeof r.completed_at === "string" ? r.completed_at : null,
+          typeof r.idea_status === "string" ? r.idea_status : null,
+        )
+      ) {
         entry.completed++;
       }
     }

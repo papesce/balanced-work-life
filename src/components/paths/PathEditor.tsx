@@ -2,6 +2,7 @@
 
 import { PathView, PathCanvasProvider } from "@/components/projects/PathView";
 import { PathPreviewSvg } from "./PathPreviewSvg";
+import type { Idea } from "@/lib/types";
 
 export interface PathEditorProps {
   pathId: string;
@@ -10,6 +11,9 @@ export interface PathEditorProps {
   onOpenFullEdit?: () => void;
   className?: string;
   compact?: boolean;
+  projectId?: string;
+  projectTasks?: Idea[];
+  isNarrow?: boolean;
 }
 
 export function PathEditor({
@@ -19,6 +23,9 @@ export function PathEditor({
   onOpenFullEdit,
   className = "",
   compact = false,
+  projectId,
+  projectTasks,
+  isNarrow,
 }: PathEditorProps) {
   if (mode === "preview") {
     return (
@@ -48,7 +55,13 @@ export function PathEditor({
   return (
     <div className={`h-full w-full ${className}`}>
       <PathCanvasProvider>
-        <PathView pathId={pathId} fillHeight={fillHeight} />
+        <PathView
+          pathId={pathId}
+          fillHeight={fillHeight}
+          projectId={projectId}
+          projectTasks={projectTasks}
+          isNarrow={isNarrow}
+        />
       </PathCanvasProvider>
     </div>
   );

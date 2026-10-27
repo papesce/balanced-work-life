@@ -10,6 +10,7 @@ interface AssociationPanelProps {
   currentAssociations: string[];
   onAssociate: (targetId: string) => Promise<void>;
   onDisassociate: (targetId: string) => Promise<void>;
+  onError: (message: string) => void;
 }
 
 export function PathAssociationPanel({
@@ -17,6 +18,7 @@ export function PathAssociationPanel({
   currentAssociations,
   onAssociate,
   onDisassociate,
+  onError,
 }: AssociationPanelProps) {
   const { user } = useAuth();
   const [targetId, setTargetId] = useState("");
@@ -32,9 +34,12 @@ export function PathAssociationPanel({
   );
 
   return (
-    <div className="glass-card-strong min-w-[260px] rounded-xl border border-gray-200 p-3 shadow-xl dark:border-gray-700">
-      <p className="mb-2 text-[10px] font-bold tracking-wider text-gray-400 uppercase">
-        Associations
+    <div className="w-full rounded-xl border border-gray-200 bg-gray-50/60 p-3 dark:border-gray-700 dark:bg-gray-800/40">
+      <p className="mb-1 text-xs font-semibold text-gray-700 dark:text-gray-200">
+        Path associations
+      </p>
+      <p className="mb-2 text-[11px] text-gray-500 dark:text-gray-400">
+        Link this path to a project, idea, or goal.
       </p>
 
       <div className="mb-3 space-y-1">
@@ -50,7 +55,15 @@ export function PathAssociationPanel({
                 {String(ideas.find((idea) => idea.id === id)?.text ?? id)}
               </span>
               <button
-                onClick={() => void onDisassociate(id)}
+                type="button"
+                onClick={() =>
+                  void onDisassociate(id).catch((error: unknown) =>
+                    onError(
+                      error instanceof Error ? error.message : "Could not remove association.",
+                    ),
+                  )
+                }
+                aria-label={`Remove path association with ${String(ideas.find((idea) => idea.id === id)?.text ?? "item")}`}
                 className="text-gray-400 hover:text-rose-500"
               >
                 <Unlink size={12} />
@@ -75,13 +88,19 @@ export function PathAssociationPanel({
           ))}
         </select>
         <button
+          type="button"
+          disabled={!targetId}
+          aria-label="Add path association"
           onClick={() => {
             if (targetId) {
-              void onAssociate(targetId);
-              setTargetId("");
+              void onAssociate(targetId)
+                .then(() => setTargetId(""))
+                .catch((error: unknown) =>
+                  onError(error instanceof Error ? error.message : "Could not add association."),
+                );
             }
           }}
-          className="rounded-lg bg-violet-600 p-1.5 text-white hover:bg-violet-700"
+          className="rounded-lg bg-violet-600 p-1.5 text-white hover:bg-violet-700 focus-visible:outline-2 focus-visible:outline-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <LinkIcon size={14} />
         </button>

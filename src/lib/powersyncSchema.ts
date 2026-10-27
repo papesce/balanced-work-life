@@ -143,6 +143,8 @@ export const PathItemsTable = new Table(
     path_id: column.text,
     title: column.text,
     idea_id: column.text,
+    completed_at: column.text,
+    promoted_at: column.text,
     x: column.real,
     y: column.real,
     created_at: column.text,

@@ -1,7 +1,7 @@
 "use client";
 
 import { ReactNode, useState, useEffect, useCallback } from "react";
-import { FileText } from "lucide-react";
+import { StickyNote } from "lucide-react";
 import { Navigation } from "@/components/Navigation";
 import { QuickAddButton } from "@/components/QuickAddButton";
 import { DesktopSidebar } from "@/components/DesktopSidebar";
@@ -97,9 +97,11 @@ export function AppShell({
       >
         <header className="glass-card-strong sticky top-0 z-40 flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-none border-b border-white/30 px-4 py-2.5 md:px-5 dark:border-white/5">
           <div className="flex min-w-0 items-center gap-2">
-            <h1 className="truncate text-[13px] font-semibold tracking-tight text-gray-500 dark:text-gray-400">
-              {title}
-            </h1>
+            {title && (
+              <h1 className="truncate text-[13px] font-semibold tracking-tight text-gray-500 dark:text-gray-400">
+                {title}
+              </h1>
+            )}
             {headerStartActions && (
               <div className="flex flex-wrap items-center gap-1.5">{headerStartActions}</div>
             )}
@@ -107,6 +109,26 @@ export function AppShell({
           <div className="flex shrink-0 items-center gap-2">
             <GlobalSearchBar />
             {headerActions}
+            <button
+              type="button"
+              onClick={() => openQuickNote()}
+              className="flex h-9 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/80 px-2.5 text-gray-600 transition-colors hover:bg-gray-100 hover:text-violet-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:border-gray-700 dark:bg-gray-900/80 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-violet-400"
+              title={quickNoteLabel}
+              aria-label={
+                totalUnreadCount > 0 ? `Open quick notes, ${quickNoteLabel}` : "Open quick notes"
+              }
+            >
+              <StickyNote size={16} />
+              <span className="hidden text-xs font-semibold sm:inline">Quick note</span>
+              {totalUnreadCount > 0 && (
+                <span
+                  aria-hidden="true"
+                  className={`flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-none font-bold text-white ${badgeColor}`}
+                >
+                  {openNotes.length > 99 ? "99+" : openNotes.length}
+                </span>
+              )}
+            </button>
             {headerActions && (
               <>
                 <div className="h-5 w-px bg-black/[0.06] dark:bg-white/[0.08]" />
@@ -134,27 +156,6 @@ export function AppShell({
 
       <Navigation className="md:hidden" />
       {onAdd && <QuickAddButton onAdd={onAdd} />}
-      <button
-        onClick={() => openQuickNote()}
-        className="fixed right-6 bottom-24 z-50 flex h-12 items-center justify-center gap-2 rounded-2xl bg-violet-600 px-3 text-white shadow-lg shadow-violet-900/20 transition-all hover:bg-violet-700 hover:shadow-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 active:scale-95"
-        title={quickNoteLabel}
-        aria-label={
-          totalUnreadCount > 0 ? `Open quick notes, ${quickNoteLabel}` : "Open quick notes"
-        }
-      >
-        <FileText size={18} />
-        <span className="hidden text-xs font-semibold sm:inline">Quick note</span>
-        {totalUnreadCount > 0 && (
-          <span
-            aria-hidden="true"
-            className={`absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white px-1.5 text-[10px] leading-none font-bold text-white shadow-sm dark:border-gray-900 ${badgeColor} ${
-              backlogLevel !== "normal" ? "animate-pulse" : ""
-            }`}
-          >
-            {openNotes.length > 99 ? "99+" : openNotes.length}
-          </span>
-        )}
-      </button>
     </div>
   );
 }

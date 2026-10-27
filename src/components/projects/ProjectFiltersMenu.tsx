@@ -49,7 +49,8 @@ export function ProjectFiltersMenu({
     },
   ];
 
-  const active = hideClosed || hideCompleted;
+  const activeCount = Number(hideClosed) + Number(hideCompleted);
+  const active = activeCount > 0;
 
   return (
     <div className="relative">
@@ -65,6 +66,7 @@ export function ProjectFiltersMenu({
           setOpen(true);
         }}
         aria-expanded={open}
+        aria-label={active ? `Filters, ${activeCount} active` : "Filters"}
         title="Display filters"
         className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
           active
@@ -73,8 +75,7 @@ export function ProjectFiltersMenu({
         }`}
       >
         <SlidersHorizontal size={12} />
-        <span className="hidden sm:inline">Filters</span>
-        {active && <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" aria-hidden="true" />}
+        <span className="hidden sm:inline">Filters{active ? ` · ${activeCount} active` : ""}</span>
       </button>
       {open && pos && (
         <FloatingPanel

@@ -66,6 +66,7 @@ export function RowLabel<T extends TreeItem>({
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <span
           onClick={handleClick}
+          title={label || undefined}
           className={`cursor-text rounded px-1 py-0.5 text-sm leading-snug font-medium hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${
             options.labelClassName?.(node) ?? ""
           }`}
@@ -87,6 +88,7 @@ export function RowLabel<T extends TreeItem>({
   return (
     <span
       onClick={handleClick}
+      title={label || undefined}
       className={`max-w-sm min-w-0 flex-1 cursor-text truncate rounded px-2 py-0.5 text-sm hover:bg-gray-100 dark:hover:bg-white/[0.04] ${
         options.labelClassName?.(node) ?? ""
       }`}

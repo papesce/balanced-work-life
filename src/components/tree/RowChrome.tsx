@@ -50,7 +50,7 @@ export function RowChrome<T extends TreeItem>({
           hasChildren ? `${node.collapsed ? "Expand" : "Collapse"} ${label || "item"}` : undefined
         }
         aria-hidden={!hasChildren}
-        className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-gray-400 hover:text-gray-600"
+        className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline-2 focus-visible:outline-violet-500 dark:hover:bg-gray-800"
       >
         {hasChildren ? (
           node.collapsed ? (
@@ -75,7 +75,7 @@ export function RowChrome<T extends TreeItem>({
           }}
           title="Add child"
           aria-label={`Add child under ${label || "this item"}`}
-          className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 hover:text-indigo-500 focus-visible:text-indigo-500 focus-visible:opacity-100 dark:text-gray-600 dark:hover:text-indigo-400"
+          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-gray-100 hover:text-indigo-500 focus-visible:bg-gray-100 focus-visible:text-indigo-500 focus-visible:opacity-100 dark:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-indigo-400 dark:focus-visible:bg-gray-800"
         >
           <Plus size={14} strokeWidth={2} />
         </button>
@@ -90,7 +90,7 @@ export function RowChrome<T extends TreeItem>({
           {...draggable.attributes}
           {...draggable.listeners}
           aria-label={`Move ${label || "item"}`}
-          className="flex flex-shrink-0 cursor-grab touch-none items-center text-gray-300 select-none hover:text-gray-500"
+          className="flex h-8 w-8 flex-shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-gray-300 select-none hover:bg-gray-100 hover:text-gray-500 focus-visible:outline-2 focus-visible:outline-violet-500 dark:hover:bg-gray-800"
         >
           <GripVertical size={14} strokeWidth={1.5} />
         </span>

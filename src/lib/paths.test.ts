@@ -2,6 +2,19 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert";
 import { v4 as uuidv4 } from "uuid";
+import { isPathStepComplete } from "./paths";
+
+describe("isPathStepComplete", () => {
+  it("uses the manual timestamp for a plan-only step", () => {
+    assert.strictEqual(isPathStepComplete(null, null), false);
+    assert.strictEqual(isPathStepComplete("2026-10-27T12:00:00Z", null), true);
+  });
+
+  it("derives linked-step completion from the task status", () => {
+    assert.strictEqual(isPathStepComplete(null, "planned"), false);
+    assert.strictEqual(isPathStepComplete(null, "completed"), true);
+  });
+});
 
 // Mock PowerSync DB
 const createMockDb = () => {

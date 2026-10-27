@@ -500,13 +500,41 @@ export function IdeaTree({
               isPath={node.type === "path"}
             />
             {pathChipsForIdea?.(node.id).map((title) => (
-              <span
+              <button
+                type="button"
                 key={title}
                 title={`In path: ${title}`}
-                className="max-w-[110px] truncate rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-500/20 dark:text-violet-300"
+                aria-label={`Highlight linked step in path ${title}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  window.dispatchEvent(
+                    new CustomEvent("path-task-highlight", { detail: { ideaId: node.id } }),
+                  );
+                }}
+                onFocus={() =>
+                  window.dispatchEvent(
+                    new CustomEvent("path-task-highlight", { detail: { ideaId: node.id } }),
+                  )
+                }
+                onBlur={() =>
+                  window.dispatchEvent(
+                    new CustomEvent("path-task-highlight", { detail: { ideaId: null } }),
+                  )
+                }
+                onMouseEnter={() =>
+                  window.dispatchEvent(
+                    new CustomEvent("path-task-highlight", { detail: { ideaId: node.id } }),
+                  )
+                }
+                onMouseLeave={() =>
+                  window.dispatchEvent(
+                    new CustomEvent("path-task-highlight", { detail: { ideaId: null } }),
+                  )
+                }
+                className="max-w-[110px] truncate rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 focus-visible:outline-2 focus-visible:outline-violet-500 dark:bg-violet-500/20 dark:text-violet-300"
               >
                 {title}
-              </span>
+              </button>
             ))}
             <ScheduleChip node={node} todayString={todayString} />
             {focusedId !== node.id && (

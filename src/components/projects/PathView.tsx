@@ -15,6 +15,7 @@ import { v4 as uuidv4 } from "uuid";
 import { usePowerSync, useQuery } from "@powersync/react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePathManager } from "@/hooks/usePathManager";
+import { usePathStepSummary } from "@/hooks/usePathStepSummary";
 import type { PathPosition } from "@/lib/paths";
 import { PathNode } from "./PathNode";
 import { useNodesState, useEdgesState } from "@xyflow/react";
@@ -24,22 +25,36 @@ import { PathToolbar } from "./path/PathToolbar";
 import { PathPromotePanel } from "./path/PathPromotePanel";
 import { PathAssociationPanel } from "./path/PathAssociationPanel";
 import { PathEmptyState } from "./path/PathEmptyState";
+import type { Idea } from "@/lib/types";
 
 const nodeTypes = { pathNode: PathNode };
 
 interface Props {
   pathId: string;
   fillHeight?: boolean;
+  projectId?: string;
+  projectTasks?: Idea[];
+  isNarrow?: boolean;
 }
 
-export function PathView({ pathId, fillHeight = false }: Props) {
+export function PathView({
+  pathId,
+  fillHeight = false,
+  projectId,
+  projectTasks = [],
+  isNarrow = false,
+}: Props) {
   const manager = usePathManager(pathId);
+  const stepSummary = usePathStepSummary(pathId);
   const nodesInitialized = useNodesInitialized();
   const initialFitPathId = useRef<string | null>(null);
   const [flowReady, setFlowReady] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [promotingId, setPromotingId] = useState<string | null>(null);
+  const [pathLinksOpen, setPathLinksOpen] = useState(false);
+  const [taskToLink, setTaskToLink] = useState("");
+  const [connectionTargetId, setConnectionTargetId] = useState("");
 
   const { nodes, edges, flow, itemMap } = usePathGraph({
     items: manager.items,
@@ -102,6 +117,19 @@ export function PathView({ pathId, fillHeight = false }: Props) {
     };
     window.addEventListener("path-node-title", handler);
     return () => window.removeEventListener("path-node-title", handler);
+  }, [manager]);
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ id: string; completed: boolean }>).detail;
+      if (!detail?.id) return;
+      void manager
+        .updatePlanStepCompletion(detail.id, detail.completed)
+        .catch((error: unknown) =>
+          setMessage(error instanceof Error ? error.message : "Could not update step status."),
+        );
+    };
+    window.addEventListener("path-step-completion", handler);
+    return () => window.removeEventListener("path-step-completion", handler);
   }, [manager]);
 
   const { user } = useAuth();
@@ -173,6 +201,13 @@ export function PathView({ pathId, fillHeight = false }: Props) {
 
   const selectedNode = flowNodes.find((n) => n.id === selectedId);
   const selectedItem = selectedNode && selectedId ? itemMap.get(selectedId) : null;
+  const incompleteNodes = nodes.filter((node) => !node.data.isCompleted);
+  const rootIncompleteNodes = incompleteNodes.filter(
+    (node) => !manager.edges.some((edge) => edge.to_item_id === node.id),
+  );
+  const nextStepTitle = [
+    ...(rootIncompleteNodes.length ? rootIncompleteNodes : incompleteNodes),
+  ].sort((a, b) => a.position.x - b.position.x || a.position.y - b.position.y)[0]?.data.title;
 
   return (
     <div
@@ -217,8 +252,12 @@ export function PathView({ pathId, fillHeight = false }: Props) {
         </select>
       </div>
       <PathToolbar
-        nodeCount={nodes.length}
+        stepCount={stepSummary.totalSteps}
+        completedStepCount={stepSummary.completedSteps}
+        nextStepTitle={nextStepTitle ?? null}
         selectedId={selectedId}
+        pathLinksOpen={pathLinksOpen}
+        onTogglePathLinks={() => setPathLinksOpen((open) => !open)}
         onAutoLayout={autoLayout}
         onFitView={() => fitView({ nodes, padding: 0.2, duration: 250 })}
         onRemoveSelected={() => {
@@ -230,6 +269,18 @@ export function PathView({ pathId, fillHeight = false }: Props) {
         onAddNode={() => void addRandomNode()}
       />
 
+      {pathLinksOpen && (
+        <div className="border-b border-gray-200 px-3 py-3 dark:border-gray-700">
+          <PathAssociationPanel
+            pathId={pathId}
+            currentAssociations={associations}
+            onAssociate={handleAssociate}
+            onDisassociate={handleDisassociate}
+            onError={(error) => setMessage(error)}
+          />
+        </div>
+      )}
+
       {manager.items.length > 12 && (
         <p className="border-b border-gray-200 px-3 py-1.5 text-[11px] text-gray-400 dark:border-gray-700">
           This path is getting large — consider splitting it into another path.
@@ -239,8 +290,8 @@ export function PathView({ pathId, fillHeight = false }: Props) {
       <div
         className={
           fillHeight
-            ? "relative min-h-[400px] w-full flex-1"
-            : "relative h-[600px] min-h-[560px] w-full"
+            ? "relative flex min-h-[400px] w-full flex-1"
+            : "relative flex h-[600px] min-h-[560px] w-full"
         }
         onDragOver={(event) => {
           if (event.dataTransfer.types.includes("application/project-task")) {
@@ -265,75 +316,287 @@ export function PathView({ pathId, fillHeight = false }: Props) {
         {message && (
           <p
             role="status"
-            className="absolute top-3 left-1/2 z-20 -translate-x-1/2 rounded-lg border border-gray-200 bg-white/95 px-3 py-1.5 text-xs text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-900/95 dark:text-gray-300"
+            className="absolute top-3 left-1/2 z-20 -translate-x-1/2 rounded-lg border border-gray-200 bg-white/95 px-3 py-1.5 text-xs text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-900/95"
           >
             {message}
           </p>
         )}
-        <ReactFlow
-          onInit={() => setFlowReady(true)}
-          nodesDraggable={nodesInitialized}
-          nodes={flowNodes}
-          edges={flowEdges}
-          nodeTypes={nodeTypes}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onNodeClick={(_, node) => setSelectedId(node.id)}
-          onPaneClick={() => setSelectedId(null)}
-          onNodeDragStop={(_, node) => {
-            const positions: PathPosition[] = [
-              {
-                itemId: node.id,
-                x: node.position.x,
-                y: node.position.y,
-              },
-            ];
-            void manager.moveNodes(positions);
-          }}
-          fitView
-          minZoom={0.25}
-          maxZoom={1.5}
-          deleteKeyCode={["Backspace", "Delete"]}
-        >
-          <Background gap={20} size={1} />
-          <Controls position="bottom-left" />
-          <MiniMap
-            pannable
-            zoomable
-            style={{ width: 140, height: 100 }}
-            className="!border-gray-200 !bg-white/90 dark:!border-gray-800/90"
-          />
-        </ReactFlow>
-
-        {nodes.length === 0 && <PathEmptyState onAdd={() => void addRandomNode()} />}
+        <div className="relative min-w-0 flex-1">
+          <ReactFlow
+            onInit={() => setFlowReady(true)}
+            nodesDraggable={nodesInitialized}
+            nodes={flowNodes}
+            edges={flowEdges}
+            nodeTypes={nodeTypes}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={(_, node) => {
+              setSelectedId(node.id);
+              setTaskToLink("");
+              setConnectionTargetId("");
+            }}
+            onPaneClick={() => setSelectedId(null)}
+            onNodeDragStop={(_, node) => {
+              const positions: PathPosition[] = [
+                {
+                  itemId: node.id,
+                  x: node.position.x,
+                  y: node.position.y,
+                },
+              ];
+              void manager.moveNodes(positions);
+            }}
+            fitView
+            minZoom={0.25}
+            maxZoom={1.5}
+            deleteKeyCode={["Backspace", "Delete"]}
+          >
+            <Background gap={20} size={1} />
+            <Controls position="bottom-left" />
+            <MiniMap
+              pannable
+              zoomable
+              style={{ width: 140, height: 100 }}
+              className="!border-gray-200 !bg-white/90 dark:!border-gray-800/90"
+            />
+          </ReactFlow>
+          {nodes.length === 0 && <PathEmptyState onAdd={() => void addRandomNode()} />}
+        </div>
 
         {selectedId && selectedItem && (
-          <div className="absolute right-4 bottom-4 z-10 flex flex-col gap-2">
-            <PathAssociationPanel
-              pathId={pathId}
-              currentAssociations={associations}
-              onAssociate={handleAssociate}
-              onDisassociate={handleDisassociate}
-            />
-            {!selectedItem.idea_id && (
-              <PathPromotePanel
-                item={{ title: selectedItem.title, ideaId: selectedItem.idea_id }}
-                onPromote={async (title) => {
-                  try {
-                    await manager.promoteNode(selectedId, title);
-                    setMessage("Node promoted to task!");
-                    setPromotingId(null);
-                  } catch {
-                    setMessage("Promotion failed.");
+          <aside
+            aria-label="Step inspector"
+            className={`z-10 flex flex-col gap-3 overflow-y-auto border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900 ${
+              isNarrow
+                ? "absolute inset-x-0 bottom-0 max-h-[60%] rounded-t-2xl border-t shadow-[0_-8px_24px_rgba(0,0,0,0.12)]"
+                : "w-[min(100%,280px)] shrink-0 border-l max-[640px]:absolute max-[640px]:inset-x-0 max-[640px]:bottom-0 max-[640px]:max-h-[60%] max-[640px]:w-full max-[640px]:rounded-t-2xl max-[640px]:border-t max-[640px]:border-l-0 max-[640px]:shadow-[0_-8px_24px_rgba(0,0,0,0.12)]"
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                Step details
+              </h3>
+              <button
+                type="button"
+                aria-label="Close step inspector"
+                onClick={() => setSelectedId(null)}
+                className="rounded-md px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-violet-500 dark:hover:bg-gray-800"
+              >
+                Close
+              </button>
+            </div>
+            <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
+              Step name
+              <input
+                key={`${selectedId}-${selectedItem.title}`}
+                defaultValue={selectedItem.title}
+                onBlur={(event) => {
+                  const title = event.currentTarget.value.trim();
+                  if (title && title !== selectedItem.title) {
+                    void manager
+                      .updateNodeTitle(selectedId, title)
+                      .catch((error: unknown) =>
+                        setMessage(
+                          error instanceof Error ? error.message : "Could not rename step.",
+                        ),
+                      );
                   }
                 }}
-                onCancel={() => setPromotingId(null)}
-                isPromoting={promotingId !== null}
-                setPromoting={() => setPromotingId(selectedId)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") event.currentTarget.blur();
+                }}
+                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-800 focus-visible:outline-2 focus-visible:outline-violet-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
               />
+            </label>
+
+            <section className="space-y-2 border-t border-gray-200 pt-3 dark:border-gray-700">
+              <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-200">Sequence</h4>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                This step happens before:
+              </p>
+              <div className="flex gap-2">
+                <select
+                  aria-label="Choose the next step"
+                  value={connectionTargetId}
+                  onChange={(event) => setConnectionTargetId(event.target.value)}
+                  className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-2 py-2 text-xs dark:border-gray-700 dark:bg-gray-800"
+                >
+                  <option value="">Choose a step</option>
+                  {manager.items
+                    .filter(
+                      (item) =>
+                        item.id !== selectedId &&
+                        !manager.edges.some(
+                          (edge) => edge.from_item_id === selectedId && edge.to_item_id === item.id,
+                        ),
+                    )
+                    .map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.title || "Untitled step"}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={!connectionTargetId}
+                  onClick={() => {
+                    if (!connectionTargetId) return;
+                    void manager
+                      .addEdge(selectedId, connectionTargetId)
+                      .then(() => setConnectionTargetId(""))
+                      .catch((error: unknown) =>
+                        setMessage(
+                          error instanceof Error ? error.message : "Could not connect steps.",
+                        ),
+                      );
+                  }}
+                  className="rounded-lg bg-violet-600 px-2.5 py-2 text-xs font-semibold text-white hover:bg-violet-700 focus-visible:outline-2 focus-visible:outline-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Connect
+                </button>
+              </div>
+              {manager.edges
+                .filter((edge) => edge.from_item_id === selectedId)
+                .map((edge) => (
+                  <div
+                    key={edge.id}
+                    className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-2 py-1.5 text-xs dark:bg-gray-800"
+                  >
+                    <span className="truncate">
+                      Before {itemMap.get(edge.to_item_id)?.title ?? "another step"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void manager.removeEdge(edge.id)}
+                      aria-label={`Remove sequence connection to ${itemMap.get(edge.to_item_id)?.title ?? "step"}`}
+                      className="shrink-0 rounded px-2 py-1 text-gray-500 hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-violet-500 dark:hover:bg-gray-700"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+            </section>
+
+            {selectedItem.idea_id ? (
+              <div className="rounded-lg bg-violet-50 p-2.5 text-xs text-violet-900 dark:bg-violet-900/30 dark:text-violet-100">
+                <p className="font-semibold">
+                  {selectedItem.promoted_at ? "Task created from this step" : "Linked task"}
+                </p>
+                <p className="mt-1 break-words">{selectedItem.idea_text ?? selectedItem.title}</p>
+                <p className="mt-1 text-violet-700 capitalize dark:text-violet-300">
+                  {String(selectedItem.idea_status ?? "unknown").replaceAll("_", " ")}
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void manager
+                      .unlinkNodeTask(selectedId)
+                      .catch((error: unknown) =>
+                        setMessage(
+                          error instanceof Error ? error.message : "Could not unlink task.",
+                        ),
+                      )
+                  }
+                  className="mt-2 rounded-md border border-violet-200 px-2 py-1 font-medium hover:bg-violet-100 focus-visible:outline-2 focus-visible:outline-violet-500 dark:border-violet-700 dark:hover:bg-violet-800"
+                >
+                  Unlink task
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Plan-only step · {selectedItem.completed_at ? "Done" : "Not done"}
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void manager
+                      .updatePlanStepCompletion(selectedId, !Boolean(selectedItem.completed_at))
+                      .catch((error: unknown) =>
+                        setMessage(
+                          error instanceof Error ? error.message : "Could not update step status.",
+                        ),
+                      )
+                  }
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-violet-500 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                >
+                  Mark {selectedItem.completed_at ? "not done" : "done"}
+                </button>
+                {projectId && (
+                  <>
+                    {projectTasks.length > 0 ? (
+                      <>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-300">
+                          Link existing task
+                          <select
+                            value={taskToLink}
+                            onChange={(event) => setTaskToLink(event.target.value)}
+                            className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs dark:border-gray-700 dark:bg-gray-800"
+                          >
+                            <option value="">Choose a project task</option>
+                            {projectTasks
+                              .filter(
+                                (task) =>
+                                  !manager.items.some(
+                                    (item) => item.idea_id === task.id && item.id !== selectedId,
+                                  ),
+                              )
+                              .map((task) => (
+                                <option key={task.id} value={task.id}>
+                                  {task.text}
+                                </option>
+                              ))}
+                          </select>
+                        </label>
+                        <button
+                          type="button"
+                          disabled={!taskToLink}
+                          onClick={() => {
+                            void manager
+                              .linkNodeToTask(selectedId, taskToLink)
+                              .then(() => setTaskToLink(""))
+                              .catch((error: unknown) =>
+                                setMessage(
+                                  error instanceof Error
+                                    ? error.message
+                                    : "Could not link this task.",
+                                ),
+                              );
+                          }}
+                          className="w-full rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Link task
+                        </button>
+                      </>
+                    ) : (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        No project tasks yet. Create one from this step.
+                      </p>
+                    )}
+                  </>
+                )}
+                <PathPromotePanel
+                  key={selectedId}
+                  item={{ title: selectedItem.title, ideaId: selectedItem.idea_id }}
+                  onPromote={async (title) => {
+                    try {
+                      await manager.promoteNode(selectedId, title);
+                      setMessage(
+                        projectId ? "Step created as a project task." : "Step promoted to task.",
+                      );
+                      setPromotingId(null);
+                    } catch (error) {
+                      setMessage(error instanceof Error ? error.message : "Promotion failed.");
+                    }
+                  }}
+                  onCancel={() => setPromotingId(null)}
+                  isPromoting={promotingId === selectedId}
+                  setPromoting={() => setPromotingId(selectedId)}
+                />
+              </div>
             )}
-          </div>
+          </aside>
         )}
       </div>
     </div>

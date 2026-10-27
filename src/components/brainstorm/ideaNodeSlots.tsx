@@ -31,12 +31,14 @@ export const TYPE_COLORS: Record<IdeaType, string> = {
 };
 
 function formatScheduleDate(date: string, today: string): string {
-  if (date === today) return "Hoy";
+  const locale = typeof navigator === "undefined" ? "en-US" : navigator.language;
+  const relativeDate = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  if (date === today) return relativeDate.format(0, "day");
   const tomorrow = new Date(today + "T12:00:00");
   tomorrow.setDate(tomorrow.getDate() + 1);
-  if (date === tomorrow.toISOString().split("T")[0]) return "Mañana";
+  if (date === tomorrow.toISOString().split("T")[0]) return relativeDate.format(1, "day");
   const d = new Date(date + "T12:00:00");
-  return d.toLocaleDateString("es", { weekday: "short", day: "numeric", month: "short" });
+  return d.toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" });
 }
 
 export function StatusIconSlot({
@@ -260,13 +262,17 @@ export function LinkCountBadge({
   if (isPath) {
     if (!stepSummary || stepSummary.totalSteps === 0) {
       return (
-        <span className="flex-shrink-0 rounded-full bg-violet-50 px-1.5 py-0.5 text-xs text-violet-600 dark:bg-violet-500/20 dark:text-violet-300">
+        <span
+          aria-label="0 path steps"
+          className="flex-shrink-0 rounded-full bg-violet-50 px-1.5 py-0.5 text-xs text-violet-600 dark:bg-violet-500/20 dark:text-violet-300"
+        >
           0 steps
         </span>
       );
     }
     return (
       <span
+        aria-label={`${stepSummary.completedSteps} of ${stepSummary.totalSteps} path steps complete`}
         title={`${stepSummary.completedSteps} of ${stepSummary.totalSteps} steps completed`}
         className="flex-shrink-0 rounded-full bg-violet-50 px-1.5 py-0.5 text-xs text-violet-600 dark:bg-violet-500/20 dark:text-violet-300"
       >
@@ -279,7 +285,10 @@ export function LinkCountBadge({
   const linkCount = links.filter((l) => l.source_id === nodeId || l.target_id === nodeId).length;
   if (linkCount === 0) return null;
   return (
-    <span className="flex-shrink-0 rounded-full bg-indigo-50 px-1.5 py-0.5 text-xs text-indigo-500 dark:bg-indigo-500/20 dark:text-indigo-300">
+    <span
+      aria-label={`${linkCount} linked item${linkCount === 1 ? "" : "s"}`}
+      className="flex-shrink-0 rounded-full bg-indigo-50 px-1.5 py-0.5 text-xs text-indigo-500 dark:bg-indigo-500/20 dark:text-indigo-300"
+    >
       {linkCount}
     </span>
   );

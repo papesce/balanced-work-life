@@ -148,7 +148,7 @@ export function ProjectDetailLayout({ model }: { model: ProjectsPageModel }) {
 
   return (
     <AppShell
-      title={selectedProject.text || "Untitled project"}
+      title=""
       fullWidth
       headerStartActions={
         <ProjectDetailStartActions
@@ -215,6 +215,8 @@ export function ProjectDetailLayout({ model }: { model: ProjectsPageModel }) {
             groupedForest={groupedForest}
             hideIds={unpathedOnly ? pathedIds : undefined}
             focusId={focusedId ?? selectedId ?? ""}
+            totalTaskCount={projectTasks.length}
+            showFilterCount={effectiveMode === "split"}
             onAddTaskInGroup={(value) => void handleAddTaskInGroup(value)}
           />
         }
@@ -228,6 +230,7 @@ export function ProjectDetailLayout({ model }: { model: ProjectsPageModel }) {
           onCreateLink: (s, t, type) => createLink(s, t, type),
           onDeleteLink: deleteLink,
           fillHeight: effectiveMode === "split",
+          isNarrow,
           fitTick,
           onCanvasApi: handleCanvasApi,
           hideClosed: model.detailHideClosed,

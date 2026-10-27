@@ -23,6 +23,7 @@ interface Props {
   fitTick?: number;
   onCanvasApi?: (api: PathCanvasApi | null) => void;
   hideClosed?: boolean;
+  isNarrow?: boolean;
 }
 
 export interface PathCanvasApi {
@@ -31,7 +32,13 @@ export interface PathCanvasApi {
   addToPath: (ideaId: string) => Promise<boolean>;
 }
 
-export function ProjectPathsTab({ projectId, tasks, fillHeight = false, onCanvasApi }: Props) {
+export function ProjectPathsTab({
+  projectId,
+  tasks,
+  fillHeight = false,
+  onCanvasApi,
+  isNarrow = false,
+}: Props) {
   const { user } = useAuth();
   const db = usePowerSync();
   const userId = user?.id ?? "";
@@ -174,7 +181,14 @@ export function ProjectPathsTab({ projectId, tasks, fillHeight = false, onCanvas
           No paths associated with this project yet.
         </div>
       ) : (
-        <PathEditor pathId={selectedPath.id} fillHeight={fillHeight} mode="edit" />
+        <PathEditor
+          pathId={selectedPath.id}
+          fillHeight={fillHeight}
+          projectId={projectId}
+          projectTasks={tasks.filter((task) => task.type === "task")}
+          isNarrow={isNarrow}
+          mode="edit"
+        />
       )}
     </div>
   );

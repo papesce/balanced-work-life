@@ -21,8 +21,13 @@ export function usePathManager(pathId: string) {
 
   // 1. Data Fetching
   const { data: rawItems, isLoading: itemsLoading } = useQuery<Record<string, unknown>>(
-    hasScope ? "SELECT * FROM path_items WHERE path_id = ?" : "SELECT * FROM path_items WHERE 0",
-    hasScope ? [pathId] : [],
+    hasScope
+      ? `SELECT pi.*, i.text AS idea_text, i.status AS idea_status
+         FROM path_items pi
+         LEFT JOIN ideas i ON i.id = pi.idea_id
+         WHERE pi.path_id = ? AND pi.user_id = ?`
+      : "SELECT * FROM path_items WHERE 0",
+    hasScope ? [pathId, userId] : [],
   );
   const { data: rawEdges, isLoading: edgesLoading } = useQuery<Record<string, unknown>>(
     hasScope ? "SELECT * FROM path_edges WHERE path_id = ?" : "SELECT * FROM path_edges WHERE 0",
@@ -91,6 +96,64 @@ export function usePathManager(pathId: string) {
     await db.execute("UPDATE path_items SET title = ? WHERE id = ?", [title, itemId]);
   };
 
+  const linkNodeToTask = async (itemId: string, taskId: string): Promise<void> => {
+    if (!user || !pathId) throw new Error("Auth or PathId missing");
+
+    await db.writeTransaction(async (tx) => {
+      const pathProject = await tx.getOptional<Record<string, unknown>>(
+        `SELECT l.target_id AS project_id
+         FROM idea_links l
+         JOIN ideas p ON p.id = l.target_id AND p.user_id = l.user_id
+         WHERE l.source_id = ? AND l.user_id = ? AND l.link_type = 'path_of' AND p.type = 'project'
+         LIMIT 1`,
+        [pathId, userId],
+      );
+      if (!pathProject) throw new Error("This path is not linked to a project.");
+
+      const task = await tx.getOptional<Record<string, unknown>>(
+        `WITH RECURSIVE project_tasks(id) AS (
+           SELECT id FROM ideas WHERE parent_id = ? AND user_id = ?
+           UNION ALL
+           SELECT child.id FROM ideas child
+           JOIN project_tasks parent ON child.parent_id = parent.id
+           WHERE child.user_id = ?
+         )
+         SELECT id, text FROM ideas
+         WHERE id = ? AND user_id = ? AND type = 'task'
+           AND id IN (SELECT id FROM project_tasks)`,
+        [String(pathProject.project_id), userId, userId, taskId, userId],
+      );
+      if (!task) throw new Error("Choose a task that belongs to this project.");
+
+      const item = await tx.getOptional<Record<string, unknown>>(
+        "SELECT id FROM path_items WHERE id = ? AND path_id = ? AND user_id = ?",
+        [itemId, pathId, userId],
+      );
+      if (!item) throw new Error("Path step not found.");
+
+      await tx.execute(
+        "UPDATE path_items SET idea_id = ?, title = ?, completed_at = NULL, promoted_at = NULL WHERE id = ? AND path_id = ? AND user_id = ?",
+        [taskId, String(task.text ?? ""), itemId, pathId, userId],
+      );
+    });
+  };
+
+  const unlinkNodeTask = async (itemId: string): Promise<void> => {
+    if (!user || !pathId) throw new Error("Auth or PathId missing");
+    await db.execute(
+      "UPDATE path_items SET idea_id = NULL, completed_at = NULL, promoted_at = NULL WHERE id = ? AND path_id = ? AND user_id = ?",
+      [itemId, pathId, userId],
+    );
+  };
+
+  const updatePlanStepCompletion = async (itemId: string, completed: boolean): Promise<void> => {
+    if (!user || !pathId) throw new Error("Auth or PathId missing");
+    await db.execute(
+      "UPDATE path_items SET completed_at = ? WHERE id = ? AND path_id = ? AND user_id = ? AND idea_id IS NULL",
+      [completed ? new Date().toISOString() : null, itemId, pathId, userId],
+    );
+  };
+
   const moveNodes = async (positions: PathPosition[]): Promise<void> => {
     if (positions.length === 0) return;
     await db.writeTransaction(async (tx) => {
@@ -137,22 +200,33 @@ export function usePathManager(pathId: string) {
 
     return await db.writeTransaction(async (tx) => {
       const existing = await tx.getOptional<Record<string, unknown>>(
-        "SELECT idea_id FROM path_items WHERE id = ? AND path_id = ?",
-        [itemId, pathId],
+        "SELECT idea_id FROM path_items WHERE id = ? AND path_id = ? AND user_id = ?",
+        [itemId, pathId, userId],
       );
       if (!existing) throw new Error("Path node not found");
       if (existing.idea_id) return String(existing.idea_id);
       const taskId = uuidv4();
       const now = new Date().toISOString();
+      const project = await tx.getOptional<Record<string, unknown>>(
+        `SELECT l.target_id AS project_id
+         FROM idea_links l
+         JOIN ideas i ON i.id = l.target_id AND i.user_id = l.user_id
+         WHERE l.source_id = ? AND l.user_id = ? AND l.link_type = 'path_of' AND i.type = 'project'
+         LIMIT 1`,
+        [pathId, userId],
+      );
 
       // a. Create the real Idea (Task)
       await tx.execute(
-        `INSERT INTO ideas (id, user_id, text, type, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?)`,
-        [taskId, userId, taskTitle, "task", "draft", now, now],
+        `INSERT INTO ideas (id, user_id, parent_id, text, type, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)`,
+        [taskId, userId, project?.project_id ?? null, taskTitle, "task", "draft", now, now],
       );
 
       // b. Link the node to the Idea
-      await tx.execute(`UPDATE path_items SET idea_id = ? WHERE id = ?`, [taskId, itemId]);
+      await tx.execute(
+        `UPDATE path_items SET idea_id = ?, completed_at = NULL, promoted_at = ? WHERE id = ? AND path_id = ? AND user_id = ?`,
+        [taskId, now, itemId, pathId, userId],
+      );
 
       // c. Materialize Edges
       // Find all edges connected to this node
@@ -195,6 +269,9 @@ export function usePathManager(pathId: string) {
     addNode,
     addExistingIdea,
     updateNodeTitle,
+    linkNodeToTask,
+    unlinkNodeTask,
+    updatePlanStepCompletion,
     moveNodes,
     deleteNode,
     addEdge,

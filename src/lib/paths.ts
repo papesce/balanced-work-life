@@ -25,6 +25,10 @@ export interface PathItem {
   path_id: string;
   title: string;
   idea_id: string | null;
+  completed_at?: string | null;
+  promoted_at?: string | null;
+  idea_text?: string | null;
+  idea_status?: string | null;
   x: number;
   y: number;
   created_at: string;
@@ -43,6 +47,13 @@ export interface PathPosition {
   itemId: string;
   x: number;
   y: number;
+}
+
+export function isPathStepComplete(
+  completedAt: string | null | undefined,
+  ideaStatus: string | null | undefined,
+): boolean {
+  return Boolean(completedAt) || ideaStatus === "completed";
 }
 
 function toNumber(value: unknown, fallback: number): number {
@@ -73,6 +84,10 @@ export function deserializePathItem(row: Record<string, unknown>): PathItem {
     path_id: String(row.path_id ?? ""),
     title: typeof row.title === "string" ? row.title : "",
     idea_id: row.idea_id ? String(row.idea_id) : null,
+    completed_at: typeof row.completed_at === "string" ? row.completed_at : null,
+    promoted_at: typeof row.promoted_at === "string" ? row.promoted_at : null,
+    idea_text: typeof row.idea_text === "string" ? row.idea_text : null,
+    idea_status: typeof row.idea_status === "string" ? row.idea_status : null,
     x: toNumber(row.x, 0),
     y: toNumber(row.y, 0),
     created_at: typeof row.created_at === "string" ? row.created_at : "",

@@ -82,7 +82,7 @@ export function ProjectDetailStartActions({
               : "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
           }`}
         >
-          Unpathed ({unpathedCount})
+          Tasks not in a path ({unpathedCount})
         </button>
       )}
     </>
@@ -104,6 +104,7 @@ export function ProjectDetailActions({
     <div className="flex items-center gap-2">
       <div
         className="flex rounded-xl border border-gray-200 p-0.5 dark:border-gray-700"
+        role="group"
         aria-label="Project view"
       >
         <button
@@ -247,10 +248,10 @@ export function ProjectDetailTop({
       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">
         <span className="capitalize">{project.status.replace("_", " ")}</span>
         <span>·</span>
-        <span>{directCount} tasks</span>
+        <span>{directCount} direct tasks</span>
         <span>·</span>
         <span>
-          {doneCount}/{totalCount} done
+          {doneCount}/{totalCount} complete
         </span>
         {nextText && (
           <>

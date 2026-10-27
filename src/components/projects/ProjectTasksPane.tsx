@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { IdeaTree } from "@/components/brainstorm/IdeaTree";
 import { TaskComposer } from "@/components/shared/TaskComposer";
 import { groupKeyOf, type LensColumn } from "@/components/lens";
+import { filterIdeaTree } from "@/lib/ideaTreeFilters";
 import type { Idea, IdeaNode } from "@/lib/types";
 
 type SharedTreeProps = Omit<ComponentProps<typeof IdeaTree>, "tree" | "hideIds" | "focusedId">;
@@ -26,6 +27,8 @@ interface ProjectTasksPaneProps {
   hideIds?: Set<string>;
   /** Focus root id for single mode; null re-roots per-group forests. */
   focusId: string;
+  totalTaskCount: number;
+  showFilterCount?: boolean;
   onAddTaskInGroup: (value: string | null) => void;
 }
 
@@ -43,8 +46,45 @@ export function ProjectTasksPane({
   groupedForest,
   hideIds,
   focusId,
+  totalTaskCount,
+  showFilterCount = false,
   onAddTaskInGroup,
 }: ProjectTasksPaneProps) {
+  const filterOptions = {
+    hideClosed: treeProps.hideClosed,
+    hideCompleted: treeProps.hideCompleted,
+    hideDeferred: treeProps.hideDeferred,
+    hideIds,
+  };
+  const focusedNode = (nodes: IdeaNode[]): IdeaNode | null => {
+    for (const node of nodes) {
+      if (node.id === focusId) return node;
+      const nested = focusedNode(node.children);
+      if (nested) return nested;
+    }
+    return null;
+  };
+  const countNodes = (nodes: IdeaNode[]): number =>
+    nodes.reduce((count, node) => count + 1 + countNodes(node.children), 0);
+  const matchingTaskCount =
+    groupColumns && groupedForest
+      ? groupColumns.reduce(
+          (count, column) =>
+            count +
+            countNodes(
+              filterIdeaTree(
+                groupedForest.get(groupKeyOf(column.key)) ?? [],
+                treeProps.ideas,
+                filterOptions,
+              ),
+            ),
+          0,
+        )
+      : countNodes(
+          focusedNode(filterIdeaTree(tree, treeProps.ideas, filterOptions))?.children ?? [],
+        );
+  const hiddenByFilters = Math.max(0, totalTaskCount - matchingTaskCount);
+
   return (
     <div className="flex min-h-0 flex-col">
       <div className="sticky top-0 z-10 bg-white pb-2 dark:bg-gray-950">
@@ -74,10 +114,16 @@ export function ProjectTasksPane({
             <option value="">Manual</option>
             {groupSchemeOptions.map((s) => (
               <option key={s.key} value={s.key}>
-                {s.label}
+                {s.key === "nnl" ? "Now / Next / Later" : s.label}
               </option>
             ))}
           </select>
+          {showFilterCount && (
+            <span className="ml-auto text-[10px] text-gray-400 dark:text-gray-500">
+              {matchingTaskCount} shown
+              {hiddenByFilters > 0 ? ` · ${hiddenByFilters} hidden by filters` : ""}
+            </span>
+          )}
         </div>
       </div>
       {!groupColumns || !groupValueOf || !groupedForest ? (

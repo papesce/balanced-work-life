@@ -1,15 +1,19 @@
 "use client";
 
 import { useMemo } from "react";
-import { useReactFlow, type Node } from "@xyflow/react";
-import { type PathItem, type PathEdge } from "@/lib/paths";
+import { MarkerType, useReactFlow, type Node } from "@xyflow/react";
+import { isPathStepComplete, type PathItem, type PathEdge } from "@/lib/paths";
 import type { PathPosition } from "@/lib/paths";
 
 export interface PathFlowNode extends Node {
   data: {
     title: string;
     ideaId: string | null;
+    ideaText: string | null;
+    ideaStatus: string | null;
+    isLinked: boolean;
     isPromoted: boolean;
+    isCompleted: boolean;
   };
 }
 
@@ -36,7 +40,11 @@ export function usePathGraph({ items, edges }: PathGraphProps) {
       data: {
         title: item.title,
         ideaId: item.idea_id,
-        isPromoted: !!item.idea_id,
+        ideaText: item.idea_text ?? null,
+        ideaStatus: item.idea_status ?? null,
+        isLinked: Boolean(item.idea_id),
+        isPromoted: Boolean(item.promoted_at),
+        isCompleted: isPathStepComplete(item.completed_at, item.idea_status),
       },
     })) as PathFlowNode[];
   }, [items]);
@@ -47,7 +55,8 @@ export function usePathGraph({ items, edges }: PathGraphProps) {
       source: edge.from_item_id,
       target: edge.to_item_id,
       animated: false,
-      style: { strokeWidth: 2 },
+      markerEnd: { type: MarkerType.ArrowClosed },
+      style: { strokeWidth: 2, stroke: "#8b5cf6" },
     }));
   }, [edges]);
 

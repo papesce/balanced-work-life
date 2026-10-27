@@ -22,10 +22,11 @@ export function PathHandle({
 }) {
   const disabled = isInPath || pathAddDisabled;
   return (
-    <span
-      role="button"
+    <button
+      type="button"
       tabIndex={disabled ? -1 : 0}
       aria-disabled={disabled}
+      disabled={disabled}
       aria-label={
         isInPath ? `Already in path: ${label || "item"}` : `Add ${label || "item"} to path`
       }
@@ -53,13 +54,13 @@ export function PathHandle({
           onAddToPath(nodeId);
         }
       }}
-      className={`flex flex-shrink-0 items-center select-none ${
+      className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg select-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-violet-500 ${
         disabled
           ? "cursor-not-allowed text-gray-200 opacity-40 dark:text-gray-700"
           : "cursor-grab text-violet-300 hover:text-violet-600 active:cursor-grabbing dark:text-gray-600 dark:hover:text-violet-400"
       }`}
     >
       <ArrowRightToLine size={14} strokeWidth={1.5} />
-    </span>
+    </button>
   );
 }
