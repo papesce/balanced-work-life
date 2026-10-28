@@ -19,16 +19,18 @@ export const PathNode = memo(function PathNode({ data, id, selected }: NodeProps
   return (
     <div
       className={`min-w-[160px] rounded-xl border px-3 py-2 shadow-sm transition-colors ${
-        data.isPromoted
-          ? "border-violet-300 bg-violet-50 text-violet-900 dark:border-violet-700 dark:bg-violet-900/30 dark:text-violet-100"
-          : data.isLinked
-            ? "border-blue-300 bg-blue-50 text-blue-900 dark:border-blue-700 dark:bg-blue-900/30 dark:text-blue-100"
-            : "border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+        data.isCompleted
+          ? "border-emerald-500 bg-emerald-50 text-emerald-950 dark:border-emerald-500 dark:bg-emerald-950/60 dark:text-emerald-100"
+          : data.isPromoted
+            ? "border-violet-300 bg-violet-50 text-violet-900 dark:border-violet-700 dark:bg-violet-900/30 dark:text-violet-100"
+            : data.isLinked
+              ? "border-blue-300 bg-blue-50 text-blue-900 dark:border-blue-700 dark:bg-blue-900/30 dark:text-blue-100"
+              : "border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
       } ${
         selected || linkedTaskHighlighted
           ? "ring-2 ring-violet-500 ring-offset-2 dark:ring-offset-gray-900"
           : ""
-      } ${data.isCompleted ? "opacity-75" : ""}`}
+      }`}
     >
       <Handle
         type="target"
@@ -40,10 +42,14 @@ export const PathNode = memo(function PathNode({ data, id, selected }: NodeProps
         {data.isLinked ? (
           <span
             aria-hidden="true"
-            title={`${data.isPromoted ? "Created task" : "Linked task"}${data.ideaStatus ? ` · ${String(data.ideaStatus).replaceAll("_", " ")}` : ""}`}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-violet-600 dark:text-violet-300"
+            title={`${data.isCompleted ? "Completed" : data.isPromoted ? "Created task" : "Linked task"}${data.ideaStatus ? ` · ${String(data.ideaStatus).replaceAll("_", " ")}` : ""}`}
+            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
+              data.isCompleted
+                ? "text-emerald-700 dark:text-emerald-300"
+                : "text-violet-600 dark:text-violet-300"
+            }`}
           >
-            {data.isPromoted ? <Check size={13} /> : <Link2 size={13} />}
+            {data.isCompleted ? <Check size={13} /> : <Link2 size={13} />}
           </span>
         ) : (
           <button
@@ -99,11 +105,27 @@ export const PathNode = memo(function PathNode({ data, id, selected }: NodeProps
           </span>
         )}
       </div>
-      <p className="mt-1 truncate pl-8 text-[10px] text-gray-500 dark:text-gray-400">
-        {data.isLinked
-          ? `${data.isPromoted ? "Created task" : "Linked task"} · ${String(data.ideaText ?? data.title ?? "Untitled task")}${data.ideaStatus ? ` · ${String(data.ideaStatus).replaceAll("_", " ")}` : ""}`
-          : `Plan-only · ${data.isCompleted ? "Done" : "Not done"}`}
-      </p>
+      <div className="mt-1 flex min-w-0 items-center gap-1.5 pl-8">
+        <span className="min-w-0 flex-1 truncate text-[10px] text-gray-500 dark:text-gray-400">
+          {data.isLinked
+            ? `${data.isPromoted ? "Created task" : "Linked task"} · ${String(data.ideaText ?? data.title ?? "Untitled task")}`
+            : "Plan-only"}
+        </span>
+        <span
+          aria-label={data.isCompleted ? "Completed" : "Not completed"}
+          className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] leading-none font-semibold ${
+            data.isCompleted
+              ? "bg-emerald-200 text-emerald-900 dark:bg-emerald-800 dark:text-emerald-100"
+              : "bg-gray-200/80 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+          }`}
+        >
+          {data.isCompleted
+            ? "Completed"
+            : data.isLinked && data.ideaStatus
+              ? String(data.ideaStatus).replaceAll("_", " ")
+              : "Not done"}
+        </span>
+      </div>
 
       <Handle
         type="source"
