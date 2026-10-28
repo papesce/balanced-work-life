@@ -8,6 +8,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   type Edge,
+  type EdgeChange,
   useNodesInitialized,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -16,7 +17,7 @@ import { usePowerSync, useQuery } from "@powersync/react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePathManager } from "@/hooks/usePathManager";
 import { usePathStepSummary } from "@/hooks/usePathStepSummary";
-import type { PathPosition } from "@/lib/paths";
+import type { PathItem, PathPosition } from "@/lib/paths";
 import { PathNode } from "./PathNode";
 import { useNodesState, useEdgesState } from "@xyflow/react";
 import { usePathGraph, type PathFlowNode } from "./path/usePathGraph";
@@ -26,6 +27,8 @@ import { PathPromotePanel } from "./path/PathPromotePanel";
 import { PathAssociationPanel } from "./path/PathAssociationPanel";
 import { PathEmptyState } from "./path/PathEmptyState";
 import type { Idea } from "@/lib/types";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { DetailsEditor } from "@/components/shared/DetailsEditor";
 
 const nodeTypes = { pathNode: PathNode };
 
@@ -55,6 +58,8 @@ export function PathView({
   const [pathLinksOpen, setPathLinksOpen] = useState(false);
   const [taskToLink, setTaskToLink] = useState("");
   const [connectionTargetId, setConnectionTargetId] = useState("");
+  const [stepsToDelete, setStepsToDelete] = useState<PathItem[]>([]);
+  const deletingStepRef = useRef(false);
 
   const { nodes, edges, flow, itemMap } = usePathGraph({
     items: manager.items,
@@ -199,6 +204,25 @@ export function PathView({
     setMessage,
   });
 
+  const removePathEdge = async (edgeId: string) => {
+    try {
+      await manager.removeEdge(edgeId);
+      setMessage("Connection removed.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not remove connection.");
+    }
+  };
+  const handleEdgesChange = (changes: EdgeChange<Edge>[]) => {
+    onEdgesChange(changes);
+    for (const change of changes) {
+      if (change.type !== "remove") continue;
+      const pathEdge = manager.edges.find(
+        (edge) => `e-${edge.from_item_id}-${edge.to_item_id}` === change.id,
+      );
+      if (pathEdge) void removePathEdge(pathEdge.id);
+    }
+  };
+
   const selectedNode = flowNodes.find((n) => n.id === selectedId);
   const selectedItem = selectedNode && selectedId ? itemMap.get(selectedId) : null;
   const incompleteNodes = nodes.filter((node) => !node.data.isCompleted);
@@ -260,11 +284,9 @@ export function PathView({
         onTogglePathLinks={() => setPathLinksOpen((open) => !open)}
         onAutoLayout={autoLayout}
         onFitView={() => fitView({ nodes, padding: 0.2, duration: 250 })}
-        onRemoveSelected={() => {
-          if (selectedId) {
-            void manager.deleteNode(selectedId);
-            setSelectedId(null);
-          }
+        onRemoveSelected={(id) => {
+          const item = itemMap.get(id);
+          if (item) setStepsToDelete([item]);
         }}
         onAddNode={() => void addRandomNode()}
       />
@@ -280,6 +302,39 @@ export function PathView({
           />
         </div>
       )}
+      <ConfirmDialog
+        open={stepsToDelete.length > 0}
+        title={
+          stepsToDelete.length === 1
+            ? `Delete “${stepsToDelete[0].title || "Untitled step"}”?`
+            : `Delete ${stepsToDelete.length} steps?`
+        }
+        body="This will also remove their connections from this path. This action can’t be undone."
+        confirmLabel={stepsToDelete.length === 1 ? "Delete step" : "Delete steps"}
+        cancelLabel="Cancel"
+        onCancel={() => setStepsToDelete([])}
+        onConfirm={() => {
+          if (stepsToDelete.length === 0 || deletingStepRef.current) return;
+          deletingStepRef.current = true;
+          void (async () => {
+            for (const item of stepsToDelete) {
+              await manager.deleteNode(item.id);
+            }
+          })()
+            .then(() => {
+              setSelectedId((current) =>
+                stepsToDelete.some((item) => item.id === current) ? null : current,
+              );
+              setStepsToDelete([]);
+            })
+            .catch((error: unknown) =>
+              setMessage(error instanceof Error ? error.message : "Could not delete step."),
+            )
+            .finally(() => {
+              deletingStepRef.current = false;
+            });
+        }}
+      />
 
       {manager.items.length > 12 && (
         <p className="border-b border-gray-200 px-3 py-1.5 text-[11px] text-gray-400 dark:border-gray-700">
@@ -329,8 +384,16 @@ export function PathView({
             edges={flowEdges}
             nodeTypes={nodeTypes}
             onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
+            onEdgesChange={handleEdgesChange}
             onConnect={onConnect}
+            onBeforeDelete={async ({ nodes: nodesToRemove }) => {
+              if (nodesToRemove.length === 0) return true;
+              const items = nodesToRemove
+                .map((node) => itemMap.get(node.id))
+                .filter((item): item is PathItem => Boolean(item));
+              if (items.length > 0) setStepsToDelete(items);
+              return false;
+            }}
             onNodeClick={(_, node) => {
               setSelectedId(node.id);
               setTaskToLink("");
@@ -410,6 +473,31 @@ export function PathView({
               />
             </label>
 
+            <section className="space-y-1.5 border-t border-gray-200 pt-3 dark:border-gray-700">
+              <div>
+                <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+                  Step note
+                </h4>
+                <p className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">
+                  Planning context for this step. Task notes stay with the linked task.
+                </p>
+              </div>
+              <DetailsEditor
+                key={`notes-${selectedId}`}
+                value={selectedItem.notes ?? null}
+                placeholder="Add a short note about this step…"
+                onSave={(notes) => {
+                  void manager
+                    .updateNodeNotes(selectedId, notes)
+                    .catch((error: unknown) =>
+                      setMessage(
+                        error instanceof Error ? error.message : "Could not save step note.",
+                      ),
+                    );
+                }}
+              />
+            </section>
+
             <section className="space-y-2 border-t border-gray-200 pt-3 dark:border-gray-700">
               <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-200">Sequence</h4>
               <p className="text-[11px] text-gray-500 dark:text-gray-400">
@@ -468,7 +556,7 @@ export function PathView({
                     </span>
                     <button
                       type="button"
-                      onClick={() => void manager.removeEdge(edge.id)}
+                      onClick={() => void removePathEdge(edge.id)}
                       aria-label={`Remove sequence connection to ${itemMap.get(edge.to_item_id)?.title ?? "step"}`}
                       className="shrink-0 rounded px-2 py-1 text-gray-500 hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-violet-500 dark:hover:bg-gray-700"
                     >

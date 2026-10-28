@@ -93,7 +93,18 @@ export function usePathManager(pathId: string) {
 
   const updateNodeTitle = async (itemId: string, title: string): Promise<void> => {
     if (!user || !pathId) throw new Error("Auth or PathId missing");
-    await db.execute("UPDATE path_items SET title = ? WHERE id = ?", [title, itemId]);
+    await db.execute(
+      "UPDATE path_items SET title = ? WHERE id = ? AND path_id = ? AND user_id = ?",
+      [title, itemId, pathId, userId],
+    );
+  };
+
+  const updateNodeNotes = async (itemId: string, notes: string | null): Promise<void> => {
+    if (!user || !pathId) throw new Error("Auth or PathId missing");
+    await db.execute(
+      "UPDATE path_items SET notes = ? WHERE id = ? AND path_id = ? AND user_id = ?",
+      [notes?.trim() || null, itemId, pathId, userId],
+    );
   };
 
   const linkNodeToTask = async (itemId: string, taskId: string): Promise<void> => {
@@ -269,6 +280,7 @@ export function usePathManager(pathId: string) {
     addNode,
     addExistingIdea,
     updateNodeTitle,
+    updateNodeNotes,
     linkNodeToTask,
     unlinkNodeTask,
     updatePlanStepCompletion,

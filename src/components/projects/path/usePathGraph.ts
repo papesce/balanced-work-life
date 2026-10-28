@@ -8,6 +8,7 @@ import type { PathPosition } from "@/lib/paths";
 export interface PathFlowNode extends Node {
   data: {
     title: string;
+    hasNotes: boolean;
     ideaId: string | null;
     ideaText: string | null;
     ideaStatus: string | null;
@@ -39,6 +40,7 @@ export function usePathGraph({ items, edges }: PathGraphProps) {
       position: { x: item.x, y: item.y },
       data: {
         title: item.title,
+        hasNotes: Boolean(item.notes?.trim()),
         ideaId: item.idea_id,
         ideaText: item.idea_text ?? null,
         ideaStatus: item.idea_status ?? null,

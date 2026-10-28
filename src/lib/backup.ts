@@ -27,6 +27,7 @@ export interface BackupPathItem {
   user_id: string;
   path_id: string;
   title: string;
+  notes?: string | null;
   idea_id: string | null;
   x: number;
   y: number;
@@ -235,12 +236,13 @@ export async function restorePaths(
   await db.writeTransaction(async (tx) => {
     for (const item of items) {
       await tx.execute(
-        `INSERT OR REPLACE INTO path_items (id, user_id, path_id, title, idea_id, x, y, created_at) VALUES (?,?,?,?,?,?,?,?)`,
+        `INSERT OR REPLACE INTO path_items (id, user_id, path_id, title, notes, idea_id, x, y, created_at) VALUES (?,?,?,?,?,?,?,?,?)`,
         [
           item.id,
           userId,
           item.path_id,
           item.title,
+          item.notes ?? null,
           item.idea_id ?? null,
           item.x,
           item.y,

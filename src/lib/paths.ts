@@ -24,6 +24,7 @@ export interface PathItem {
   user_id: string;
   path_id: string;
   title: string;
+  notes?: string | null;
   idea_id: string | null;
   completed_at?: string | null;
   promoted_at?: string | null;
@@ -83,6 +84,7 @@ export function deserializePathItem(row: Record<string, unknown>): PathItem {
     user_id: String(row.user_id ?? ""),
     path_id: String(row.path_id ?? ""),
     title: typeof row.title === "string" ? row.title : "",
+    notes: typeof row.notes === "string" ? row.notes : null,
     idea_id: row.idea_id ? String(row.idea_id) : null,
     completed_at: typeof row.completed_at === "string" ? row.completed_at : null,
     promoted_at: typeof row.promoted_at === "string" ? row.promoted_at : null,

@@ -12,11 +12,13 @@ export function DetailsEditor({
   value,
   onSave,
   parentId,
+  placeholder = "Add notes… Use as project plan: select text to create tasks.",
 }: {
   value: string | null;
   onSave: (next: string | null) => void;
   /** When set, text selections offer "create as child" (project plan flow). */
   parentId?: string | null;
+  placeholder?: string;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [selection, setSelection] = useState<{ start: number; end: number; text: string } | null>(
@@ -107,7 +109,7 @@ export function DetailsEditor({
           <DetailField
             icon={StickyNote}
             value={value}
-            placeholder="Add notes… Use as project plan: select text to create tasks."
+            placeholder={placeholder}
             multiline
             onSave={onSave}
             textareaRef={textareaRef}
@@ -191,7 +193,7 @@ export function DetailsEditor({
                   <DetailField
                     icon={StickyNote}
                     value={value}
-                    placeholder="Add notes… Use as project plan: select text to create tasks."
+                    placeholder={placeholder}
                     multiline
                     onSave={onSave}
                     textareaRef={textareaRef}

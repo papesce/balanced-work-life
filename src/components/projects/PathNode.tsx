@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { Check, Link2 } from "lucide-react";
+import { Check, Link2, StickyNote } from "lucide-react";
 import type { PathFlowNode } from "./path/usePathGraph";
 
 export const PathNode = memo(function PathNode({ data, id, selected }: NodeProps<PathFlowNode>) {
@@ -85,7 +85,18 @@ export const PathNode = memo(function PathNode({ data, id, selected }: NodeProps
             className="nodrag w-full bg-transparent text-xs font-semibold outline-none"
           />
         ) : (
-          <span className="truncate text-xs font-semibold">{String(data.title ?? "")}</span>
+          <span className="min-w-0 flex-1 truncate text-xs font-semibold">
+            {String(data.title ?? "")}
+          </span>
+        )}
+        {!editing && data.hasNotes && (
+          <span
+            title="Step has a note"
+            aria-label="Step has a note"
+            className="shrink-0 text-gray-500 dark:text-gray-400"
+          >
+            <StickyNote size={12} />
+          </span>
         )}
       </div>
       <p className="mt-1 truncate pl-8 text-[10px] text-gray-500 dark:text-gray-400">

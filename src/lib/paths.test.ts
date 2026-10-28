@@ -2,7 +2,17 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert";
 import { v4 as uuidv4 } from "uuid";
-import { isPathStepComplete } from "./paths";
+import { deserializePathItem, isPathStepComplete } from "./paths";
+
+describe("deserializePathItem", () => {
+  it("preserves a step note and defaults older rows without one to null", () => {
+    assert.strictEqual(
+      deserializePathItem({ id: "step-1", notes: "Bring measurements" }).notes,
+      "Bring measurements",
+    );
+    assert.strictEqual(deserializePathItem({ id: "step-2" }).notes, null);
+  });
+});
 
 describe("isPathStepComplete", () => {
   it("uses the manual timestamp for a plan-only step", () => {
