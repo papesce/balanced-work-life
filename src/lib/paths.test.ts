@@ -2,7 +2,17 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert";
 import { v4 as uuidv4 } from "uuid";
-import { deserializePathItem, isPathStepComplete } from "./paths";
+import { deserializePath, deserializePathItem, isPathStepComplete } from "./paths";
+
+describe("deserializePath", () => {
+  it("preserves path notes and defaults older rows without notes to null", () => {
+    assert.strictEqual(
+      deserializePath({ id: "path-1", notes: "Consider alternatives" }).notes,
+      "Consider alternatives",
+    );
+    assert.strictEqual(deserializePath({ id: "path-2" }).notes, null);
+  });
+});
 
 describe("deserializePathItem", () => {
   it("preserves a step note and defaults older rows without one to null", () => {

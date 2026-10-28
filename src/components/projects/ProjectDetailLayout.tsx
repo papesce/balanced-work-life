@@ -95,6 +95,17 @@ export function ProjectDetailLayout({ model }: { model: ProjectsPageModel }) {
     ? (ideasHook.ideas.find((i) => i.id === focusedId) ?? null)
     : null;
   const projectPaths = useProjectPaths(selectedProject.id);
+  const [pathRenameRequest, setPathRenameRequest] = useState<{
+    pathId: string;
+    key: number;
+  } | null>(null);
+  const requestPathRename = (pathId: string) => {
+    projectPaths.selectPath(pathId);
+    setPathRenameRequest((request) => ({ pathId, key: (request?.key ?? 0) + 1 }));
+  };
+  const acknowledgePathRenameRequest = (key: number) => {
+    setPathRenameRequest((request) => (request?.key === key ? null : request));
+  };
   const selectedPathTaskIds = useMemo(
     () =>
       canvasApi?.selectedPathId === projectPaths.selectedPathId
@@ -250,6 +261,8 @@ export function ProjectDetailLayout({ model }: { model: ProjectsPageModel }) {
           onRenamePath: projectPaths.renamePath,
           onUpdatePathStatus: projectPaths.updatePathStatus,
           onDeletePath: projectPaths.deletePath,
+          renameRequest: pathRenameRequest,
+          onRenameRequestHandled: acknowledgePathRenameRequest,
         }}
         pathCanvas={
           <ProjectPathCanvas
@@ -259,6 +272,7 @@ export function ProjectDetailLayout({ model }: { model: ProjectsPageModel }) {
             fillHeight
             isNarrow={isNarrow}
             onCanvasApi={handleCanvasApi}
+            onRequestRenamePath={requestPathRename}
           />
         }
         onListResize={handleListResize}

@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { ChevronDown, ChevronUp, Ellipsis, Network, Plus } from "lucide-react";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { DetailsDrawer } from "@/components/shared/DetailsDrawer";
+import { NotesIndicator } from "@/components/shared/NotesIndicator";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { PathEditor } from "@/components/paths/PathEditor";
 import { useAllPathStepSummaries } from "@/hooks/usePathStepSummary";
@@ -24,6 +26,8 @@ interface PathManagementProps {
   onRenamePath: (pathId: string, title: string) => Promise<void>;
   onUpdatePathStatus: (pathId: string, status: string) => Promise<void>;
   onDeletePath: (pathId: string) => Promise<void>;
+  renameRequest?: { pathId: string; key: number } | null;
+  onRenameRequestHandled?: (key: number) => void;
   collapsed?: boolean;
   onToggleCollapsed?: () => void;
 }
@@ -37,6 +41,8 @@ export function ProjectPathsTab({
   onRenamePath,
   onUpdatePathStatus,
   onDeletePath,
+  renameRequest = null,
+  onRenameRequestHandled,
   collapsed = false,
   onToggleCollapsed,
 }: PathManagementProps) {
@@ -44,22 +50,43 @@ export function ProjectPathsTab({
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [openStatusId, setOpenStatusId] = useState<string | null>(null);
   const [editingPathId, setEditingPathId] = useState<string | null>(null);
+  const [notesPathId, setNotesPathId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Path | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const rowRefs = useRef(new Map<string, HTMLButtonElement>());
   const cancelRenameRef = useRef(false);
+  const handledRenameRequestRef = useRef<number | null>(null);
   const summaries = useAllPathStepSummaries();
   const visiblePaths = useMemo(
     () =>
       paths.filter(
-        (path) => statusFilter === "all" || normalizePathStatus(path.status) === statusFilter,
+        (path) =>
+          statusFilter === "all" ||
+          normalizePathStatus(path.status) === statusFilter ||
+          path.id === renameRequest?.pathId ||
+          path.id === editingPathId,
       ),
-    [paths, statusFilter],
+    [editingPathId, paths, renameRequest?.pathId, statusFilter],
   );
   const focusPathId = visiblePaths.some((path) => path.id === selectedPathId)
     ? selectedPathId
     : (visiblePaths[0]?.id ?? null);
+  const activeEditingPathId = editingPathId ?? renameRequest?.pathId ?? null;
+
+  useEffect(() => {
+    if (!renameRequest || handledRenameRequestRef.current === renameRequest.key) return;
+    if (collapsed) {
+      onToggleCollapsed?.();
+      return;
+    }
+    if (!paths.some((path) => path.id === renameRequest.pathId)) {
+      return;
+    }
+    handledRenameRequestRef.current = renameRequest.key;
+    onSelectPath(renameRequest.pathId);
+    cancelRenameRef.current = false;
+  }, [collapsed, onSelectPath, onToggleCollapsed, paths, renameRequest]);
 
   const runAction = async (action: () => Promise<void>) => {
     setBusy(true);
@@ -192,7 +219,7 @@ export function ProjectPathsTab({
                         aria-hidden="true"
                         className="ml-1 shrink-0 text-violet-500 dark:text-violet-300"
                       />
-                      {editingPathId === path.id ? (
+                      {activeEditingPathId === path.id ? (
                         <input
                           autoFocus
                           defaultValue={path.title}
@@ -201,12 +228,18 @@ export function ProjectPathsTab({
                             if (cancelRenameRef.current) {
                               cancelRenameRef.current = false;
                               setEditingPathId(null);
+                              if (renameRequest?.pathId === path.id) {
+                                onRenameRequestHandled?.(renameRequest.key);
+                              }
                               return;
                             }
                             setEditingPathId(null);
                             const title = event.currentTarget.value.trim();
                             if (title && title !== path.title) {
                               void runAction(() => onRenamePath(path.id, title));
+                            }
+                            if (renameRequest?.pathId === path.id) {
+                              onRenameRequestHandled?.(renameRequest.key);
                             }
                           }}
                           onKeyDown={(event) => {
@@ -247,7 +280,7 @@ export function ProjectPathsTab({
                           </span>
                         </button>
                       )}
-                      {editingPathId !== path.id && (
+                      {activeEditingPathId !== path.id && (
                         <>
                           <StatusPill
                             id={`path-status-${path.id}`}
@@ -262,6 +295,11 @@ export function ProjectPathsTab({
                           >
                             {status.label}
                           </StatusPill>
+                          <NotesIndicator
+                            hasNotes={!!path.notes?.trim()}
+                            onClick={() => setNotesPathId(path.id)}
+                            className="!h-9 !w-9 max-sm:!h-11 max-sm:!w-11"
+                          />
                           <span
                             className="shrink-0 text-[10px] text-gray-500 tabular-nums dark:text-gray-400"
                             aria-label={`${summary.completedSteps} of ${summary.totalSteps} steps complete`}
@@ -338,6 +376,16 @@ export function ProjectPathsTab({
                           type="button"
                           onClick={() => {
                             setOpenMenuId(null);
+                            setNotesPathId(path.id);
+                          }}
+                          className="rounded px-2 py-1.5 text-left text-xs hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-violet-500 dark:hover:bg-gray-800"
+                        >
+                          Open notes
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpenMenuId(null);
                             setDeleteTarget(path);
                           }}
                           className="rounded px-2 py-1.5 text-left text-xs text-rose-600 hover:bg-rose-50 focus-visible:outline-2 focus-visible:outline-rose-500 dark:text-rose-400 dark:hover:bg-rose-950/30"
@@ -357,6 +405,14 @@ export function ProjectPathsTab({
         <p role="alert" className="mt-1 text-[11px] text-rose-600 dark:text-rose-400">
           {error}
         </p>
+      )}
+      {notesPathId && (
+        <DetailsDrawer
+          ideaId={notesPathId}
+          variant="path"
+          initialSection="notes"
+          onClose={() => setNotesPathId(null)}
+        />
       )}
       <ConfirmDialog
         open={Boolean(deleteTarget)}
@@ -383,6 +439,7 @@ interface ProjectPathCanvasProps {
   fillHeight?: boolean;
   isNarrow?: boolean;
   onCanvasApi?: (api: PathCanvasApi | null) => void;
+  onRequestRenamePath?: (pathId: string) => void;
 }
 
 export function ProjectPathCanvas({
@@ -392,6 +449,7 @@ export function ProjectPathCanvas({
   fillHeight = false,
   isNarrow = false,
   onCanvasApi,
+  onRequestRenamePath,
 }: ProjectPathCanvasProps) {
   if (!pathId) {
     return (
@@ -412,6 +470,7 @@ export function ProjectPathCanvas({
       projectTasks={tasks.filter((task) => task.type === "task")}
       isNarrow={isNarrow}
       onCanvasApi={onCanvasApi}
+      onRequestRenamePath={onRequestRenamePath}
       mode="edit"
     />
   );

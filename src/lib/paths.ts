@@ -17,6 +17,7 @@ export interface Path {
   updated_at: string;
   type: string;
   status: string;
+  notes?: string | null;
 }
 
 export interface PathItem {
@@ -75,6 +76,7 @@ export function deserializePath(row: Record<string, unknown>): Path {
     updated_at: typeof row.updated_at === "string" ? row.updated_at : "",
     type: String(row.type ?? "path"),
     status: String(row.status ?? "open"),
+    notes: typeof row.notes === "string" ? row.notes : null,
   };
 }
 

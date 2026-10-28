@@ -16,6 +16,7 @@ export interface PathEditorProps {
   projectTasks?: Idea[];
   isNarrow?: boolean;
   onCanvasApi?: (api: PathCanvasApi | null) => void;
+  onRequestRenamePath?: (pathId: string) => void;
 }
 
 export function PathEditor({
@@ -29,6 +30,7 @@ export function PathEditor({
   projectTasks,
   isNarrow,
   onCanvasApi,
+  onRequestRenamePath,
 }: PathEditorProps) {
   if (mode === "preview") {
     return (
@@ -65,6 +67,7 @@ export function PathEditor({
           projectTasks={projectTasks}
           isNarrow={isNarrow}
           onCanvasApi={onCanvasApi}
+          onRequestRenamePath={onRequestRenamePath}
         />
       </PathCanvasProvider>
     </div>
