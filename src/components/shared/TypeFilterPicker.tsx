@@ -45,7 +45,7 @@ export function TypeFilterPicker({
         Filter by type
       </div>
       {TYPES.map((type) => {
-        const badge = TYPE_BADGE[type];
+        const badge = TYPE_BADGE[type] ?? { label: type, className: "" };
         const isSelected = selected.includes(type);
         return (
           <button

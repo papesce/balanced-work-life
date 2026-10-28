@@ -10,7 +10,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import type { IdeaStatus, LifeArea } from "@/lib/types";
+import type { IdeaStatus, IdeaType, LifeArea } from "@/lib/types";
 
 export const AREA_ORDER: LifeArea[] = [
   "work",
@@ -195,7 +195,7 @@ export const DEFAULT_TARGETS: Record<LifeArea, number> = {
 
 export const DEFAULT_UNASSIGNED_LABEL = "Unassigned";
 
-export const TYPE_BADGE: Record<string, { label: string; className: string }> = {
+export const TYPE_BADGE: Record<IdeaType, { label: string; className: string }> = {
   idea: {
     label: "Idea",
     className: "bg-orange-100/80 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400",
@@ -215,6 +215,10 @@ export const TYPE_BADGE: Record<string, { label: string; className: string }> = 
   task: {
     label: "Task",
     className: "bg-gray-100/80 text-gray-500 dark:bg-gray-800/40 dark:text-gray-400",
+  },
+  path: {
+    label: "Path",
+    className: "bg-teal-100/80 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400",
   },
 };
 

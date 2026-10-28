@@ -89,7 +89,6 @@ export function BrainstormToolbar({
   const [typePickerPos, setTypePickerPos] = useState<{ top: number; left: number } | null>(null);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const filtersRef = useRef<HTMLDivElement>(null);
-  const typePickerRef = useRef<HTMLDivElement>(null);
   const overflowRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -108,23 +107,6 @@ export function BrainstormToolbar({
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [filtersOpen]);
-
-  useEffect(() => {
-    if (!typePickerOpen) return;
-    const onPointerDown = (e: PointerEvent) => {
-      if (typePickerRef.current && !typePickerRef.current.contains(e.target as Node))
-        setTypePickerOpen(false);
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setTypePickerOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [typePickerOpen]);
 
   useEffect(() => {
     if (!overflowOpen) return;
@@ -317,7 +299,7 @@ export function BrainstormToolbar({
         </AnimatePresence>
       </div>
 
-      <div ref={typePickerRef} className="relative">
+      <div className="relative">
         <button
           type="button"
           onClick={(e) => {

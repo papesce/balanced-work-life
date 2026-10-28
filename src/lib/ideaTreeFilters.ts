@@ -1,4 +1,4 @@
-import { IdeaNode, Idea, IdeaType } from "@/lib/types";
+import type { IdeaNode, Idea, IdeaType } from "@/lib/types";
 import { dropSubtrees, pruneTree, pruneTreeToIds } from "@/components/tree/filterTree";
 
 export function filterTreeBySearch(nodes: IdeaNode[], query: string): IdeaNode[] {
@@ -106,7 +106,11 @@ export function filterIdeaTree(
   }
 
   if (!search.trim()) {
-    return pruneTreeToIds(tree, hidePassedIds);
+    let result = hasHideFilters ? pruneTreeToIds(tree, hidePassedIds) : tree;
+    if (hasTypeFilter) {
+      result = filterTreeByType(result, typeFilter!);
+    }
+    return result;
   }
 
   const q = search.toLowerCase();
