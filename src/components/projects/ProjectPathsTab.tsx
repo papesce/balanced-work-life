@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { Check, ChevronDown, ChevronUp, Ellipsis, Plus } from "lucide-react";
+import { ChevronDown, ChevronUp, Ellipsis, Network, Plus } from "lucide-react";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { PathEditor } from "@/components/paths/PathEditor";
 import { useAllPathStepSummaries } from "@/hooks/usePathStepSummary";
@@ -48,6 +48,7 @@ export function ProjectPathsTab({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const rowRefs = useRef(new Map<string, HTMLButtonElement>());
+  const cancelRenameRef = useRef(false);
   const summaries = useAllPathStepSummaries();
   const visiblePaths = useMemo(
     () =>
@@ -75,6 +76,15 @@ export function ProjectPathsTab({
   };
 
   const handleRowKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (
+      event.key === "F2" ||
+      (event.key === "Enter" && visiblePaths[index]?.id === selectedPathId)
+    ) {
+      event.preventDefault();
+      cancelRenameRef.current = false;
+      setEditingPathId(visiblePaths[index]?.id ?? null);
+      return;
+    }
     const nextIndex =
       event.key === "ArrowDown"
         ? Math.min(index + 1, visiblePaths.length - 1)
@@ -166,13 +176,35 @@ export function ProjectPathsTab({
                 const done = path.status === "completed";
                 return (
                   <li key={path.id} className="relative">
-                    <div className="flex min-w-0 items-center gap-1">
+                    <div
+                      className={`group relative flex min-w-0 items-center gap-1 rounded-md px-1 py-1 transition-colors ${
+                        selected
+                          ? "bg-indigo-100/70 dark:bg-indigo-500/15"
+                          : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                      }`}
+                    >
+                      {selected && (
+                        <span
+                          aria-hidden="true"
+                          className="absolute inset-y-1 left-0 w-0.5 rounded-full bg-violet-500"
+                        />
+                      )}
+                      <Network
+                        size={14}
+                        aria-hidden="true"
+                        className="ml-1 shrink-0 text-violet-500 dark:text-violet-300"
+                      />
                       {editingPathId === path.id ? (
                         <input
                           autoFocus
                           defaultValue={path.title}
                           aria-label={`Rename ${path.title || "Untitled path"}`}
                           onBlur={(event) => {
+                            if (cancelRenameRef.current) {
+                              cancelRenameRef.current = false;
+                              setEditingPathId(null);
+                              return;
+                            }
                             setEditingPathId(null);
                             const title = event.currentTarget.value.trim();
                             if (title && title !== path.title) {
@@ -180,13 +212,17 @@ export function ProjectPathsTab({
                             }
                           }}
                           onKeyDown={(event) => {
-                            if (event.key === "Enter") event.currentTarget.blur();
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              event.currentTarget.blur();
+                            }
                             if (event.key === "Escape") {
-                              event.currentTarget.value = path.title;
+                              cancelRenameRef.current = true;
+                              event.preventDefault();
                               event.currentTarget.blur();
                             }
                           }}
-                          className="min-h-9 min-w-0 flex-1 rounded-md border border-violet-400 bg-white px-2 text-xs text-gray-800 focus-visible:outline-2 focus-visible:outline-violet-500 max-sm:min-h-11 dark:bg-gray-900 dark:text-gray-100"
+                          className="min-h-9 min-w-0 flex-1 rounded-md border border-violet-400 bg-white px-2 text-sm text-gray-800 focus-visible:outline-2 focus-visible:outline-violet-500 max-sm:min-h-11 dark:bg-gray-900 dark:text-gray-100"
                         />
                       ) : (
                         <button
@@ -197,15 +233,24 @@ export function ProjectPathsTab({
                           type="button"
                           aria-current={selected ? "true" : undefined}
                           aria-label={`${path.title || "Untitled path"}, ${done ? "completed" : path.status === "draft" ? "open" : path.status}, ${formatPathProgress(summary.completedSteps, summary.totalSteps)} steps complete`}
+                          title={path.title || "Untitled path"}
                           tabIndex={path.id === focusPathId ? 0 : -1}
                           onClick={() => onSelectPath(path.id)}
+                          onDoubleClick={(event) => {
+                            event.preventDefault();
+                            cancelRenameRef.current = false;
+                            setEditingPathId(path.id);
+                          }}
                           onKeyDown={(event) => handleRowKeyDown(event, index)}
-                          className={`flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-md border-l-2 px-2 text-left text-xs transition-colors focus-visible:outline-2 focus-visible:outline-violet-500 max-sm:min-h-11 ${
-                            selected
-                              ? "border-violet-500 bg-violet-50 font-semibold text-gray-900 dark:bg-violet-500/10 dark:text-gray-100"
-                              : "border-transparent text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                          }`}
+                          className="flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left text-sm text-gray-700 focus-visible:outline-2 focus-visible:outline-violet-500 max-sm:min-h-11 dark:text-gray-200"
                         >
+                          <span className="min-w-0 flex-1 truncate rounded px-1 py-0.5 group-hover:bg-gray-100 dark:group-hover:bg-white/[0.04]">
+                            {path.title || "Untitled path"}
+                          </span>
+                        </button>
+                      )}
+                      {editingPathId !== path.id && (
+                        <>
                           <span
                             aria-label={
                               done
@@ -219,23 +264,13 @@ export function ProjectPathsTab({
                               done ? "bg-emerald-500" : "bg-gray-400 dark:bg-gray-500"
                             }`}
                           />
-                          <span className="min-w-0 flex-1 truncate">
-                            {path.title || "Untitled path"}
-                          </span>
-                          {done && (
-                            <Check
-                              size={12}
-                              aria-hidden="true"
-                              className="shrink-0 text-emerald-600"
-                            />
-                          )}
                           <span
                             className="shrink-0 text-[10px] text-gray-500 tabular-nums dark:text-gray-400"
                             aria-label={`${summary.completedSteps} of ${summary.totalSteps} steps complete`}
                           >
                             {formatPathProgress(summary.completedSteps, summary.totalSteps)}
                           </span>
-                        </button>
+                        </>
                       )}
                       <button
                         type="button"
@@ -260,6 +295,8 @@ export function ProjectPathsTab({
                           type="button"
                           onClick={() => {
                             setOpenMenuId(null);
+                            onSelectPath(path.id);
+                            cancelRenameRef.current = false;
                             setEditingPathId(path.id);
                           }}
                           className="rounded px-2 py-1.5 text-left text-xs hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-violet-500 dark:hover:bg-gray-800"
