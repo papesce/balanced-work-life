@@ -18,6 +18,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePathManager } from "@/hooks/usePathManager";
 import { usePathStepSummary } from "@/hooks/usePathStepSummary";
 import type { PathItem, PathPosition } from "@/lib/paths";
+import type { PathCanvasApi } from "@/lib/projectPaths";
 import { PathNode } from "./PathNode";
 import { useNodesState, useEdgesState } from "@xyflow/react";
 import { usePathGraph, type PathFlowNode } from "./path/usePathGraph";
@@ -40,6 +41,7 @@ interface Props {
   projectId?: string;
   projectTasks?: Idea[];
   isNarrow?: boolean;
+  onCanvasApi?: (api: PathCanvasApi | null) => void;
 }
 
 export function PathView({
@@ -48,6 +50,7 @@ export function PathView({
   projectId,
   projectTasks = [],
   isNarrow = false,
+  onCanvasApi,
 }: Props) {
   const manager = usePathManager(pathId);
   const stepSummary = usePathStepSummary(pathId);
@@ -149,6 +152,50 @@ export function PathView({
       : "SELECT * FROM ideas WHERE 0",
     userId ? [userId, pathId] : [],
   );
+  const placedIds = useMemo(
+    () => new Set(manager.items.map((item) => item.idea_id).filter((id): id is string => !!id)),
+    [manager.items],
+  );
+  const projectTasksRef = useRef(projectTasks);
+  useEffect(() => {
+    projectTasksRef.current = projectTasks;
+  }, [projectTasks]);
+  useEffect(() => {
+    if (!userId || !onCanvasApi) return;
+    onCanvasApi({
+      selectedPathId: pathId,
+      placedIds,
+      addToPath: async (ideaId) => {
+        if (placedIds.has(ideaId)) return true;
+        const task = projectTasksRef.current.find((item) => item.id === ideaId);
+        if (!task) throw new Error("Choose a task that belongs to this project.");
+        await db.writeTransaction(async (tx) => {
+          const existing = await tx.getOptional<Record<string, unknown>>(
+            "SELECT id FROM path_items WHERE path_id = ? AND user_id = ? AND idea_id = ?",
+            [pathId, userId, ideaId],
+          );
+          if (existing) return;
+          const itemId = uuidv4();
+          const n = manager.items.length;
+          await tx.execute(
+            "INSERT INTO path_items (id, user_id, path_id, title, idea_id, x, y, created_at) VALUES (?,?,?,?,?,?,?,?)",
+            [
+              itemId,
+              userId,
+              pathId,
+              task.text ?? "",
+              ideaId,
+              100 + (n % 3) * 220,
+              100 + Math.floor(n / 3) * 140,
+              new Date().toISOString(),
+            ],
+          );
+        });
+        return true;
+      },
+    });
+    return () => onCanvasApi(null);
+  }, [db, manager.items, onCanvasApi, pathId, placedIds, userId]);
 
   const [titleDraft, setTitleDraft] = useState<string>("");
   const currentTitle = String(pathRows[0]?.text ?? "");

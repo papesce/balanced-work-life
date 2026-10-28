@@ -84,6 +84,10 @@ interface IdeaTreeProps {
   hideIds?: Set<string>;
   /** Path titles per task id; renders small path chips in each row. */
   pathChipsForIdea?: (ideaId: string) => string[];
+  /** Tasks linked to the currently selected path; lightly highlighted in the tree. */
+  highlightPathTaskIds?: Set<string>;
+  /** Task whose linked path step is currently hovered. */
+  hoveredPathTaskId?: string | null;
   typeFilter?: IdeaType[];
   focusedId: string | null;
   onFocus: (id: string | null) => void;
@@ -174,6 +178,8 @@ export function IdeaTree({
   hideInHorizonIds,
   hideIds,
   pathChipsForIdea,
+  highlightPathTaskIds,
+  hoveredPathTaskId,
   typeFilter,
   focusedId,
   onFocus,
@@ -447,6 +453,25 @@ export function IdeaTree({
           ) : null
         }
         labelClassName={labelClassName}
+        rowClassName={(node) =>
+          hoveredPathTaskId === node.id
+            ? "border-l-2 border-violet-500 bg-violet-100 dark:bg-violet-500/20"
+            : highlightPathTaskIds?.has(node.id)
+              ? "border-l-2 border-violet-400 bg-violet-50/70 dark:bg-violet-500/10"
+              : ""
+        }
+        onRowMouseEnter={(node) => {
+          if (!highlightPathTaskIds?.has(node.id)) return;
+          window.dispatchEvent(
+            new CustomEvent("path-task-highlight", { detail: { ideaId: node.id } }),
+          );
+        }}
+        onRowMouseLeave={(node) => {
+          if (!highlightPathTaskIds?.has(node.id)) return;
+          window.dispatchEvent(
+            new CustomEvent("path-task-highlight", { detail: { ideaId: null } }),
+          );
+        }}
         renderLeading={(node) => (
           <>
             {node.id === "__unassociated_paths__" ? (

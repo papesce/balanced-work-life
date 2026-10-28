@@ -2,6 +2,12 @@ export interface SelectablePath {
   id: string;
 }
 
+export interface PathCanvasApi {
+  selectedPathId: string | null;
+  placedIds: Set<string>;
+  addToPath: (ideaId: string) => Promise<boolean>;
+}
+
 export function resolveSelectedPathId(
   paths: SelectablePath[],
   selectedId: string | null,

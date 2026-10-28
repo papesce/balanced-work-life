@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useUiPrefsStore, type ProjectViewMode } from "@/stores/uiPrefsStore";
-import type { PathCanvasApi } from "@/components/projects/ProjectPathsTab";
+import type { PathCanvasApi } from "@/lib/projectPaths";
 import { clampSplitRatio, resolveEffectiveMode, SPLIT_MIN_WIDTH } from "@/lib/projectSplit";
 
 /**

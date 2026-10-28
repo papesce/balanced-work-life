@@ -76,6 +76,10 @@ export function TreeNodeRow<T extends TreeItem>({
   });
 
   const detailRef = useRef<HTMLDivElement | null>(null);
+  const customRowClassName =
+    typeof options.rowClassName === "function"
+      ? options.rowClassName(node)
+      : (options.rowClassName ?? "");
   useEffect(() => {
     if (isSelected && options.renderDetail) {
       detailRef.current?.scrollIntoView({ block: "nearest" });
@@ -86,7 +90,7 @@ export function TreeNodeRow<T extends TreeItem>({
   const rowClasses = isCardMode
     ? [
         "group relative flex items-start gap-1 rounded-xl border bg-white/80 px-2 py-2 shadow-sm dark:border-white/10 dark:bg-gray-800/60",
-        options.rowClassName ?? "",
+        customRowClassName,
         dropZone === "center" ? "bg-indigo-50 dark:bg-indigo-500/10" : "",
         !dropZone && isSelected ? "ring-2 ring-indigo-400 dark:ring-indigo-500" : "border-black/5",
         isDragging ? "opacity-40" : "",
@@ -95,7 +99,7 @@ export function TreeNodeRow<T extends TreeItem>({
         .join(" ")
     : [
         "group relative flex items-center gap-1 rounded-md px-1 py-1",
-        options.rowClassName ?? "",
+        customRowClassName,
         dropZone === "center" ? "bg-indigo-50 dark:bg-indigo-500/10" : "",
         !dropZone && isSelected ? "bg-indigo-100/70 dark:bg-indigo-500/15" : "",
         isDragging ? "opacity-40" : "",
@@ -172,6 +176,8 @@ export function TreeNodeRow<T extends TreeItem>({
             id={`idea-${node.id}`}
             data-idea-id={node.id}
             onMouseMove={band.handleInsertHover}
+            onMouseEnter={() => options.onRowMouseEnter?.(node)}
+            onMouseLeave={() => options.onRowMouseLeave?.(node)}
             onContextMenu={(e) => options.onContextMenu?.(node, e)}
             onClick={(e) => {
               e.stopPropagation();

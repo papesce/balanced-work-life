@@ -18,6 +18,20 @@ export const PathNode = memo(function PathNode({ data, id, selected }: NodeProps
   }, [data.ideaId]);
   return (
     <div
+      onMouseEnter={() => {
+        if (data.ideaId) {
+          window.dispatchEvent(
+            new CustomEvent("path-task-highlight", { detail: { ideaId: data.ideaId } }),
+          );
+        }
+      }}
+      onMouseLeave={() => {
+        if (data.ideaId) {
+          window.dispatchEvent(
+            new CustomEvent("path-task-highlight", { detail: { ideaId: null } }),
+          );
+        }
+      }}
       className={`min-w-[160px] rounded-xl border px-3 py-2 shadow-sm transition-colors ${
         data.isCompleted
           ? "border-emerald-500 bg-emerald-50 text-emerald-950 dark:border-emerald-500 dark:bg-emerald-950/60 dark:text-emerald-100"

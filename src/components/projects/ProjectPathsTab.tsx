@@ -1,59 +1,54 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
-import { usePowerSync, useQuery } from "@powersync/react";
-import { v4 as uuidv4 } from "uuid";
-import { useAuth } from "@/hooks/useAuth";
-import { useUiPrefsStore } from "@/stores/uiPrefsStore";
-import { deserializePath } from "@/lib/paths";
+import { useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { Check, ChevronDown, ChevronUp, Ellipsis, Plus } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { PathEditor } from "@/components/paths/PathEditor";
-import type { Idea, IdeaLink, LinkType, Tag } from "@/lib/types";
+import { useAllPathStepSummaries } from "@/hooks/usePathStepSummary";
+import { formatPathProgress, type PathCanvasApi } from "@/lib/projectPaths";
+import type { Path } from "@/lib/paths";
+import type { Idea } from "@/lib/types";
 
-interface Props {
+interface PathManagementProps {
   projectId: string;
-  tasks: Idea[];
-  links: IdeaLink[];
-  tagsForTask: (id: string) => Tag[];
-  onUpdateTask: (id: string, updates: Partial<Idea>) => Promise<void>;
-  onOpenNotes: (id: string) => void;
-  onCreateLink: (sourceId: string, targetId: string, type: LinkType) => Promise<string>;
-  onDeleteLink: (id: string) => Promise<void>;
-  fillHeight?: boolean;
-  fitTick?: number;
-  onCanvasApi?: (api: PathCanvasApi | null) => void;
-  hideClosed?: boolean;
-  isNarrow?: boolean;
+  paths: Path[];
+  selectedPathId: string | null;
+  onSelectPath: (pathId: string) => void;
+  onCreatePath: () => Promise<void>;
+  onRenamePath: (pathId: string, title: string) => Promise<void>;
+  onUpdatePathStatus: (pathId: string, status: string) => Promise<void>;
+  onDeletePath: (pathId: string) => Promise<void>;
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
 }
 
-export interface PathCanvasApi {
-  selectedPathId: string | null;
-  placedIds: Set<string>;
-  addToPath: (ideaId: string) => Promise<boolean>;
-}
+const PATH_STATUS_OPTIONS = [
+  { value: "open", label: "Open" },
+  { value: "paused", label: "Paused" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
+];
 
 export function ProjectPathsTab({
   projectId,
-  tasks,
-  fillHeight = false,
-  onCanvasApi,
-  isNarrow = false,
-}: Props) {
-  const { user } = useAuth();
-  const db = usePowerSync();
-  const userId = user?.id ?? "";
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
+  paths,
+  selectedPathId,
+  onSelectPath,
+  onCreatePath,
+  onRenamePath,
+  onUpdatePathStatus,
+  onDeletePath,
+  collapsed = false,
+  onToggleCollapsed,
+}: PathManagementProps) {
   const [statusFilter, setStatusFilter] = useState("all");
-  const projectLastPath = useUiPrefsStore((s) => s.projectLastPath);
-  const setPrefs = useUiPrefsStore((s) => s.set);
-  const { data: rawPaths } = useQuery<Record<string, unknown>>(
-    userId
-      ? "SELECT i.*, l.target_id AS project_id FROM ideas i JOIN idea_links l ON l.source_id = i.id WHERE i.user_id = ? AND i.type = 'path' AND l.target_id = ? AND l.link_type = 'path_of' ORDER BY i.sort_order, i.created_at"
-      : "SELECT * FROM ideas WHERE 0",
-    userId ? [userId, projectId] : [],
-  );
-  const paths = useMemo(() => rawPaths.map(deserializePath), [rawPaths]);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [editingPathId, setEditingPathId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Path | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const rowRefs = useRef(new Map<string, HTMLButtonElement>());
+  const summaries = useAllPathStepSummaries();
   const visiblePaths = useMemo(
     () =>
       paths.filter(
@@ -63,133 +58,311 @@ export function ProjectPathsTab({
       ),
     [paths, statusFilter],
   );
-
-  const remembered = projectLastPath[projectId];
-  const activeSelectedId = paths.some((p) => p.id === selectedId)
-    ? selectedId
-    : paths.some((p) => p.id === remembered)
-      ? remembered
-      : (paths[0]?.id ?? null);
-  const activePathId = visiblePaths.some((path) => path.id === activeSelectedId)
-    ? activeSelectedId
+  const focusPathId = visiblePaths.some((path) => path.id === selectedPathId)
+    ? selectedPathId
     : (visiblePaths[0]?.id ?? null);
 
-  const selectPath = useCallback(
-    (id: string) => {
-      setSelectedId(id);
-      setPrefs({ projectLastPath: { ...projectLastPath, [projectId]: id } });
-    },
-    [projectId, projectLastPath, setPrefs],
-  );
-
-  const createPath = async () => {
-    if (!userId || creating) return;
-    setCreating(true);
-    const id = uuidv4();
-    const now = new Date().toISOString();
+  const runAction = async (action: () => Promise<void>) => {
+    setBusy(true);
+    setError("");
     try {
-      await db.execute(
-        "INSERT INTO ideas (id, user_id, text, type, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
-        [id, userId, "Untitled path", "path", "draft", now, now],
-      );
-      await db.execute(
-        "INSERT INTO idea_links (id, user_id, source_id, target_id, link_type, created_at) VALUES (?,?,?,?,?,?)",
-        [uuidv4(), userId, id, projectId, "path_of", now],
-      );
-      selectPath(id);
+      await action();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not update paths.");
     } finally {
-      setCreating(false);
+      setBusy(false);
     }
   };
 
-  const selectedPath = paths.find((p) => p.id === activePathId);
-  const { data: items } = useQuery<Record<string, unknown>>(
-    userId && activePathId
-      ? "SELECT * FROM path_items WHERE user_id = ? AND path_id = ?"
-      : "SELECT * FROM path_items WHERE 0",
-    userId && activePathId ? [userId, activePathId] : [],
-  );
-  const placedIds = useMemo(
-    () => new Set(items.map((item) => String(item.idea_id ?? "")).filter(Boolean)),
-    [items],
-  );
+  const handleRowKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const nextIndex =
+      event.key === "ArrowDown"
+        ? Math.min(index + 1, visiblePaths.length - 1)
+        : event.key === "ArrowUp"
+          ? Math.max(index - 1, 0)
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? visiblePaths.length - 1
+              : -1;
+    if (nextIndex < 0) return;
+    event.preventDefault();
+    const nextPath = visiblePaths[nextIndex];
+    if (!nextPath) return;
+    onSelectPath(nextPath.id);
+    rowRefs.current.get(nextPath.id)?.focus();
+  };
 
-  useEffect(() => {
-    if (!activePathId) return;
-    const api: PathCanvasApi = {
-      selectedPathId: activePathId,
-      placedIds,
-      addToPath: async (ideaId) => {
-        if (placedIds.has(ideaId)) return true;
-        const itemId = uuidv4();
-        const n = items.length;
-        await db.execute(
-          "INSERT INTO path_items (id, user_id, path_id, title, idea_id, x, y, created_at) VALUES (?,?,?,?,?,?,?,?)",
-          [
-            itemId,
-            userId,
-            activePathId,
-            tasks.find((task) => task.id === ideaId)?.text ?? "",
-            ideaId,
-            100 + (n % 3) * 220,
-            100 + Math.floor(n / 3) * 140,
-            new Date().toISOString(),
-          ],
-        );
-        return true;
-      },
-    };
-    onCanvasApi?.(api);
-    return () => onCanvasApi?.(null);
-  }, [activePathId, placedIds, items, db, userId, tasks, onCanvasApi]);
-
-  if (!userId) return null;
   return (
-    <div className={fillHeight ? "flex h-full min-h-0 flex-col gap-3" : "space-y-3"}>
-      <div className="flex flex-wrap items-center gap-1.5">
+    <section aria-labelledby={`paths-heading-${projectId}`} className="min-w-0">
+      <div className="flex min-h-8 items-center gap-2">
+        <h3
+          id={`paths-heading-${projectId}`}
+          className="text-xs font-bold tracking-wide text-gray-500 uppercase dark:text-gray-400"
+        >
+          Paths
+        </h3>
+        <label className="sr-only" htmlFor={`paths-filter-${projectId}`}>
+          Filter paths by status
+        </label>
         <select
+          id={`paths-filter-${projectId}`}
           aria-label="Filter paths by status"
           value={statusFilter}
           onChange={(event) => setStatusFilter(event.target.value)}
-          className="rounded-xl border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+          className="min-w-0 rounded-lg border border-gray-200 bg-white px-1.5 py-1 text-[11px] text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
         >
           <option value="all">All statuses</option>
-          <option value="open">Open</option>
-          <option value="paused">Paused</option>
-          <option value="completed">Completed</option>
-          <option value="cancelled">Cancelled</option>
+          {PATH_STATUS_OPTIONS.map((status) => (
+            <option key={status.value} value={status.value}>
+              {status.label}
+            </option>
+          ))}
         </select>
-        {visiblePaths.map((path) => (
-          <button
-            key={path.id}
-            onClick={() => selectPath(path.id)}
-            className={`rounded-xl px-3 py-1.5 text-xs font-semibold ${activePathId === path.id ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300" : "bg-black/[0.03] text-gray-500 dark:bg-white/[0.04]"}`}
-          >
-            {path.title || "Untitled path"}
-          </button>
-        ))}
         <button
-          onClick={() => void createPath()}
-          disabled={creating}
-          className="flex items-center gap-1 rounded-xl border border-dashed border-black/10 px-3 py-1.5 text-xs font-semibold text-gray-500"
+          type="button"
+          onClick={() => void runAction(onCreatePath)}
+          disabled={busy}
+          aria-label="Create path"
+          title="Create path"
+          className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-violet-600 focus-visible:outline-2 focus-visible:outline-violet-500 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-800"
         >
-          <Plus size={12} /> New path
+          <Plus size={15} />
         </button>
+        {onToggleCollapsed && (
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? "Expand paths section" : "Collapse paths section"}
+            className="rounded-lg p-1.5 text-gray-400 hover:bg-black/5 hover:text-violet-600 focus-visible:outline-2 focus-visible:outline-violet-500 dark:hover:bg-white/5"
+          >
+            {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+          </button>
+        )}
       </div>
-      {!selectedPath ? (
-        <div className="rounded-xl border border-gray-200 px-4 py-12 text-center text-sm text-gray-500 dark:border-gray-700">
-          No paths associated with this project yet.
+      {!collapsed && (
+        <div className="mt-1">
+          {visiblePaths.length === 0 ? (
+            <div className="flex min-h-9 items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+              <span>{paths.length === 0 ? "No paths yet" : "No paths match this status"}</span>
+              <button
+                type="button"
+                onClick={() => void runAction(onCreatePath)}
+                disabled={busy}
+                className="font-semibold text-violet-600 hover:underline focus-visible:outline-2 focus-visible:outline-violet-500 disabled:opacity-50 dark:text-violet-300"
+              >
+                New path
+              </button>
+            </div>
+          ) : (
+            <ul aria-label="Project paths" className="space-y-0.5">
+              {visiblePaths.map((path, index) => {
+                const summary = summaries.get(path.id) ?? {
+                  completedSteps: 0,
+                  totalSteps: 0,
+                };
+                const selected = path.id === selectedPathId;
+                const done = path.status === "completed";
+                return (
+                  <li key={path.id} className="relative">
+                    <div className="flex min-w-0 items-center gap-1">
+                      {editingPathId === path.id ? (
+                        <input
+                          autoFocus
+                          defaultValue={path.title}
+                          aria-label={`Rename ${path.title || "Untitled path"}`}
+                          onBlur={(event) => {
+                            setEditingPathId(null);
+                            const title = event.currentTarget.value.trim();
+                            if (title && title !== path.title) {
+                              void runAction(() => onRenamePath(path.id, title));
+                            }
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") event.currentTarget.blur();
+                            if (event.key === "Escape") {
+                              event.currentTarget.value = path.title;
+                              event.currentTarget.blur();
+                            }
+                          }}
+                          className="min-h-9 min-w-0 flex-1 rounded-md border border-violet-400 bg-white px-2 text-xs text-gray-800 focus-visible:outline-2 focus-visible:outline-violet-500 max-sm:min-h-11 dark:bg-gray-900 dark:text-gray-100"
+                        />
+                      ) : (
+                        <button
+                          ref={(element) => {
+                            if (element) rowRefs.current.set(path.id, element);
+                            else rowRefs.current.delete(path.id);
+                          }}
+                          type="button"
+                          aria-current={selected ? "true" : undefined}
+                          aria-label={`${path.title || "Untitled path"}, ${done ? "completed" : path.status === "draft" ? "open" : path.status}, ${formatPathProgress(summary.completedSteps, summary.totalSteps)} steps complete`}
+                          tabIndex={path.id === focusPathId ? 0 : -1}
+                          onClick={() => onSelectPath(path.id)}
+                          onKeyDown={(event) => handleRowKeyDown(event, index)}
+                          className={`flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-md border-l-2 px-2 text-left text-xs transition-colors focus-visible:outline-2 focus-visible:outline-violet-500 max-sm:min-h-11 ${
+                            selected
+                              ? "border-violet-500 bg-violet-50 font-semibold text-gray-900 dark:bg-violet-500/10 dark:text-gray-100"
+                              : "border-transparent text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                          }`}
+                        >
+                          <span
+                            aria-label={
+                              done
+                                ? "Status: completed"
+                                : `Status: ${path.status === "draft" ? "open" : path.status}`
+                            }
+                            title={
+                              done ? "Completed" : path.status === "draft" ? "Open" : path.status
+                            }
+                            className={`h-2 w-2 shrink-0 rounded-full ${
+                              done ? "bg-emerald-500" : "bg-gray-400 dark:bg-gray-500"
+                            }`}
+                          />
+                          <span className="min-w-0 flex-1 truncate">
+                            {path.title || "Untitled path"}
+                          </span>
+                          {done && (
+                            <Check
+                              size={12}
+                              aria-hidden="true"
+                              className="shrink-0 text-emerald-600"
+                            />
+                          )}
+                          <span
+                            className="shrink-0 text-[10px] text-gray-500 tabular-nums dark:text-gray-400"
+                            aria-label={`${summary.completedSteps} of ${summary.totalSteps} steps complete`}
+                          >
+                            {formatPathProgress(summary.completedSteps, summary.totalSteps)}
+                          </span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        aria-label={`Actions for ${path.title || "Untitled path"}`}
+                        aria-haspopup="true"
+                        aria-controls={`path-actions-${path.id}`}
+                        aria-expanded={openMenuId === path.id}
+                        onClick={() =>
+                          setOpenMenuId((current) => (current === path.id ? null : path.id))
+                        }
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-violet-500 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                      >
+                        <Ellipsis size={15} />
+                      </button>
+                    </div>
+                    {openMenuId === path.id && (
+                      <div
+                        id={`path-actions-${path.id}`}
+                        className="absolute top-full right-0 z-20 mt-1 flex w-48 flex-col gap-1 rounded-lg border border-gray-200 bg-white p-2 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpenMenuId(null);
+                            setEditingPathId(path.id);
+                          }}
+                          className="rounded px-2 py-1.5 text-left text-xs hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-violet-500 dark:hover:bg-gray-800"
+                        >
+                          Rename
+                        </button>
+                        <label className="flex flex-col gap-1 px-2 py-1 text-[11px] text-gray-500 dark:text-gray-400">
+                          Change status
+                          <select
+                            aria-label={`Change status for ${path.title || "Untitled path"}`}
+                            value={path.status === "draft" ? "open" : path.status}
+                            onChange={(event) => {
+                              setOpenMenuId(null);
+                              void runAction(() => onUpdatePathStatus(path.id, event.target.value));
+                            }}
+                            className="rounded border border-gray-200 bg-white px-1.5 py-1 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                          >
+                            {PATH_STATUS_OPTIONS.map((status) => (
+                              <option key={status.value} value={status.value}>
+                                {status.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpenMenuId(null);
+                            setDeleteTarget(path);
+                          }}
+                          className="rounded px-2 py-1.5 text-left text-xs text-rose-600 hover:bg-rose-50 focus-visible:outline-2 focus-visible:outline-rose-500 dark:text-rose-400 dark:hover:bg-rose-950/30"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
-      ) : (
-        <PathEditor
-          pathId={selectedPath.id}
-          fillHeight={fillHeight}
-          projectId={projectId}
-          projectTasks={tasks.filter((task) => task.type === "task")}
-          isNarrow={isNarrow}
-          mode="edit"
-        />
       )}
-    </div>
+      {error && (
+        <p role="alert" className="mt-1 text-[11px] text-rose-600 dark:text-rose-400">
+          {error}
+        </p>
+      )}
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title={`Delete “${deleteTarget?.title || "Untitled path"}”?`}
+        body="This removes the path and its steps. Linked tasks are not deleted."
+        confirmLabel="Delete path"
+        cancelLabel="Cancel"
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          const pathId = deleteTarget.id;
+          setDeleteTarget(null);
+          void runAction(() => onDeletePath(pathId));
+        }}
+      />
+    </section>
+  );
+}
+
+interface ProjectPathCanvasProps {
+  pathId: string | null;
+  projectId: string;
+  tasks: Idea[];
+  fillHeight?: boolean;
+  isNarrow?: boolean;
+  onCanvasApi?: (api: PathCanvasApi | null) => void;
+}
+
+export function ProjectPathCanvas({
+  pathId,
+  projectId,
+  tasks,
+  fillHeight = false,
+  isNarrow = false,
+  onCanvasApi,
+}: ProjectPathCanvasProps) {
+  if (!pathId) {
+    return (
+      <div
+        className={`flex min-h-0 items-center justify-center text-sm text-gray-500 dark:text-gray-400 ${
+          fillHeight ? "h-full" : "min-h-64"
+        }`}
+      >
+        Select or create a path to start planning.
+      </div>
+    );
+  }
+  return (
+    <PathEditor
+      pathId={pathId}
+      fillHeight={fillHeight}
+      projectId={projectId}
+      projectTasks={tasks.filter((task) => task.type === "task")}
+      isNarrow={isNarrow}
+      onCanvasApi={onCanvasApi}
+      mode="edit"
+    />
   );
 }

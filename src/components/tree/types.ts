@@ -108,7 +108,9 @@ export interface TreeOptions<T extends TreeItem> {
   ) => ReactNode;
   composerPlaceholder?: (composing: ComposingState) => string;
   /** Extra classes appended to every row. */
-  rowClassName?: string;
+  rowClassName?: string | ((node: TreeNode<T>) => string);
+  onRowMouseEnter?: (node: TreeNode<T>) => void;
+  onRowMouseLeave?: (node: TreeNode<T>) => void;
   /** Pixels of indentation per depth level. */
   indentSize?: number;
   /** Renders each row as a card instead of a compact label row. */

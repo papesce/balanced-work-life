@@ -3,6 +3,7 @@
 import { PathView, PathCanvasProvider } from "@/components/projects/PathView";
 import { PathPreviewSvg } from "./PathPreviewSvg";
 import type { Idea } from "@/lib/types";
+import type { PathCanvasApi } from "@/lib/projectPaths";
 
 export interface PathEditorProps {
   pathId: string;
@@ -14,6 +15,7 @@ export interface PathEditorProps {
   projectId?: string;
   projectTasks?: Idea[];
   isNarrow?: boolean;
+  onCanvasApi?: (api: PathCanvasApi | null) => void;
 }
 
 export function PathEditor({
@@ -26,6 +28,7 @@ export function PathEditor({
   projectId,
   projectTasks,
   isNarrow,
+  onCanvasApi,
 }: PathEditorProps) {
   if (mode === "preview") {
     return (
@@ -61,6 +64,7 @@ export function PathEditor({
           projectId={projectId}
           projectTasks={projectTasks}
           isNarrow={isNarrow}
+          onCanvasApi={onCanvasApi}
         />
       </PathCanvasProvider>
     </div>

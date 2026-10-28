@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import {
   ProjectDetailActions,
@@ -8,8 +9,10 @@ import {
 } from "@/components/projects/ProjectDetailHeader";
 import { ProjectDetailView } from "@/components/projects/ProjectDetailView";
 import { ProjectTasksPane } from "@/components/projects/ProjectTasksPane";
+import { ProjectPathCanvas } from "@/components/projects/ProjectPathsTab";
 import { getGroupSchemeOptions } from "@/lib/groupSchemeOptions";
 import type { ProjectsPageModel } from "@/hooks/useProjectsPage";
+import { useProjectPaths } from "@/hooks/useProjectPaths";
 
 /**
  * The focused-project detail view (AppShell + breadcrumb top + split/paths
@@ -31,7 +34,6 @@ export function ProjectDetailLayout({ model }: { model: ProjectsPageModel }) {
     canvasApi,
     handleCanvasApi,
     handleAddToPath,
-    fitTick,
     handleListResize,
     setViewMode,
     ideasHook,
@@ -68,10 +70,10 @@ export function ProjectDetailLayout({ model }: { model: ProjectsPageModel }) {
     undoAction,
     onGroupByChange,
     handleComposerAdd,
-    handleComposerAddToPath,
     handleAddTaskInGroup,
     actions,
   } = model;
+  const [hoveredPathTaskId, setHoveredPathTaskId] = useState<string | null>(null);
 
   const {
     createIdea,
@@ -92,6 +94,22 @@ export function ProjectDetailLayout({ model }: { model: ProjectsPageModel }) {
   const composerParent = focusedId
     ? (ideasHook.ideas.find((i) => i.id === focusedId) ?? null)
     : null;
+  const projectPaths = useProjectPaths(selectedProject.id);
+  const selectedPathTaskIds = useMemo(
+    () =>
+      canvasApi?.selectedPathId === projectPaths.selectedPathId
+        ? canvasApi.placedIds
+        : new Set<string>(),
+    [canvasApi, projectPaths.selectedPathId],
+  );
+  useEffect(() => {
+    const handleHighlight = (event: Event) => {
+      const { ideaId } = (event as CustomEvent<{ ideaId: string | null }>).detail ?? {};
+      setHoveredPathTaskId(ideaId && selectedPathTaskIds.has(ideaId) ? ideaId : null);
+    };
+    window.addEventListener("path-task-highlight", handleHighlight);
+    return () => window.removeEventListener("path-task-highlight", handleHighlight);
+  }, [selectedPathTaskIds]);
 
   // Shared IdeaTree props for the detail TASKS pane (single + grouped modes).
   const sharedTreeProps = {
@@ -130,6 +148,8 @@ export function ProjectDetailLayout({ model }: { model: ProjectsPageModel }) {
     hideCompleted: model.detailHideCompleted,
     hideDeferred: false,
     pathChipsForIdea: (id: string) => membership.titlesByIdea.get(id) ?? [],
+    highlightPathTaskIds: selectedPathTaskIds,
+    hoveredPathTaskId,
     onFocus: model.onFocusNode,
     cardMode: false,
     compact: effectiveMode === "split",
@@ -199,6 +219,7 @@ export function ProjectDetailLayout({ model }: { model: ProjectsPageModel }) {
 
       <ProjectDetailView
         effectiveMode={effectiveMode}
+        isNarrow={isNarrow}
         projectSplitRatio={projectSplitRatio}
         listPane={
           <ProjectTasksPane
@@ -222,21 +243,24 @@ export function ProjectDetailLayout({ model }: { model: ProjectsPageModel }) {
         }
         paths={{
           projectId: selectedProject.id,
-          tasks: projectTasks,
-          links: linksHook.links,
-          tagsForTask: taskTagsHook.getTagsForIdea,
-          onUpdateTask: updateIdea,
-          onOpenNotes: openNotes,
-          onCreateLink: (s, t, type) => createLink(s, t, type),
-          onDeleteLink: deleteLink,
-          fillHeight: effectiveMode === "split",
-          isNarrow,
-          fitTick,
-          onCanvasApi: handleCanvasApi,
-          hideClosed: model.detailHideClosed,
+          paths: projectPaths.paths,
+          selectedPathId: projectPaths.selectedPathId,
+          onSelectPath: projectPaths.selectPath,
+          onCreatePath: projectPaths.createPath,
+          onRenamePath: projectPaths.renamePath,
+          onUpdatePathStatus: projectPaths.updatePathStatus,
+          onDeletePath: projectPaths.deletePath,
         }}
-        suggestIdeas={ideasHook.ideas}
-        onComposerAddToPath={(text) => void handleComposerAddToPath(text)}
+        pathCanvas={
+          <ProjectPathCanvas
+            pathId={projectPaths.selectedPathId}
+            projectId={selectedProject.id}
+            tasks={projectTasks}
+            fillHeight
+            isNarrow={isNarrow}
+            onCanvasApi={handleCanvasApi}
+          />
+        }
         onListResize={handleListResize}
         onViewModeChange={setViewMode}
         completionEffects={completionEffects}

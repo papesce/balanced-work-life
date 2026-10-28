@@ -31,7 +31,7 @@ export function PathToolbar({
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50/50 px-4 py-2 dark:border-gray-700 dark:bg-gray-800/50">
       <div className="flex flex-wrap items-center gap-2 sm:gap-4">
         <span className="text-xs font-medium text-gray-500" aria-live="polite">
-          {stepCount} step{stepCount !== 1 ? "s" : ""} · {completedStepCount} done
+          {completedStepCount}/{stepCount} steps
         </span>
         {nextStepTitle && (
           <span className="max-w-[180px] truncate text-xs font-semibold text-violet-700 dark:text-violet-300">
