@@ -61,10 +61,12 @@ export function PathView({
   const [message, setMessage] = useState("");
   const [promotingId, setPromotingId] = useState<string | null>(null);
   const [pathLinksOpen, setPathLinksOpen] = useState(false);
+  const [standaloneTitleEditing, setStandaloneTitleEditing] = useState(false);
   const [taskToLink, setTaskToLink] = useState("");
   const [connectionTargetId, setConnectionTargetId] = useState("");
   const [stepsToDelete, setStepsToDelete] = useState<PathItem[]>([]);
   const deletingStepRef = useRef(false);
+  const cancelStandaloneTitleRef = useRef(false);
 
   const { nodes, edges, flow, itemMap } = usePathGraph({
     items: manager.items,
@@ -197,6 +199,14 @@ export function PathView({
   }, [db, manager.items, onCanvasApi, pathId, placedIds, userId]);
 
   const currentTitle = String(pathRows[0]?.text ?? "");
+  const saveStandaloneTitle = async (title: string) => {
+    if (!userId) throw new Error("Sign in to rename a path.");
+    await db.execute("UPDATE ideas SET text = ?, updated_at = ? WHERE id = ?", [
+      title,
+      new Date().toISOString(),
+      pathId,
+    ]);
+  };
 
   const { data: links } = useQuery<Record<string, unknown>>(
     userId
@@ -268,23 +278,50 @@ export function PathView({
       }`}
     >
       <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2 dark:border-gray-700">
-        {onRequestRenamePath ? (
+        {standaloneTitleEditing && !onRequestRenamePath ? (
+          <input
+            autoFocus
+            aria-label="Rename path"
+            defaultValue={currentTitle}
+            onBlur={(event) => {
+              if (cancelStandaloneTitleRef.current) {
+                cancelStandaloneTitleRef.current = false;
+                setStandaloneTitleEditing(false);
+                return;
+              }
+              setStandaloneTitleEditing(false);
+              const title = event.currentTarget.value.trim();
+              if (title && title !== currentTitle) {
+                void saveStandaloneTitle(title).catch((error: unknown) =>
+                  setMessage(error instanceof Error ? error.message : "Could not rename path."),
+                );
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                event.currentTarget.blur();
+              } else if (event.key === "Escape") {
+                cancelStandaloneTitleRef.current = true;
+                event.preventDefault();
+                event.currentTarget.blur();
+              }
+            }}
+            className="min-w-0 flex-1 rounded border border-violet-400 bg-transparent px-2 py-1 text-xs font-semibold text-gray-700 focus-visible:outline-2 focus-visible:outline-violet-500 dark:text-gray-200"
+          />
+        ) : (
           <button
             type="button"
-            onClick={() => onRequestRenamePath(pathId)}
+            onClick={() => {
+              if (onRequestRenamePath) onRequestRenamePath(pathId);
+              else setStandaloneTitleEditing(true);
+            }}
             aria-label={`Rename path ${currentTitle || "Untitled path"}`}
             title={currentTitle || "Untitled path"}
             className="min-w-0 truncate rounded px-2 py-1 text-left text-xs font-semibold text-gray-700 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-violet-500 dark:text-gray-200 dark:hover:bg-gray-800"
           >
             {currentTitle || "Untitled path"}
           </button>
-        ) : (
-          <span
-            title={currentTitle || "Untitled path"}
-            className="min-w-0 truncate px-2 py-1 text-xs font-semibold text-gray-700 dark:text-gray-200"
-          >
-            {currentTitle || "Untitled path"}
-          </span>
         )}
       </div>
       <PathToolbar
