@@ -29,6 +29,8 @@ import { PathEmptyState } from "./path/PathEmptyState";
 import type { Idea } from "@/lib/types";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { DetailsEditor } from "@/components/shared/DetailsEditor";
+import { DetailsDrawer } from "@/components/shared/DetailsDrawer";
+import { FileText } from "lucide-react";
 
 const nodeTypes = { pathNode: PathNode };
 
@@ -56,6 +58,7 @@ export function PathView({
   const [message, setMessage] = useState("");
   const [promotingId, setPromotingId] = useState<string | null>(null);
   const [pathLinksOpen, setPathLinksOpen] = useState(false);
+  const [pathDetailsOpen, setPathDetailsOpen] = useState(false);
   const [taskToLink, setTaskToLink] = useState("");
   const [connectionTargetId, setConnectionTargetId] = useState("");
   const [stepsToDelete, setStepsToDelete] = useState<PathItem[]>([]);
@@ -258,23 +261,42 @@ export function PathView({
           placeholder="Untitled path"
           className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-gray-700 outline-none dark:text-gray-200"
         />
-        <select
-          aria-label="Path status"
-          value={
-            String(pathRows[0]?.status ?? "draft") === "draft"
-              ? "open"
-              : String(pathRows[0]?.status)
-          }
-          onChange={(event) => void updatePathStatus(event.target.value)}
-          className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
-        >
-          {(["open", "completed", "cancelled", "paused"] as const).map((status) => (
-            <option key={status} value={status}>
-              {status}
-            </option>
-          ))}
-        </select>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPathDetailsOpen(true)}
+            aria-label="Open path details"
+            title="Path details and notes"
+            className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-violet-600 focus-visible:outline-2 focus-visible:outline-violet-500 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-violet-300"
+          >
+            <FileText size={14} />
+          </button>
+          <select
+            aria-label="Path status"
+            value={
+              String(pathRows[0]?.status ?? "draft") === "draft"
+                ? "open"
+                : String(pathRows[0]?.status)
+            }
+            onChange={(event) => void updatePathStatus(event.target.value)}
+            className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
+          >
+            {(["open", "completed", "cancelled", "paused"] as const).map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
+      {pathDetailsOpen && (
+        <DetailsDrawer
+          ideaId={pathId}
+          variant="path"
+          initialSection="notes"
+          onClose={() => setPathDetailsOpen(false)}
+        />
+      )}
       <PathToolbar
         stepCount={stepSummary.totalSteps}
         completedStepCount={stepSummary.completedSteps}

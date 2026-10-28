@@ -64,10 +64,12 @@ const LINK_GROUP_ORDER = [
 export function DetailsDrawer({
   ideaId,
   initialSection = "notes",
+  variant = "idea",
   onClose,
 }: {
   ideaId: string | null;
   initialSection?: DetailsSection;
+  variant?: "idea" | "path";
   onClose: () => void;
 }) {
   const { ideas, updateIdea } = useIdeas();
@@ -188,7 +190,9 @@ export function DetailsDrawer({
         <div className="flex items-center justify-between border-b border-black/5 px-4 py-3 dark:border-white/5">
           <div className="flex items-center gap-2">
             <StickyNote size={16} className="text-indigo-500" />
-            <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">Details</span>
+            <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+              {variant === "path" ? "Path details" : "Details"}
+            </span>
           </div>
           <button
             onClick={onClose}
@@ -419,18 +423,28 @@ export function DetailsDrawer({
           </div>
 
           {/* Notes Section */}
-          <DateCorrectionSection idea={idea} onUpdate={updateIdea} />
-          <ScheduleAttempts
-            idea={idea}
-            onRemoveAttempt={(date) =>
-              void updateIdea(ideaId, computeRemoveAttemptCorrection(idea, date))
-            }
-            onGoToDate={(date) => {
-              router.push(`/?date=${date}&highlight=${ideaId}`);
-              onClose();
-            }}
+          {variant === "idea" && (
+            <>
+              <DateCorrectionSection idea={idea} onUpdate={updateIdea} />
+              <ScheduleAttempts
+                idea={idea}
+                onRemoveAttempt={(date) =>
+                  void updateIdea(ideaId, computeRemoveAttemptCorrection(idea, date))
+                }
+                onGoToDate={(date) => {
+                  router.push(`/?date=${date}&highlight=${ideaId}`);
+                  onClose();
+                }}
+              />
+            </>
+          )}
+          <DetailsEditor
+            key={idea.id}
+            value={idea.notes}
+            onSave={handleSave}
+            parentId={variant === "idea" ? idea.id : undefined}
+            placeholder={variant === "path" ? "Add notes about this path…" : undefined}
           />
-          <DetailsEditor key={idea.id} value={idea.notes} onSave={handleSave} parentId={idea.id} />
         </div>
       </div>
     </div>,
