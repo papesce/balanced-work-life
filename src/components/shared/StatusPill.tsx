@@ -1,0 +1,35 @@
+"use client";
+
+import type { ReactNode } from "react";
+
+export function StatusPill({
+  children,
+  className,
+  ariaLabel,
+  onClick,
+  id,
+  ariaHasPopup,
+  ariaExpanded,
+}: {
+  children: ReactNode;
+  className: string;
+  ariaLabel: string;
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  id?: string;
+  ariaHasPopup?: "menu";
+  ariaExpanded?: boolean;
+}) {
+  return (
+    <button
+      id={id}
+      type="button"
+      aria-label={ariaLabel}
+      aria-haspopup={ariaHasPopup}
+      aria-expanded={ariaExpanded}
+      onClick={onClick}
+      className={`inline-flex min-h-6 items-center justify-center rounded-full border px-2 py-0.5 text-xs leading-tight whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-violet-500 ${className}`}
+    >
+      {children}
+    </button>
+  );
+}

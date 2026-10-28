@@ -3,9 +3,15 @@
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { ChevronDown, ChevronUp, Ellipsis, Network, Plus } from "lucide-react";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { StatusPill } from "@/components/shared/StatusPill";
 import { PathEditor } from "@/components/paths/PathEditor";
 import { useAllPathStepSummaries } from "@/hooks/usePathStepSummary";
 import { formatPathProgress, type PathCanvasApi } from "@/lib/projectPaths";
+import {
+  getPathStatusPresentation,
+  normalizePathStatus,
+  PATH_STATUS_OPTIONS,
+} from "@/lib/projectPathStatus";
 import type { Path } from "@/lib/paths";
 import type { Idea } from "@/lib/types";
 
@@ -22,13 +28,6 @@ interface PathManagementProps {
   onToggleCollapsed?: () => void;
 }
 
-const PATH_STATUS_OPTIONS = [
-  { value: "open", label: "Open" },
-  { value: "paused", label: "Paused" },
-  { value: "completed", label: "Completed" },
-  { value: "cancelled", label: "Cancelled" },
-];
-
 export function ProjectPathsTab({
   projectId,
   paths,
@@ -43,6 +42,7 @@ export function ProjectPathsTab({
 }: PathManagementProps) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [openStatusId, setOpenStatusId] = useState<string | null>(null);
   const [editingPathId, setEditingPathId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Path | null>(null);
   const [busy, setBusy] = useState(false);
@@ -53,9 +53,7 @@ export function ProjectPathsTab({
   const visiblePaths = useMemo(
     () =>
       paths.filter(
-        (path) =>
-          statusFilter === "all" ||
-          (statusFilter === "open" ? path.status === "draft" : path.status === statusFilter),
+        (path) => statusFilter === "all" || normalizePathStatus(path.status) === statusFilter,
       ),
     [paths, statusFilter],
   );
@@ -173,7 +171,7 @@ export function ProjectPathsTab({
                   totalSteps: 0,
                 };
                 const selected = path.id === selectedPathId;
-                const done = path.status === "completed";
+                const status = getPathStatusPresentation(path.status);
                 return (
                   <li key={path.id} className="relative">
                     <div
@@ -232,7 +230,7 @@ export function ProjectPathsTab({
                           }}
                           type="button"
                           aria-current={selected ? "true" : undefined}
-                          aria-label={`${path.title || "Untitled path"}, ${done ? "completed" : path.status === "draft" ? "open" : path.status}, ${formatPathProgress(summary.completedSteps, summary.totalSteps)} steps complete`}
+                          aria-label={`${path.title || "Untitled path"}, ${status.label.toLowerCase()}, ${formatPathProgress(summary.completedSteps, summary.totalSteps)} steps complete`}
                           title={path.title || "Untitled path"}
                           tabIndex={path.id === focusPathId ? 0 : -1}
                           onClick={() => onSelectPath(path.id)}
@@ -251,19 +249,19 @@ export function ProjectPathsTab({
                       )}
                       {editingPathId !== path.id && (
                         <>
-                          <span
-                            aria-label={
-                              done
-                                ? "Status: completed"
-                                : `Status: ${path.status === "draft" ? "open" : path.status}`
-                            }
-                            title={
-                              done ? "Completed" : path.status === "draft" ? "Open" : path.status
-                            }
-                            className={`h-2 w-2 shrink-0 rounded-full ${
-                              done ? "bg-emerald-500" : "bg-gray-400 dark:bg-gray-500"
-                            }`}
-                          />
+                          <StatusPill
+                            id={`path-status-${path.id}`}
+                            ariaLabel={`Status: ${status.label.toLowerCase()}. Change status`}
+                            className={status.className}
+                            ariaHasPopup="menu"
+                            ariaExpanded={openStatusId === path.id}
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              setOpenStatusId((current) => (current === path.id ? null : path.id));
+                            }}
+                          >
+                            {status.label}
+                          </StatusPill>
                           <span
                             className="shrink-0 text-[10px] text-gray-500 tabular-nums dark:text-gray-400"
                             aria-label={`${summary.completedSteps} of ${summary.totalSteps} steps complete`}
@@ -286,6 +284,29 @@ export function ProjectPathsTab({
                         <Ellipsis size={15} />
                       </button>
                     </div>
+                    {openStatusId === path.id && (
+                      <div
+                        role="menu"
+                        aria-labelledby={`path-status-${path.id}`}
+                        className="absolute top-full left-8 z-30 mt-1 flex w-36 flex-col gap-1 rounded-lg border border-gray-200 bg-white p-2 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+                      >
+                        {PATH_STATUS_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            role="menuitemradio"
+                            aria-checked={normalizePathStatus(path.status) === option.value}
+                            onClick={() => {
+                              setOpenStatusId(null);
+                              void runAction(() => onUpdatePathStatus(path.id, option.value));
+                            }}
+                            className="min-h-9 rounded px-2 text-left text-xs hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-violet-500 max-sm:min-h-11 dark:hover:bg-gray-800"
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     {openMenuId === path.id && (
                       <div
                         id={`path-actions-${path.id}`}
@@ -303,24 +324,16 @@ export function ProjectPathsTab({
                         >
                           Rename
                         </button>
-                        <label className="flex flex-col gap-1 px-2 py-1 text-[11px] text-gray-500 dark:text-gray-400">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpenMenuId(null);
+                            setOpenStatusId(path.id);
+                          }}
+                          className="rounded px-2 py-1.5 text-left text-xs hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-violet-500 dark:hover:bg-gray-800"
+                        >
                           Change status
-                          <select
-                            aria-label={`Change status for ${path.title || "Untitled path"}`}
-                            value={path.status === "draft" ? "open" : path.status}
-                            onChange={(event) => {
-                              setOpenMenuId(null);
-                              void runAction(() => onUpdatePathStatus(path.id, event.target.value));
-                            }}
-                            className="rounded border border-gray-200 bg-white px-1.5 py-1 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-                          >
-                            {PATH_STATUS_OPTIONS.map((status) => (
-                              <option key={status.value} value={status.value}>
-                                {status.label}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                        </button>
                         <button
                           type="button"
                           onClick={() => {

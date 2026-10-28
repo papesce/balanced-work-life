@@ -17,6 +17,7 @@ import { computeStatusUpdates } from "@/lib/tasks/statusTransition";
 import { TypePicker } from "./TypePicker";
 import { StatusPicker } from "./StatusPicker";
 import { TagPicker } from "@/components/shared/TagPicker";
+import { StatusPill } from "@/components/shared/StatusPill";
 
 export const TYPE_COLORS: Record<IdeaType, string> = {
   idea: "bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-700/30",
@@ -226,16 +227,17 @@ export function StatusPillSlot({
 
   return (
     <div className="relative w-20 flex-shrink-0 text-center" onClick={(e) => e.stopPropagation()}>
-      <button
+      <StatusPill
+        ariaLabel={`Status: ${STATUS_LABELS[node.status]}. Change status`}
+        className={STATUS_STYLES[node.status]}
         onClick={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();
           setPickerPos({ top: rect.bottom + 4, left: rect.left });
           setShowPicker(!showPicker);
         }}
-        className={`cursor-pointer rounded-full border px-2 py-0.5 text-xs whitespace-nowrap ${STATUS_STYLES[node.status]}`}
       >
         {STATUS_LABELS[node.status]}
-      </button>
+      </StatusPill>
       {showPicker && pickerPos && (
         <StatusPicker
           current={node.status}

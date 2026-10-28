@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 import { deserializePath, nextPathSortOrder, sortPaths } from "@/lib/paths";
 import { resolveSelectedPathId } from "@/lib/projectPaths";
+import { toStoredPathStatus } from "@/lib/projectPathStatus";
 
 export function useProjectPaths(projectId: string) {
   const { user } = useAuth();
@@ -82,7 +83,7 @@ export function useProjectPaths(projectId: string) {
     if (!userId) throw new Error("Sign in to update a path.");
     await db.execute(
       "UPDATE ideas SET status = ?, updated_at = ? WHERE id = ? AND user_id = ? AND type = 'path'",
-      [status === "open" ? "draft" : status, new Date().toISOString(), pathId, userId],
+      [toStoredPathStatus(status), new Date().toISOString(), pathId, userId],
     );
   };
 
