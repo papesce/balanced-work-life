@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { formatPathProgress, resolveSelectedPathId } from "./projectPaths";
+import { formatPathProgress, formatPathProgressLabel, resolveSelectedPathId } from "./projectPaths";
 
 describe("resolveSelectedPathId", () => {
   const paths = [{ id: "first" }, { id: "second" }];
@@ -26,5 +26,10 @@ describe("formatPathProgress", () => {
   it("formats completed and total steps", () => {
     assert.equal(formatPathProgress(3, 5), "3/5");
     assert.equal(formatPathProgress(0, 0), "0/0");
+  });
+
+  it("formats an accessible step progress label", () => {
+    assert.equal(formatPathProgressLabel(3, 5), "3 of 5 steps complete");
+    assert.equal(formatPathProgressLabel(0, 0), "0 of 0 steps complete");
   });
 });

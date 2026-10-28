@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import type { Ref } from "react";
 
 export function StatusPill({
   children,
@@ -8,6 +9,8 @@ export function StatusPill({
   ariaLabel,
   onClick,
   id,
+  buttonRef,
+  ariaControls,
   ariaHasPopup,
   ariaExpanded,
 }: {
@@ -16,14 +19,18 @@ export function StatusPill({
   ariaLabel: string;
   onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
   id?: string;
+  buttonRef?: Ref<HTMLButtonElement>;
+  ariaControls?: string;
   ariaHasPopup?: "menu";
   ariaExpanded?: boolean;
 }) {
   return (
     <button
       id={id}
+      ref={buttonRef}
       type="button"
       aria-label={ariaLabel}
+      aria-controls={ariaControls}
       aria-haspopup={ariaHasPopup}
       aria-expanded={ariaExpanded}
       onClick={onClick}

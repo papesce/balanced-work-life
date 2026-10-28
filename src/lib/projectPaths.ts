@@ -21,3 +21,7 @@ export function resolveSelectedPathId(
 export function formatPathProgress(completedSteps: number, totalSteps: number): string {
   return `${completedSteps}/${totalSteps}`;
 }
+
+export function formatPathProgressLabel(completedSteps: number, totalSteps: number): string {
+  return `${completedSteps} of ${totalSteps} steps complete`;
+}

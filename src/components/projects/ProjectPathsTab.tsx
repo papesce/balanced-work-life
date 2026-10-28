@@ -8,7 +8,11 @@ import { NotesIndicator } from "@/components/shared/NotesIndicator";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { PathEditor } from "@/components/paths/PathEditor";
 import { useAllPathStepSummaries } from "@/hooks/usePathStepSummary";
-import { formatPathProgress, type PathCanvasApi } from "@/lib/projectPaths";
+import {
+  formatPathProgress,
+  formatPathProgressLabel,
+  type PathCanvasApi,
+} from "@/lib/projectPaths";
 import {
   getPathStatusPresentation,
   normalizePathStatus,
@@ -55,6 +59,8 @@ export function ProjectPathsTab({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const rowRefs = useRef(new Map<string, HTMLButtonElement>());
+  const statusTriggerRefs = useRef(new Map<string, HTMLButtonElement>());
+  const actionTriggerRefs = useRef(new Map<string, HTMLButtonElement>());
   const cancelRenameRef = useRef(false);
   const handledRenameRequestRef = useRef<number | null>(null);
   const summaries = useAllPathStepSummaries();
@@ -100,14 +106,42 @@ export function ProjectPathsTab({
     }
   };
 
+  const handleMenuKeyDown = (
+    event: KeyboardEvent<HTMLDivElement>,
+    close: () => void,
+    trigger: HTMLButtonElement | undefined,
+  ) => {
+    const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button"));
+    if (event.key === "Escape") {
+      event.preventDefault();
+      close();
+      trigger?.focus();
+      return;
+    }
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    event.preventDefault();
+    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+    const direction = event.key === "ArrowDown" ? 1 : -1;
+    const nextIndex =
+      currentIndex < 0
+        ? direction === 1
+          ? 0
+          : items.length - 1
+        : (currentIndex + direction + items.length) % items.length;
+    items[nextIndex]?.focus();
+  };
+
   const handleRowKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     if (
       event.key === "F2" ||
       (event.key === "Enter" && visiblePaths[index]?.id === selectedPathId)
     ) {
       event.preventDefault();
+      const path = visiblePaths[index];
+      if (!path) return;
+      onSelectPath(path.id);
       cancelRenameRef.current = false;
-      setEditingPathId(visiblePaths[index]?.id ?? null);
+      setEditingPathId(path.id);
       return;
     }
     const nextIndex =
@@ -177,7 +211,7 @@ export function ProjectPathsTab({
         )}
       </div>
       {!collapsed && (
-        <div className="mt-1">
+        <div className="@container mt-1">
           {visiblePaths.length === 0 ? (
             <div className="flex min-h-9 items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
               <span>{paths.length === 0 ? "No paths yet" : "No paths match this status"}</span>
@@ -273,9 +307,15 @@ export function ProjectPathsTab({
                             setEditingPathId(path.id);
                           }}
                           onKeyDown={(event) => handleRowKeyDown(event, index)}
-                          className="flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left text-sm text-gray-700 focus-visible:outline-2 focus-visible:outline-violet-500 max-sm:min-h-11 dark:text-gray-200"
+                          className="group/title relative flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left text-sm text-gray-700 focus-visible:outline-2 focus-visible:outline-violet-500 max-sm:min-h-11 dark:text-gray-200"
                         >
                           <span className="min-w-0 flex-1 truncate rounded px-1 py-0.5 group-hover:bg-gray-100 dark:group-hover:bg-white/[0.04]">
+                            {path.title || "Untitled path"}
+                          </span>
+                          <span
+                            aria-hidden="true"
+                            className="pointer-events-none absolute top-full left-2 z-40 hidden max-w-xs rounded bg-gray-900 px-2 py-1 text-xs whitespace-normal text-white shadow-lg group-hover/title:block group-focus-visible/title:block"
+                          >
                             {path.title || "Untitled path"}
                           </span>
                         </button>
@@ -284,8 +324,13 @@ export function ProjectPathsTab({
                         <>
                           <StatusPill
                             id={`path-status-${path.id}`}
+                            buttonRef={(element) => {
+                              if (element) statusTriggerRefs.current.set(path.id, element);
+                              else statusTriggerRefs.current.delete(path.id);
+                            }}
+                            ariaControls={`path-status-menu-${path.id}`}
                             ariaLabel={`Status: ${status.label.toLowerCase()}. Change status`}
-                            className={status.className}
+                            className={`${status.className} min-h-9 px-1.5 max-sm:min-h-11`}
                             ariaHasPopup="menu"
                             ariaExpanded={openStatusId === path.id}
                             onClick={() => {
@@ -293,31 +338,45 @@ export function ProjectPathsTab({
                               setOpenStatusId((current) => (current === path.id ? null : path.id));
                             }}
                           >
-                            {status.label}
+                            <span className="@max-[240px]:hidden">{status.label}</span>
+                            <span
+                              aria-hidden="true"
+                              className="hidden h-1.5 w-1.5 rounded-full bg-current @max-[240px]:inline-block"
+                            />
                           </StatusPill>
                           <NotesIndicator
                             hasNotes={!!path.notes?.trim()}
                             onClick={() => setNotesPathId(path.id)}
-                            className="!h-9 !w-9 max-sm:!h-11 max-sm:!w-11"
+                            className="!h-9 !w-9 focus-visible:outline-2 focus-visible:outline-violet-500 max-sm:!h-11 max-sm:!w-11 @max-[280px]:hidden"
                           />
                           <span
+                            role="img"
                             className="shrink-0 text-[10px] text-gray-500 tabular-nums dark:text-gray-400"
-                            aria-label={`${summary.completedSteps} of ${summary.totalSteps} steps complete`}
+                            aria-label={formatPathProgressLabel(
+                              summary.completedSteps,
+                              summary.totalSteps,
+                            )}
                           >
                             {formatPathProgress(summary.completedSteps, summary.totalSteps)}
                           </span>
                         </>
                       )}
                       <button
+                        ref={(element) => {
+                          if (element) actionTriggerRefs.current.set(path.id, element);
+                          else actionTriggerRefs.current.delete(path.id);
+                        }}
+                        id={`path-actions-trigger-${path.id}`}
                         type="button"
                         aria-label={`Actions for ${path.title || "Untitled path"}`}
-                        aria-haspopup="true"
+                        aria-haspopup="menu"
                         aria-controls={`path-actions-${path.id}`}
                         aria-expanded={openMenuId === path.id}
-                        onClick={() =>
-                          setOpenMenuId((current) => (current === path.id ? null : path.id))
-                        }
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-violet-500 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                        onClick={() => {
+                          setOpenStatusId(null);
+                          setOpenMenuId((current) => (current === path.id ? null : path.id));
+                        }}
+                        className="flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-violet-500 max-sm:min-h-11 max-sm:min-w-11 dark:hover:bg-gray-800 dark:hover:text-gray-200"
                       >
                         <Ellipsis size={15} />
                       </button>
@@ -325,7 +384,15 @@ export function ProjectPathsTab({
                     {openStatusId === path.id && (
                       <div
                         role="menu"
+                        id={`path-status-menu-${path.id}`}
                         aria-labelledby={`path-status-${path.id}`}
+                        onKeyDown={(event) =>
+                          handleMenuKeyDown(
+                            event,
+                            () => setOpenStatusId(null),
+                            statusTriggerRefs.current.get(path.id),
+                          )
+                        }
                         className="absolute top-full left-8 z-30 mt-1 flex w-36 flex-col gap-1 rounded-lg border border-gray-200 bg-white p-2 shadow-lg dark:border-gray-700 dark:bg-gray-900"
                       >
                         {PATH_STATUS_OPTIONS.map((option) => (
@@ -336,6 +403,7 @@ export function ProjectPathsTab({
                             aria-checked={normalizePathStatus(path.status) === option.value}
                             onClick={() => {
                               setOpenStatusId(null);
+                              statusTriggerRefs.current.get(path.id)?.focus();
                               void runAction(() => onUpdatePathStatus(path.id, option.value));
                             }}
                             className="min-h-9 rounded px-2 text-left text-xs hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-violet-500 max-sm:min-h-11 dark:hover:bg-gray-800"
@@ -347,48 +415,62 @@ export function ProjectPathsTab({
                     )}
                     {openMenuId === path.id && (
                       <div
+                        role="menu"
                         id={`path-actions-${path.id}`}
+                        aria-labelledby={`path-actions-trigger-${path.id}`}
+                        onKeyDown={(event) =>
+                          handleMenuKeyDown(
+                            event,
+                            () => setOpenMenuId(null),
+                            actionTriggerRefs.current.get(path.id),
+                          )
+                        }
                         className="absolute top-full right-0 z-20 mt-1 flex w-48 flex-col gap-1 rounded-lg border border-gray-200 bg-white p-2 shadow-lg dark:border-gray-700 dark:bg-gray-900"
                       >
                         <button
                           type="button"
+                          role="menuitem"
                           onClick={() => {
                             setOpenMenuId(null);
                             onSelectPath(path.id);
                             cancelRenameRef.current = false;
                             setEditingPathId(path.id);
                           }}
-                          className="rounded px-2 py-1.5 text-left text-xs hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-violet-500 dark:hover:bg-gray-800"
+                          className="min-h-9 rounded px-2 text-left text-xs hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-violet-500 max-sm:min-h-11 dark:hover:bg-gray-800"
                         >
                           Rename
                         </button>
                         <button
                           type="button"
+                          role="menuitem"
                           onClick={() => {
                             setOpenMenuId(null);
                             setOpenStatusId(path.id);
+                            statusTriggerRefs.current.get(path.id)?.focus();
                           }}
-                          className="rounded px-2 py-1.5 text-left text-xs hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-violet-500 dark:hover:bg-gray-800"
+                          className="min-h-9 rounded px-2 text-left text-xs hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-violet-500 max-sm:min-h-11 dark:hover:bg-gray-800"
                         >
                           Change status
                         </button>
                         <button
                           type="button"
+                          role="menuitem"
                           onClick={() => {
                             setOpenMenuId(null);
                             setNotesPathId(path.id);
                           }}
-                          className="rounded px-2 py-1.5 text-left text-xs hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-violet-500 dark:hover:bg-gray-800"
+                          className="min-h-9 rounded px-2 text-left text-xs hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-violet-500 max-sm:min-h-11 dark:hover:bg-gray-800"
                         >
                           Open notes
                         </button>
                         <button
                           type="button"
+                          role="menuitem"
                           onClick={() => {
                             setOpenMenuId(null);
                             setDeleteTarget(path);
                           }}
-                          className="rounded px-2 py-1.5 text-left text-xs text-rose-600 hover:bg-rose-50 focus-visible:outline-2 focus-visible:outline-rose-500 dark:text-rose-400 dark:hover:bg-rose-950/30"
+                          className="min-h-9 rounded px-2 text-left text-xs text-rose-600 hover:bg-rose-50 focus-visible:outline-2 focus-visible:outline-rose-500 max-sm:min-h-11 dark:text-rose-400 dark:hover:bg-rose-950/30"
                         >
                           Delete
                         </button>
