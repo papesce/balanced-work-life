@@ -368,7 +368,7 @@ export const QuickNoteCapture = memo(function QuickNoteCapture({
               }}
               className="rounded-lg bg-violet-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-violet-700"
             >
-              Process selection
+              Create from selection
             </button>
             <button
               onClick={() => void handleConvertToPath()}

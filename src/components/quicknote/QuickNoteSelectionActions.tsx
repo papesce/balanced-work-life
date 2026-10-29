@@ -1,29 +1,13 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useQuery } from "@powersync/react";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  Plus,
-  GitBranch,
-  Check,
-  MoreHorizontal,
-  Eye,
-  LayoutDashboard,
-  CalendarDays,
-  Telescope,
-  BrainCircuit,
-  FolderKanban,
-  Target,
-  ChevronLeft,
-  ArrowRight,
-} from "lucide-react";
-import { useQuickNoteEditor, useQuickNoteData } from "@/contexts/QuickNoteContext";
-import { parseTaskBlock, findBestMatch, isTaskLine } from "@/lib/quickNotes";
+import { Plus, GitBranch, Check, MoreHorizontal } from "lucide-react";
+import { useQuickNoteData } from "@/contexts/QuickNoteContext";
+import { parseTaskBlock, isTaskLine } from "@/lib/quickNotes";
 import { Idea, IdeaType } from "@/lib/types";
 import { getToday, getTomorrow, formatDate } from "@/lib/dateUtils";
-import { getRevealHref, getSmartRevealView, getRevealLabel, type RevealView } from "@/lib/reveal";
 import { IdeaSearchPicker } from "@/components/brainstorm/IdeaSearchPicker";
 
 const KIND_PILL_STYLES: Record<IdeaType, string> = {
@@ -49,8 +33,7 @@ type PickerMode = null | "create_under";
 
 /**
  * Actions for an arbitrary text selection from the capture textarea.
- * Successful create and match actions resolve the selected text and retain
- * the associated idea ID in the note.
+ * Creating an idea resolves the selected text and retains its ID in the note.
  */
 export function QuickNoteSelectionActions({
   selection,
@@ -62,14 +45,11 @@ export function QuickNoteSelectionActions({
   onMarked: (ideaId: string) => void;
   onDone: () => void;
 }) {
-  const router = useRouter();
   const { user } = useAuth();
-  const { createSelectionIdea, closePanel } = useQuickNoteData();
-  const { flushNow } = useQuickNoteEditor();
+  const { createSelectionIdea } = useQuickNoteData();
   const [saving, setSaving] = useState(false);
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
   const [overflowOpen, setOverflowOpen] = useState(false);
-  const [revealSubmenuOpen, setRevealSubmenuOpen] = useState(false);
   const [kindOverride, setKindOverride] = useState<IdeaType | null>(null);
   const [scheduledDate, setScheduledDate] = useState<string | null>(null);
   const overflowRef = useRef<HTMLDivElement>(null);
@@ -85,12 +65,6 @@ export function QuickNoteSelectionActions({
   const taskLines = useMemo(() => selection.split("\n"), [selection]);
   const firstLine = taskLines[0]?.trim() ?? "";
   const parsed = useMemo(() => parseTaskBlock(taskLines), [taskLines]);
-  const suggestedMatch = useMemo(
-    () => (parsed.title ? findBestMatch(parsed.title, allIdeas) : null),
-    [parsed.title, allIdeas],
-  );
-  const hasMatch = !!suggestedMatch && suggestedMatch.score >= 0.6;
-  const smartView = hasMatch ? getSmartRevealView(suggestedMatch!.idea, allIdeas) : null;
   // Selections starting with the processed mark can't be created again.
   const hasMarked = selection.trimStart().startsWith("✓");
   // Effective type: explicit user choice wins, then #tag, then "- " → task.
@@ -110,10 +84,8 @@ export function QuickNoteSelectionActions({
   useEffect(() => {
     if (!overflowOpen) return;
     const handler = (e: MouseEvent) => {
-      if (overflowRef.current && !overflowRef.current.contains(e.target as Node)) {
+      if (overflowRef.current && !overflowRef.current.contains(e.target as Node))
         setOverflowOpen(false);
-        setRevealSubmenuOpen(false);
-      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -134,22 +106,6 @@ export function QuickNoteSelectionActions({
       }
     },
     [createSelectionIdea, selection, effectiveKind, scheduledDate, onMarked, onDone],
-  );
-
-  const handleNavigate = useCallback(
-    async (ideaId: string, view?: RevealView) => {
-      const idea = allIdeas.find((i) => i.id === ideaId);
-      if (!idea) return;
-      const target = view ?? getSmartRevealView(idea, allIdeas);
-      onMarked(ideaId);
-      // Persist the mark before leaving: the debounced autosave may not
-      // have landed yet when the route changes.
-      await flushNow();
-      onDone();
-      closePanel();
-      router.push(getRevealHref(target, idea, allIdeas));
-    },
-    [allIdeas, closePanel, flushNow, onMarked, onDone, router],
   );
 
   const preview = selection.length > 120 ? selection.slice(0, 120).trimEnd() + "…" : selection;
@@ -246,53 +202,18 @@ export function QuickNoteSelectionActions({
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-1">
-        {hasMatch ? (
-          <>
-            <button
-              onClick={() => handleNavigate(suggestedMatch!.idea.id)}
-              disabled={saving}
-              className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-violet-600 px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Check size={12} />
-              Match “{suggestedMatch!.idea.text}”
-            </button>
-            <button
-              onClick={() => handleNavigate(suggestedMatch!.idea.id, smartView!)}
-              disabled={saving}
-              className="flex cursor-pointer items-center gap-1 rounded-lg bg-gray-100 px-2 py-1.5 text-[11px] font-medium text-gray-600 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-            >
-              <ArrowRight size={11} />
-              Go to {getRevealLabel(smartView!)}
-            </button>
-            <button
-              onClick={() => void handleCreate()}
-              disabled={saving || hasMarked}
-              title={hasMarked ? "Already processed" : undefined}
-              className="flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-medium text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-            >
-              <Plus size={11} />
-              {createLabel}
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              onClick={() => void handleCreate()}
-              disabled={saving || hasMarked}
-              title={hasMarked ? "Already processed" : undefined}
-              className="flex cursor-pointer items-center gap-1 rounded-lg bg-violet-600 px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Plus size={11} />
-              {createLabel}
-            </button>
-          </>
-        )}
+        <button
+          onClick={() => void handleCreate()}
+          disabled={saving || hasMarked}
+          title={hasMarked ? "Already processed" : undefined}
+          className="flex cursor-pointer items-center gap-1 rounded-lg bg-violet-600 px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Plus size={11} />
+          {createLabel}
+        </button>
         <div className="relative" ref={overflowRef}>
           <button
-            onClick={() => {
-              setOverflowOpen(!overflowOpen);
-              setRevealSubmenuOpen(false);
-            }}
+            onClick={() => setOverflowOpen(!overflowOpen)}
             disabled={saving}
             className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-gray-800 dark:hover:text-gray-300"
             aria-label="More actions"
@@ -301,114 +222,22 @@ export function QuickNoteSelectionActions({
           </button>
           {overflowOpen && (
             <div className="absolute right-0 z-20 mt-1 w-44 rounded-xl border border-black/10 bg-white py-1 shadow-lg dark:border-white/10 dark:bg-gray-800">
-              {revealSubmenuOpen ? (
-                <>
-                  <button
-                    onClick={() => setRevealSubmenuOpen(false)}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                  >
-                    <ChevronLeft size={12} />
-                    Back
-                  </button>
-                  <div className="my-1 border-t border-black/5 dark:border-white/5" />
-                  <SelectionRevealOption
-                    view="planner"
-                    icon={<LayoutDashboard size={12} />}
-                    label="Daily Planner"
-                    ideaId={suggestedMatch?.idea.id}
-                    onSelect={handleNavigate}
-                  />
-                  <SelectionRevealOption
-                    view="timeline"
-                    icon={<CalendarDays size={12} />}
-                    label="Timeline"
-                    ideaId={suggestedMatch?.idea.id}
-                    onSelect={handleNavigate}
-                  />
-                  <SelectionRevealOption
-                    view="horizon"
-                    icon={<Telescope size={12} />}
-                    label="Horizon"
-                    ideaId={suggestedMatch?.idea.id}
-                    onSelect={handleNavigate}
-                  />
-                  <SelectionRevealOption
-                    view="brainstorm"
-                    icon={<BrainCircuit size={12} />}
-                    label="Brainstorm"
-                    ideaId={suggestedMatch?.idea.id}
-                    onSelect={handleNavigate}
-                  />
-                  <SelectionRevealOption
-                    view="projects"
-                    icon={<FolderKanban size={12} />}
-                    label="Projects"
-                    ideaId={suggestedMatch?.idea.id}
-                    onSelect={handleNavigate}
-                  />
-                  <SelectionRevealOption
-                    view="goals"
-                    icon={<Target size={12} />}
-                    label="Goals"
-                    ideaId={suggestedMatch?.idea.id}
-                    onSelect={handleNavigate}
-                  />
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={() => {
-                      setOverflowOpen(false);
-                      setPickerMode("create_under");
-                    }}
-                    disabled={saving || hasMarked}
-                    title={hasMarked ? "Already processed" : undefined}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                  >
-                    <GitBranch size={12} />
-                    Create under…
-                  </button>
-                  {hasMatch && (
-                    <button
-                      onClick={() => setRevealSubmenuOpen(true)}
-                      disabled={saving}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                    >
-                      <Eye size={12} />
-                      Reveal in…
-                    </button>
-                  )}
-                </>
-              )}
+              <button
+                onClick={() => {
+                  setOverflowOpen(false);
+                  setPickerMode("create_under");
+                }}
+                disabled={saving || hasMarked}
+                title={hasMarked ? "Already processed" : undefined}
+                className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+              >
+                <GitBranch size={12} />
+                Create under…
+              </button>
             </div>
           )}
         </div>
       </div>
     </div>
-  );
-}
-
-function SelectionRevealOption({
-  view,
-  icon,
-  label,
-  ideaId,
-  onSelect,
-}: {
-  view: RevealView;
-  icon: React.ReactNode;
-  label: string;
-  ideaId: string | undefined;
-  onSelect: (ideaId: string, view: RevealView) => void;
-}) {
-  return (
-    <button
-      onClick={() => ideaId && onSelect(ideaId, view)}
-      disabled={!ideaId}
-      className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] disabled:opacity-40 dark:text-gray-300 dark:hover:bg-white/[0.04]"
-    >
-      {icon}
-      {label}
-    </button>
   );
 }
