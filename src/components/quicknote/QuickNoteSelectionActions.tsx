@@ -49,8 +49,8 @@ type PickerMode = null | "create_under";
 
 /**
  * Actions for an arbitrary text selection from the capture textarea.
- * Creates ideas from the selection without touching note text — no line
- * resolution, no archiving. "Match" is navigate-only.
+ * Successful create and match actions resolve the selected text and retain
+ * the associated idea ID in the note.
  */
 export function QuickNoteSelectionActions({
   selection,
@@ -58,8 +58,8 @@ export function QuickNoteSelectionActions({
   onDone,
 }: {
   selection: string;
-  /** Insert the ✓ mark at the selection start (no-op for archived notes). */
-  onMarked: () => void;
+  /** Mark the selection and associate it with the created or matched idea. */
+  onMarked: (ideaId: string) => void;
   onDone: () => void;
 }) {
   const router = useRouter();
@@ -127,7 +127,7 @@ export function QuickNoteSelectionActions({
           type: effectiveKind,
           scheduled_date: scheduledDate,
         });
-        if (id) onMarked();
+        if (id) onMarked(id);
         onDone();
       } finally {
         setSaving(false);
@@ -141,7 +141,7 @@ export function QuickNoteSelectionActions({
       const idea = allIdeas.find((i) => i.id === ideaId);
       if (!idea) return;
       const target = view ?? getSmartRevealView(idea, allIdeas);
-      onMarked();
+      onMarked(ideaId);
       // Persist the mark before leaving: the debounced autosave may not
       // have landed yet when the route changes.
       await flushNow();

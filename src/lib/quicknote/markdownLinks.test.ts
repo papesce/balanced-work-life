@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { parseNoteLinks } from "./markdownLinks";
+import { formatIdeaReference, parseNoteLinks } from "./markdownLinks";
 
 describe("parseNoteLinks", () => {
   it("splits Markdown links from surrounding text", () => {
@@ -16,6 +16,27 @@ describe("parseNoteLinks", () => {
       { type: "text", value: "First line\n" },
       { type: "link", label: "email", href: "mailto:team@example.com" },
     ]);
+  });
+
+  it("parses idea references for Quick Note previews only", () => {
+    const text = "✓ [Call the dentist](idea:idea-123)";
+    assert.deepEqual(parseNoteLinks(text, true), [
+      { type: "text", value: "✓ " },
+      { type: "idea", label: "Call the dentist", ideaId: "idea-123" },
+    ]);
+    assert.deepEqual(parseNoteLinks(text), [{ type: "text", value: text }]);
+  });
+
+  it("unescapes linked labels and leaves malformed idea references as text", () => {
+    assert.deepEqual(
+      parseNoteLinks(`✓ ${formatIdeaReference("Review ] brackets", "idea-123")}`, true),
+      [
+        { type: "text", value: "✓ " },
+        { type: "idea", label: "Review ] brackets", ideaId: "idea-123" },
+      ],
+    );
+    const malformed = "[missing id](idea:)";
+    assert.deepEqual(parseNoteLinks(malformed, true), [{ type: "text", value: malformed }]);
   });
 
   it("leaves unsafe and malformed links as plain text", () => {

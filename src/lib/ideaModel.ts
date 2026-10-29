@@ -31,6 +31,7 @@ export function computeCollapsedIds(
   const parents = new Set(
     ideas.filter((i) => ideas.some((c) => c.parent_id === i.id)).map((i) => i.id),
   );
+  const pathIds = new Set<string>(ideas.filter((i) => i.type === "path").map((i) => i.id));
   const hasSearch = search.trim().length > 0;
 
   const nodeHasSearchMatch = (ideaId: string): boolean => {
@@ -44,6 +45,9 @@ export function computeCollapsedIds(
   };
 
   for (const id of parents) {
+    // Paths drive the mini plan rather than tree children; they are handled
+    // below so they default to expanded instead of the depth rule.
+    if (pathIds.has(id)) continue;
     const depth = depths.get(id) ?? 0;
     const override = overrides.get(id);
     if (override === "expanded") continue;
@@ -52,6 +56,17 @@ export function computeCollapsedIds(
       collapsed.add(id);
     }
   }
+
+  // Paths: collapsed only when the user explicitly collapsed the row (stored
+  // in `overrides`); otherwise expanded so the mini plan is visible by default.
+  // Without this, a path's collapse is lost on every rawRowCount/search
+  // re-computation and the mini plan reverts to expanded.
+  for (const id of pathIds) {
+    if (overrides.get(id) === "collapsed") {
+      collapsed.add(id);
+    }
+  }
+
   return collapsed;
 }
 

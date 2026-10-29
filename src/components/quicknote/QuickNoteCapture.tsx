@@ -2,6 +2,7 @@
 
 import { memo, useRef, useEffect, useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@powersync/react";
 import { Eye, Pencil, Search } from "lucide-react";
 import {
   useQuickNoteEditor,
@@ -11,8 +12,12 @@ import {
 import { QuickNoteSaveIndicator } from "./QuickNoteSaveIndicator";
 import { QuickNoteSelectionActions } from "./QuickNoteSelectionActions";
 import { QuickNoteIdeaSearch } from "./QuickNoteIdeaSearch";
+import { QuickNoteIdeaLink } from "./QuickNoteIdeaLink";
 import { requestGlobalSearch } from "@/lib/globalSearchBus";
-import { parseNoteLinks } from "@/lib/quicknote/markdownLinks";
+import { formatIdeaReference, parseNoteLinks } from "@/lib/quicknote/markdownLinks";
+import { useAuth } from "@/hooks/useAuth";
+import { getRevealHref, type RevealView } from "@/lib/reveal";
+import type { Idea } from "@/lib/types";
 
 const SUGGESTIONS_STORAGE_KEY = "quicknote-auto-suggestions";
 
@@ -39,10 +44,18 @@ export const QuickNoteCapture = memo(function QuickNoteCapture({
   const { noteId, isSelectedNoteLive, reopenNote } = useQuickNoteCaptureMeta();
   const { closePanel } = useQuickNoteData();
   const { convertToPath } = useQuickNoteData();
+  const { user } = useAuth();
   const router = useRouter();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const readonly = !isSelectedNoteLive;
-  const previewSegments = useMemo(() => parseNoteLinks(draft), [draft]);
+  const previewSegments = useMemo(() => parseNoteLinks(draft, true), [draft]);
+  const { data: ideaRows } = useQuery<Record<string, unknown>>(
+    user
+      ? "SELECT * FROM ideas WHERE user_id = ? ORDER BY sort_order ASC"
+      : "SELECT * FROM ideas WHERE 0",
+    user ? [user.id] : [],
+  );
+  const allIdeas: Idea[] = useMemo(() => (ideaRows as unknown as Idea[]) ?? [], [ideaRows]);
   const [selection, setSelection] = useState<{ start: number; end: number; text: string } | null>(
     null,
   );
@@ -177,32 +190,39 @@ export const QuickNoteCapture = memo(function QuickNoteCapture({
     [handleSelectionDone, closePanel],
   );
 
-  // Insert a "✓ " mark at the selection start after successful processing.
-  // Skipped for archived notes so their text stays pristine. Offsets are
-  // safe: typing clears selection state, so the actions UI only exists
-  // while the offsets are intact.
-  const handleSelectionMarked = useCallback(() => {
-    if (readonly || !selection) {
-      handleSelectionDone();
-      return;
-    }
-    const marked = draft.slice(0, selection.start) + "✓ " + draft.slice(selection.start);
-    updateText(marked);
-    setSelection(null);
-    setSelectionOpen(false);
-    const el = textareaRef.current;
-    if (el) {
-      const pos = selection.start + 2;
-      // Defer so it runs after the controlled value re-renders.
-      requestAnimationFrame(() => el.setSelectionRange(pos, pos));
-    }
-  }, [readonly, selection, draft, updateText, handleSelectionDone]);
+  // Resolve the selection and persist its idea reference after processing.
+  // Skipped for archived notes so their text stays pristine.
+  const handleSelectionMarked = useCallback(
+    (ideaId: string) => {
+      if (readonly || !selection) {
+        handleSelectionDone();
+        return;
+      }
+      const markedSelection = `✓ ${formatIdeaReference(selection.text, ideaId)}`;
+      const marked = draft.slice(0, selection.start) + markedSelection + draft.slice(selection.end);
+      updateText(marked);
+      setSelection(null);
+      setSelectionOpen(false);
+      const el = textareaRef.current;
+      if (el) {
+        const pos = selection.start + 2;
+        // Defer so it runs after the controlled value re-renders.
+        requestAnimationFrame(() => el.setSelectionRange(pos, pos));
+      }
+    },
+    [readonly, selection, draft, updateText, handleSelectionDone],
+  );
 
-  // NOTE: previously the textarea was bound to `draft` with internal
-  // `[matched:<id>]` tags stripped for display. The next keystroke then fed
-  // the stripped text back through updateText, permanently deleting the
-  // match metadata (breaking undo/match linkage). The draft is now bound
-  // verbatim — tags stay intact.
+  const handleRevealIdea = useCallback(
+    async (idea: Idea, view: RevealView) => {
+      await flushNow();
+      await closePanel();
+      router.push(getRevealHref(view, idea, allIdeas));
+    },
+    [allIdeas, closePanel, flushNow, router],
+  );
+
+  // Keep the raw idea-reference notation in the editor; only Preview hides it.
   const handleBlur = useCallback(() => {
     if (readonly) return;
     void flushNow();
@@ -279,7 +299,14 @@ export const QuickNoteCapture = memo(function QuickNoteCapture({
               <span className="text-gray-400 italic dark:text-gray-500">Empty note</span>
             ) : (
               previewSegments.map((segment, index) =>
-                segment.type === "link" ? (
+                segment.type === "idea" ? (
+                  <QuickNoteIdeaLink
+                    key={`${segment.ideaId}-${index}`}
+                    segment={segment}
+                    ideas={allIdeas}
+                    onReveal={(idea, view) => void handleRevealIdea(idea, view)}
+                  />
+                ) : segment.type === "link" ? (
                   <a
                     key={index}
                     href={segment.href}

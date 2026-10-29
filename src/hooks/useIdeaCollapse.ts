@@ -89,14 +89,20 @@ export function useIdeaCollapse({
     const parents = new Set(
       ideas.filter((i) => ideas.some((c) => c.parent_id === i.id)).map((i) => i.id),
     );
+    const pathIds = new Set<string>(ideas.filter((i) => i.type === "path").map((i) => i.id));
     for (const id of parents) {
       const depth = getDepthMap(ideas).get(id) ?? 0;
       if (depth < DEFAULT_EXPAND_DEPTH) {
         overridesRef.current.set(id, "collapsed");
       }
     }
+    // Paths aren't covered by the depth rule; collapse them too (mini plans
+    // hide) and record an override so the state survives re-computation.
+    for (const id of pathIds) {
+      overridesRef.current.set(id, "collapsed");
+    }
     writeTreeOverrides(storageKey, overridesRef.current);
-    setCollapsedIds(parents);
+    setCollapsedIds(new Set([...parents, ...pathIds]));
   };
 
   const tree = useMemo(() => buildIdeaTree(ideas, collapsedIds), [ideas, collapsedIds]);
