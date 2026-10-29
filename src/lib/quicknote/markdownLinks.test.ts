@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { formatIdeaReference, parseNoteLinks } from "./markdownLinks";
+import { formatIdeaReference, markIdeaReferenceInNote, parseNoteLinks } from "./markdownLinks";
 
 describe("parseNoteLinks", () => {
   it("splits Markdown links from surrounding text", () => {
@@ -46,5 +46,17 @@ describe("parseNoteLinks", () => {
 
   it("returns an empty list for empty text", () => {
     assert.deepEqual(parseNoteLinks(""), []);
+  });
+});
+
+describe("markIdeaReferenceInNote", () => {
+  it("replaces the selected text with a checked idea reference and preserves surrounding text", () => {
+    const note = "Before buy elastic bands after";
+    const selection = { start: 7, end: 24, text: "buy elastic bands" };
+
+    assert.equal(
+      markIdeaReferenceInNote(note, selection, "idea-123"),
+      "Before ✓ [buy elastic bands](idea:idea-123) after",
+    );
   });
 });

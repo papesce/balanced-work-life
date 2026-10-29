@@ -14,6 +14,15 @@ export function formatIdeaReference(label: string, ideaId: string): string {
   return `[${escapedLabel}](idea:${ideaId})`;
 }
 
+export function markIdeaReferenceInNote(
+  noteText: string,
+  selection: { start: number; end: number; text: string },
+  ideaId: string,
+): string {
+  const markedSelection = `✓ ${formatIdeaReference(selection.text, ideaId)}`;
+  return noteText.slice(0, selection.start) + markedSelection + noteText.slice(selection.end);
+}
+
 function isSafeNoteHref(href: string): boolean {
   try {
     const protocol = new URL(href).protocol;

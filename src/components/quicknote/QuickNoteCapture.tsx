@@ -14,7 +14,7 @@ import { QuickNoteSelectionActions } from "./QuickNoteSelectionActions";
 import { QuickNoteIdeaSearch } from "./QuickNoteIdeaSearch";
 import { QuickNoteIdeaLink } from "./QuickNoteIdeaLink";
 import { requestGlobalSearch } from "@/lib/globalSearchBus";
-import { formatIdeaReference, parseNoteLinks } from "@/lib/quicknote/markdownLinks";
+import { markIdeaReferenceInNote, parseNoteLinks } from "@/lib/quicknote/markdownLinks";
 import { useAuth } from "@/hooks/useAuth";
 import { getRevealHref, type RevealView } from "@/lib/reveal";
 import type { Idea } from "@/lib/types";
@@ -198,8 +198,7 @@ export const QuickNoteCapture = memo(function QuickNoteCapture({
         handleSelectionDone();
         return;
       }
-      const markedSelection = `✓ ${formatIdeaReference(selection.text, ideaId)}`;
-      const marked = draft.slice(0, selection.start) + markedSelection + draft.slice(selection.end);
+      const marked = markIdeaReferenceInNote(draft, selection, ideaId);
       updateText(marked);
       setSelection(null);
       setSelectionOpen(false);
@@ -396,6 +395,9 @@ export const QuickNoteCapture = memo(function QuickNoteCapture({
             initialQuery={ideaSearchQuery}
             hideCompleted={hideCompletedIdeas}
             onHideCompletedChange={setHideCompletedIdeas}
+            onLinkSelectedText={
+              editing && selection && !readonly ? handleSelectionMarked : undefined
+            }
             onDone={handleSelectionDone}
             onOpenInGlobalSearch={(q) => void handleOpenInGlobalSearch(q)}
           />

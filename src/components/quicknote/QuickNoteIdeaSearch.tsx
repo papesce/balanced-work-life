@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@powersync/react";
 import {
   Eye,
+  Link2,
   LayoutDashboard,
   CalendarDays,
   Telescope,
@@ -44,12 +45,15 @@ export function QuickNoteIdeaSearch({
   initialQuery,
   hideCompleted,
   onHideCompletedChange,
+  onLinkSelectedText,
   onDone,
   onOpenInGlobalSearch,
 }: {
   initialQuery: string;
   hideCompleted: boolean;
   onHideCompletedChange: (hide: boolean) => void;
+  /** Link the active editable note selection to a result without navigating. */
+  onLinkSelectedText?: (ideaId: string) => void;
   /** Clear selection/search UI state (does not close the panel). */
   onDone: () => void;
   /** Fall back to the header global search (closes the panel). */
@@ -143,33 +147,48 @@ export function QuickNoteIdeaSearch({
         renderActions={(idea) => {
           const targets = VIEWS.filter((v) => canRevealInView(v, idea, allIdeas));
           return (
-            <div className="relative" ref={eyeFor === idea.id ? eyeRef : undefined}>
-              <button
-                onClick={() => setEyeFor((cur) => (cur === idea.id ? null : idea.id))}
-                title="Reveal in…"
-                aria-label={`Reveal "${idea.text || "untitled"}" in…`}
-                className="flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:hover:bg-white/5 dark:hover:text-gray-200"
-              >
-                <Eye size={11} />
-                Reveal in…
-              </button>
-              {eyeFor === idea.id && (
-                <div className="absolute right-0 z-20 mt-1 w-44 rounded-xl border border-black/10 bg-white py-1 shadow-lg dark:border-white/10 dark:bg-gray-800">
-                  {targets.length === 0 && (
-                    <p className="px-3 py-2 text-xs text-gray-400 italic">No view can show this</p>
-                  )}
-                  {targets.map((view) => (
-                    <button
-                      key={view}
-                      onClick={() => void handleReveal(idea, view)}
-                      className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                    >
-                      {VIEW_ICON[view]}
-                      {getRevealLabel(view)}
-                    </button>
-                  ))}
-                </div>
+            <div className="flex items-center gap-1">
+              {onLinkSelectedText && (
+                <button
+                  onClick={() => onLinkSelectedText(idea.id)}
+                  title={`Link selected text to "${idea.text || "untitled"}"`}
+                  aria-label={`Link selected text to "${idea.text || "untitled"}"`}
+                  className="flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold text-violet-600 transition-colors hover:bg-violet-50 dark:text-violet-300 dark:hover:bg-violet-500/10"
+                >
+                  <Link2 size={11} />
+                  Link
+                </button>
               )}
+              <div className="relative" ref={eyeFor === idea.id ? eyeRef : undefined}>
+                <button
+                  onClick={() => setEyeFor((cur) => (cur === idea.id ? null : idea.id))}
+                  title="Reveal in…"
+                  aria-label={`Reveal "${idea.text || "untitled"}" in…`}
+                  className="flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:hover:bg-white/5 dark:hover:text-gray-200"
+                >
+                  <Eye size={11} />
+                  Reveal in…
+                </button>
+                {eyeFor === idea.id && (
+                  <div className="absolute right-0 z-20 mt-1 w-44 rounded-xl border border-black/10 bg-white py-1 shadow-lg dark:border-white/10 dark:bg-gray-800">
+                    {targets.length === 0 && (
+                      <p className="px-3 py-2 text-xs text-gray-400 italic">
+                        No view can show this
+                      </p>
+                    )}
+                    {targets.map((view) => (
+                      <button
+                        key={view}
+                        onClick={() => void handleReveal(idea, view)}
+                        className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 transition-colors hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                      >
+                        {VIEW_ICON[view]}
+                        {getRevealLabel(view)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           );
         }}
