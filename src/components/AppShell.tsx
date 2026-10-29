@@ -32,12 +32,7 @@ export function AppShell({
   fillViewport,
   onAdd,
 }: AppShellProps) {
-  const {
-    openPanel: openQuickNote,
-    pendingNotesCount,
-    totalUnreadCount,
-    openNotes,
-  } = useQuickNoteData();
+  const { openPanel: openQuickNote, totalUnreadCount, openNotes } = useQuickNoteData();
   // Badge shows the open-note count; its color escalates with both the
   // note pile (>5 open notes) and the actionable task sum (amber at 5+,
   // red at 10+ tasks).
@@ -49,8 +44,8 @@ export function AppShell({
         ? "bg-amber-500"
         : "bg-violet-600";
   const quickNoteLabel =
-    totalUnreadCount > 0
-      ? `Quick Notes (${totalUnreadCount} task${totalUnreadCount === 1 ? "" : "s"} across ${pendingNotesCount} note${pendingNotesCount === 1 ? "" : "s"}) (⌘⌥N)`
+    openNotes.length > 0
+      ? `Quick Notes (${openNotes.length} note${openNotes.length === 1 ? "" : "s"}) (⌘⌥N)`
       : "Quick Note (⌘⌥N)";
 
   const setPrefs = useUiPrefsStore((s) => s.set);
@@ -115,12 +110,14 @@ export function AppShell({
               className="flex h-9 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/80 px-2.5 text-gray-600 transition-colors hover:bg-gray-100 hover:text-violet-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:border-gray-700 dark:bg-gray-900/80 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-violet-400"
               title={quickNoteLabel}
               aria-label={
-                totalUnreadCount > 0 ? `Open quick notes, ${quickNoteLabel}` : "Open quick notes"
+                openNotes.length > 0
+                  ? `Open quick notes, ${openNotes.length} open note${openNotes.length === 1 ? "" : "s"}`
+                  : "Open quick notes"
               }
             >
               <StickyNote size={16} />
               <span className="hidden text-xs font-semibold sm:inline">Quick note</span>
-              {totalUnreadCount > 0 && (
+              {openNotes.length > 0 && (
                 <span
                   aria-hidden="true"
                   className={`flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-none font-bold text-white ${badgeColor}`}
