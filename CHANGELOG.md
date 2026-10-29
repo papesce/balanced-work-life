@@ -1,5 +1,38 @@
 # balanced-work-life
 
+## 0.6.0
+
+### Minor Changes
+
+- c7bc2d2: Paths canvas, project filters/grouping, Horizon committed filters, and row/menu fixes.
+
+  **Paths canvas:** new synced `paths` / `path_items` tables with position persistence, RLS-safe uploads, labeled edges with link-type picker on connect, and horizon classification order hints. Project detail tasks group by classification (Option A).
+
+  **Project filters:** Filters menu with Hide closed and Hide completed (hide-completed persisted on by default), per-mode task add, and removal of the header Add task in favor of contextual adds. Split-mode tray strip removed with canvas height fix.
+
+  **Horizon:** committed filter split into upcoming / overdue, filters menu, top-level make action, and quick-note backlog alert.
+
+  **Fixes:** inline link panel in drawer, persisted global search Done toggle, anchored attach/link flyouts beside the menu, and done ideas hidden in the attach picker.
+
+  **Refactors (no behavior change):** page/component splits across projects, planner, timeline, horizon, brainstorm, goals, tree rows, `useIdeas`, PowerSync schema/connector/sync handlers, and themed `ConfirmDialog`.
+
+- dfd6df0: Project detail view is now a resizable split: task List on the left, Paths canvas on the right.
+
+  **Split layout:** the List / Paths toggle becomes a List | Split | Paths switcher (persisted globally as `projectViewMode`, default Split, with persisted `projectSplitRatio`). The split uses `react-resizable-panels` with a draggable, keyboard-accessible divider; each pane has a collapse button that switches to the other single-pane mode. Detail renders full-width so both panes fit, and the canvas re-fits its viewport after divider drags and collapses.
+
+  **Drag from List to canvas:** each List row gains a second handle (arrow icon) using native HTML5 drag with the same `application/project-task` payload as the old tray, so existing canvas drop logic is reused untouched. The reorder grip stays @dnd-kit-only. Clicking (or Enter/Space on) the handle adds the task to the selected path — the touch fallback. Handles dim when the task is already in the path or no path is selected. Opt-in via `IdeaTree` props, so other tree views are unaffected; narrow split panes use a compact row variant (type/area chips hidden).
+
+  **Tray:** the "Project tasks" strip above the canvas is removed in split mode (the List is the source) and kept in Paths-only mode via a `showTray` prop.
+
+  **Responsive:** below 1024px (same threshold as the app sidebar) split is disabled and the switcher offers List / Paths only. Hide-completed stays shared between panes.
+
+- Expand planning paths across Brainstorm and Projects with reusable path items, editable path details, status and notes, plus improved canvas interactions. Improve Quick Notes with in-place idea search, Markdown link previews, and a richer details editor.
+- dbcaaed: Persist Horizon lens configuration in the synced database and add human-friendly default lenses plus the Impact scheme.
+
+  **Synced lens config:** saved views, the default view/lens and the secondary-split map move from localStorage into two new synced tables (`horizon_views`, `horizon_prefs`), so they follow the user across devices. Active selection stays local in `uiPrefsStore`. Legacy localStorage keys are imported once (views kept, defaults and splits adopted only when the database is empty) and then removed. Backup format bumps to v4 and round-trips the new tables; old backups still import.
+
+  **Default lenses:** six built-in lenses (Closest in time, Easiest first, What matters most, Ready to move, Looking ahead, Biggest payoff) as a presentation overlay on classification schemes, with explicit column order and in-column tiebreakers (unvalued last, `sort_order` fallback). New `impact` scheme (High/Medium/Low) seeded for new and existing users. Legacy `?lens=` links, stored prefs and saved views resolve to the equivalent lens; `nnl`/`priority` keep working via synthesized lenses.
+
 ## 0.5.0
 
 ### Minor Changes
