@@ -1,4 +1,5 @@
-FROM node:20-alpine AS base
+ARG NODE_VERSION=24
+FROM node:${NODE_VERSION}-alpine AS base
 RUN corepack enable && corepack prepare pnpm@10.25.0 --activate
 
 FROM base AS builder
