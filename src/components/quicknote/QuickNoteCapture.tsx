@@ -14,7 +14,12 @@ import { QuickNoteSelectionActions } from "./QuickNoteSelectionActions";
 import { QuickNoteIdeaSearch } from "./QuickNoteIdeaSearch";
 import { QuickNoteIdeaLink } from "./QuickNoteIdeaLink";
 import { requestGlobalSearch } from "@/lib/globalSearchBus";
-import { markIdeaReferenceInNote, parseNoteLinks } from "@/lib/quicknote/markdownLinks";
+import {
+  mapPreviewSelectionToSource,
+  markIdeaReferenceInNote,
+  parseNoteLinks,
+  type NoteTextSelection,
+} from "@/lib/quicknote/markdownLinks";
 import { useAuth } from "@/hooks/useAuth";
 import { getRevealHref, type RevealView } from "@/lib/reveal";
 import type { Idea } from "@/lib/types";
@@ -26,6 +31,18 @@ function readAutoSuggestions(): boolean {
     return localStorage.getItem(SUGGESTIONS_STORAGE_KEY) !== "false";
   } catch {
     return true;
+  }
+}
+
+function getPreviewTextOffset(root: HTMLElement, node: Node, offset: number): number | null {
+  if (node !== root && !root.contains(node)) return null;
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(root);
+    range.setEnd(node, offset);
+    return range.toString().length;
+  } catch {
+    return null;
   }
 }
 
@@ -47,6 +64,8 @@ export const QuickNoteCapture = memo(function QuickNoteCapture({
   const { user } = useAuth();
   const router = useRouter();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const pendingPreviewSelectionRef = useRef<NoteTextSelection | null>(null);
   const readonly = !isSelectedNoteLive;
   const previewSegments = useMemo(() => parseNoteLinks(draft, true), [draft]);
   const { data: ideaRows } = useQuery<Record<string, unknown>>(
@@ -64,6 +83,8 @@ export const QuickNoteCapture = memo(function QuickNoteCapture({
   const [ideaSearchQuery, setIdeaSearchQuery] = useState<string | null>(null);
   const [hideCompletedIdeas, setHideCompletedIdeas] = useState(false);
   const [autoSuggestions, setAutoSuggestions] = useState(readAutoSuggestions);
+  const autoSuggestionsRef = useRef(autoSuggestions);
+  autoSuggestionsRef.current = autoSuggestions;
   const selectionRef = useRef(selection);
   const selectionOpenRef = useRef(selectionOpen);
   selectionRef.current = selection;
@@ -74,6 +95,7 @@ export const QuickNoteCapture = memo(function QuickNoteCapture({
   const prevNoteIdRef = useRef(noteId);
   if (noteId !== prevNoteIdRef.current) {
     prevNoteIdRef.current = noteId;
+    pendingPreviewSelectionRef.current = null;
     setSelection(null);
     setSelectionOpen(false);
     setIdeaSearchQuery(null);
@@ -84,20 +106,16 @@ export const QuickNoteCapture = memo(function QuickNoteCapture({
     const el = textareaRef.current;
     if (!el) return;
     el.focus();
-    el.setSelectionRange(el.value.length, el.value.length);
+    const pendingSelection = pendingPreviewSelectionRef.current;
+    pendingPreviewSelectionRef.current = null;
+    if (pendingSelection && pendingSelection.end <= el.value.length) {
+      el.setSelectionRange(pendingSelection.start, pendingSelection.end);
+      setSelection(pendingSelection);
+      if (autoSuggestionsRef.current) setIdeaSearchQuery(pendingSelection.text);
+    } else {
+      el.setSelectionRange(el.value.length, el.value.length);
+    }
   }, [noteId, readonly, editing]);
-
-  const handleEditingChange = useCallback(
-    (next: boolean) => {
-      if (!next) {
-        setSelection(null);
-        setSelectionOpen(false);
-        setIdeaSearchQuery(null);
-      }
-      onEditingChange(next);
-    },
-    [onEditingChange],
-  );
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -137,6 +155,48 @@ export const QuickNoteCapture = memo(function QuickNoteCapture({
     setSelection((prev) => (prev === null ? prev : null));
     setSelectionOpen((prev) => (prev ? false : prev));
   }, [autoSuggestions]);
+
+  const readPreviewSelection = useCallback((): NoteTextSelection | null => {
+    const root = previewRef.current;
+    const browserSelection = window.getSelection();
+    if (!root || !browserSelection || browserSelection.isCollapsed || !browserSelection.rangeCount)
+      return null;
+    const range = browserSelection.getRangeAt(0);
+    const expectedText = previewSegments
+      .map((segment) => (segment.type === "text" ? segment.value : segment.label))
+      .join("");
+    if (
+      root.textContent !== expectedText ||
+      (range.startContainer !== root && !root.contains(range.startContainer)) ||
+      (range.endContainer !== root && !root.contains(range.endContainer))
+    ) {
+      return null;
+    }
+
+    const start = getPreviewTextOffset(root, range.startContainer, range.startOffset);
+    const end = getPreviewTextOffset(root, range.endContainer, range.endOffset);
+    if (start === null || end === null || end <= start) return null;
+    const mapped = mapPreviewSelectionToSource(draft, start, end);
+    return mapped?.text === range.toString() && mapped.text.trim() ? mapped : null;
+  }, [draft, previewSegments]);
+
+  const capturePreviewSelection = useCallback(() => {
+    pendingPreviewSelectionRef.current = readPreviewSelection();
+  }, [readPreviewSelection]);
+
+  const handleEditingChange = useCallback(
+    (next: boolean) => {
+      if (next && !pendingPreviewSelectionRef.current) capturePreviewSelection();
+      if (!next) {
+        pendingPreviewSelectionRef.current = null;
+        setSelection(null);
+        setSelectionOpen(false);
+        setIdeaSearchQuery(null);
+      }
+      onEditingChange(next);
+    },
+    [capturePreviewSelection, onEditingChange],
+  );
 
   const handleSelectionDone = useCallback(() => {
     setSelection(null);
@@ -266,6 +326,9 @@ export const QuickNoteCapture = memo(function QuickNoteCapture({
               </button>
               <button
                 type="button"
+                onPointerDown={() => {
+                  if (!editing) capturePreviewSelection();
+                }}
                 onClick={() => handleEditingChange(true)}
                 aria-pressed={editing}
                 className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-violet-500 ${
@@ -293,7 +356,10 @@ export const QuickNoteCapture = memo(function QuickNoteCapture({
             rows={10}
           />
         ) : (
-          <div className="min-h-[280px] rounded-2xl border border-gray-200/80 bg-gray-50/70 px-4 py-4 text-sm leading-relaxed break-words whitespace-pre-wrap text-gray-800 sm:min-h-[360px] sm:px-5 sm:py-5 dark:border-white/10 dark:bg-gray-950/30 dark:text-gray-200">
+          <div
+            ref={previewRef}
+            className="min-h-[280px] rounded-2xl border border-gray-200/80 bg-gray-50/70 px-4 py-4 text-sm leading-relaxed break-words whitespace-pre-wrap text-gray-800 sm:min-h-[360px] sm:px-5 sm:py-5 dark:border-white/10 dark:bg-gray-950/30 dark:text-gray-200"
+          >
             {previewSegments.length === 0 ? (
               <span className="text-gray-400 italic dark:text-gray-500">Empty note</span>
             ) : (

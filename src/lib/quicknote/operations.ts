@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import type { AbstractPowerSyncDatabase } from "@powersync/web";
 import { parseTaskBlock, stripTaskPrefix, isTaskLine } from "@/lib/quickNotes";
 import { ideaInsertSql, ideaInsertParams } from "@/lib/ideaInsert";
+import { computeQuickAssignPatch } from "@/lib/tasks/dateCorrections";
 import type { QuickNoteDraftApi } from "./draft";
 import type { QuickNoteNotes } from "./notes";
 import type { QuickNotePersistence } from "./persistence";
@@ -62,7 +63,7 @@ function insertQuickNoteIdea(
   },
 ): Promise<string> {
   const id = uuidv4();
-  const scheduled = !!opts.scheduledDate;
+  const datePatch = opts.scheduledDate ? computeQuickAssignPatch(opts.scheduledDate) : null;
   return tx
     .execute(
       ideaInsertSql(),
@@ -82,9 +83,9 @@ function insertQuickNoteIdea(
         duration_minutes: null,
         is_priority: false,
         priority_order: null,
-        status: scheduled ? "scheduled" : "draft",
+        status: datePatch?.status ?? "draft",
         notes: opts.notes,
-        completed_at: null,
+        completed_at: datePatch?.completed_at ?? null,
         cancelled_at: null,
         paused_at: null,
         attempt_dates: [],

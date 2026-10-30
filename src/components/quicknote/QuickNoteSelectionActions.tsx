@@ -183,7 +183,6 @@ export function QuickNoteSelectionActions({
           <input
             type="date"
             value={scheduledDate ?? ""}
-            min={today}
             onChange={(e) => setScheduledDate(e.target.value || null)}
             disabled={saving}
             aria-label="Custom scheduled date"

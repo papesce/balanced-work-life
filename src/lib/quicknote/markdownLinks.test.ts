@@ -1,6 +1,11 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { formatIdeaReference, markIdeaReferenceInNote, parseNoteLinks } from "./markdownLinks";
+import {
+  formatIdeaReference,
+  mapPreviewSelectionToSource,
+  markIdeaReferenceInNote,
+  parseNoteLinks,
+} from "./markdownLinks";
 
 describe("parseNoteLinks", () => {
   it("splits Markdown links from surrounding text", () => {
@@ -58,5 +63,43 @@ describe("markIdeaReferenceInNote", () => {
       markIdeaReferenceInNote(note, selection, "idea-123"),
       "Before ✓ [buy elastic bands](idea:idea-123) after",
     );
+  });
+});
+
+describe("mapPreviewSelectionToSource", () => {
+  it("maps plain preview text to its source range", () => {
+    assert.deepEqual(mapPreviewSelectionToSource("Before selected text after", 7, 20), {
+      start: 7,
+      end: 20,
+      text: "selected text",
+    });
+  });
+
+  it("maps rendered Markdown link labels to their complete source markup", () => {
+    const note = "Read [help](https://example.com) now";
+    assert.deepEqual(mapPreviewSelectionToSource(note, 5, 9), {
+      start: 5,
+      end: note.indexOf(" now"),
+      text: "help",
+    });
+  });
+
+  it("maps rendered idea references and escaped label characters", () => {
+    const note = `✓ ${formatIdeaReference("Review ] brackets", "idea-123")}`;
+    assert.deepEqual(mapPreviewSelectionToSource(note, 2, "✓ Review ] brackets".length), {
+      start: 0,
+      end: note.length,
+      text: "Review ] brackets",
+    });
+  });
+
+  it("rejects partial rendered-link labels that cannot safely be replaced", () => {
+    assert.equal(mapPreviewSelectionToSource("[help](https://example.com)", 1, 3), null);
+  });
+
+  it("returns null for collapsed or out-of-range preview selections", () => {
+    assert.equal(mapPreviewSelectionToSource("text", 2, 2), null);
+    assert.equal(mapPreviewSelectionToSource("text", 0, 5), null);
+    assert.equal(mapPreviewSelectionToSource("text", -1, 2), null);
   });
 });
