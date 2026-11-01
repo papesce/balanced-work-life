@@ -187,6 +187,16 @@ export function isActiveOccurrence(occ: DayOccurrence): boolean {
   );
 }
 
+/** All active historical occurrences, using the same predicates as Timeline's Deferred filter. */
+export function getDeferredOccurrences(ideas: Idea[], today: string = getToday()): DayOccurrence[] {
+  const dates = new Set(ideas.flatMap((idea) => getHistoricalOccurrenceDates(idea, today)));
+  return [...dates].flatMap((date) =>
+    getDayOccurrences(ideas, date, today, true).filter(
+      (occurrence) => occurrence.isHistorical && isActiveOccurrence(occurrence),
+    ),
+  );
+}
+
 export interface TriageMeta {
   originalDate: string | null;
   currentDate: string | null;

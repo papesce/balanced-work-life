@@ -77,7 +77,7 @@ export function HorizonRowTrailing({
           title="Open this project"
           aria-label="Open this project"
           onClick={(e) => e.stopPropagation()}
-          className="flex flex-shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-500/10"
+          className="flex flex-shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-violet-500 dark:text-violet-400 dark:hover:bg-violet-500/10"
         >
           Open
           <ArrowUpRight size={11} strokeWidth={2.5} />

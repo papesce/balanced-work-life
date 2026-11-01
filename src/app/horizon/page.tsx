@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useRef, useCallback } from "react";
 import { useEffect } from "react";
+import Link from "next/link";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useTags } from "@/hooks/useTags";
 import { useTaskTags } from "@/hooks/useTaskTags";
@@ -85,7 +86,9 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
     setClassification,
     isLoading: classificationsLoading,
   } = useClassifications();
-  const { updateParams, setLensParam, lensParam, horizonParam, highlightId } = useHorizonUrl();
+  const { updateParams, setLensParam, lensParam, horizonParam, highlightId, searchParams } =
+    useHorizonUrl();
+  const fromPlanner = searchParams.get("from") === "planner";
   const selection = useHorizonSelection({
     views,
     dbDefaultViewId,
@@ -97,6 +100,7 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
     classifications,
     lensParam,
     setLensParam,
+    fromPlanner,
   });
   const {
     lensKey,
@@ -411,45 +415,55 @@ function HorizonBoard({ prefs }: { prefs: UseHorizonPrefsResult }) {
   };
 
   const headerStartActions = (
-    <HorizonBoardHeader
-      views={views}
-      activeViewId={activeViewId}
-      defaultViewId={defaultViewId}
-      displayLenses={displayLenses}
-      activeLensId={!activeView && !lensSynthesized ? lens.id : null}
-      defaultLensId={defaultLensId}
-      schemes={schemes}
-      onSelectView={handleSelectView}
-      onDeleteView={deleteView}
-      onToggleDefaultView={toggleDefaultView}
-      onSelectLens={handleSelectLens}
-      onToggleDefaultLens={toggleDefaultLens}
-      onCreateLens={createLens}
-      onStartEdit={startMenuEdit}
-      showClassificationOrder={showClassificationOrder}
-      onToggleShowClassificationOrder={() =>
-        setPrefs({ horizonShowClassificationOrder: !showClassificationOrder })
-      }
-      hideClosed={hideClosed}
-      onToggleHideClosed={() => setHideClosed((v) => !v)}
-      hideUpcoming={hideUpcomingPref}
-      onToggleHideUpcoming={() => setPrefs({ horizonHideUpcomingCommitted: !hideUpcomingPref })}
-      hideOverdue={hideOverduePref}
-      onToggleHideOverdue={() => setPrefs({ horizonHideOverdueCommitted: !hideOverduePref })}
-      hideProjectsWithTasks={hideProjectsWithTasks}
-      onToggleHideProjectsWithTasks={() =>
-        setPrefs({ horizonHideProjectsWithTasks: !hideProjectsWithTasks })
-      }
-      typeFilter={typeFilter}
-      onToggleTypeFilter={(type) =>
-        setTypeFilter((prev) =>
-          prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type],
-        )
-      }
-      onClearTypeFilter={() => setTypeFilter([])}
-      cardMode={cardMode}
-      onToggleCardMode={() => setCardMode((v) => !v)}
-    />
+    <>
+      <HorizonBoardHeader
+        views={views}
+        activeViewId={activeViewId}
+        defaultViewId={defaultViewId}
+        displayLenses={displayLenses}
+        activeLensId={!activeView && !lensSynthesized ? lens.id : null}
+        defaultLensId={defaultLensId}
+        schemes={schemes}
+        onSelectView={handleSelectView}
+        onDeleteView={deleteView}
+        onToggleDefaultView={toggleDefaultView}
+        onSelectLens={handleSelectLens}
+        onToggleDefaultLens={toggleDefaultLens}
+        onCreateLens={createLens}
+        onStartEdit={startMenuEdit}
+        showClassificationOrder={showClassificationOrder}
+        onToggleShowClassificationOrder={() =>
+          setPrefs({ horizonShowClassificationOrder: !showClassificationOrder })
+        }
+        hideClosed={hideClosed}
+        onToggleHideClosed={() => setHideClosed((v) => !v)}
+        hideUpcoming={hideUpcomingPref}
+        onToggleHideUpcoming={() => setPrefs({ horizonHideUpcomingCommitted: !hideUpcomingPref })}
+        hideOverdue={hideOverduePref}
+        onToggleHideOverdue={() => setPrefs({ horizonHideOverdueCommitted: !hideOverduePref })}
+        hideProjectsWithTasks={hideProjectsWithTasks}
+        onToggleHideProjectsWithTasks={() =>
+          setPrefs({ horizonHideProjectsWithTasks: !hideProjectsWithTasks })
+        }
+        typeFilter={typeFilter}
+        onToggleTypeFilter={(type) =>
+          setTypeFilter((prev) =>
+            prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type],
+          )
+        }
+        onClearTypeFilter={() => setTypeFilter([])}
+        cardMode={cardMode}
+        onToggleCardMode={() => setCardMode((v) => !v)}
+      />
+      {fromPlanner && (
+        <Link
+          href="/"
+          className="ml-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-violet-600 transition-colors hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/30"
+        >
+          Back to today
+        </Link>
+      )}
+    </>
   );
 
   return (

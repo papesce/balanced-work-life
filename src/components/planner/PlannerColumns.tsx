@@ -6,6 +6,7 @@ import { AreaFilters } from "@/components/planner/AreaFilters";
 import { AreaTaskGroup } from "@/components/planner/AreaTaskGroup";
 import { DayslotTimeline } from "@/components/planner/DayslotTimeline";
 import { DeferredOnDateSection } from "@/components/planner/DeferredOnDateSection";
+import { EmptyDayFork } from "@/components/planner/EmptyDayFork";
 import { QuickNoteChip } from "@/components/quicknote/QuickNoteChip";
 import { AREA_LABELS, AREA_ORDER } from "@/lib/constants";
 import type { DayOccurrence, RescheduleAction } from "@/lib/tasks/rescheduleTask";
@@ -21,6 +22,7 @@ export function PlannerLeftColumn({
   onSelectArea,
   targets,
   activeMobileTab,
+  dayIsEmpty,
 }: {
   balanceRingCounts: Record<LifeArea, number>;
   areaTaskCounts: Record<LifeArea, { pending: number; scheduled: number; done: number }>;
@@ -28,6 +30,7 @@ export function PlannerLeftColumn({
   onSelectArea: (area: LifeArea | null) => void;
   targets: Record<LifeArea, number>;
   activeMobileTab: PlannerMobileTab;
+  dayIsEmpty: boolean;
 }) {
   return (
     <div
@@ -38,6 +41,7 @@ export function PlannerLeftColumn({
         modeLabel="Work-Life Balance Ring"
         statLabel="Total Minutes"
         statSub="scheduled today"
+        emptyLabel={dayIsEmpty ? "Plan your day to fill the ring" : undefined}
       />
       <AreaFilters
         areaTaskCounts={areaTaskCounts}
@@ -64,6 +68,9 @@ interface PlannerAgendaColumnProps {
   pendingByArea: Record<LifeArea, Idea[]>;
   doneByArea: Record<LifeArea, Idea[]>;
   dayIsEmpty: boolean;
+  missedCount: number;
+  onCatchUp: () => void;
+  onPickFresh: () => void;
   activeMobileTab: PlannerMobileTab;
   onDone: (id: string) => void;
   onUndone: (id: string) => void;
@@ -99,6 +106,9 @@ export function PlannerAgendaColumn({
   pendingByArea,
   doneByArea,
   dayIsEmpty,
+  missedCount,
+  onCatchUp,
+  onPickFresh,
   activeMobileTab,
   ...groupProps
 }: PlannerAgendaColumnProps) {
@@ -146,24 +156,27 @@ export function PlannerAgendaColumn({
         />
       )}
 
-      <div className="space-y-4">
-        {visibleAreas.map((area) => {
-          const pending = pendingByArea[area];
-          const done = doneByArea[area];
-          if (pending.length === 0 && done.length === 0 && selectedArea !== area && !dayIsEmpty)
-            return null;
-          return (
-            <AreaTaskGroup
-              key={area}
-              area={area}
-              pendingTasks={pending}
-              doneTasks={done}
-              getTagsForIdea={getTagsForIdea}
-              {...groupProps}
-            />
-          );
-        })}
-      </div>
+      {dayIsEmpty ? (
+        <EmptyDayFork missedCount={missedCount} onCatchUp={onCatchUp} onPickFresh={onPickFresh} />
+      ) : (
+        <div className="space-y-4">
+          {visibleAreas.map((area) => {
+            const pending = pendingByArea[area];
+            const done = doneByArea[area];
+            if (pending.length === 0 && done.length === 0 && selectedArea !== area) return null;
+            return (
+              <AreaTaskGroup
+                key={area}
+                area={area}
+                pendingTasks={pending}
+                doneTasks={done}
+                getTagsForIdea={getTagsForIdea}
+                {...groupProps}
+              />
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

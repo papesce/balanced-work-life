@@ -3,7 +3,8 @@
 import { useState, useMemo } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown } from "lucide-react";
+import Link from "next/link";
+import { ArrowUpRight, ChevronDown } from "lucide-react";
 import {
   Idea,
   IdeaLink,
@@ -235,8 +236,20 @@ export function HorizonTree({
       const parent = ideasById.get(node.parent_id);
       if (!parent) return null;
       return (
-        <div className="truncate px-9 text-[11px] text-gray-400 italic dark:text-gray-500">
-          ↳ {parent.text || "Untitled"}
+        <div className="group flex min-w-0 items-center gap-1 px-9 text-[11px] text-gray-400 italic dark:text-gray-500">
+          <span className="truncate">↳ {parent.text || "Untitled"}</span>
+          {parent.type === "project" && (
+            <Link
+              href={`/projects?projectId=${parent.id}&highlight=${node.id}`}
+              title="Open this project"
+              aria-label={`Open project ${parent.text || "Untitled"}`}
+              onClick={(e) => e.stopPropagation()}
+              className="flex flex-shrink-0 items-center gap-0.5 rounded px-1 py-0.5 font-semibold text-violet-600 not-italic opacity-0 transition-opacity group-hover:opacity-100 hover:bg-violet-50 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-violet-500 dark:text-violet-400 dark:hover:bg-violet-500/10"
+            >
+              Open
+              <ArrowUpRight size={11} strokeWidth={2.5} />
+            </Link>
+          )}
         </div>
       );
     },

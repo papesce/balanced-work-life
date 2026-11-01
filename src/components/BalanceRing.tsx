@@ -9,12 +9,19 @@ interface BalanceRingProps {
   modeLabel: string;
   statLabel: string;
   statSub: string;
+  emptyLabel?: string;
 }
 
 const CIRC = 2 * Math.PI * 60;
 const GAP = 4;
 
-export function BalanceRing({ counts, modeLabel, statLabel, statSub }: BalanceRingProps) {
+export function BalanceRing({
+  counts,
+  modeLabel,
+  statLabel,
+  statSub,
+  emptyLabel,
+}: BalanceRingProps) {
   const areas = Object.entries(counts).filter(([, count]) => count > 0) as [LifeArea, number][];
   const total = areas.reduce((sum, [, count]) => sum + count, 0);
 
@@ -57,7 +64,11 @@ export function BalanceRing({ counts, modeLabel, statLabel, statSub }: BalanceRi
           {total === 0 ? (
             <>
               <div className="text-2xl font-medium text-gray-400 dark:text-gray-500">—</div>
-              <div className="text-xs text-gray-400 dark:text-gray-500">no tasks</div>
+              <div
+                className={`text-xs text-gray-400 dark:text-gray-500 ${emptyLabel ? "mx-auto max-w-28 leading-tight" : ""}`}
+              >
+                {emptyLabel ?? "no tasks"}
+              </div>
             </>
           ) : (
             <>

@@ -21,7 +21,8 @@ import {
   PlannerLeftColumn,
   PlannerScheduleColumn,
 } from "@/components/planner/PlannerColumns";
-import { loadAreaTargets } from "@/lib/storage";
+import { loadAreaTargets, STORAGE_KEYS, writeJson } from "@/lib/storage";
+import { loadTimelinePrefs } from "@/lib/timelinePresets";
 import { useUiPrefsStore } from "@/stores/uiPrefsStore";
 import { usePlannerActions } from "@/hooks/usePlannerActions";
 import { usePlannerDay } from "@/hooks/usePlannerDay";
@@ -125,6 +126,7 @@ function DailyPlannerInner() {
     areaTaskCounts,
     balanceRingCounts,
     dayIsEmpty,
+    missedCount,
     pendingByArea,
     doneByArea,
   } = usePlannerDay({
@@ -154,6 +156,15 @@ function DailyPlannerInner() {
     registerUndo,
     pendingByArea,
   });
+
+  const handleCatchUp = () => {
+    writeJson(STORAGE_KEYS.timelinePrefs, { ...loadTimelinePrefs(), filter: "deferred" });
+    router.push("/timeline?from=planner");
+  };
+
+  const handlePickFresh = () => {
+    router.push("/horizon?from=planner");
+  };
 
   if (loading) {
     return (
@@ -222,6 +233,7 @@ function DailyPlannerInner() {
             onSelectArea={setSelectedArea}
             targets={targets}
             activeMobileTab={activeMobileTab}
+            dayIsEmpty={dayIsEmpty}
           />
           <PlannerAgendaColumn
             selectedArea={selectedArea}
@@ -238,6 +250,9 @@ function DailyPlannerInner() {
             pendingByArea={pendingByArea}
             doneByArea={doneByArea}
             dayIsEmpty={dayIsEmpty}
+            missedCount={missedCount}
+            onCatchUp={handleCatchUp}
+            onPickFresh={handlePickFresh}
             activeMobileTab={activeMobileTab}
             onDone={markDone}
             onUndone={markUndone}

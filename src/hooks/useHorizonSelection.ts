@@ -27,6 +27,7 @@ interface UseHorizonSelectionParams {
   classifications: IdeaClassification[];
   lensParam: string | null;
   setLensParam: (primary: string) => void;
+  fromPlanner?: boolean;
 }
 
 /**
@@ -47,6 +48,7 @@ export function useHorizonSelection({
   classifications,
   lensParam,
   setLensParam,
+  fromPlanner = false,
 }: UseHorizonSelectionParams) {
   const prefsLens = useUiPrefsStore((s) => s.horizonLens);
   const setPrefs = useUiPrefsStore((s) => s.set);
@@ -66,6 +68,7 @@ export function useHorizonSelection({
     if (initialDefaultView) return initialDefaultView.primary;
     const defLens = DEFAULT_LENSES.find((l) => l.id === dbDefaultLensId) ?? null;
     if (defLens) return defLens.primaryScheme;
+    if (fromPlanner) return "moscow";
     return prefsLens ?? "term";
   });
 

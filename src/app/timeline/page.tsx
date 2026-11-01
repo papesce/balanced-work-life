@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Clock } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
@@ -77,6 +78,7 @@ function TimelineInner() {
   const anchorParam = searchParams.get("date");
   const anchor = anchorParam && /^\d{4}-\d{2}-\d{2}$/.test(anchorParam) ? anchorParam : today;
   const highlightId = searchParams.get("highlight");
+  const fromPlanner = searchParams.get("from") === "planner";
 
   const {
     dates,
@@ -250,25 +252,35 @@ function TimelineInner() {
         : !monthGridDates.includes(today);
 
   const headerStartActions = (
-    <TimelineToolbar
-      view={view}
-      filter={filter}
-      hasRevisitDates={hasRevisitDates}
-      preset={preset}
-      rangeCounts={rangeCounts}
-      rangeSpans={rangeSpans}
-      windowMenuOpen={windowMenuOpen}
-      onViewChange={setView}
-      onFilterChange={handleFilterChange}
-      onToggleWindowMenu={() => setWindowMenuOpen((v) => !v)}
-      onCloseWindowMenu={() => setWindowMenuOpen(false)}
-      onSelectPreset={(id) => {
-        setPreset(id);
-        setRangeFlash(true);
-        window.setTimeout(() => setRangeFlash(false), 900);
-        setWindowMenuOpen(false);
-      }}
-    />
+    <>
+      <TimelineToolbar
+        view={view}
+        filter={filter}
+        hasRevisitDates={hasRevisitDates}
+        preset={preset}
+        rangeCounts={rangeCounts}
+        rangeSpans={rangeSpans}
+        windowMenuOpen={windowMenuOpen}
+        onViewChange={setView}
+        onFilterChange={handleFilterChange}
+        onToggleWindowMenu={() => setWindowMenuOpen((v) => !v)}
+        onCloseWindowMenu={() => setWindowMenuOpen(false)}
+        onSelectPreset={(id) => {
+          setPreset(id);
+          setRangeFlash(true);
+          window.setTimeout(() => setRangeFlash(false), 900);
+          setWindowMenuOpen(false);
+        }}
+      />
+      {fromPlanner && (
+        <Link
+          href="/"
+          className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-violet-600 transition-colors hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/30"
+        >
+          Back to today
+        </Link>
+      )}
+    </>
   );
 
   return (

@@ -1,6 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { computeClearDatePatch, computeReschedulePatch, willRecordAttempt } from "./rescheduleTask";
+import {
+  computeClearDatePatch,
+  computeReschedulePatch,
+  getDeferredOccurrences,
+  willRecordAttempt,
+} from "./rescheduleTask";
 import { addDays, getToday } from "../dateUtils";
 import type { Idea } from "../types";
 
@@ -151,5 +156,30 @@ describe("computeClearDatePatch", () => {
       yesterday,
     ]);
     assert.deepEqual(computeClearDatePatch(task({ scheduled_date: today })).attempt_dates, []);
+  });
+});
+
+describe("getDeferredOccurrences", () => {
+  it("counts unique active historical occurrences and excludes inactive tasks", () => {
+    const occurrences = getDeferredOccurrences(
+      [
+        task({
+          scheduled_date: tomorrow,
+          attempt_dates: [yesterday, yesterday, today, tomorrow],
+        }),
+        task({ status: "completed", attempt_dates: [yesterday] }),
+        task({ status: "missed", attempt_dates: [yesterday] }),
+        task({ type: "project", attempt_dates: [yesterday] }),
+      ],
+      today,
+    );
+
+    assert.deepEqual(
+      occurrences.map(({ date, isHistorical }) => [date, isHistorical]),
+      [
+        [yesterday, true],
+        [today, true],
+      ],
+    );
   });
 });

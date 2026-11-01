@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { getDayOccurrences } from "@/lib/tasks/rescheduleTask";
+import { getDayOccurrences, getDeferredOccurrences } from "@/lib/tasks/rescheduleTask";
 import { AREA_ORDER } from "@/lib/constants";
 import { Idea, LifeArea, Tag, getAreasForIdea } from "@/lib/types";
 
@@ -81,6 +81,11 @@ export function usePlannerDay({
     [taskIdeas, activeDate, today],
   );
 
+  const missedCount = useMemo(
+    () => getDeferredOccurrences(taskIdeas, today).length,
+    [taskIdeas, today],
+  );
+
   const allTasksForTimeline = useMemo(
     () => [...pendingOnDate, ...scheduledOnDate, ...doneOnDate],
     [pendingOnDate, scheduledOnDate, doneOnDate],
@@ -144,6 +149,7 @@ export function usePlannerDay({
     pendingOnDate,
     scheduledOnDate,
     deferredOnDate,
+    missedCount,
     allTasksForTimeline,
     areaTaskCounts,
     balanceRingCounts,
