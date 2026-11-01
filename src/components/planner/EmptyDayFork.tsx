@@ -4,12 +4,18 @@ import { ArrowRight, Compass, RotateCcw } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface EmptyDayForkProps {
+  dayIsEmpty: boolean;
   missedCount: number;
   onCatchUp: () => void;
   onPickFresh: () => void;
 }
 
-export function EmptyDayFork({ missedCount, onCatchUp, onPickFresh }: EmptyDayForkProps) {
+export function EmptyDayFork({
+  dayIsEmpty,
+  missedCount,
+  onCatchUp,
+  onPickFresh,
+}: EmptyDayForkProps) {
   const pickFreshIsPrimary = missedCount === 0;
 
   return (
@@ -20,7 +26,9 @@ export function EmptyDayFork({ missedCount, onCatchUp, onPickFresh }: EmptyDayFo
       className="glass-card rounded-2xl border border-black/5 p-5 dark:border-white/5"
     >
       <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100">
-        Nothing planned yet. How do you want to start?
+        {dayIsEmpty
+          ? "Nothing planned yet. How do you want to start?"
+          : "Choose what to focus on next"}
       </h3>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {missedCount > 0 && (

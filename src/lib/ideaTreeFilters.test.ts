@@ -8,6 +8,7 @@ function makeIdea(id: string, type: IdeaType, parent_id: string | null = null): 
     id,
     user_id: "user-1",
     parent_id,
+    series_id: null,
     text: id,
     description: null,
     type,

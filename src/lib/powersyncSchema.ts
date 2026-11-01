@@ -6,6 +6,7 @@ export const IdeasTable = new Table(
   {
     user_id: column.text,
     parent_id: column.text,
+    series_id: column.text,
     text: column.text,
     description: column.text,
     type: column.text,
@@ -30,7 +31,7 @@ export const IdeasTable = new Table(
     created_at: column.text,
     updated_at: column.text,
   },
-  { indexes: {} },
+  { indexes: { by_series_id: ["series_id"] } },
 );
 
 export const IdeaLinksTable = new Table(

@@ -26,6 +26,7 @@ import { DetailsEditor } from "./DetailsEditor";
 import { DetailField } from "@/components/brainstorm/IdeaDetailField";
 import { DateCorrectionSection } from "./DateCorrectionSection";
 import { computeRemoveAttemptCorrection } from "@/lib/tasks/dateCorrections";
+import { daysSinceLastCompleted } from "@/lib/tasks/series";
 import { ScheduleAttempts } from "./ScheduleAttempts";
 import { LinkPanel } from "./LinkPanel";
 
@@ -77,6 +78,7 @@ export function DetailsDrawer({
   const [mounted, setMounted] = useState(false);
   const [classificationOpen, setClassificationOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(initialSection === "context");
+  const [seriesOpen, setSeriesOpen] = useState(false);
   const router = useRouter();
   const { schemes, options, getOptionForIdea, setClassification } = useClassifications();
   const { links, createLink, deleteLink } = useIdeaLinks();
@@ -91,6 +93,7 @@ export function DetailsDrawer({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setContextOpen(initialSection === "context");
     setShowLinkPanel(false);
+    setSeriesOpen(false);
   }, [ideaId, initialSection]);
 
   useEffect(() => {
@@ -178,6 +181,18 @@ export function DetailsDrawer({
     .join(" · ");
 
   const termValue = getOptionForIdea(idea.id, "term")?.value ?? null;
+  const seriesInstances = idea.series_id
+    ? ideas.filter((instance) => instance.series_id === idea.series_id)
+    : [];
+  const previousCompletions = seriesInstances
+    .filter(
+      (instance) =>
+        instance.id !== idea.id &&
+        instance.completed_at !== null &&
+        (instance.status === "completed" || instance.status === "archived"),
+    )
+    .sort((a, b) => Date.parse(b.completed_at!) - Date.parse(a.completed_at!));
+  const daysSinceDone = daysSinceLastCompleted(seriesInstances, new Date());
 
   return createPortal(
     <div style={{ zIndex: LAYER_MODAL }} className="fixed inset-0 flex justify-end">
@@ -425,6 +440,67 @@ export function DetailsDrawer({
           {/* Notes Section */}
           {variant === "idea" && (
             <>
+              {idea.series_id && (
+                <div className="mb-4 rounded-lg border border-black/5 dark:border-white/5">
+                  <button
+                    onClick={() => setSeriesOpen(!seriesOpen)}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                  >
+                    <span className="flex-1">Task series</span>
+                    <span className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500">
+                      <span>
+                        {seriesInstances.length} occurrence{seriesInstances.length === 1 ? "" : "s"}
+                      </span>
+                      {seriesOpen ? (
+                        <ChevronDown size={12} strokeWidth={1.5} />
+                      ) : (
+                        <ChevronRight size={12} strokeWidth={1.5} />
+                      )}
+                    </span>
+                  </button>
+                  {seriesOpen && (
+                    <div className="border-t border-black/5 px-3 py-2 dark:border-white/5">
+                      <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                        {daysSinceDone === null
+                          ? "No recorded completion yet"
+                          : `Last done ${daysSinceDone} day${daysSinceDone === 1 ? "" : "s"} ago`}
+                      </p>
+                      {previousCompletions.length > 0 && (
+                        <div className="mb-3">
+                          <p className="mb-1 text-[10px] font-medium tracking-wide text-gray-400 uppercase">
+                            Previous completed instances
+                          </p>
+                          <ul className="space-y-1">
+                            {previousCompletions.map((instance) => (
+                              <li
+                                key={instance.id}
+                                className="flex items-baseline justify-between gap-3 text-xs text-gray-600 dark:text-gray-400"
+                              >
+                                <span className="min-w-0 truncate">
+                                  {instance.text || "Untitled"}
+                                </span>
+                                <time
+                                  className="shrink-0 text-[10px] text-gray-400 dark:text-gray-500"
+                                  dateTime={instance.completed_at!}
+                                >
+                                  {new Date(instance.completed_at!).toLocaleDateString()}
+                                </time>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => void updateIdea(idea.id, { series_id: null })}
+                        className="text-[10px] font-medium text-gray-500 hover:text-gray-700 hover:underline dark:text-gray-400 dark:hover:text-gray-200"
+                      >
+                        Not the same task
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
               <DateCorrectionSection idea={idea} onUpdate={updateIdea} />
               <ScheduleAttempts
                 idea={idea}

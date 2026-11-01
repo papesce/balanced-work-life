@@ -11,6 +11,7 @@ export const IDEA_INSERT_COLUMNS = [
   "id",
   "user_id",
   "parent_id",
+  "series_id",
   "text",
   "description",
   "type",
@@ -46,6 +47,7 @@ export interface IdeaInsertRow {
   id: string;
   user_id: string;
   parent_id: string | null;
+  series_id: string | null;
   text: string;
   description: string | null;
   type: string | null;
@@ -77,6 +79,7 @@ export function ideaInsertParams(row: IdeaInsertRow): unknown[] {
     row.id,
     row.user_id,
     row.parent_id,
+    row.series_id,
     row.text,
     row.description,
     row.type,

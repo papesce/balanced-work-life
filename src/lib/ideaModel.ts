@@ -140,6 +140,7 @@ export function deserializeIdea(row: Record<string, unknown>): Idea {
   return {
     ...row,
     why: (row.why as string | null) ?? null,
+    series_id: (row.series_id as string | null) ?? null,
     is_priority: Boolean(row.is_priority),
     attempt_dates: parseStringArray(row.attempt_dates),
     status_history: parseStatusHistory(row.status_history),

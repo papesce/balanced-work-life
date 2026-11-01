@@ -14,6 +14,7 @@ function task(overrides: Partial<Idea> = {}): Idea {
     id: "t1",
     user_id: "u1",
     parent_id: null,
+    series_id: null,
     text: "Test task",
     description: null,
     type: "task",

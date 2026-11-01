@@ -13,6 +13,7 @@ function baseIdea(): Idea {
     id: "1",
     user_id: "u",
     parent_id: null,
+    series_id: null,
     text: "t",
     description: null,
     type: "task",

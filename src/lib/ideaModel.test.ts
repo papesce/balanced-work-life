@@ -10,6 +10,7 @@ function idea(overrides: Partial<Idea>): Idea {
     id: "x",
     user_id: "user-1",
     parent_id: null,
+    series_id: null,
     text: "",
     description: null,
     type: "idea" as IdeaType,

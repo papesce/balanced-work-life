@@ -70,6 +70,7 @@ export function useIdeaCrud({
       id,
       user_id: userId,
       parent_id: parentId,
+      series_id: null,
       text,
       description: null,
       type: null,
@@ -102,6 +103,7 @@ export function useIdeaCrud({
           id: idea.id,
           user_id: idea.user_id,
           parent_id: idea.parent_id,
+          series_id: idea.series_id,
           text: idea.text,
           description: idea.description,
           type: idea.type,
@@ -193,15 +195,16 @@ export function useIdeaCrud({
     await db.writeTransaction(async (tx) => {
       for (const idea of orderedIdeas) {
         await tx.execute(
-          `INSERT OR REPLACE INTO ideas (id, user_id, parent_id, text, description, type, effort, impact, urgency,
+          `INSERT OR REPLACE INTO ideas (id, user_id, parent_id, series_id, text, description, type, effort, impact, urgency,
             scheduled_date, scheduled_time, duration_minutes, is_priority, priority_order,
             status, notes, why, completed_at, cancelled_at, paused_at, attempt_dates, status_history,
             productivity_signal, sort_order, created_at, updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
           [
             idea.id,
             idea.user_id,
             idea.parent_id,
+            idea.series_id ?? null,
             idea.text,
             idea.description,
             idea.type,
@@ -258,6 +261,7 @@ export function useIdeaCrud({
           id: parentId,
           user_id: userId,
           parent_id: null,
+          series_id: null,
           text,
           description: null,
           type: parentType,

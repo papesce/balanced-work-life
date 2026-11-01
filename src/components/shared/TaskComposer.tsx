@@ -7,8 +7,10 @@ import { LAYER_MODAL } from "@/lib/layers";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { searchIdeas } from "@/lib/ideaSearch";
 import { formatScheduleLabel, getTypeLabel } from "@/lib/ideaSearch";
+import { DONE_STATUSES } from "@/lib/ideaSearch";
 import { STATUS_LABELS, STATUS_STYLES } from "@/lib/constants";
 import { canRevealInView, getRevealHref, getSmartRevealView, type RevealView } from "@/lib/reveal";
+import { useTaskSeries } from "@/hooks/useTaskSeries";
 import type { Idea } from "@/lib/types";
 
 function pathnameToView(pathname: string): RevealView | null {
@@ -110,6 +112,7 @@ export function TaskComposer({
   const [dismissedQuery, setDismissedQuery] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const submittingRef = useRef(false);
+  const seriesActionRefs = useRef(new Map<string, HTMLButtonElement>());
   const containerRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -125,13 +128,23 @@ export function TaskComposer({
     return () => clearTimeout(t);
   }, [text]);
 
-  const suggestions = useMemo(
+  const suggestions = useMemo(() => {
+    if (!suggestFrom || debounced.trim().length < 2) return [];
+    return searchIdeas(suggestFrom, debounced, {
+      includeDone: true,
+      limit: suggestFrom.length,
+    })
+      .filter((idea) => !DONE_STATUSES.includes(idea.status) || idea.status === "completed")
+      .slice(0, suggestLimit);
+  }, [suggestFrom, debounced, suggestLimit]);
+  const seriesIds = useMemo(
     () =>
-      suggestFrom && debounced.trim().length >= 2
-        ? searchIdeas(suggestFrom, debounced, { includeDone: false, limit: suggestLimit })
-        : [],
-    [suggestFrom, debounced, suggestLimit],
+      suggestions
+        .filter((idea) => idea.status === "completed")
+        .map((idea) => idea.series_id ?? idea.id),
+    [suggestions],
   );
+  const { openInstances, createOccurrence } = useTaskSeries(seriesIds);
   const listOpen = suggestions.length > 0 && dismissedQuery !== debounced;
   const active = Math.min(activeIndex, Math.max(suggestions.length - 1, 0));
 
@@ -158,7 +171,7 @@ export function TaskComposer({
       if (!rect) return;
       const width = Math.min(rect.width, window.innerWidth - 16);
       const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
-      const estHeight = 220;
+      const estHeight = 360;
       const top =
         rect.bottom + estHeight > window.innerHeight && rect.top - estHeight - 4 > 0
           ? rect.top - estHeight - 4
@@ -179,6 +192,7 @@ export function TaskComposer({
   const hasExactMatch = suggestions.some(
     (s) => (s.text ?? "").trim().toLowerCase() === normalizedQuery,
   );
+  const hasCompletedSuggestion = suggestions.some((s) => s.status === "completed");
 
   const pick = (idea: Idea) => {
     setText("");
@@ -227,6 +241,20 @@ export function TaskComposer({
     }
   };
 
+  const repeat = async (idea: Idea) => {
+    const trimmed = text.trim();
+    if (!trimmed || submittingRef.current) return;
+    submittingRef.current = true;
+    try {
+      setText("");
+      setDebounced("");
+      await createOccurrence(idea, trimmed);
+      onDismiss?.();
+    } finally {
+      submittingRef.current = false;
+    }
+  };
+
   const handleKeyDown = async (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowDown" && listOpen && suggestions.length > 0) {
       e.preventDefault();
@@ -238,10 +266,21 @@ export function TaskComposer({
       setActiveIndex((i) => (i - 1 + suggestions.length) % suggestions.length);
       return;
     }
-    // Tab jumps to the highlighted existing task instead of creating.
+    // Keep Tab-to-open for active tasks. Completed matches expose a secondary
+    // action, so Tab moves focus to that action instead.
     if (e.key === "Tab" && listOpen && suggestions.length > 0) {
+      const selected = suggestions[active] ?? suggestions[0];
+      if (e.shiftKey) return;
+      if (selected.status === "completed") {
+        const action = seriesActionRefs.current.get(selected.id);
+        if (action) {
+          e.preventDefault();
+          action.focus();
+        }
+        return;
+      }
       e.preventDefault();
-      pick(suggestions[active] ?? suggestions[0]);
+      pick(selected);
       return;
     }
     if (e.key === "Enter") {
@@ -281,7 +320,7 @@ export function TaskComposer({
           autoFocus={autoFocus}
           className={inputClassName ?? styles.input}
           aria-expanded={listOpen}
-          aria-autocomplete="list"
+          aria-haspopup="dialog"
           aria-controls={listId}
           role="combobox"
         />
@@ -294,8 +333,9 @@ export function TaskComposer({
           <div
             ref={listRef}
             id={listId}
-            role="listbox"
-            aria-label="Possible duplicates"
+            role="dialog"
+            aria-modal="false"
+            aria-label="Possible task matches"
             style={{
               position: "fixed",
               top: listPos.top,
@@ -312,21 +352,36 @@ export function TaskComposer({
                   : "text-gray-400 dark:text-gray-500"
               }`}
             >
-              {hasExactMatch ? "Already exists — Tab to open" : "Similar open tasks — Tab to open"}
+              {hasExactMatch
+                ? "Already exists — Tab to open or repeat"
+                : hasCompletedSuggestion
+                  ? "Similar tasks — open or repeat"
+                  : "Similar open tasks — Tab to open"}
             </p>
-            <ul className="max-h-48 overflow-y-auto py-1">
+            <ul className="max-h-80 overflow-y-auto py-1">
               {suggestions.map((s, i) => {
                 const schedule = formatScheduleLabel(s);
+                const openOccurrence = openInstances.find(
+                  (instance) => instance.series_id === (s.series_id ?? s.id),
+                );
+                const isCompleted = s.status === "completed";
                 return (
-                  <li key={s.id}>
+                  <li
+                    key={s.id}
+                    className={`border-t border-black/[0.04] px-1 dark:border-white/[0.05] ${
+                      isCompleted ? "bg-indigo-50/30 dark:bg-indigo-500/[0.04]" : ""
+                    }`}
+                  >
                     <button
                       type="button"
-                      role="option"
-                      aria-selected={i === active}
+                      ref={(node) => {
+                        if (node) seriesActionRefs.current.set(s.id, node);
+                        else seriesActionRefs.current.delete(s.id);
+                      }}
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => pick(s)}
                       onMouseEnter={() => setActiveIndex(i)}
-                      className={`flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left text-xs ${
+                      className={`flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs ${
                         i === active
                           ? "bg-amber-50 dark:bg-amber-500/10"
                           : "bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
@@ -349,6 +404,43 @@ export function TaskComposer({
                         </span>
                       )}
                     </button>
+                    {isCompleted && (
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-2 pb-1.5">
+                        {openOccurrence ? (
+                          <>
+                            <button
+                              type="button"
+                              ref={(node) => {
+                                if (node) seriesActionRefs.current.set(s.id, node);
+                                else seriesActionRefs.current.delete(s.id);
+                              }}
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => pick(openOccurrence)}
+                              className="text-[10px] font-medium text-indigo-600 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-indigo-500 dark:text-indigo-300"
+                            >
+                              Open “{openOccurrence.text || "Untitled"}”
+                            </button>
+                            <button
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => void submit()}
+                              className="text-[10px] text-gray-500 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-indigo-500 dark:text-gray-400"
+                            >
+                              Create standalone task anyway
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => void repeat(s)}
+                            className="text-[10px] font-medium text-indigo-600 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-indigo-500 dark:text-indigo-300"
+                          >
+                            Same task, repeat
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </li>
                 );
               })}

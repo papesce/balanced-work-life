@@ -226,6 +226,7 @@ export function IdeaTree({
           id: groupId,
           user_id: unassociated[0].user_id,
           parent_id: null,
+          series_id: null,
           text: "Unassociated paths",
           description: null,
           type: "idea",

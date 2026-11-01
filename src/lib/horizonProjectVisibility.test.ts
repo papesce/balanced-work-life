@@ -11,6 +11,7 @@ function idea(
   return {
     user_id: "u",
     parent_id: null,
+    series_id: null,
     text: `t${n}`,
     description: null,
     effort: null,

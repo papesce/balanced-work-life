@@ -86,7 +86,7 @@ export interface BackupData {
   pathEdges: BackupPathEdge[];
 }
 
-export const BACKUP_VERSION = 5;
+export const BACKUP_VERSION = 6;
 
 export function isValidBackup(data: unknown): data is BackupData {
   if (!data || typeof data !== "object") return false;
@@ -101,7 +101,7 @@ function asArray<T>(value: unknown): T[] {
 /**
  * Accepts v1 backups (no tags/taskTags), v2 backups (no
  * quickNotes/classifications/lensPrefs) and v3 backups (no
- * horizonViews/horizonPrefs) by defaulting new fields to empty.
+ * horizonViews/horizonPrefs and v6 series ids) by defaulting new fields.
  */
 export function normalizeBackup(data: BackupData): BackupData {
   const obj = data as unknown as Record<string, unknown>;
@@ -111,6 +111,7 @@ export function normalizeBackup(data: BackupData): BackupData {
     ideas: asArray<Idea>(obj.ideas).map((idea) => ({
       ...idea,
       why: (idea as Partial<Idea>).why ?? null,
+      series_id: (idea as Partial<Idea>).series_id ?? null,
     })),
     tags: asArray<Tag>(obj.tags),
     taskTags: asArray<BackupTaskTag>(obj.taskTags),
@@ -191,6 +192,7 @@ export async function buildBackupData(
       ({
         ...row,
         why: (row.why as string | null) ?? null,
+        series_id: (row.series_id as string | null) ?? null,
         is_priority: Boolean(row.is_priority),
         attempt_dates: row.attempt_dates
           ? (JSON.parse(row.attempt_dates as string) as string[])

@@ -156,9 +156,7 @@ export function PlannerAgendaColumn({
         />
       )}
 
-      {dayIsEmpty ? (
-        <EmptyDayFork missedCount={missedCount} onCatchUp={onCatchUp} onPickFresh={onPickFresh} />
-      ) : (
+      {!dayIsEmpty && (
         <div className="space-y-4">
           {visibleAreas.map((area) => {
             const pending = pendingByArea[area];
@@ -177,6 +175,13 @@ export function PlannerAgendaColumn({
           })}
         </div>
       )}
+
+      <EmptyDayFork
+        dayIsEmpty={dayIsEmpty}
+        missedCount={missedCount}
+        onCatchUp={onCatchUp}
+        onPickFresh={onPickFresh}
+      />
     </div>
   );
 }

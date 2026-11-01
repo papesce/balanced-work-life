@@ -9,6 +9,7 @@ function idea(overrides: Partial<Idea> & { id: string }): Idea {
   return {
     user_id: "u",
     parent_id: null,
+    series_id: null,
     text: `t${n}`,
     description: null,
     type: "task",

@@ -41,6 +41,7 @@ export interface Idea {
   id: string;
   user_id: string;
   parent_id: string | null;
+  series_id: string | null;
   text: string;
   description: string | null;
   type: IdeaType | null;
