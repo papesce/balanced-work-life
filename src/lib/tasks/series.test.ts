@@ -2,7 +2,9 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   daysSinceLastCompleted,
+  findUnlinkedPastTaskOccurrences,
   findOpenSeriesInstance,
+  isUnlinkedPastTaskOccurrence,
   isOpenSeriesInstance,
   lastCompletedAt,
   seriesIdForAdoption,
@@ -51,6 +53,74 @@ describe("task series", () => {
   it("adopts an instance using its own id or its existing series id", () => {
     assert.equal(seriesIdForAdoption(instance("first", "completed", null, null)), "first");
     assert.equal(seriesIdForAdoption(instance("later", "completed", null, "first")), "first");
+  });
+
+  it("suggests only matching, completed, unlinked task occurrences from before the current task", () => {
+    const current = {
+      ...instance("current", "scheduled", null, null),
+      text: "weekly report",
+      created_at: "2026-03-01T00:00:00.000Z",
+    };
+    const match = {
+      ...instance("match", "completed", "2026-02-01T00:00:00.000Z", null),
+      text: "Weekly report",
+    };
+    const archivedMatch = {
+      ...instance("archived-match", "archived", "2026-02-15T00:00:00.000Z", null),
+      text: "weekly report",
+    };
+    const linkedMatch = {
+      ...instance("linked", "completed", "2026-02-02T00:00:00.000Z"),
+      text: "weekly report",
+    };
+    const recentMatch = {
+      ...instance("recent", "completed", "2026-03-02T00:00:00.000Z", null),
+      text: "weekly report",
+    };
+    const unrelated = {
+      ...instance("unrelated", "completed", "2026-02-03T00:00:00.000Z", null),
+      text: "plan vacation",
+    };
+
+    assert.deepEqual(
+      findUnlinkedPastTaskOccurrences(
+        [current, match, archivedMatch, linkedMatch, recentMatch, unrelated],
+        current,
+      ).map(({ id }) => id),
+      ["archived-match", "match"],
+    );
+    assert.equal(isUnlinkedPastTaskOccurrence(match, current), true);
+    assert.equal(isUnlinkedPastTaskOccurrence(archivedMatch, current), true);
+    assert.equal(isUnlinkedPastTaskOccurrence(linkedMatch, current), false);
+    assert.equal(isUnlinkedPastTaskOccurrence(recentMatch, current), false);
+    assert.equal(isUnlinkedPastTaskOccurrence({ ...match, status: "cancelled" }, current), false);
+    assert.equal(isUnlinkedPastTaskOccurrence({ ...match, type: "idea" }, current), false);
+    assert.equal(
+      isUnlinkedPastTaskOccurrence({ ...match, completed_at: "invalid" }, current),
+      false,
+    );
+  });
+
+  it("sorts suggested matches newest first and caps the result", () => {
+    const current = {
+      ...instance("current", "scheduled", null, null),
+      text: "weekly report",
+      created_at: "2026-03-01T00:00:00.000Z",
+    };
+    const matches = Array.from({ length: 7 }, (_, index) => ({
+      ...instance(
+        `match-${index}`,
+        "completed",
+        `2026-02-${String(index + 1).padStart(2, "0")}T00:00:00.000Z`,
+        null,
+      ),
+      text: "weekly report",
+    }));
+
+    assert.deepEqual(
+      findUnlinkedPastTaskOccurrences([current, ...matches], current).map(({ id }) => id),
+      ["match-6", "match-5", "match-4", "match-3", "match-2"],
+    );
   });
 
   it("computes the latest completion and elapsed whole days from completed instances", () => {

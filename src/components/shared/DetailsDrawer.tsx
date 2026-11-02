@@ -18,6 +18,7 @@ import {
   Link2,
 } from "lucide-react";
 import { useIdeas } from "@/hooks/useIdeas";
+import { useTaskSeries } from "@/hooks/useTaskSeries";
 import { useIdeaLinks } from "@/hooks/useIdeaLinks";
 import { useClassifications } from "@/hooks/useClassifications";
 import { getRevealHref } from "@/lib/reveal";
@@ -26,7 +27,7 @@ import { DetailsEditor } from "./DetailsEditor";
 import { DetailField } from "@/components/brainstorm/IdeaDetailField";
 import { DateCorrectionSection } from "./DateCorrectionSection";
 import { computeRemoveAttemptCorrection } from "@/lib/tasks/dateCorrections";
-import { daysSinceLastCompleted } from "@/lib/tasks/series";
+import { daysSinceLastCompleted, findUnlinkedPastTaskOccurrences } from "@/lib/tasks/series";
 import { ScheduleAttempts } from "./ScheduleAttempts";
 import { LinkPanel } from "./LinkPanel";
 
@@ -74,11 +75,14 @@ export function DetailsDrawer({
   onClose: () => void;
 }) {
   const { ideas, updateIdea } = useIdeas();
+  const { attachOccurrence } = useTaskSeries([]);
   const idea = ideaId ? (ideas.find((i) => i.id === ideaId) ?? null) : null;
   const [mounted, setMounted] = useState(false);
   const [classificationOpen, setClassificationOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(initialSection === "context");
   const [seriesOpen, setSeriesOpen] = useState(false);
+  const [attachingOccurrenceId, setAttachingOccurrenceId] = useState<string | null>(null);
+  const [seriesError, setSeriesError] = useState<string | null>(null);
   const router = useRouter();
   const { schemes, options, getOptionForIdea, setClassification } = useClassifications();
   const { links, createLink, deleteLink } = useIdeaLinks();
@@ -94,6 +98,7 @@ export function DetailsDrawer({
     setContextOpen(initialSection === "context");
     setShowLinkPanel(false);
     setSeriesOpen(false);
+    setSeriesError(null);
   }, [ideaId, initialSection]);
 
   useEffect(() => {
@@ -175,6 +180,20 @@ export function DetailsDrawer({
     await updateIdea(ideaId, { why: next });
   };
 
+  const handleAttachOccurrence = async (occurrence: Idea) => {
+    setSeriesError(null);
+    setAttachingOccurrenceId(occurrence.id);
+    try {
+      await attachOccurrence(idea.id, occurrence.id);
+    } catch (error) {
+      setSeriesError(
+        error instanceof Error ? error.message : "Could not attach this past task occurrence.",
+      );
+    } finally {
+      setAttachingOccurrenceId(null);
+    }
+  };
+
   const classificationSummary = schemes
     .map((s) => getOptionForIdea(idea.id, s.key)?.label)
     .filter(Boolean)
@@ -193,6 +212,8 @@ export function DetailsDrawer({
     )
     .sort((a, b) => Date.parse(b.completed_at!) - Date.parse(a.completed_at!));
   const daysSinceDone = daysSinceLastCompleted(seriesInstances, new Date());
+  const suggestedOccurrences =
+    idea.type === "task" ? findUnlinkedPastTaskOccurrences(ideas, idea) : [];
 
   return createPortal(
     <div style={{ zIndex: LAYER_MODAL }} className="fixed inset-0 flex justify-end">
@@ -440,17 +461,23 @@ export function DetailsDrawer({
           {/* Notes Section */}
           {variant === "idea" && (
             <>
-              {idea.series_id && (
+              {idea.type === "task" && (
                 <div className="mb-4 rounded-lg border border-black/5 dark:border-white/5">
                   <button
                     onClick={() => setSeriesOpen(!seriesOpen)}
+                    aria-expanded={seriesOpen}
                     className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-black/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.04]"
                   >
                     <span className="flex-1">Task series</span>
                     <span className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500">
-                      <span>
-                        {seriesInstances.length} occurrence{seriesInstances.length === 1 ? "" : "s"}
-                      </span>
+                      {idea.series_id ? (
+                        <span>
+                          {seriesInstances.length} occurrence
+                          {seriesInstances.length === 1 ? "" : "s"}
+                        </span>
+                      ) : (
+                        <span>Not linked</span>
+                      )}
                       {seriesOpen ? (
                         <ChevronDown size={12} strokeWidth={1.5} />
                       ) : (
@@ -460,11 +487,17 @@ export function DetailsDrawer({
                   </button>
                   {seriesOpen && (
                     <div className="border-t border-black/5 px-3 py-2 dark:border-white/5">
-                      <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
-                        {daysSinceDone === null
-                          ? "No recorded completion yet"
-                          : `Last done ${daysSinceDone} day${daysSinceDone === 1 ? "" : "s"} ago`}
-                      </p>
+                      {idea.series_id ? (
+                        <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                          {daysSinceDone === null
+                            ? "No recorded completion yet"
+                            : `Last done ${daysSinceDone} day${daysSinceDone === 1 ? "" : "s"} ago`}
+                        </p>
+                      ) : (
+                        <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                          Add a matching past task to start a series.
+                        </p>
+                      )}
                       {previousCompletions.length > 0 && (
                         <div className="mb-3">
                           <p className="mb-1 text-[10px] font-medium tracking-wide text-gray-400 uppercase">
@@ -490,13 +523,61 @@ export function DetailsDrawer({
                           </ul>
                         </div>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => void updateIdea(idea.id, { series_id: null })}
-                        className="text-[10px] font-medium text-gray-500 hover:text-gray-700 hover:underline dark:text-gray-400 dark:hover:text-gray-200"
-                      >
-                        Not the same task
-                      </button>
+                      {suggestedOccurrences.length > 0 ? (
+                        <div className="mb-3">
+                          <p className="mb-1 text-[10px] font-medium tracking-wide text-gray-400 uppercase">
+                            Possible past matches
+                          </p>
+                          <ul className="space-y-1">
+                            {suggestedOccurrences.map((occurrence) => (
+                              <li
+                                key={occurrence.id}
+                                className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400"
+                              >
+                                <span className="min-w-0 flex-1 truncate">
+                                  {occurrence.text || "Untitled"}
+                                </span>
+                                <time
+                                  className="shrink-0 text-[10px] text-gray-400 dark:text-gray-500"
+                                  dateTime={occurrence.completed_at!}
+                                >
+                                  {new Date(occurrence.completed_at!).toLocaleDateString()}
+                                </time>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleAttachOccurrence(occurrence)}
+                                  disabled={attachingOccurrenceId !== null}
+                                  aria-label={`Link ${occurrence.text || "Untitled"} to this task series`}
+                                  aria-busy={attachingOccurrenceId === occurrence.id}
+                                  className="min-h-8 shrink-0 rounded px-2 text-[11px] font-semibold text-indigo-600 hover:bg-indigo-50/50 focus-visible:outline-2 focus-visible:outline-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
+                                >
+                                  <span aria-live="polite">
+                                    {attachingOccurrenceId === occurrence.id ? "Linking…" : "Link"}
+                                  </span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : (
+                        <p className="mb-3 text-xs text-gray-400 italic">
+                          No unlinked past matches found.
+                        </p>
+                      )}
+                      {seriesError && (
+                        <p role="alert" className="mb-2 text-xs text-red-600 dark:text-red-400">
+                          {seriesError}
+                        </p>
+                      )}
+                      {idea.series_id && (
+                        <button
+                          type="button"
+                          onClick={() => void updateIdea(idea.id, { series_id: null })}
+                          className="text-[10px] font-medium text-gray-500 hover:text-gray-700 hover:underline dark:text-gray-400 dark:hover:text-gray-200"
+                        >
+                          Not the same task
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

@@ -7,10 +7,14 @@ import { useAuth } from "./useAuth";
 import { DONE_STATUSES } from "@/lib/ideaSearch";
 import { deserializeIdea } from "@/lib/ideaModel";
 import { ideaInsertParams, ideaInsertSql } from "@/lib/ideaInsert";
-import { seriesIdForAdoption } from "@/lib/tasks/series";
+import { isUnlinkedPastTaskOccurrence, seriesIdForAdoption } from "@/lib/tasks/series";
 import type { Idea } from "@/lib/types";
 
 type SeriesParentRow = Pick<Idea, "id" | "series_id" | "parent_id">;
+type AttachableOccurrenceRow = Pick<
+  Idea,
+  "id" | "series_id" | "type" | "status" | "completed_at" | "created_at"
+>;
 
 export function useTaskSeries(seriesIds: string[]) {
   const db = usePowerSync();
@@ -114,5 +118,48 @@ export function useTaskSeries(seriesIds: string[]) {
     return id;
   };
 
-  return { openInstances, createOccurrence };
+  const attachOccurrence = async (currentId: string, occurrenceId: string): Promise<void> => {
+    if (!userId) throw new Error("Cannot attach an occurrence without an authenticated user.");
+    if (currentId === occurrenceId) throw new Error("A task cannot be attached to itself.");
+
+    await db.writeTransaction(async (tx) => {
+      const current = await tx.getOptional<AttachableOccurrenceRow>(
+        "SELECT id, series_id, type, status, completed_at, created_at FROM ideas WHERE id = ? AND user_id = ?",
+        [currentId, userId],
+      );
+      if (!current || current.type !== "task") {
+        throw new Error("Cannot attach an occurrence to a task that no longer exists.");
+      }
+
+      const occurrence = await tx.getOptional<AttachableOccurrenceRow>(
+        "SELECT id, series_id, type, status, completed_at, created_at FROM ideas WHERE id = ? AND user_id = ?",
+        [occurrenceId, userId],
+      );
+      if (!occurrence || !isUnlinkedPastTaskOccurrence(occurrence, current)) {
+        throw new Error("This past task is no longer available to attach.");
+      }
+
+      const seriesId = seriesIdForAdoption(current);
+      const now = new Date().toISOString();
+      if (current.series_id === null) {
+        const updatedCurrent = await tx.execute(
+          "UPDATE ideas SET series_id = ?, updated_at = ? WHERE id = ? AND user_id = ? AND series_id IS NULL",
+          [seriesId, now, currentId, userId],
+        );
+        if (updatedCurrent.rowsAffected === 0) {
+          throw new Error("The task series changed before the occurrence could be attached.");
+        }
+      }
+
+      const updatedOccurrence = await tx.execute(
+        "UPDATE ideas SET series_id = ?, updated_at = ? WHERE id = ? AND user_id = ? AND series_id IS NULL",
+        [seriesId, now, occurrenceId, userId],
+      );
+      if (updatedOccurrence.rowsAffected === 0) {
+        throw new Error("This past task is no longer available to attach.");
+      }
+    });
+  };
+
+  return { openInstances, createOccurrence, attachOccurrence };
 }

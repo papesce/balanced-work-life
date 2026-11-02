@@ -1,4 +1,4 @@
-import { DONE_STATUSES } from "@/lib/ideaSearch";
+import { DONE_STATUSES, searchIdeas } from "@/lib/ideaSearch";
 import type { Idea } from "@/lib/types";
 
 type SeriesInstance = Pick<Idea, "id" | "series_id" | "status" | "completed_at">;
@@ -22,6 +22,34 @@ function completedTimestamps(instances: SeriesInstance[]): number[] {
 
 export function seriesIdForAdoption(instance: Pick<Idea, "id" | "series_id">): string {
   return instance.series_id ?? instance.id;
+}
+
+export function isUnlinkedPastTaskOccurrence(
+  occurrence: Pick<Idea, "id" | "series_id" | "type" | "status" | "completed_at">,
+  current: Pick<Idea, "id" | "created_at">,
+): boolean {
+  const completedAt = occurrence.completed_at ? Date.parse(occurrence.completed_at) : NaN;
+  const currentCreatedAt = Date.parse(current.created_at);
+  return (
+    occurrence.id !== current.id &&
+    occurrence.series_id === null &&
+    occurrence.type === "task" &&
+    (occurrence.status === "completed" || occurrence.status === "archived") &&
+    Number.isFinite(completedAt) &&
+    Number.isFinite(currentCreatedAt) &&
+    completedAt <= currentCreatedAt
+  );
+}
+
+export function findUnlinkedPastTaskOccurrences(ideas: Idea[], current: Idea, limit = 5): Idea[] {
+  return searchIdeas(ideas, current.text, {
+    excludeIds: new Set([current.id]),
+    includeDone: true,
+    limit: ideas.length,
+  })
+    .filter((occurrence) => isUnlinkedPastTaskOccurrence(occurrence, current))
+    .sort((a, b) => Date.parse(b.completed_at!) - Date.parse(a.completed_at!))
+    .slice(0, limit);
 }
 
 export function lastCompletedAt(instances: SeriesInstance[]): string | null {
