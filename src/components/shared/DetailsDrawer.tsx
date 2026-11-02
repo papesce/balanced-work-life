@@ -82,6 +82,7 @@ export function DetailsDrawer({
   const [contextOpen, setContextOpen] = useState(initialSection === "context");
   const [seriesOpen, setSeriesOpen] = useState(false);
   const [attachingOccurrenceId, setAttachingOccurrenceId] = useState<string | null>(null);
+  const [seriesQuery, setSeriesQuery] = useState("");
   const [seriesError, setSeriesError] = useState<string | null>(null);
   const router = useRouter();
   const { schemes, options, getOptionForIdea, setClassification } = useClassifications();
@@ -99,6 +100,7 @@ export function DetailsDrawer({
     setShowLinkPanel(false);
     setSeriesOpen(false);
     setSeriesError(null);
+    setSeriesQuery("");
   }, [ideaId, initialSection]);
 
   useEffect(() => {
@@ -213,7 +215,9 @@ export function DetailsDrawer({
     .sort((a, b) => Date.parse(b.completed_at!) - Date.parse(a.completed_at!));
   const daysSinceDone = daysSinceLastCompleted(seriesInstances, new Date());
   const suggestedOccurrences =
-    idea.type === "task" ? findUnlinkedPastTaskOccurrences(ideas, idea) : [];
+    idea.type === "task"
+      ? findUnlinkedPastTaskOccurrences(ideas, idea, { query: seriesQuery })
+      : [];
 
   return createPortal(
     <div style={{ zIndex: LAYER_MODAL }} className="fixed inset-0 flex justify-end">
@@ -523,6 +527,19 @@ export function DetailsDrawer({
                           </ul>
                         </div>
                       )}
+                      <input
+                        type="search"
+                        value={seriesQuery}
+                        onChange={(e) => setSeriesQuery(e.target.value)}
+                        placeholder="Search past tasks…"
+                        aria-label="Search past tasks to link"
+                        className="mb-2 w-full rounded border border-black/10 bg-transparent px-2 py-1 text-xs text-gray-700 placeholder:text-gray-400 dark:border-white/10 dark:text-gray-300"
+                      />
+                      {seriesError && (
+                        <p role="alert" className="mb-2 text-xs text-red-600 dark:text-red-400">
+                          {seriesError}
+                        </p>
+                      )}
                       {suggestedOccurrences.length > 0 ? (
                         <div className="mb-3">
                           <p className="mb-1 text-[10px] font-medium tracking-wide text-gray-400 uppercase">
@@ -562,11 +579,6 @@ export function DetailsDrawer({
                       ) : (
                         <p className="mb-3 text-xs text-gray-400 italic">
                           No unlinked past matches found.
-                        </p>
-                      )}
-                      {seriesError && (
-                        <p role="alert" className="mb-2 text-xs text-red-600 dark:text-red-400">
-                          {seriesError}
                         </p>
                       )}
                       {idea.series_id && (

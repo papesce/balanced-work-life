@@ -55,72 +55,60 @@ describe("task series", () => {
     assert.equal(seriesIdForAdoption(instance("later", "completed", null, "first")), "first");
   });
 
-  it("suggests only matching, completed, unlinked task occurrences from before the current task", () => {
+  it("suggests completed unlinked task occurrences with loosely matching titles", () => {
     const current = {
       ...instance("current", "scheduled", null, null),
-      text: "weekly report",
-      created_at: "2026-03-01T00:00:00.000Z",
+      text: "cortar el pasto del frente",
+      created_at: "2020-01-01T00:00:00.000Z",
     };
-    const match = {
-      ...instance("match", "completed", "2026-02-01T00:00:00.000Z", null),
-      text: "Weekly report",
-    };
-    const archivedMatch = {
-      ...instance("archived-match", "archived", "2026-02-15T00:00:00.000Z", null),
-      text: "weekly report",
-    };
-    const linkedMatch = {
-      ...instance("linked", "completed", "2026-02-02T00:00:00.000Z"),
-      text: "weekly report",
-    };
-    const recentMatch = {
-      ...instance("recent", "completed", "2026-03-02T00:00:00.000Z", null),
-      text: "weekly report",
-    };
-    const unrelated = {
-      ...instance("unrelated", "completed", "2026-02-03T00:00:00.000Z", null),
-      text: "plan vacation",
-    };
-
+    const make = (id: string, text: string, status: Idea["status"], at: string | null) => ({
+      ...instance(id, status, at, null),
+      text,
+    });
+    const ideas = [
+      current,
+      make("exact", "Cortar el pasto del frente", "completed", "2026-02-01T00:00:00.000Z"),
+      make("loose", "cortar pasto frente", "archived", "2026-03-01T00:00:00.000Z"),
+      make("accent", "Cortár el pásto", "completed", "2026-01-01T00:00:00.000Z"),
+      make("unrelated", "plan vacation", "completed", "2026-02-03T00:00:00.000Z"),
+      make("cancelled", "cortar el pasto del frente", "cancelled", "2026-02-04T00:00:00.000Z"),
+      make("nodate", "cortar el pasto del frente", "completed", null),
+      {
+        ...make("linked", "cortar el pasto del frente", "completed", "2026-02-05T00:00:00.000Z"),
+        series_id: "s",
+      },
+    ];
     assert.deepEqual(
-      findUnlinkedPastTaskOccurrences(
-        [current, match, archivedMatch, linkedMatch, recentMatch, unrelated],
-        current,
-      ).map(({ id }) => id),
-      ["archived-match", "match"],
+      findUnlinkedPastTaskOccurrences(ideas, current).map(({ id }) => id),
+      ["loose", "exact", "accent"],
     );
-    assert.equal(isUnlinkedPastTaskOccurrence(match, current), true);
-    assert.equal(isUnlinkedPastTaskOccurrence(archivedMatch, current), true);
-    assert.equal(isUnlinkedPastTaskOccurrence(linkedMatch, current), false);
-    assert.equal(isUnlinkedPastTaskOccurrence(recentMatch, current), false);
-    assert.equal(isUnlinkedPastTaskOccurrence({ ...match, status: "cancelled" }, current), false);
-    assert.equal(isUnlinkedPastTaskOccurrence({ ...match, type: "idea" }, current), false);
+    assert.equal(isUnlinkedPastTaskOccurrence({ ...ideas[1], type: "idea" }, current), false);
     assert.equal(
-      isUnlinkedPastTaskOccurrence({ ...match, completed_at: "invalid" }, current),
+      isUnlinkedPastTaskOccurrence({ ...ideas[1], completed_at: "invalid" }, current),
       false,
     );
   });
 
-  it("sorts suggested matches newest first and caps the result", () => {
-    const current = {
-      ...instance("current", "scheduled", null, null),
-      text: "weekly report",
-      created_at: "2026-03-01T00:00:00.000Z",
-    };
-    const matches = Array.from({ length: 7 }, (_, index) => ({
+  it("uses a manual query and caps results newest first", () => {
+    const current = { ...instance("current", "scheduled", null, null), text: "weekly report" };
+    const matches = Array.from({ length: 12 }, (_, index) => ({
       ...instance(
-        `match-${index}`,
+        `m-${index}`,
         "completed",
         `2026-02-${String(index + 1).padStart(2, "0")}T00:00:00.000Z`,
         null,
       ),
-      text: "weekly report",
+      text: "garden work",
     }));
-
+    const result = findUnlinkedPastTaskOccurrences([current, ...matches], current, {
+      query: "garden",
+      limit: 3,
+    });
     assert.deepEqual(
-      findUnlinkedPastTaskOccurrences([current, ...matches], current).map(({ id }) => id),
-      ["match-6", "match-5", "match-4", "match-3", "match-2"],
+      result.map(({ id }) => id),
+      ["m-11", "m-10", "m-9"],
     );
+    assert.deepEqual(findUnlinkedPastTaskOccurrences([current, ...matches], current), []);
   });
 
   it("computes the latest completion and elapsed whole days from completed instances", () => {

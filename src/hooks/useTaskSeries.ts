@@ -141,23 +141,20 @@ export function useTaskSeries(seriesIds: string[]) {
 
       const seriesId = seriesIdForAdoption(current);
       const now = new Date().toISOString();
+      // No rowsAffected checks: `ideas` is a PowerSync view (INSTEAD OF triggers),
+      // where SQLite reports 0 changes. The reads above run in this same write
+      // transaction, so the series_id IS NULL guarantees already hold.
       if (current.series_id === null) {
-        const updatedCurrent = await tx.execute(
-          "UPDATE ideas SET series_id = ?, updated_at = ? WHERE id = ? AND user_id = ? AND series_id IS NULL",
+        await tx.execute(
+          "UPDATE ideas SET series_id = ?, updated_at = ? WHERE id = ? AND user_id = ?",
           [seriesId, now, currentId, userId],
         );
-        if (updatedCurrent.rowsAffected === 0) {
-          throw new Error("The task series changed before the occurrence could be attached.");
-        }
       }
 
-      const updatedOccurrence = await tx.execute(
-        "UPDATE ideas SET series_id = ?, updated_at = ? WHERE id = ? AND user_id = ? AND series_id IS NULL",
+      await tx.execute(
+        "UPDATE ideas SET series_id = ?, updated_at = ? WHERE id = ? AND user_id = ?",
         [seriesId, now, occurrenceId, userId],
       );
-      if (updatedOccurrence.rowsAffected === 0) {
-        throw new Error("This past task is no longer available to attach.");
-      }
     });
   };
 

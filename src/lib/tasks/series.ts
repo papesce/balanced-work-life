@@ -1,4 +1,4 @@
-import { DONE_STATUSES, searchIdeas } from "@/lib/ideaSearch";
+import { DONE_STATUSES } from "@/lib/ideaSearch";
 import type { Idea } from "@/lib/types";
 
 type SeriesInstance = Pick<Idea, "id" | "series_id" | "status" | "completed_at">;
@@ -24,30 +24,75 @@ export function seriesIdForAdoption(instance: Pick<Idea, "id" | "series_id">): s
   return instance.series_id ?? instance.id;
 }
 
+const STOPWORDS = new Set([
+  "a",
+  "al",
+  "de",
+  "del",
+  "el",
+  "la",
+  "las",
+  "lo",
+  "los",
+  "un",
+  "una",
+  "y",
+  "en",
+  "the",
+  "of",
+  "to",
+  "and",
+]);
+
+function normalizeTokens(text: string | null): string[] {
+  return (text ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token && !STOPWORDS.has(token));
+}
+
+/** Loose title match: most significant words of `query` appear in `text`. */
+export function matchesTaskText(text: string | null, query: string, threshold = 0.6): boolean {
+  const queryTokens = [...new Set(normalizeTokens(query))];
+  if (queryTokens.length === 0) return false;
+  const textTokens = normalizeTokens(text);
+  const hits = queryTokens.filter((q) =>
+    textTokens.some((t) => t === q || (q.length > 3 && (t.startsWith(q) || q.startsWith(t)))),
+  ).length;
+  return hits / queryTokens.length >= threshold;
+}
+
 export function isUnlinkedPastTaskOccurrence(
   occurrence: Pick<Idea, "id" | "series_id" | "type" | "status" | "completed_at">,
-  current: Pick<Idea, "id" | "created_at">,
+  current: Pick<Idea, "id">,
 ): boolean {
   const completedAt = occurrence.completed_at ? Date.parse(occurrence.completed_at) : NaN;
-  const currentCreatedAt = Date.parse(current.created_at);
   return (
     occurrence.id !== current.id &&
     occurrence.series_id === null &&
     occurrence.type === "task" &&
     (occurrence.status === "completed" || occurrence.status === "archived") &&
-    Number.isFinite(completedAt) &&
-    Number.isFinite(currentCreatedAt) &&
-    completedAt <= currentCreatedAt
+    Number.isFinite(completedAt)
   );
 }
 
-export function findUnlinkedPastTaskOccurrences(ideas: Idea[], current: Idea, limit = 5): Idea[] {
-  return searchIdeas(ideas, current.text, {
-    excludeIds: new Set([current.id]),
-    includeDone: true,
-    limit: ideas.length,
-  })
+/** Past completed tasks not yet in a series. A manual `query` overrides the current title. */
+export function findUnlinkedPastTaskOccurrences(
+  ideas: Idea[],
+  current: Idea,
+  options: { query?: string; limit?: number } = {},
+): Idea[] {
+  const { query, limit = 10 } = options;
+  const manual = query?.trim();
+  return ideas
     .filter((occurrence) => isUnlinkedPastTaskOccurrence(occurrence, current))
+    .filter((occurrence) =>
+      manual
+        ? matchesTaskText(occurrence.text, manual, 1)
+        : matchesTaskText(occurrence.text, current.text),
+    )
     .sort((a, b) => Date.parse(b.completed_at!) - Date.parse(a.completed_at!))
     .slice(0, limit);
 }
