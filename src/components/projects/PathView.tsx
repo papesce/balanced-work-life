@@ -465,12 +465,12 @@ export function PathView({
             deleteKeyCode={["Backspace", "Delete"]}
           >
             <Background gap={20} size={1} />
-            <Controls position="bottom-left" />
+            <Controls position="bottom-left" className="path-editor-controls" />
             <MiniMap
               pannable
               zoomable
               style={{ width: 140, height: 100 }}
-              className="!border-gray-200 !bg-white/90 dark:!border-gray-800/90"
+              className="!border-gray-200 !bg-white/90 dark:!border-gray-700 dark:!bg-gray-800/90"
             />
           </ReactFlow>
           {nodes.length === 0 && <PathEmptyState onAdd={() => void addRandomNode()} />}
