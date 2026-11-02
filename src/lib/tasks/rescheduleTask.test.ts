@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   computeClearDatePatch,
   computeReschedulePatch,
+  getDayOccurrences,
   getDeferredOccurrences,
   willRecordAttempt,
 } from "./rescheduleTask";
@@ -181,6 +182,34 @@ describe("getDeferredOccurrences", () => {
         [yesterday, true],
         [today, true],
       ],
+    );
+  });
+});
+
+describe("events and not_applicable status", () => {
+  const eventIdea = () =>
+    task({
+      type: "event",
+      status: "not_applicable",
+      scheduled_date: today,
+      scheduled_time: "09:00",
+      attempt_dates: [yesterday],
+    });
+
+  it("never produces deferred occurrences for events", () => {
+    assert.deepEqual(getDeferredOccurrences([eventIdea()], today), []);
+  });
+
+  it("never produces day occurrences for events or not_applicable rows", () => {
+    assert.deepEqual(getDayOccurrences([eventIdea()], today, today, true), []);
+    assert.deepEqual(
+      getDayOccurrences(
+        [task({ status: "not_applicable", scheduled_date: today })],
+        today,
+        today,
+        true,
+      ),
+      [],
     );
   });
 });

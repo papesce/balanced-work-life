@@ -24,7 +24,7 @@ export function PathAssociationPanel({
   const [targetId, setTargetId] = useState("");
   const { data: ideas } = useQuery<Record<string, unknown>>(
     user
-      ? "SELECT id, text, type FROM ideas WHERE user_id = ? AND id != ? ORDER BY text"
+      ? "SELECT id, text, type FROM ideas WHERE user_id = ? AND id != ? AND (type IS NULL OR type <> 'event') ORDER BY text"
       : "SELECT * FROM ideas WHERE 0",
     user ? [user.id, pathId] : [],
   );

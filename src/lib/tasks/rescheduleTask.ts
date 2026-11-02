@@ -1,4 +1,5 @@
 import type { Idea } from "@/lib/types";
+import { isTask } from "@/lib/ideaPredicates";
 import { getToday, addDays, getCurrentTimeRounded } from "@/lib/dateUtils";
 
 export function computeCompletePatch(): Partial<Idea> {
@@ -157,7 +158,7 @@ export function getDayOccurrences(
 ): DayOccurrence[] {
   const result: DayOccurrence[] = [];
   for (const idea of ideas) {
-    if (idea.type !== "task" || idea.status === "archived") continue;
+    if (!isTask(idea) || idea.status === "archived" || idea.status === "not_applicable") continue;
     if (
       !includeInactive &&
       (idea.status === "completed" || idea.status === "cancelled" || idea.status === "missed")
@@ -183,7 +184,8 @@ export function isActiveOccurrence(occ: DayOccurrence): boolean {
     task.status !== "completed" &&
     task.status !== "cancelled" &&
     task.status !== "missed" &&
-    task.status !== "archived"
+    task.status !== "archived" &&
+    task.status !== "not_applicable"
   );
 }
 

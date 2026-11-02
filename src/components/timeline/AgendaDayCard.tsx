@@ -15,6 +15,7 @@ import {
 import { isPast, isPlanDate } from "@/lib/dateUtils";
 import type { DayOccurrence } from "@/lib/tasks/rescheduleTask";
 import type { Idea, LifeArea } from "@/lib/types";
+import { CalendarEventList } from "@/components/timeline/CalendarEventList";
 
 const cardVariants = {
   hidden: { opacity: 0, y: 12 },
@@ -93,6 +94,9 @@ interface AgendaDayCardProps extends SharedDayProps {
   onPlan: (date: string) => void;
   onAnchorReady: (date: string, node: HTMLDivElement) => void;
   onTodayReady: (date: string, node: HTMLDivElement) => void;
+  events: Idea[];
+  onSelectEvent: (event: Idea) => void;
+  onCreateEvent: (date: string) => void;
 }
 
 export function AgendaDayCard({
@@ -110,6 +114,9 @@ export function AgendaDayCard({
   onPlan,
   onAnchorReady,
   onTodayReady,
+  events,
+  onSelectEvent,
+  onCreateEvent,
   ...dayListProps
 }: AgendaDayCardProps) {
   const dayOccurrences = occurrences;
@@ -200,10 +207,21 @@ export function AgendaDayCard({
                     <span className="hidden sm:inline">Smart Sort</span>
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => onCreateEvent(date)}
+                  className="rounded-lg px-2 py-1.5 text-xs font-semibold text-indigo-600 transition-colors hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-950/20"
+                >
+                  + Event
+                </button>
                 <button onClick={() => onPlan(date)} className="focus-button">
                   Plan
                 </button>
               </div>
+            </div>
+
+            <div className="px-5 pb-2">
+              <CalendarEventList events={events} onSelect={onSelectEvent} />
             </div>
 
             <div className="px-5 pb-2">

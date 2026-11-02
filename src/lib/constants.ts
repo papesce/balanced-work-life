@@ -9,6 +9,7 @@ import {
   Sparkles,
   Users,
   X,
+  CalendarDays,
 } from "lucide-react";
 import type { IdeaStatus, IdeaType, LifeArea } from "@/lib/types";
 
@@ -131,6 +132,13 @@ export const STATUS_CONFIG: Record<
     bg: "rgba(217,119,6,0.1)",
     icon: null,
   },
+  not_applicable: {
+    label: "N/A",
+    textClass: "text-gray-400",
+    hex: "#9ca3af",
+    bg: "rgba(0,0,0,0.05)",
+    icon: CalendarDays,
+  },
 };
 
 /** Pill styles for status chips in tree rows (shared by brainstorm + horizon). */
@@ -153,6 +161,8 @@ export const STATUS_STYLES: Record<IdeaStatus, string> = {
   archived: "border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 bg-transparent",
   deferred:
     "border-amber-200 dark:border-amber-700/30 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300",
+  not_applicable:
+    "border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/40 text-gray-500 dark:text-gray-400",
 };
 
 /** Statuses that close an item. Everything else counts as open. */
@@ -219,6 +229,10 @@ export const TYPE_BADGE: Record<IdeaType, { label: string; className: string }> 
   path: {
     label: "Path",
     className: "bg-teal-100/80 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400",
+  },
+  event: {
+    label: "Event",
+    className: "bg-indigo-100/80 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300",
   },
 };
 

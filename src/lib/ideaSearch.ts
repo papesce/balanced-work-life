@@ -30,6 +30,7 @@ export function getPathLabel(idea: Idea, ideasById: Map<string, Idea>): string {
 export interface SearchIdeasOptions {
   excludeIds?: Set<string>;
   includeDone?: boolean;
+  includeEvents?: boolean;
   limit?: number;
 }
 
@@ -39,13 +40,14 @@ export function searchIdeas(
   rawQuery: string,
   options: SearchIdeasOptions = {},
 ): Idea[] {
-  const { excludeIds, includeDone = true, limit = 10 } = options;
+  const { excludeIds, includeDone = true, includeEvents = false, limit = 10 } = options;
   const query = rawQuery.trim().toLowerCase();
   if (!query) return [];
   const words = query.split(/\s+/).filter(Boolean);
   return ideas
     .filter((idea) => {
       if (excludeIds?.has(idea.id)) return false;
+      if (!includeEvents && idea.type === "event") return false;
       if (!includeDone && DONE_STATUSES.includes(idea.status)) return false;
       const haystack = `${idea.text ?? ""} ${idea.notes ?? ""} ${idea.why ?? ""}`.toLowerCase();
       return words.every((w) => haystack.includes(w));

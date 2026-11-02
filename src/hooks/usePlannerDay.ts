@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { getDayOccurrences, getDeferredOccurrences } from "@/lib/tasks/rescheduleTask";
 import { AREA_ORDER } from "@/lib/constants";
 import { Idea, LifeArea, Tag, getAreasForIdea } from "@/lib/types";
+import { isTask } from "@/lib/ideaPredicates";
 
 interface UsePlannerDayParams {
   ideas: Idea[];
@@ -50,9 +51,12 @@ export function usePlannerDay({
   hideCompleted,
   getTagsForIdea,
 }: UsePlannerDayParams) {
-  const taskIdeas = useMemo(() => ideas.filter((i) => i.type === "task"), [ideas]);
+  const taskIdeas = useMemo(() => ideas.filter(isTask), [ideas]);
   const scheduledTaskIdeas = useMemo(
-    () => taskIdeas.filter((i) => i.status !== "completed" && i.status !== "archived"),
+    () =>
+      taskIdeas.filter(
+        (i) => i.status !== "completed" && i.status !== "archived" && i.status !== "not_applicable",
+      ),
     [taskIdeas],
   );
 

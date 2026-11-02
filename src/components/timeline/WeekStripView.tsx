@@ -53,6 +53,9 @@ export interface WeekStripViewProps {
   suggestFrom: Idea[];
   cardPreview: WeekCardPreview;
   onCardPreviewChange: (preview: WeekCardPreview) => void;
+  eventsByDate: Record<string, Idea[]>;
+  onSelectEvent: (event: Idea) => void;
+  onCreateEvent: (date: string) => void;
 }
 
 export function WeekStripView(props: WeekStripViewProps) {
@@ -136,6 +139,8 @@ export function WeekStripView(props: WeekStripViewProps) {
                 today={today}
                 tomorrow={tomorrow}
                 occurrences={occurrencesByDate[date] ?? []}
+                events={props.eventsByDate[date] ?? []}
+                onSelectEvent={props.onSelectEvent}
                 onSelect={() => {
                   if (date !== anchor) onAnchorChange(date);
                 }}
@@ -156,7 +161,10 @@ export function WeekStripView(props: WeekStripViewProps) {
           selectedDate={selectedDate}
           selectedOccurrences={selectedOccurrences}
           selectedDayTasks={selectedDayTasks}
+          selectedDayEvents={props.eventsByDate[selectedDate] ?? []}
           detailRef={detailRef}
+          onSelectEvent={props.onSelectEvent}
+          onCreateEvent={props.onCreateEvent}
           viewProps={props}
         />
       </div>

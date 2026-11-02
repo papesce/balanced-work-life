@@ -10,6 +10,7 @@ import { formatDayTitle, formatTimelineDate } from "@/components/timeline/timeli
 import { isPlanDate } from "@/lib/dateUtils";
 import type { DayOccurrence } from "@/lib/tasks/rescheduleTask";
 import type { Idea } from "@/lib/types";
+import { CalendarEventList } from "@/components/timeline/CalendarEventList";
 
 type ViewProps = Pick<
   WeekStripViewProps,
@@ -37,19 +38,26 @@ type ViewProps = Pick<
   | "onQuickAddAreaChange"
   | "onQuickAdd"
   | "suggestFrom"
+  | "onCreateEvent"
 >;
 
 export function WeekDetailPanel({
   selectedDate,
   selectedOccurrences,
   selectedDayTasks,
+  selectedDayEvents,
   detailRef,
+  onSelectEvent,
+  onCreateEvent,
   viewProps,
 }: {
   selectedDate: string;
   selectedOccurrences: DayOccurrence[];
   selectedDayTasks: Idea[];
+  selectedDayEvents: Idea[];
   detailRef: RefObject<HTMLDivElement | null>;
+  onSelectEvent: (event: Idea) => void;
+  onCreateEvent: (date: string) => void;
   viewProps: ViewProps;
 }) {
   return (
@@ -77,6 +85,13 @@ export function WeekDetailPanel({
           )}
         </div>
         <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onCreateEvent(selectedDate)}
+            className="rounded-lg px-2 py-1 text-[11px] font-semibold text-indigo-600 transition-colors hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-950/20"
+          >
+            + Event
+          </button>
           {selectedDayTasks.length > 0 && viewProps.onSmartSort && (
             <button
               onClick={() => viewProps.onSmartSort?.(selectedDayTasks)}
@@ -96,6 +111,10 @@ export function WeekDetailPanel({
             </button>
           )}
         </div>
+      </div>
+
+      <div className="pb-2">
+        <CalendarEventList events={selectedDayEvents} onSelect={onSelectEvent} />
       </div>
 
       <div className="pb-2">

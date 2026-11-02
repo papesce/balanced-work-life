@@ -19,15 +19,17 @@ export type IdeasScope = "all" | "this_month";
  */
 export type CreateIdeaPosition = "top" | "bottom" | { beforeId: string } | { afterId: string };
 
-export function useIdeas(options: { scope?: IdeasScope; searchQuery?: string } = {}) {
-  const { scope = "all", searchQuery = "" } = options;
+export function useIdeas(
+  options: { scope?: IdeasScope; searchQuery?: string; includeEvents?: boolean } = {},
+) {
+  const { scope = "all", searchQuery = "", includeEvents = false } = options;
   const { user } = useAuth();
   const db = usePowerSync();
 
   const userId = user?.id ?? "";
   const hasSearch = searchQuery.trim().length > 0;
   // While searching, look at every idea regardless of the active time scope.
-  const { sql, params } = buildScopedQuery(userId, hasSearch ? "all" : scope);
+  const { sql, params } = buildScopedQuery(userId, hasSearch ? "all" : scope, { includeEvents });
 
   const { data: rawRows, isLoading: loading } = useQuery<Record<string, unknown>>(
     userId ? sql : "SELECT * FROM ideas WHERE 0",

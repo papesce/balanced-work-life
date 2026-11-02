@@ -70,7 +70,7 @@ export const QuickNoteCapture = memo(function QuickNoteCapture({
   const previewSegments = useMemo(() => parseNoteLinks(draft, true), [draft]);
   const { data: ideaRows } = useQuery<Record<string, unknown>>(
     user
-      ? "SELECT * FROM ideas WHERE user_id = ? ORDER BY sort_order ASC"
+      ? "SELECT * FROM ideas WHERE user_id = ? AND (type IS NULL OR type <> 'event') ORDER BY sort_order ASC"
       : "SELECT * FROM ideas WHERE 0",
     user ? [user.id] : [],
   );

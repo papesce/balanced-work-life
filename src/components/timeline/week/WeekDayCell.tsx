@@ -16,6 +16,8 @@ import {
   formatTimelineDate,
   getTimelineKicker,
 } from "@/components/timeline/timelineUtils";
+import { CalendarEventList } from "@/components/timeline/CalendarEventList";
+import type { Idea } from "@/lib/types";
 
 export function WeekDayCell({
   date,
@@ -23,6 +25,8 @@ export function WeekDayCell({
   today,
   tomorrow,
   occurrences,
+  events,
+  onSelectEvent,
   onSelect,
   getTagsForIdea,
   preview,
@@ -33,6 +37,8 @@ export function WeekDayCell({
   today: string;
   tomorrow: string;
   occurrences: DayOccurrence[];
+  events: Idea[];
+  onSelectEvent: (event: Idea) => void;
   onSelect: () => void;
   getTagsForIdea: (ideaId: string) => Tag[];
   preview: WeekCardPreview;
@@ -100,6 +106,7 @@ export function WeekDayCell({
         </span>
       )}
       <MiniBalanceBar tasks={dayTasks} getTagsForIdea={getTagsForIdea} date={date} />
+      <CalendarEventList events={events} onSelect={onSelectEvent} compact maxItems={2} />
       <WeekPreviewContent
         current={current}
         preview={preview}

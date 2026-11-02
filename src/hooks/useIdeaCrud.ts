@@ -40,6 +40,12 @@ export function useIdeaCrud({
     initialUpdates: Partial<Idea> = {},
   ): Promise<string> => {
     if (!userId) return "";
+    if (initialUpdates.type === "event" && parentId !== null) {
+      throw new Error("Calendar events must be root ideas.");
+    }
+    if (ideas.some((idea) => idea.id === parentId && idea.type === "event")) {
+      throw new Error("Calendar events cannot contain child ideas.");
+    }
     const siblings = ideas.filter((i) => i.parent_id === parentId);
     const maxOrder = siblings.length > 0 ? Math.max(...siblings.map((s) => s.sort_order)) : -1;
     const now = new Date().toISOString();
@@ -154,7 +160,8 @@ export function useIdeaCrud({
 
     // Instant UI: merge patch over the live row before touching SQLite.
     const prevPending = pendingIdeas.get(id);
-    setPendingIdea(id, { ...prevPending, ...finalUpdates });
+    const hasOptimisticRow = previous !== undefined || prevPending !== undefined;
+    if (hasOptimisticRow) setPendingIdea(id, { ...prevPending, ...finalUpdates });
 
     const setClauses = [...fields, "updated_at"].map((f) => `${f} = ?`).join(", ");
     const values = fields.map((f) => {
@@ -169,8 +176,10 @@ export function useIdeaCrud({
     try {
       await db.execute(`UPDATE ideas SET ${setClauses} WHERE id = ?`, [...values, id]);
     } catch (e) {
-      if (prevPending) setPendingIdea(id, prevPending);
-      else removePendingIdea(id);
+      if (hasOptimisticRow) {
+        if (prevPending) setPendingIdea(id, prevPending);
+        else removePendingIdea(id);
+      }
       throw e;
     }
   };
@@ -245,6 +254,9 @@ export function useIdeaCrud({
     parentText: string,
     parentType: Idea["type"],
   ): Promise<string> => {
+    if (parentType === "event") {
+      throw new Error("Calendar events cannot be parent ideas.");
+    }
     if (!userId) return "";
     const text = parentText.trim();
     if (!text) return "";

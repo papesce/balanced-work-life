@@ -159,7 +159,7 @@ export function isPrereqSatisfied(status: Idea["status"] | undefined): boolean {
  * A missing prerequisite task counts as unsatisfied.
  */
 export function isReady(task: TaskRef, links: LinkRef[], byId: StatusLookup): boolean {
-  if (TERMINAL_STATUSES.includes(task.status)) return false;
+  if (task.status === "not_applicable" || TERMINAL_STATUSES.includes(task.status)) return false;
   for (const link of links) {
     if (link.link_type !== "depends_on" || link.source_id !== task.id) continue;
     if (!isPrereqSatisfied(byId.get(link.target_id)?.status)) return false;

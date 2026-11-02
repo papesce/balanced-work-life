@@ -94,6 +94,7 @@ export function IdeaSearchPicker({
     ? ideas
         .filter((idea) => {
           if (excludeIds.has(idea.id)) return false;
+          if (idea.type === "event") return false;
           if (excludeDone && DONE_STATUSES.includes(idea.status)) return false;
           if (matchAllWords) {
             const words = query.split(/\s+/).filter(Boolean);

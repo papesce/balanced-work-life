@@ -12,6 +12,7 @@ import { MiniBalanceBar } from "@/components/MiniBalanceBar";
 import { DateChip } from "@/components/shared/DateChip";
 import { formatTimelineDate, formatDayTitle, formatTaskCount } from "./timelineUtils";
 import { TaskChip } from "./TaskChip";
+import { CalendarEventList } from "./CalendarEventList";
 
 const DAY_HEADERS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MAX_CHIPS = 3;
@@ -45,6 +46,9 @@ interface MonthGridViewProps {
   onQuickAddAreaChange: (area: LifeArea | null) => void;
   onQuickAdd: (text: string, date: string) => Promise<void>;
   showQuickAdd?: (date: string) => boolean;
+  eventsByDate: Record<string, Idea[]>;
+  onSelectEvent: (event: Idea) => void;
+  onCreateEvent: (date: string) => void;
 }
 
 function DayCell({
@@ -53,6 +57,8 @@ function DayCell({
   today,
   isCurrentMonth,
   occurrences,
+  events,
+  onSelectEvent,
   onSelect,
   justDraggedRef,
 }: {
@@ -61,6 +67,8 @@ function DayCell({
   today: string;
   isCurrentMonth: boolean;
   occurrences: DayOccurrence[];
+  events: Idea[];
+  onSelectEvent: (event: Idea) => void;
   onSelect: () => void;
   justDraggedRef: React.MutableRefObject<number>;
 }) {
@@ -107,6 +115,7 @@ function DayCell({
         )}
       </span>
       <span className="mt-0.5 block space-y-px" onClick={(e) => e.stopPropagation()}>
+        <CalendarEventList events={events} onSelect={onSelectEvent} compact maxItems={2} />
         {visible.map((o) => (
           <TaskChip
             key={o.task.id}
@@ -231,6 +240,8 @@ export function MonthGridView(props: MonthGridViewProps) {
                 today={today}
                 isCurrentMonth={date.slice(0, 7) === anchorMonth}
                 occurrences={occurrencesByDate[date] ?? []}
+                events={props.eventsByDate[date] ?? []}
+                onSelectEvent={props.onSelectEvent}
                 onSelect={() => {
                   if (date !== anchor) onAnchorChange(date);
                 }}
@@ -258,6 +269,13 @@ export function MonthGridView(props: MonthGridViewProps) {
               />
             </div>
             <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => props.onCreateEvent(anchor)}
+                className="rounded-lg px-2 py-1 text-[11px] font-semibold text-indigo-600 transition-colors hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-950/20"
+              >
+                + Event
+              </button>
               {selectedDayTasks.length > 0 && props.onSmartSort && (
                 <button
                   onClick={() => props.onSmartSort?.(selectedDayTasks)}
@@ -275,6 +293,12 @@ export function MonthGridView(props: MonthGridViewProps) {
                 Open day →
               </button>
             </div>
+          </div>
+          <div className="pb-2">
+            <CalendarEventList
+              events={props.eventsByDate[anchor] ?? []}
+              onSelect={props.onSelectEvent}
+            />
           </div>
           <div className="pb-2">
             {selectedOccurrences.length === 0 ? (

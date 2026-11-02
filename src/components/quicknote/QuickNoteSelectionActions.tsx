@@ -17,6 +17,7 @@ const KIND_PILL_STYLES: Record<IdeaType, string> = {
   initiative: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
   task: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
   path: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
+  event: "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300",
 };
 
 export function KindPill({ kind }: { kind: IdeaType }) {
@@ -56,7 +57,7 @@ export function QuickNoteSelectionActions({
 
   const { data: ideaRows } = useQuery<Record<string, unknown>>(
     user
-      ? "SELECT * FROM ideas WHERE user_id = ? ORDER BY sort_order ASC"
+      ? "SELECT * FROM ideas WHERE user_id = ? AND (type IS NULL OR type <> 'event') ORDER BY sort_order ASC"
       : "SELECT * FROM ideas WHERE 0",
     user ? [user.id] : [],
   );

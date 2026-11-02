@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { getDatesRange, getMonthCalendarGrid, getWindowRange } from "@/lib/dateUtils";
 import type { Idea } from "@/lib/types";
+import { isTask } from "@/lib/ideaPredicates";
 import {
   buildRenderPlan,
   getLookbackForward,
@@ -36,7 +37,7 @@ export function useTimelineModel({ ideas, anchor, today, preset, filter }: UseTi
   );
   const hasRevisitDates = dates.some((d) => d <= today);
   const effectiveFilter = hasRevisitDates ? filter : "all";
-  const tasks = useMemo(() => ideas.filter((i) => i.type === "task"), [ideas]);
+  const tasks = useMemo(() => ideas.filter(isTask), [ideas]);
 
   const monthGridDates = useMemo(() => getMonthCalendarGrid(anchor), [anchor]);
   const weekStart = useMemo(() => getWindowRange("week", anchor).start, [anchor]);

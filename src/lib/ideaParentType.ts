@@ -31,8 +31,13 @@ export function getDefaultParentType(childType: IdeaType | null | undefined): Id
 }
 
 /** Show the create-row only when the query isn't an exact match of a visible idea. */
-export function hasExactMatch(ideas: { text: string }[], query: string): boolean {
+export function hasExactMatch(
+  ideas: { text: string; type?: IdeaType | null }[],
+  query: string,
+): boolean {
   const normalized = query.trim().toLowerCase();
   if (!normalized) return false;
-  return ideas.some((idea) => idea.text.trim().toLowerCase() === normalized);
+  return ideas.some(
+    (idea) => idea.type !== "event" && idea.text.trim().toLowerCase() === normalized,
+  );
 }

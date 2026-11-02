@@ -1,6 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { computeCollapsedIds, DEFAULT_EXPAND_DEPTH } from "@/lib/ideaModel";
+import {
+  buildIdeaTree,
+  buildScopedQuery,
+  computeCollapsedIds,
+  DEFAULT_EXPAND_DEPTH,
+} from "@/lib/ideaModel";
 import type { Idea, IdeaType } from "@/lib/types";
 
 type Override = "expanded" | "collapsed";
@@ -56,6 +61,25 @@ describe("computeCollapsedIds", () => {
     const collapsed = computeCollapsedIds(base, new Map());
     assert.equal(collapsed.has("child"), true, "deep parent collapsed by default");
     assert.equal(collapsed.has("root"), false, "depth-0 parent not collapsed by default");
+  });
+
+  describe("buildScopedQuery event handling", () => {
+    it("excludes events by default and includes them only when requested", () => {
+      const defaultQuery = buildScopedQuery("user-1", "all");
+      const includeEventsQuery = buildScopedQuery("user-1", "all", { includeEvents: true });
+      assert.match(defaultQuery.sql, /type IS NULL OR type <> 'event'/);
+      assert.doesNotMatch(includeEventsQuery.sql, /type <> 'event'/);
+    });
+  });
+
+  describe("buildIdeaTree event handling", () => {
+    it("never adds events to the brainstorm tree", () => {
+      const event = idea({ id: "event", type: "event", status: "not_applicable" });
+      assert.deepEqual(
+        buildIdeaTree([root, event], new Set()).map((node) => node.id),
+        ["root"],
+      );
+    });
   });
 
   it("leaves paths expanded by default when there is no override", () => {

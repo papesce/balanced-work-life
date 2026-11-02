@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback, Suspense } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Clock } from "lucide-react";
@@ -25,7 +25,16 @@ import { useCompletionEffects } from "@/stores/feedbackStore";
 import { LinkedEffectsReveal } from "@/components/shared/LinkedEffectsReveal";
 import { AgendaDayCard, AgendaGap } from "@/components/timeline/AgendaDayCard";
 import { TimelineFloatingControls, TimelineToolbar } from "@/components/timeline/TimelineToolbar";
-import { loadTimelinePrefs, type TimelinePresetId, type TimelineView } from "@/lib/timelinePresets";
+import {
+  buildRenderPlan,
+  loadTimelinePrefs,
+  type TimelinePresetId,
+  type TimelineView,
+} from "@/lib/timelinePresets";
+import { useEvents } from "@/hooks/useEvents";
+import { groupEventsByDate } from "@/lib/eventModel";
+import { EventEditor, type EventValues } from "@/components/timeline/EventEditor";
+import type { Idea } from "@/lib/types";
 
 export default function TimelinePage() {
   return (
@@ -45,6 +54,7 @@ function TimelineInner() {
     markDone,
     markUndone,
     updateIdea,
+    deleteIdea,
     moveIdea,
     reorderTasks,
     smartSortTasks,
@@ -82,6 +92,7 @@ function TimelineInner() {
 
   const {
     dates,
+    extendedRange,
     hasRevisitDates,
     effectiveFilter,
     monthGridDates,
@@ -89,9 +100,71 @@ function TimelineInner() {
     occurrencesByDate,
     rangeCounts,
     rangeSpans,
-    renderPlan,
     noDeferredActivity,
   } = useTimelineModel({ ideas, anchor, today, preset, filter });
+  const eventRange = useMemo(() => {
+    const allDates = [...dates, ...monthGridDates, ...weekDates].sort();
+    return { start: allDates[0] ?? anchor, end: allDates.at(-1) ?? anchor };
+  }, [dates, monthGridDates, weekDates, anchor]);
+  const { events } = useEvents(eventRange.start, eventRange.end);
+  const eventsByDate = useMemo(() => groupEventsByDate(events), [events]);
+  const agendaRenderPlan = useMemo(
+    () =>
+      buildRenderPlan(
+        dates,
+        occurrencesByDate,
+        extendedRange,
+        anchor,
+        new Set(
+          events.map((event) => event.scheduled_date).filter((date): date is string => !!date),
+        ),
+      ),
+    [dates, occurrencesByDate, extendedRange, anchor, events],
+  );
+  const hasAgendaEvents = dates.some((date) => (eventsByDate[date]?.length ?? 0) > 0);
+  const [manualEventEditor, setManualEventEditor] = useState<{
+    event: Idea | null;
+    date: string;
+  } | null>(null);
+  const eventId = searchParams.get("event");
+  const linkedEvent = eventId ? events.find((item) => item.id === eventId) : undefined;
+  const eventEditor =
+    manualEventEditor ??
+    (linkedEvent ? { event: linkedEvent, date: linkedEvent.scheduled_date ?? anchor } : null);
+
+  const handleSelectEvent = (event: Idea) => {
+    const date = event.scheduled_date ?? anchor;
+    router.push(`/timeline?date=${encodeURIComponent(date)}&event=${encodeURIComponent(event.id)}`);
+  };
+
+  const handleCloseEventEditor = () => {
+    setManualEventEditor(null);
+    if (eventId) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("event");
+      const query = params.toString();
+      router.replace(query ? `/timeline?${query}` : "/timeline", { scroll: false });
+    }
+  };
+
+  const handleSaveEvent = async (values: EventValues) => {
+    if (eventEditor?.event) {
+      await updateIdea(eventEditor.event.id, {
+        ...values,
+        type: "event",
+        status: "not_applicable",
+        parent_id: null,
+      });
+      return;
+    }
+    await createIdea(values.text, null, "bottom", {
+      ...values,
+      type: "event",
+      status: "not_applicable",
+      parent_id: null,
+      status_history: null,
+    });
+  };
 
   const handleFilterChange = (id: "all" | "deferred") => {
     setFilter(id);
@@ -306,6 +379,9 @@ function TimelineInner() {
             anchor={anchor}
             today={today}
             occurrencesByDate={occurrencesByDate}
+            eventsByDate={eventsByDate}
+            onSelectEvent={handleSelectEvent}
+            onCreateEvent={(date) => setManualEventEditor({ event: null, date })}
             onAnchorChange={handleAnchorChange}
             onOpenDay={(d) => router.push(`/?date=${d}`)}
             onReorder={handleReorderDate}
@@ -337,6 +413,9 @@ function TimelineInner() {
             today={today}
             tomorrow={tomorrow}
             occurrencesByDate={occurrencesByDate}
+            eventsByDate={eventsByDate}
+            onSelectEvent={handleSelectEvent}
+            onCreateEvent={(date) => setManualEventEditor({ event: null, date })}
             showQuickAdd={(date) => effectiveFilter === "all" || isPlanDate(date)}
             onAnchorChange={handleAnchorChange}
             onOpenDay={(d) => router.push(`/?date=${d}`)}
@@ -364,14 +443,14 @@ function TimelineInner() {
             cardPreview={weekCardPreview}
             onCardPreviewChange={setWeekCardPreview}
           />
-        ) : noDeferredActivity ? (
+        ) : noDeferredActivity && !hasAgendaEvents ? (
           <div className="glass-card rounded-2xl border border-dashed border-black/5 py-20 text-center text-gray-400 dark:border-white/5 dark:text-gray-500">
             <Clock size={32} className="mx-auto mb-3 text-gray-300 opacity-60 dark:text-gray-600" />
             <p className="mb-1 text-sm font-semibold">No deferred tasks</p>
             <p className="text-xs">No tasks found in the selected range.</p>
           </div>
         ) : (
-          renderPlan.map((unit, index) => {
+          agendaRenderPlan.map((unit, index) => {
             if (unit.kind === "gap") {
               return <AgendaGap key={`gap-${index}`} count={unit.count} />;
             }
@@ -385,6 +464,11 @@ function TimelineInner() {
                 today={today}
                 tomorrow={tomorrow}
                 occurrences={occurrencesByDate[date] ?? []}
+                events={eventsByDate[date] ?? []}
+                onSelectEvent={handleSelectEvent}
+                onCreateEvent={(selectedDate) =>
+                  setManualEventEditor({ event: null, date: selectedDate })
+                }
                 effectiveFilter={effectiveFilter}
                 quickAddArea={quickAddArea}
                 onQuickAddAreaChange={setQuickAddArea}
@@ -427,6 +511,21 @@ function TimelineInner() {
           else handleAnchorChange(today);
         }}
       />
+      {eventEditor && (
+        <EventEditor
+          event={eventEditor.event}
+          initialDate={eventEditor.date}
+          onSave={handleSaveEvent}
+          onDelete={
+            eventEditor.event
+              ? async () => {
+                  await deleteIdea(eventEditor.event!.id);
+                }
+              : undefined
+          }
+          onClose={handleCloseEventEditor}
+        />
+      )}
     </AppShell>
   );
 }

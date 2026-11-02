@@ -78,7 +78,11 @@ export function compareIdeasForTree(a: Idea, b: Idea): number {
 }
 
 export function buildIdeaTree(ideas: Idea[], collapsedIds: Set<string>): IdeaNode[] {
-  return buildTreeGeneric(ideas, collapsedIds, compareIdeasForTree);
+  return buildTreeGeneric(
+    ideas.filter((idea) => idea.type !== "event"),
+    collapsedIds,
+    compareIdeasForTree,
+  );
 }
 
 export function sortIdeasForInsert(ideas: Idea[]): Idea[] {
@@ -150,21 +154,24 @@ export function deserializeIdea(row: Record<string, unknown>): Idea {
 export function buildScopedQuery(
   userId: string,
   scope: IdeasScope,
+  options: { includeEvents?: boolean } = {},
 ): { sql: string; params: string[] } {
+  const eventFilter = options.includeEvents ? "" : "AND (type IS NULL OR type <> 'event')";
   if (scope === "this_month") {
     const { start, end } = getWindowRange("month", getToday());
     return {
       sql: `SELECT * FROM ideas WHERE user_id = ?
+            ${eventFilter}
             AND (
               (scheduled_date >= ? AND scheduled_date <= ?)
-              OR (scheduled_date IS NULL AND status NOT IN ('completed','cancelled','missed','archived'))
+              OR (scheduled_date IS NULL AND status NOT IN ('completed','cancelled','missed','archived','not_applicable'))
             )
             ORDER BY sort_order ASC`,
       params: [userId, start, end],
     };
   }
   return {
-    sql: `SELECT * FROM ideas WHERE user_id = ? ORDER BY sort_order ASC`,
+    sql: `SELECT * FROM ideas WHERE user_id = ? ${eventFilter} ORDER BY sort_order ASC`,
     params: [userId],
   };
 }

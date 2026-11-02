@@ -49,6 +49,13 @@ export function useIdeaOrder({ db, ideas }: { db: Db; ideas: Idea[] }) {
   );
 
   const moveIdea = async (id: string, newParentId: string | null, newSortOrder: number) => {
+    const movedIdea = ideas.find((idea) => idea.id === id);
+    if (movedIdea?.type === "event") {
+      throw new Error("Calendar events cannot be moved into the idea tree.");
+    }
+    if (ideas.some((idea) => idea.id === newParentId && idea.type === "event")) {
+      throw new Error("Calendar events cannot contain child ideas.");
+    }
     const updatedAt = new Date().toISOString();
     const siblings = ideas.filter((i) => i.parent_id === newParentId && i.id !== id);
     const previousOrders = new Map(ideas.map((i) => [i.id, i.sort_order]));

@@ -1,4 +1,4 @@
-export type IdeaType = "idea" | "objective" | "project" | "initiative" | "task" | "path";
+export type IdeaType = "idea" | "objective" | "project" | "initiative" | "task" | "path" | "event";
 export type LifeArea = "work" | "health" | "relationships" | "growth" | "finances" | "life";
 export type IdeaStatus =
   | "draft"
@@ -10,7 +10,8 @@ export type IdeaStatus =
   | "cancelled"
   | "missed"
   | "archived"
-  | "deferred";
+  | "deferred"
+  | "not_applicable";
 export type TermValue = "short" | "medium" | "long";
 
 export interface Tag {

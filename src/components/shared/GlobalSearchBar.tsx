@@ -22,7 +22,7 @@ import {
   getTypeLabel,
   searchIdeas,
 } from "@/lib/ideaSearch";
-import { STATUS_LABELS, STATUS_STYLES } from "@/lib/constants";
+import { STATUS_LABELS, STATUS_STYLES, TYPE_BADGE } from "@/lib/constants";
 import { TYPE_COLORS } from "@/components/brainstorm/ideaNodeSlots";
 import {
   canRevealInView,
@@ -57,7 +57,7 @@ function pathnameToView(pathname: string): RevealView | null {
 }
 
 export function GlobalSearchBar() {
-  const { ideas } = useIdeas({ scope: "all" });
+  const { ideas } = useIdeas({ scope: "all", includeEvents: true });
   const { schemes, options: classificationOptions, classifications } = useClassifications();
   const router = useRouter();
   const pathname = usePathname();
@@ -131,7 +131,7 @@ export function GlobalSearchBar() {
 
   const ideasById = useMemo(() => new Map(ideas.map((i) => [i.id, i])), [ideas]);
   const results = useMemo(
-    () => searchIdeas(ideas, query, { includeDone, limit: 10 }),
+    () => searchIdeas(ideas, query, { includeDone, includeEvents: true, limit: 10 }),
     [ideas, query, includeDone],
   );
 
@@ -161,6 +161,17 @@ export function GlobalSearchBar() {
 
   const openInCurrentView = (ideaId: string) => {
     const idea = ideas.find((i) => i.id === ideaId);
+    if (idea?.type === "event") {
+      const date = idea.scheduled_date ?? "";
+      router.push(
+        `/timeline?date=${encodeURIComponent(date)}&event=${encodeURIComponent(idea.id)}`,
+      );
+      setOpen(false);
+      setRawQuery("");
+      setQuery("");
+      inputRef.current?.blur();
+      return;
+    }
     if (idea && currentView) {
       // Archived ideas can never render on date views — send to the smart view.
       if (idea.status === "archived" && (currentView === "planner" || currentView === "timeline")) {
@@ -234,7 +245,7 @@ export function GlobalSearchBar() {
               }
             } else if (e.key === "ArrowRight") {
               const idea = results[activeIndex];
-              if (idea && expandedId !== idea.id) {
+              if (idea && idea.type !== "event" && expandedId !== idea.id) {
                 e.preventDefault();
                 setExpandedId(idea.id);
               }
@@ -276,8 +287,16 @@ export function GlobalSearchBar() {
                 ? (() => {
                     const active = results[activeIndex];
                     const opensHere =
-                      currentView && active && canRevealInView(currentView, active, ideas);
-                    const smart = active ? getSmartRevealView(active, ideas) : null;
+                      currentView &&
+                      active &&
+                      (active.type === "event"
+                        ? currentView === "timeline"
+                        : canRevealInView(currentView, active, ideas));
+                    const smart = active
+                      ? active.type === "event"
+                        ? "timeline"
+                        : getSmartRevealView(active, ideas)
+                      : null;
                     const suffix =
                       opensHere || !currentView || !smart
                         ? "Enter opens here"
@@ -324,11 +343,13 @@ export function GlobalSearchBar() {
                   <button
                     onClick={() => openInCurrentView(idea.id)}
                     title={
-                      currentView
-                        ? canRevealInView(currentView, idea, ideas)
-                          ? "Open in current view"
-                          : `Open in ${getRevealLabel(smartView)}`
-                        : "Open"
+                      idea.type === "event"
+                        ? "Open event in Timeline"
+                        : currentView
+                          ? canRevealInView(currentView, idea, ideas)
+                            ? "Open in current view"
+                            : `Open in ${getRevealLabel(smartView)}`
+                          : "Open"
                     }
                     className="min-w-0 flex-1 text-left"
                   >
@@ -336,9 +357,20 @@ export function GlobalSearchBar() {
                       {idea.text || "empty"}
                     </p>
                     <span className="mt-1 flex flex-wrap items-center gap-1">
+                      {idea.type === "event" && (
+                        <CalendarDays
+                          size={12}
+                          aria-label="Calendar event"
+                          className="text-indigo-600 dark:text-indigo-300"
+                        />
+                      )}
                       {idea.type && (
                         <span
-                          className={`rounded-full border px-1.5 py-px text-[10px] font-medium ${TYPE_COLORS[idea.type]}`}
+                          className={`rounded-full border px-1.5 py-px text-[10px] font-medium ${
+                            idea.type === "event"
+                              ? TYPE_BADGE.event.className
+                              : TYPE_COLORS[idea.type]
+                          }`}
                         >
                           {getTypeLabel(idea.type)}
                         </span>
@@ -359,29 +391,33 @@ export function GlobalSearchBar() {
                     </span>
                   </button>
                   <span className="flex shrink-0 items-center gap-1 pt-0.5">
-                    {currentView && canRevealInView(currentView, idea, ideas) && (
-                      <span
-                        title={`Reveal in ${getRevealLabel(currentView)}`}
-                        className="hidden rounded border border-black/5 px-1 py-px text-[10px] text-gray-400 lg:block dark:border-white/10"
+                    {idea.type !== "event" &&
+                      currentView &&
+                      canRevealInView(currentView, idea, ideas) && (
+                        <span
+                          title={`Reveal in ${getRevealLabel(currentView)}`}
+                          className="hidden rounded border border-black/5 px-1 py-px text-[10px] text-gray-400 lg:block dark:border-white/10"
+                        >
+                          ⏎ {getRevealLabel(currentView).slice(0, 8)}
+                        </span>
+                      )}
+                    {idea.type !== "event" && (
+                      <button
+                        aria-label={`Reveal options for ${idea.text || "idea"}`}
+                        title="Reveal in views"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveIndex(idx);
+                          setExpandedId(isExpanded ? null : idea.id);
+                        }}
+                        className="rounded p-1 text-gray-400 hover:bg-black/5 hover:text-gray-600 dark:hover:bg-white/5 dark:hover:text-gray-300"
                       >
-                        ⏎ {getRevealLabel(currentView).slice(0, 8)}
-                      </span>
+                        <Eye size={13} />
+                      </button>
                     )}
-                    <button
-                      aria-label={`Reveal options for ${idea.text || "idea"}`}
-                      title="Reveal in views"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveIndex(idx);
-                        setExpandedId(isExpanded ? null : idea.id);
-                      }}
-                      className="rounded p-1 text-gray-400 hover:bg-black/5 hover:text-gray-600 dark:hover:bg-white/5 dark:hover:text-gray-300"
-                    >
-                      <Eye size={13} />
-                    </button>
                   </span>
                 </div>
-                {isExpanded && (
+                {isExpanded && idea.type !== "event" && (
                   <div className="border-t border-black/5 bg-black/[0.015] px-3 py-1.5 dark:border-white/5 dark:bg-white/[0.02]">
                     <p className="mb-1 flex items-center gap-1 text-[10px] font-medium tracking-wide text-gray-400 uppercase">
                       <CornerDownLeft size={10} />

@@ -209,6 +209,7 @@ export function buildRenderPlan(
   occurrencesByDate: Record<string, DayOccurrence[]>,
   extendedRange: boolean,
   anchor: string,
+  additionalDates: ReadonlySet<string> = new Set(),
 ): RenderUnit[] {
   if (!extendedRange || dates.length <= MAX_SHOW_ALL_DAYS) {
     return dates.map((d) => ({ kind: "day", date: d }));
@@ -223,7 +224,7 @@ export function buildRenderPlan(
     }
   };
   dates.forEach((date, i) => {
-    const hasOccurrences = (occurrencesByDate[date]?.length ?? 0) > 0;
+    const hasOccurrences = (occurrencesByDate[date]?.length ?? 0) > 0 || additionalDates.has(date);
     const withinFocus =
       anchorIndex >= 0 &&
       i >= anchorIndex - FOCUS_BACK_DAYS &&
