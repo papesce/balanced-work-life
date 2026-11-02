@@ -69,6 +69,9 @@ function DayCell({
   const visible = current.slice(0, MAX_CHIPS);
   const overflow = current.length - visible.length;
   const dayNum = Number(date.slice(8, 10));
+  const dayOfWeek = new Date(`${date}T12:00:00`).getDay();
+  const weekendClass =
+    dayOfWeek === 6 ? "weekend-saturday" : dayOfWeek === 0 ? "weekend-sunday" : "";
   const isToday = date === today;
   return (
     <div
@@ -93,7 +96,7 @@ function DayCell({
           : selected
             ? "glass-card-anchor"
             : "glass-card hover:bg-black/[0.02] dark:hover:bg-white/[0.03]"
-      } ${isCurrentMonth ? "" : "opacity-45"}${isToday ? "day-cell-today" : ""}`}
+      } ${!isOver && !selected ? weekendClass : ""} ${isCurrentMonth ? "" : "opacity-45"}${isToday ? "day-cell-today" : ""}`}
     >
       <span className="flex items-center justify-between px-0.5">
         <DateChip dayNum={dayNum} isToday={isToday} isSelected={selected} />
@@ -204,10 +207,16 @@ export function MonthGridView(props: MonthGridViewProps) {
           </div>
 
           <div className="mb-1 grid grid-cols-7 gap-1.5 sm:gap-2">
-            {DAY_HEADERS.map((d) => (
+            {DAY_HEADERS.map((d, index) => (
               <div
                 key={d}
-                className="py-1 text-center text-[10px] font-bold tracking-wider text-gray-400 uppercase dark:text-gray-500"
+                className={`py-1 text-center text-[10px] font-bold tracking-wider uppercase ${
+                  index === 5
+                    ? "text-slate-500 dark:text-slate-400"
+                    : index === 6
+                      ? "text-violet-500 dark:text-violet-400"
+                      : "text-gray-400 dark:text-gray-500"
+                }`}
               >
                 {d}
               </div>

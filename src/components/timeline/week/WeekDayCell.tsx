@@ -45,6 +45,15 @@ export function WeekDayCell({
     (o) =>
       o.task.status === "completed" || o.task.status === "cancelled" || o.task.status === "missed",
   ).length;
+  const dayOfWeek = new Date(`${date}T12:00:00`).getDay();
+  const weekendClass =
+    dayOfWeek === 6 ? "weekend-saturday" : dayOfWeek === 0 ? "weekend-sunday" : "";
+  const weekdayClass =
+    dayOfWeek === 6
+      ? "text-slate-600 dark:text-slate-300"
+      : dayOfWeek === 0
+        ? "text-violet-600 dark:text-violet-300"
+        : "text-gray-900 dark:text-gray-100";
   const isToday = date === today;
   const kicker = getTimelineKicker(date, today, tomorrow);
   const unresolvedCount = current.filter(
@@ -75,12 +84,12 @@ export function WeekDayCell({
           : selected
             ? "glass-card-anchor"
             : "glass-card hover:bg-black/[0.02] dark:hover:bg-white/[0.03]"
-      }`}
+      } ${!isOver && !selected ? weekendClass : ""}`}
     >
       <span className="flex items-center gap-1.5">
         <DateChip dayNum={Number(date.slice(8, 10))} isToday={isToday} isSelected={selected} />
         <span
-          className={`truncate text-xs font-bold text-gray-900 dark:text-gray-100 ${selected && !isToday ? "text-violet-700 dark:text-violet-300" : ""} ${isToday ? "underline decoration-violet-500 decoration-2 underline-offset-4" : ""}`}
+          className={`truncate text-xs font-bold ${weekdayClass} ${selected && !isToday && dayOfWeek !== 6 ? "text-violet-700 dark:text-violet-300" : ""} ${isToday ? "underline decoration-violet-500 decoration-2 underline-offset-4" : ""}`}
         >
           {formatDayTitle(date, "week").weekday}
         </span>

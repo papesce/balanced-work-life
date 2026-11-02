@@ -46,10 +46,16 @@ export function DayCalendarView({ referenceDate, flashKey = 0 }: DayCalendarView
 
       {/* Day-of-week headers */}
       <div className="mb-1 grid grid-cols-7">
-        {DAY_HEADERS.map((d) => (
+        {DAY_HEADERS.map((d, index) => (
           <div
             key={d}
-            className="py-1 text-center text-[10px] font-medium text-gray-400 dark:text-gray-500"
+            className={`py-1 text-center text-[10px] font-medium ${
+              index === 5
+                ? "text-slate-500 dark:text-slate-400"
+                : index === 6
+                  ? "text-violet-500 dark:text-violet-400"
+                  : "text-gray-400 dark:text-gray-500"
+            }`}
           >
             {d}
           </div>
@@ -60,6 +66,9 @@ export function DayCalendarView({ referenceDate, flashKey = 0 }: DayCalendarView
       <div className="grid grid-cols-7 gap-y-2">
         {dayData.map(({ date, counts, isCurrentMonth }) => {
           const dayNum = parseInt(date.slice(8), 10);
+          const dayOfWeek = new Date(`${date}T12:00:00`).getDay();
+          const weekendClass =
+            dayOfWeek === 6 ? "weekend-saturday" : dayOfWeek === 0 ? "weekend-sunday" : "";
           const isToday = date === today;
           const isFuture = date > today;
           const dimmed = !isCurrentMonth || isFuture;
@@ -69,7 +78,7 @@ export function DayCalendarView({ referenceDate, flashKey = 0 }: DayCalendarView
               key={date}
               id={isToday ? "balance-today-cell" : undefined}
               href={`/?date=${date}`}
-              className="-m-1 flex cursor-pointer flex-col items-center gap-0.5 rounded-lg p-1 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
+              className={`-m-1 flex cursor-pointer flex-col items-center gap-0.5 rounded-lg p-1 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${weekendClass}`}
             >
               <span
                 className={[

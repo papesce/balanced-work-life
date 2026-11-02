@@ -130,6 +130,14 @@ body {
   background: rgba(245, 243, 255, 0.6);
 }
 
+.weekend-saturday:not(:hover):not(.day-cell-today) {
+  background-image: linear-gradient(rgba(100, 116, 139, 0.045), rgba(100, 116, 139, 0.045));
+}
+
+.weekend-sunday:not(:hover):not(.day-cell-today) {
+  background-image: linear-gradient(rgba(139, 92, 246, 0.06), rgba(139, 92, 246, 0.06));
+}
+
 /* No scrollbar utility */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
@@ -467,6 +475,14 @@ body {
 
   .day-cell-today {
     background: rgba(139, 92, 246, 0.08);
+  }
+
+  .weekend-saturday:not(:hover):not(.day-cell-today) {
+    background-image: linear-gradient(rgba(148, 163, 184, 0.08), rgba(148, 163, 184, 0.08));
+  }
+
+  .weekend-sunday:not(:hover):not(.day-cell-today) {
+    background-image: linear-gradient(rgba(167, 139, 250, 0.09), rgba(167, 139, 250, 0.09));
   }
 
   .focus-button {
